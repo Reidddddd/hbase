@@ -62,7 +62,7 @@ public class TestRegionServerHostname {
     TEST_UTIL.shutdownMiniCluster();
   }
 
-  @Test (timeout=30000)
+  @Test(timeout=30000)
   public void testInvalidRegionServerHostnameAbortsServer() throws Exception {
     String invalidHostname = "hostAddr.invalid";
     TEST_UTIL.getConfiguration().set(HRegionServer.RS_HOSTNAME_KEY, invalidHostname);
@@ -71,9 +71,8 @@ public class TestRegionServerHostname {
       hrs = new HRegionServer(TEST_UTIL.getConfiguration(), null);
     } catch (IllegalArgumentException iae) {
       assertTrue(iae.getMessage(),
-          iae.getMessage().contains("Failed resolve of " + invalidHostname) ||
-              iae.getMessage().contains("Problem binding to " + invalidHostname));
-
+        iae.getMessage().contains("Failed resolve of " + invalidHostname) ||
+                 iae.getMessage().contains("Problem binding to " + invalidHostname));
     }
     assertNull("Failed to validate against invalid hostname", hrs);
   }
