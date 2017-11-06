@@ -276,11 +276,8 @@ public class TestCleanerChore {
       }
     }).when(spy).isFileDeletable(Mockito.any());
 
-    // attempt to delete the directory, which
-    if (chore.checkAndDeleteDirectory(parent)) {
-      throw new Exception(
-          "Reported success deleting directory, should have failed when adding file mid-iteration");
-    }
+    // run the chore
+    chore.chore();
 
     // make sure all the directories + added file exist, but the original file is deleted
     assertTrue("Added file unexpectedly deleted", fs.exists(racyFile));
