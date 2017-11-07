@@ -23,8 +23,6 @@ import org.apache.hadoop.hbase.shaded.com.google.common.collect.Iterables;
 import org.apache.hadoop.hbase.shaded.com.google.common.collect.Lists;
 
 import java.io.IOException;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +49,7 @@ import org.apache.hadoop.ipc.RemoteException;
 public abstract class CleanerChore<T extends FileCleanerDelegate> extends ScheduledChore {
 
   private static final Log LOG = LogFactory.getLog(CleanerChore.class.getName());
-  private static final String CLEANER_POOL_SIZE = "hbase.logcleaner.threadpool.size";
+  private static final String CLEANER_POOL_SIZE = "hbase.cleaner.threadpool.size";
   private static final String DEFAULT_CLEANER_POOL_SIZE = "0.5";
 
   // It may be waste resources for each cleaner chore own its pool,
@@ -96,30 +94,33 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
       // double check to make sure.
       maxPoolSize = maxPoolSize == 0 ? calculatePoolSize(DEFAULT_CLEANER_POOL_SIZE) : maxPoolSize;
       this.cleanerPool = new ForkJoinPool(maxPoolSize);
+      LOG.info("Cleaner pool size is " + maxPoolSize);
     }
   }
 
   /**
    * Calculate size for cleaner pool.
-   * If poolSize > 1, it would be the size of pool;
-   * if 0 < poolSize < 1, size of pool would be available processors * poolSize.
+   * If poolSize >= 1, it would be the size of pool;
+   * if 0.0 < poolSize <= 1.0, size of pool would be available processors * poolSize.
    * @param poolSize size from configuration
    * @return size of pool after calculation
    */
   private int calculatePoolSize(String poolSize) {
+    int availableProcessors = Runtime.getRuntime().availableProcessors();
     try {
-      // if poolSize is an integer, return it directly.
       if (poolSize.matches("[0-9]+")) {
-        return Integer.valueOf(poolSize);
-      } else if (poolSize.matches("0.[0-9]+")) {
+        // If poolSize is an integer, return it directly,
+        // but upmost to the number of available processors.
+        return Math.min(Integer.valueOf(poolSize), availableProcessors);
+      } else if (poolSize.matches("0.[0-9]+|1.0")) {
         // if poolSize is a double, return poolSize * availableProcessors;
-        int coreSize = Runtime.getRuntime().availableProcessors();
-        return (int) (coreSize * Double.valueOf(poolSize));
+        return (int) (availableProcessors * Double.valueOf(poolSize));
       } else {
-        throw new Exception(poolSize + " is neither an integer nor a double.");
+        throw new Exception(poolSize + " is neither a positive integer " +
+            "nor a double which belongs to (0.0, 1.0]");
       }
     } catch (Exception e) {
-      // in case of any exception, e.g. number format exception.
+      // in case of any exception, e.g. NumberFormatException.
       LOG.error("Unrecognized value: " + poolSize + " for " + CLEANER_POOL_SIZE +
         ", use default config: " + DEFAULT_CLEANER_POOL_SIZE + " instead.");
     }
@@ -178,6 +179,8 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
   @Override
   protected void chore() {
     if (getEnabled()) {
+      long start = System.currentTimeMillis();
+      LOG.info("Start cleaning log at: " + start);
       if (runCleaner()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Cleaned old files/dirs under " + oldFileDir + " successfully.");
@@ -185,6 +188,9 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
       } else {
         LOG.warn("Failed to fully clean old files/dirs under " + oldFileDir + ".");
       }
+      long end = System.currentTimeMillis();
+      LOG.info("Finish cleaning log at: " + end);
+      LOG.info("Interval is: " + (end - start));
     } else {
       LOG.debug("Cleaner chore disabled! Not cleaning.");
     }
@@ -415,7 +421,7 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
      * Get cleaner results of subdirs.
      * @param tasks subdirs cleaner tasks
      * @return true if all subdirs deleted successfully, false for patial/all failures
-     * @throws IOException
+     * @throws IOException something happen during computation
      */
     private boolean getCleanRusult(List<CleanerTask> tasks) throws IOException {
       boolean cleaned = true;
