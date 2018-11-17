@@ -71,7 +71,8 @@ public final class Superusers {
     String[] superUserList = conf.getStrings(SUPERUSER_CONF_KEY, new String[0]);
     for (String name : superUserList) {
       if (AuthUtil.isGroupPrincipal(name)) {
-        superGroups.add(AuthUtil.getGroupName(name));
+        // Let's keep the '@' for distinguishing from user.
+        superGroups.add(name);
       } else {
         superUsers.add(name);
       }
@@ -103,6 +104,10 @@ public final class Superusers {
 
   public static Collection<String> getSuperUsers() {
     return superUsers;
+  }
+
+  public static Collection<String> getSuperGroups() {
+    return superGroups;
   }
 
   public static User getSystemUser() {

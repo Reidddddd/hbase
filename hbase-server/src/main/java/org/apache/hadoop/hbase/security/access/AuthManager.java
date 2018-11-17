@@ -101,11 +101,13 @@ public final class AuthManager implements Closeable {
   PermissionCache<NamespacePermission> NS_NO_PERMISSION = new PermissionCache<>();
   PermissionCache<TablePermission> TBL_NO_PERMISSION = new PermissionCache<>();
 
+  /** Names of superusers and supergroups. */
+  private Set<String> superUsersGroups = new HashSet<>();
   /**
-   * Cache for global permission.
-   * Since every user/group can only have one global permission, no need to user PermissionCache.
+   * Cache for global permission excluding superuser and supergroup.
+   * Since every user/group can only have one global permission, no need to use PermissionCache.
    */
-  private volatile Map<String, GlobalPermission> globalCache;
+  private Map<String, GlobalPermission> globalCache = new ConcurrentHashMap<>();
   /** Cache for namespace permission. */
   private ConcurrentHashMap<String, PermissionCache<NamespacePermission>> namespaceCache =
     new ConcurrentHashMap<>();
@@ -122,8 +124,8 @@ public final class AuthManager implements Closeable {
   private AuthManager(ZKWatcher watcher, Configuration conf)
       throws IOException {
     this.conf = conf;
-    // initialize global permissions based on configuration
-    globalCache = initGlobal(conf);
+    // initialize superusers's and supergroup's permissions.
+    initSuperPrivileges();
 
     this.zkperms = new ZKPermissionWatcher(watcher, this, conf);
     try {
@@ -139,27 +141,18 @@ public final class AuthManager implements Closeable {
   }
 
   /**
-   * Initialize with global permission assignments
+   * Initialize super privileges
    * from the {@code hbase.superuser} configuration key.
    */
-  private Map<String, GlobalPermission> initGlobal(Configuration conf) throws IOException {
-    UserProvider userProvider = UserProvider.instantiate(conf);
-    User user = userProvider.getCurrent();
+  private void initSuperPrivileges() throws IOException {
+    User user = Superusers.getSystemUser();
     if (user == null) {
       throw new IOException("Unable to obtain the current user, " +
         "authorization checks for internal operations will not work correctly!");
     }
-    String currentUser = user.getShortName();
-
-    Map<String, GlobalPermission> global = new HashMap<>();
-    // the system user is always included
-    List<String> superusers = Lists.asList(currentUser, conf.getStrings(
-        Superusers.SUPERUSER_CONF_KEY, new String[0]));
-    for (String name : superusers) {
-      GlobalPermission globalPermission = new GlobalPermission(Permission.Action.values());
-      global.put(name, globalPermission);
-    }
-    return global;
+    superUsersGroups.add(user.getShortName());
+    superUsersGroups.addAll(Superusers.getSuperUsers());
+    superUsersGroups.addAll(Superusers.getSuperGroups());
   }
 
   public ZKPermissionWatcher getZKPermissionWatcher() {
@@ -220,13 +213,12 @@ public final class AuthManager implements Closeable {
    */
   private void updateGlobalCache(ListMultimap<String, Permission> globalPerms) {
     try {
-      Map<String, GlobalPermission> global = initGlobal(conf);
+      globalCache.clear();
       for (String name : globalPerms.keySet()) {
         for (Permission permission : globalPerms.get(name)) {
-          global.put(name, (GlobalPermission) permission);
+          globalCache.put(name, (GlobalPermission) permission);
         }
       }
-      globalCache = global;
       mtime.incrementAndGet();
     } catch (Exception e) {
       // Never happens
@@ -287,11 +279,13 @@ public final class AuthManager implements Closeable {
     if (user == null) {
       return false;
     }
-    if (authorizeGlobal(globalCache.get(user.getShortName()), action)) {
+    if (checkSuperPrivileges(user.getShortName()) ||
+        authorizeGlobal(globalCache.get(user.getShortName()), action)) {
       return true;
     }
     for (String group : user.getGroupNames()) {
-      if (authorizeGlobal(globalCache.get(AuthUtil.toGroupEntry(group)), action)) {
+      if (checkSuperPrivileges(AuthUtil.toGroupEntry(group)) ||
+          authorizeGlobal(globalCache.get(AuthUtil.toGroupEntry(group)), action)) {
         return true;
       }
     }
@@ -506,8 +500,8 @@ public final class AuthManager implements Closeable {
     try {
       List<Permission> perms = AccessControlLists.getCellPermissionsForUser(user, cell);
       if (LOG.isTraceEnabled()) {
-        LOG.trace("Perms for user " + user.getShortName() + " in cell " + cell + ": " +
-          (perms != null ? perms : ""));
+        LOG.trace("Perms for user {} in table {} in cell {}: {}",
+          user.getShortName(), table, cell, (perms != null ? perms : ""));
       }
       if (perms != null) {
         for (Permission p: perms) {
@@ -523,6 +517,15 @@ public final class AuthManager implements Closeable {
       // to collect regardless
     }
     return false;
+  }
+
+  /**
+   * Check if given user or group is superuser or supergroup.
+   * @param user name of user or group
+   * @return true if it is, false otherwise
+   */
+  public boolean checkSuperPrivileges(String user) {
+    return superUsersGroups.contains(user);
   }
 
   /**

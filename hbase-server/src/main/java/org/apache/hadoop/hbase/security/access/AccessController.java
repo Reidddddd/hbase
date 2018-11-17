@@ -2065,6 +2065,8 @@ public class AccessController implements MasterCoprocessor, RegionCoprocessor,
            break;
         }
 
+        accessChecker.performOnSuperuser("grant", caller, perm.getUser());
+
         User.runAsLoginUser(new PrivilegedExceptionAction<Void>() {
           @Override
           public Void run() throws Exception {
@@ -2127,6 +2129,8 @@ public class AccessController implements MasterCoprocessor, RegionCoprocessor,
               namespacePer.getNamespace(), null, Action.ADMIN);
             break;
         }
+
+        accessChecker.performOnSuperuser("revoke", caller, perm.getUser());
 
         User.runAsLoginUser(new PrivilegedExceptionAction<Void>() {
           @Override

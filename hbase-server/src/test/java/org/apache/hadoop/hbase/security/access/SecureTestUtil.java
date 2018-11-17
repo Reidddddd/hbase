@@ -94,7 +94,11 @@ public class SecureTestUtil {
       sb.append(',');
       sb.append(currentUser); sb.append(".hfs."); sb.append(i);
     }
+    // Add a supergroup for improving test coverage.
+    sb.append(',').append("@supergroup");
     conf.set("hbase.superuser", sb.toString());
+    // hbase.group.service.for.test.only is used in test only.
+    conf.set("hbase.group.service.for.test.only", "true");
   }
 
   public static void enableSecurity(Configuration conf) throws IOException {

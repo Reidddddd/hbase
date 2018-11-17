@@ -54,7 +54,7 @@ public class UserProvider extends BaseConfigurable {
 
   private LoadingCache<String, String[]> groupCache = null;
 
-  static Groups groups = Groups.getUserToGroupsMappingService();
+  public static Groups groups = Groups.getUserToGroupsMappingService();
 
   @Override
   public void setConf(final Configuration conf) {
