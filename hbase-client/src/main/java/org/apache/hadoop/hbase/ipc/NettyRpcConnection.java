@@ -187,7 +187,7 @@ class NettyRpcConnection extends RpcConnection {
       failInit(ch, new FatalConnectionException("ticket/user is null"));
       return;
     }
-    Promise<Boolean> saslPromise = ch.eventLoop().newPromise();
+    final Promise<Boolean> saslPromise = ch.eventLoop().newPromise();
     ChannelHandler saslHandler;
     try {
       saslHandler = new NettyHBaseSaslRpcClientHandler(saslPromise, ticket, authMethod, token,
@@ -236,14 +236,50 @@ class NettyRpcConnection extends RpcConnection {
               rpcClient.failedServers.addToFailedServers(remoteId.address, future.cause());
               return;
             }
-            ch.writeAndFlush(connectionHeaderPreamble.retainedDuplicate());
+            handshake(ch);
+          }
+        }).channel();
+  }
+
+  private void handshake(final Channel ch) {
+    ch.writeAndFlush(connectionHeaderPreamble.retainedDuplicate());
+
+    Promise<Result> preamblePromise = ch.eventLoop().newPromise();
+    ChannelHandler pr = new PreambleResponseHandler(preamblePromise, rpcClient.fallbackAllowed);
+    ch.pipeline().addFirst(pr);
+    preamblePromise.addListener(new FutureListener<Result>() {
+      @Override
+      public void operationComplete(Future<Result> future) throws Exception {
+        switch (future.get()) {
+          case SUCCESS: {
+            ch.pipeline().remove(PreambleResponseHandler.class);
             if (useSasl) {
               saslNegotiate(ch);
             } else {
               established(ch);
             }
+            return;
           }
-        }).channel();
+          case FALLBACK: {
+            ch.pipeline().remove(PreambleResponseHandler.class);
+            // Flush a useless request for server side to skip initial sasl handshake
+            ch.writeAndFlush(connectionHeaderWithLength.retainedDuplicate());
+            established(ch);
+            return;
+          }
+          case FAILURE: {
+            Throwable cause = future.cause();
+            scheduleRelogin(cause);
+            failInit(ch, toIOE(cause));
+            return;
+          }
+        }
+      }
+    });
+  }
+
+  enum Result {
+    SUCCESS, FALLBACK, FAILURE
   }
 
   private void write(Channel ch, final Call call) {

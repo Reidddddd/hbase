@@ -1589,6 +1589,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       preambleBuffer.flip();
       for (int i = 0; i < HConstants.RPC_HEADER.length; i++) {
         if (HConstants.RPC_HEADER[i] != preambleBuffer.get(i)) {
+          doRawSaslReply(SaslStatus.ERROR, null, null, null);
           return doBadPreambleHandling("Expected HEADER=" +
               Bytes.toStringBinary(HConstants.RPC_HEADER) + " but received HEADER=" +
               Bytes.toStringBinary(preambleBuffer.array(), 0, HConstants.RPC_HEADER.length) +
@@ -1599,35 +1600,52 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       byte authbyte = preambleBuffer.get(HConstants.RPC_HEADER.length + 1);
       this.authMethod = AuthMethod.valueOf(authbyte);
       if (version != CURRENT_VERSION) {
+        doRawSaslReply(SaslStatus.ERROR, null, null, null);
         String msg = getFatalConnectionString(version, authbyte);
         return doBadPreambleHandling(msg, new WrongVersionException(msg));
       }
       if (authMethod == null) {
+        doRawSaslReply(SaslStatus.ERROR, null, null, null);
         String msg = getFatalConnectionString(version, authbyte);
         return doBadPreambleHandling(msg, new BadAuthException(msg));
       }
-      if (isSecurityEnabled && authMethod == AuthMethod.SIMPLE) {
-        if (allowFallbackToSimpleAuth) {
-          metrics.authenticationFallback();
-          authenticatedWithFallback = true;
+      LOG.debug("Server auth: " + (isSecurityEnabled ? AuthMethod.KERBEROS : AuthMethod.SIMPLE)
+        + ", client auth: " + authMethod);
+      if (isSecurityEnabled) {
+        // Server side uses non-simple auth
+        if (authMethod == AuthMethod.SIMPLE) {
+          // client side uses simple auth
+          if (allowFallbackToSimpleAuth) {
+            doRawSaslReply(SaslStatus.SUCCESS, new IntWritable(0), null, null);
+            metrics.authenticationFallback();
+            authenticatedWithFallback = true;
+          } else {
+            doRawSaslReply(SaslStatus.ERROR, null, null, null);
+            AccessDeniedException ae = new AccessDeniedException("Authentication is required");
+            setupResponse(authFailedResponse, authFailedCall, ae, ae.getMessage());
+            responder.doRespond(authFailedCall);
+            throw ae;
+          }
         } else {
-          AccessDeniedException ae = new AccessDeniedException("Authentication is required");
-          setupResponse(authFailedResponse, authFailedCall, ae, ae.getMessage());
-          responder.doRespond(authFailedCall);
-          throw ae;
+          // client side use non-simple auth.
+          useSasl = true;
+          doRawSaslReply(SaslStatus.SUCCESS, new IntWritable(0), null, null);
         }
-      }
-      if (!isSecurityEnabled && authMethod != AuthMethod.SIMPLE) {
-        doRawSaslReply(SaslStatus.SUCCESS, new IntWritable(
+      } else {
+        // Server side uses simple auth
+        if (authMethod == AuthMethod.SIMPLE) {
+          // client side use simple auth.
+          doRawSaslReply(SaslStatus.SUCCESS, new IntWritable(0), null, null);
+        } else {
+          // client side use non-simple auth.
+          doRawSaslReply(SaslStatus.SUCCESS, new IntWritable(
             SaslUtil.SWITCH_TO_SIMPLE_AUTH), null, null);
-        authMethod = AuthMethod.SIMPLE;
-        // client has already sent the initial Sasl message and we
-        // should ignore it. Both client and server should fall back
-        // to simple auth from now on.
-        skipInitialSaslHandshake = true;
-      }
-      if (authMethod != AuthMethod.SIMPLE) {
-        useSasl = true;
+          authMethod = AuthMethod.SIMPLE;
+          // client has already sent the initial Sasl message and we
+          // should ignore it. Both client and server should fall back
+          // to simple auth from now on.
+          skipInitialSaslHandshake = true;
+        }
       }
 
       preambleBuffer = null; // do not need it anymore

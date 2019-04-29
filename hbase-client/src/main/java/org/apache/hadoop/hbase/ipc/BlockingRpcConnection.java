@@ -66,6 +66,8 @@ import org.apache.hadoop.hbase.protobuf.generated.RPCProtos.ExceptionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.RPCProtos.RequestHeader;
 import org.apache.hadoop.hbase.protobuf.generated.RPCProtos.ResponseHeader;
 import org.apache.hadoop.hbase.security.HBaseSaslRpcClient;
+import org.apache.hadoop.hbase.security.SaslStatus;
+import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.SaslUtil.QualityOfProtection;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.ExceptionUtil;
@@ -110,6 +112,8 @@ class BlockingRpcConnection extends RpcConnection implements Runnable {
   private byte[] connectionHeaderPreamble;
 
   private byte[] connectionHeaderWithLength;
+
+  private int serverAskFallback;
 
   /**
    * If the client wants to interrupt its calls easily (i.e. call Thread#interrupt), it gets into a
@@ -440,38 +444,49 @@ class BlockingRpcConnection extends RpcConnection implements Runnable {
         OutputStream outStream = NetUtils.getOutputStream(socket, this.rpcClient.writeTO);
         // Write out the preamble -- MAGIC, version, and auth to use.
         writeConnectionHeaderPreamble(outStream);
+        readPreambleResponse(inStream);
         if (useSasl) {
-          final InputStream in2 = inStream;
-          final OutputStream out2 = outStream;
-          UserGroupInformation ticket = getUGI();
-          boolean continueSasl;
-          if (ticket == null) {
-            throw new FatalConnectionException("ticket/user is null");
-          }
-          try {
-            continueSasl = ticket.doAs(new PrivilegedExceptionAction<Boolean>() {
-              @Override
-              public Boolean run() throws IOException {
-                return setupSaslConnection(in2, out2);
-              }
-            });
-          } catch (Exception ex) {
-            ExceptionUtil.rethrowIfInterrupt(ex);
-            handleSaslConnectionFailure(numRetries++, MAX_RETRIES, ex, ticket);
-            continue;
-          }
-          if (continueSasl) {
-            // Sasl connect is successful. Let's set up Sasl i/o streams.
-            inStream = saslRpcClient.getInputStream(inStream);
-            outStream = saslRpcClient.getOutputStream(outStream);
+          if (serverAskFallback != SaslUtil.SWITCH_TO_SIMPLE_AUTH) {
+            final InputStream in2 = inStream;
+            final OutputStream out2 = outStream;
+            UserGroupInformation ticket = getUGI();
+            boolean continueSasl;
+            if (ticket == null) {
+              throw new FatalConnectionException("ticket/user is null");
+            }
+            try {
+              continueSasl = ticket.doAs(new PrivilegedExceptionAction<Boolean>() {
+                @Override
+                public Boolean run() throws IOException {
+                  return setupSaslConnection(in2, out2);
+                }
+              });
+            } catch (Exception ex) {
+              ExceptionUtil.rethrowIfInterrupt(ex);
+              handleSaslConnectionFailure(numRetries++, MAX_RETRIES, ex, ticket);
+              continue;
+            }
+            if (continueSasl) {
+              // Sasl connect is successful. Let's set up Sasl i/o streams.
+              inStream = saslRpcClient.getInputStream(inStream);
+              outStream = saslRpcClient.getOutputStream(outStream);
+            }
           } else {
             // fall back to simple auth because server told us so.
             // do not change authMethod and useSasl here, we should start from secure when
             // reconnecting because regionserver may change its sasl config after restart.
+            this.in = new DataInputStream(new BufferedInputStream(inStream));
+            this.out = new DataOutputStream(new BufferedOutputStream(outStream));
+            // Write out a header for server to skip initial sasl handshake.
+            writeConnectionHeader();
           }
         }
-        this.in = new DataInputStream(new BufferedInputStream(inStream));
-        this.out = new DataOutputStream(new BufferedOutputStream(outStream));
+        if (this.in == null) {
+          this.in = new DataInputStream(new BufferedInputStream(inStream));
+        }
+        if (this.out == null) {
+          this.out = new DataOutputStream(new BufferedOutputStream(outStream));
+        }
         // Now write out the connection header
         writeConnectionHeader();
         break;
@@ -497,6 +512,25 @@ class BlockingRpcConnection extends RpcConnection implements Runnable {
     thread = new Thread(this, threadName);
     thread.setDaemon(true);
     thread.start();
+  }
+
+  private void readPreambleResponse(InputStream inStream) throws IOException {
+    DataInputStream resultCode = new DataInputStream(new BufferedInputStream(inStream));
+    int state = resultCode.readInt();
+    if (state == SaslStatus.SUCCESS.state) {
+      int fallback = resultCode.readInt();
+      if (fallback == SaslStatus.SUCCESS.state) {
+        return;
+      }
+      if (fallback == SaslUtil.SWITCH_TO_SIMPLE_AUTH) {
+        if (this.rpcClient.fallbackAllowed) {
+          LOG.warn("Server asked us to fall back to SIMPLE auth. Falling back...");
+          serverAskFallback = SaslUtil.SWITCH_TO_SIMPLE_AUTH;
+          return;
+        }
+        throw new FallbackDisallowedException();
+      }
+    }
   }
 
   /**
