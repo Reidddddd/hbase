@@ -721,9 +721,13 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
               SelectionKey key = iter.next();
               iter.remove();
               if (key.isValid()) {
+                LOG.info("Key is valid");
                 if (key.isReadable()) {
+                  LOG.info("Key is readable");
                   doRead(key);
                 }
+              } else {
+                LOG.info("Invalid key");
               }
             }
           } catch (InterruptedException e) {
@@ -948,7 +952,10 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       int count;
       Connection c = (Connection) key.attachment();
       if (c == null) {
+        LOG.info("Connection is null");
         return;
+      } else {
+        LOG.info("Connection is not null: " + c);
       }
       c.setLastContact(System.currentTimeMillis());
       try {
