@@ -273,6 +273,10 @@ class NettyRpcConnection extends RpcConnection {
             failInit(ch, toIOE(cause));
             return;
           }
+          default: {
+            // Here can't be reach, just for pass style check
+            return;
+          }
         }
       }
     });

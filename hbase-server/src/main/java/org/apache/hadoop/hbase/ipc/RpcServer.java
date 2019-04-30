@@ -1672,20 +1672,26 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     public int readAndProcess() throws IOException, InterruptedException {
       // If we have not read the connection setup preamble, look to see if that is on the wire.
       if (!connectionPreambleRead) {
+        LOG.info("!connectionPreambleRead");
         int count = readPreamble();
+        LOG.info("count = readPreamble() = " + count);
         if (!connectionPreambleRead) {
+          LOG.info("Still !connectionPreambleRead??? " + count);
           return count;
         }
       }
       // Try and read in an int. It will be length of the data to read (or -1 if a ping). We catch
       // the integer length into the 4-byte this.dataLengthBuffer.
       int count = read4Bytes();
+      LOG.info("count = read4Bytes() = " + count);
       if (count < 0 || dataLengthBuffer.remaining() > 0) {
+        LOG.info("count < 0 || dataLengthBuffer.remaining() > 0");
         return count;
       }
 
       // If we have not read the connection setup preamble, look to see if that is on the wire.
       if (!connectionPreambleRead) {
+        LOG.info("should not be here!!!";
         count = readPreamble();
         if (!connectionPreambleRead) {
           return count;
@@ -1798,6 +1804,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       data.flip();
       try {
         if (skipInitialSaslHandshake) {
+          LOG.info("skipInitialSaslHandshake");
           skipInitialSaslHandshake = false;
           return;
         }
@@ -1805,6 +1812,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         if (useSasl) {
           saslReadAndProcess(data);
         } else {
+          LOG.info("processOneRpc");
           processOneRpc(data);
         }
 
@@ -1962,6 +1970,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       if (connectionHeaderRead) {
         processRequest(buf);
       } else {
+        LOG.info("processConnectionHeader");
         processConnectionHeader(buf);
         this.connectionHeaderRead = true;
         if (!authorizeConnection()) {

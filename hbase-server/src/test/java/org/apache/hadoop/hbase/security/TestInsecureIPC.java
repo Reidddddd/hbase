@@ -95,7 +95,11 @@ public class TestInsecureIPC {
   }
 
   @Parameterized.Parameter
-  public String rpcClientImpl;
+  private String rpcClientImpl;
+
+  private String getRpcClientImpl() {
+    return rpcClientImpl;
+  }
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -120,7 +124,7 @@ public class TestInsecureIPC {
     krbPrincipal = getPrincipalForTesting();
     ugi = loginKerberosPrincipal(krbKeytab, krbPrincipal);
     clientConf = getSecuredConfiguration();
-    clientConf.set(RpcClientFactory.CUSTOM_RPC_CLIENT_IMPL_CONF_KEY, rpcClientImpl);
+    clientConf.set(RpcClientFactory.CUSTOM_RPC_CLIENT_IMPL_CONF_KEY, getRpcClientImpl());
     serverConf = HBaseConfiguration.create();
   }
 
