@@ -1691,7 +1691,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
       // If we have not read the connection setup preamble, look to see if that is on the wire.
       if (!connectionPreambleRead) {
-        LOG.info("should not be here!!!";
+        LOG.info("should not be here!!!");
         count = readPreamble();
         if (!connectionPreambleRead) {
           return count;
