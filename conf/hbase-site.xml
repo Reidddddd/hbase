@@ -21,4 +21,24 @@
  */
 -->
 <configuration>
+<property>
+  <name>hbase.cluster.distributed</name>
+  <value>true</value>
+</property>
+<property>
+  <name>hbase.rootdir</name>
+  <value>file:///tmp/hbase</value>
+</property>
+<property>
+  <name>hbase.rsgroup.mapping.script</name>
+  <value>/Users/reid.chen/Desktop/rs_group_mapping.sh</value>
+</property>
+<property>
+  <name>hbase.master.loadbalancer.class</name>
+  <value>org.apache.hadoop.hbase.rsgroup.RSGroupBasedLoadBalancer</value>
+</property>
+<property>
+  <name>hbase.coprocessor.master.classes</name>
+  <value>org.apache.hadoop.hbase.rsgroup.RSGroupAdminEndpoint</value>
+</property>
 </configuration>

@@ -238,6 +238,7 @@ public class RSGroupAdminServer implements RSGroupAdmin {
 
   @Override
   public void moveTables(Set<TableName> tables, String targetGroup) throws IOException {
+    LOG.info("targetGroup: " + targetGroup);
     if (tables == null) {
       throw new ConstraintException(
           "The list of servers cannot be null.");
@@ -250,6 +251,7 @@ public class RSGroupAdminServer implements RSGroupAdmin {
     synchronized (manager) {
       if(targetGroup != null) {
         RSGroupInfo destGroup = manager.getRSGroup(targetGroup);
+        LOG.info("destGroup: " + destGroup);
         if(destGroup == null) {
           throw new ConstraintException("Target group does not exist: "+targetGroup);
         }
@@ -260,6 +262,7 @@ public class RSGroupAdminServer implements RSGroupAdmin {
 
       for(TableName table : tables) {
         String srcGroup = manager.getRSGroupOfTable(table);
+        LOG.info("srcGroup: " + srcGroup);
         if(srcGroup != null && srcGroup.equals(targetGroup)) {
           throw new ConstraintException(
               "Source group is the same as target group for table "+table+" :"+srcGroup);

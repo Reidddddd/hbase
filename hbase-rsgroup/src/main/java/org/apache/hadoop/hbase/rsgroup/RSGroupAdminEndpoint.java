@@ -29,10 +29,12 @@ import com.google.protobuf.Service;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ClusterStatus;
 import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
@@ -94,6 +96,7 @@ import org.apache.hadoop.hbase.security.access.AccessChecker;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.TableAuthManager;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
+import org.apache.hadoop.util.Shell.ShellCommandExecutor;;
 
 public class RSGroupAdminEndpoint extends RSGroupAdminService
     implements CoprocessorService, Coprocessor, MasterObserver {
@@ -108,6 +111,45 @@ public class RSGroupAdminEndpoint extends RSGroupAdminService
 
   /** Provider for mapping principal names to Users */
   private UserProvider userProvider;
+  /** Get rsgroup mapping */
+  private RSGroupMappingScript script;
+
+  private class RSGroupMappingScript {
+
+    static final String RS_GROUP_MAPPING_SCRIPT = "hbase.rsgroup.mapping.script";
+    static final String RS_GROUP_MAPPING_SCRIPT_TIMEOUT = "hbase.rsgroup.mapping.script.timeout";
+
+    private ShellCommandExecutor rsgroupMappingScript;
+
+    RSGroupMappingScript(Configuration conf) {
+      String script = conf.get(RS_GROUP_MAPPING_SCRIPT);
+      if (script == null || script.isEmpty()) {
+        return;
+      }
+
+      rsgroupMappingScript = new ShellCommandExecutor(
+          new String[] { script, "", "" }, null, null,
+          conf.getLong(RS_GROUP_MAPPING_SCRIPT_TIMEOUT, 5000) // 5 seconds
+      );
+    }
+
+    String getRSGroup(String namespace, String tablename) {
+      if (rsgroupMappingScript == null) {
+        return RSGroupInfo.DEFAULT_GROUP;
+      }
+      String[] exec = rsgroupMappingScript.getExecString();
+      exec[1] = namespace;
+      exec[2] = tablename;
+      try {
+        rsgroupMappingScript.execute();
+      } catch (IOException e) {
+        LOG.error(e.getMessage());
+        return RSGroupInfo.DEFAULT_GROUP;
+      }
+      return rsgroupMappingScript.getOutput().trim();
+    }
+
+  }
 
   @Override
   public void start(CoprocessorEnvironment env) throws IOException {
@@ -125,6 +167,7 @@ public class RSGroupAdminEndpoint extends RSGroupAdminService
 
     // set the user-provider.
     this.userProvider = UserProvider.instantiate(env.getConfiguration());
+    this.script = new RSGroupMappingScript(env.getConfiguration());
   }
 
   @Override
@@ -428,12 +471,34 @@ public class RSGroupAdminEndpoint extends RSGroupAdminService
         RSGroupInfo.DEFAULT_GROUP + "' for deploy of system table");
       groupName = RSGroupInfo.DEFAULT_GROUP;
     }
+
+    if (groupName == RSGroupInfo.DEFAULT_GROUP) {
+      TableName tableName = desc.getTableName();
+      groupName = script.getRSGroup(
+          tableName.getNamespaceAsString(),
+          tableName.getQualifierAsString()
+      );
+      LOG.info("rsgroup for " + tableName + " is " + groupName);
+    }
+
     RSGroupInfo rsGroupInfo = groupAdminServer.getRSGroupInfo(groupName);
+    LOG.info("Full list " + groupAdminServer.getRSGroupInfoManager().listRSGroups());
+    Map<String, RSGroupInfo> n = ((RSGroupInfoManagerImpl) groupAdminServer.getRSGroupInfoManager()).rsGroupMap;
+    for (Map.Entry<String, RSGroupInfo> e : n.entrySet()) {
+      if (e.getKey().equals(groupName)) {
+        LOG.info(groupName + " equals to " + e.getKey());
+      }
+      LOG.info("Group name: " + e.getKey() + ", group info: " + e.getValue());
+    }
+    LOG.info("original rsGroupInfo for " + groupName + " is " + rsGroupInfo);
+    rsGroupInfo = n.get(groupName);
+    LOG.info("what about map rsGroupInfo for " + groupName + " is " + rsGroupInfo);
     if (rsGroupInfo == null) {
       throw new ConstraintException("Default RSGroup (" + groupName + ") for this table's "
           + "namespace does not exist.");
     }
     if (!rsGroupInfo.containsTable(desc.getTableName())) {
+      LOG.info("Moving table " + desc.getTableName());
       groupAdminServer.moveTables(Sets.newHashSet(desc.getTableName()), groupName);
     }
   }

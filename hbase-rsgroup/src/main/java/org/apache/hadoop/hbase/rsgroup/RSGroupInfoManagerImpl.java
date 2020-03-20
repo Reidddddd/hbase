@@ -109,7 +109,7 @@ public class RSGroupInfoManagerImpl implements RSGroupInfoManager, ServerListene
     }
   }
 
-  private volatile Map<String, RSGroupInfo> rsGroupMap;
+  public volatile Map<String, RSGroupInfo> rsGroupMap;
   private volatile Map<TableName, String> tableMap;
   private MasterServices master;
   private ClusterConnection conn;
@@ -861,7 +861,7 @@ public class RSGroupInfoManagerImpl implements RSGroupInfoManager, ServerListene
     Map<String,RSGroupInfo> newGroupMap = Maps.newHashMap(rsGroupMap);
     newGroupMap.put(srcGroupInfo.getName(), srcGroupInfo);
     newGroupMap.put(dstGroupInfo.getName(), dstGroupInfo);
-    flushConfig(newGroupMap);    
+    flushConfig(newGroupMap);
   }
 
   @Override
