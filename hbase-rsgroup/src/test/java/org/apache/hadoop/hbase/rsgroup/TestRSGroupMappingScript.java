@@ -1,0 +1,81 @@
+package org.apache.hadoop.hbase.rsgroup;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.rsgroup.RSGroupAdminEndpoint.RSGroupMappingScript;
+import org.apache.hadoop.hbase.testclassification.SmallTests;
+import org.junit.*;
+import org.junit.experimental.categories.Category;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+
+@Category({ SmallTests.class })
+public class TestRSGroupMappingScript {
+
+  private static final Log LOG = LogFactory.getLog(TestRSGroupMappingScript.class);
+
+  private static final HBaseTestingUtility UTIL = new HBaseTestingUtility();
+  private File script;
+
+  @BeforeClass
+  public static void setupScript() throws Exception {
+    String currentDir = new File("").getAbsolutePath();
+    UTIL.getConfiguration().set(
+        RSGroupMappingScript.RS_GROUP_MAPPING_SCRIPT,
+        currentDir + "/rsgroup_table_mapping.sh"
+    );
+  }
+
+  @Before
+  public void setup() throws Exception {
+    script = new File(UTIL.getConfiguration().get(RSGroupMappingScript.RS_GROUP_MAPPING_SCRIPT));
+    script.createNewFile();
+
+    PrintWriter pw = new PrintWriter(new FileOutputStream(script));
+    try {
+      pw.println("namespace=$1");
+      pw.println("tablename=$2");
+      pw.println("if [[ $namespace == \"test\" ]]; then");
+      pw.println("  echo test");
+      pw.println("elif [[ $tablename == *\"foo\"* ]]; then");
+      pw.println("  echo other");
+      pw.println("else");
+      pw.println("  echo default");
+      pw.println("fi");
+      pw.flush();
+    } finally {
+      pw.close();
+    }
+    script.setExecutable(true);
+    LOG.info("Created " + script);
+  }
+
+  @Test
+  public void testScript() throws Exception {
+    RSGroupMappingScript script = new RSGroupMappingScript(UTIL.getConfiguration());
+    TableName testNamespace = TableName.valueOf("test", "should_be_in_test");
+    String rsgroup = script.getRSGroup(testNamespace.getNamespaceAsString(), testNamespace.getQualifierAsString());
+    Assert.assertEquals("test", rsgroup);
+
+    TableName otherName = TableName.valueOf("whatever", "oh_foo_should_be_in_other");
+    rsgroup = script.getRSGroup(otherName.getNamespaceAsString(), otherName.getQualifierAsString());
+    Assert.assertEquals("other", rsgroup);
+
+    TableName defaultName = TableName.valueOf("nono", "should_be_in_default");
+    rsgroup = script.getRSGroup(defaultName.getNamespaceAsString(), defaultName.getQualifierAsString());
+    Assert.assertEquals("default", rsgroup);
+  }
+
+  @After
+  public void teardown() throws Exception {
+    if (script.exists()) {
+      script.delete();
+    }
+  }
+
+}
