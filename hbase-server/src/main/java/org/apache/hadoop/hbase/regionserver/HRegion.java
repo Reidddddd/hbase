@@ -7702,7 +7702,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
 
     } finally {
       closeRegionOperation();
-      if (!mutations.isEmpty() &&
+      if (!mutations.isEmpty() && walSyncSuccessful &&
           isFlushSize(this.addAndGetGlobalMemstoreSize(addedSize))) {
         requestFlush();
       }
