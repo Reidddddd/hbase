@@ -26,7 +26,8 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MutableFastCounter;
 
-import java.util.function.Supplier;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Hadoop2 implementation of MetricsRegionServerSource.
@@ -91,55 +92,60 @@ public class MetricsRegionServerSourceImpl
   private final MetricHistogram pausesWithGc;
   private final MetricHistogram pausesWithoutGc;
 
-  private final ThreadLocal<MetricHistogram> wholeStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
-    @Override
-    public MetricHistogram get() {
-      return getMetricsRegistry().newTimeHistogram("wholeStage_" + Thread.currentThread().getId());
-    }
-  });
-  private final ThreadLocal<MetricHistogram> selectStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
-    @Override
-    public MetricHistogram get() {
-      return getMetricsRegistry().newTimeHistogram("selectStage_" + Thread.currentThread().getId());
-    }
-  });
-  private final ThreadLocal<MetricHistogram> prepareStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
-    @Override
-    public MetricHistogram get() {
-      return getMetricsRegistry().newTimeHistogram("prepareStage_" + Thread.currentThread().getId());
-    }
-  });
-  private final ThreadLocal<MetricHistogram> flushStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
-    @Override
-    public MetricHistogram get() {
-      return getMetricsRegistry().newTimeHistogram("flushStage_" + Thread.currentThread().getId());
-    }
-  });
-  private final ThreadLocal<MetricHistogram> commitStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
-    @Override
-    public MetricHistogram get() {
-      return getMetricsRegistry().newTimeHistogram("commitStage_" + Thread.currentThread().getId());
-    }
-  });
+  private final Map<Long, MetricHistogram> wholeMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> selectMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> prepareMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> flushMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> commitMap = new ConcurrentHashMap<>();
 
   public void updateWholeStage(long t) {
-    wholeStage.get().add(t);
+    long id = Thread.currentThread().getId();
+    MetricHistogram histogram = wholeMap.get(id);
+    if (histogram == null) {
+      histogram = getMetricsRegistry().newTimeHistogram("wholeStage_" + id);
+      wholeMap.put(id, histogram);
+    }
+    histogram.add(t);
   }
 
   public void updateSelectStage(long t) {
-    selectStage.get().add(t);
+    long id = Thread.currentThread().getId();
+    MetricHistogram histogram = selectMap.get(id);
+    if (histogram == null) {
+      histogram = getMetricsRegistry().newTimeHistogram("selectStage_" + id);
+      selectMap.put(id, histogram);
+    }
+    histogram.add(t);
   }
 
   public void updatePrepareStage(long t) {
-    prepareStage.get().add(t);
+    long id = Thread.currentThread().getId();
+    MetricHistogram histogram = prepareMap.get(id);
+    if (histogram == null) {
+      histogram = getMetricsRegistry().newTimeHistogram("prepareStage_" + id);
+      prepareMap.put(id, histogram);
+    }
+    histogram.add(t);
   }
 
   public void updateFlushStage(long t) {
-    flushStage.get().add(t);
+    long id = Thread.currentThread().getId();
+    MetricHistogram histogram = flushMap.get(id);
+    if (histogram == null) {
+      histogram = getMetricsRegistry().newTimeHistogram("flushStage_" + id);
+      flushMap.put(id, histogram);
+    }
+    histogram.add(t);
   }
 
   public void updateCommitStage(long t) {
-    commitStage.get().add(t);
+    long id = Thread.currentThread().getId();
+    MetricHistogram histogram = commitMap.get(id);
+    if (histogram == null) {
+      histogram = getMetricsRegistry().newTimeHistogram("commitStage_" + id);
+      commitMap.put(id, histogram);
+    }
+    histogram.add(t);
   }
 
   public MetricsRegionServerSourceImpl(MetricsRegionServerWrapper rsWrap) {
