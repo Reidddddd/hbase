@@ -1231,7 +1231,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
    * @return Instance of {@link RegionServerServices} used by this HRegion.
    * Can be null.
    */
-  RegionServerServices getRegionServerServices() {
+  public RegionServerServices getRegionServerServices() {
     return this.rsServices;
   }
 
@@ -2209,8 +2209,10 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       }
 
       try {
+        long selectStart = System.nanoTime();
         Collection<Store> specificStoresToFlush =
             forceFlushAllStores ? stores.values() : flushPolicy.selectStoresToFlush();
+        rsServices.getMetrics().updateSelectStage(System.nanoTime() - selectStart);
         FlushResult fs = internalFlushcache(specificStoresToFlush,
           status, writeFlushRequestWalMarker);
 
@@ -2362,8 +2364,10 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
   protected FlushResult internalFlushcache(final WAL wal, final long myseqid,
       final Collection<Store> storesToFlush, MonitoredTask status, boolean writeFlushWalMarker)
           throws IOException {
+    long prepareStart = System.nanoTime();
     PrepareFlushResult result
       = internalPrepareFlushCache(wal, myseqid, storesToFlush, status, writeFlushWalMarker);
+    rsServices.getMetrics().updatePrepareStage(System.nanoTime() - prepareStart);
     if (result.result == null) {
       return internalFlushCacheAndCommit(wal, status, result, storesToFlush);
     } else {
@@ -2634,14 +2638,17 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       // just-made new flush store file. The new flushed file is still in the
       // tmp directory.
 
+      long flushStart = System.nanoTime();
       for (StoreFlushContext flush : storeFlushCtxs.values()) {
         flush.flushCache(status);
       }
+      rsServices.getMetrics().updateFlushStage(System.nanoTime() - flushStart);
 
       // Switch snapshot (in memstore) -> new hfile (thus causing
       // all the store scanners to reset/reseek).
       Iterator<Store> it = storesToFlush.iterator();
       // stores.values() and storeFlushCtxs have same order
+      long commitStart = System.nanoTime();
       for (StoreFlushContext flush : storeFlushCtxs.values()) {
         boolean needsCompaction = flush.commit(status);
         if (needsCompaction) {
@@ -2656,6 +2663,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         }
         flushedOutputFileSize += flush.getOutputFileSize();
       }
+      rsServices.getMetrics().updateCommitStage(System.nanoTime() - commitStart);
       storeFlushCtxs.clear();
 
       // Set down the memstore size by amount of flush.

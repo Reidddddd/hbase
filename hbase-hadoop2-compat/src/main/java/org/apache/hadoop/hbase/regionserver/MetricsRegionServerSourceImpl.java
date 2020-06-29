@@ -26,6 +26,8 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MutableFastCounter;
 
+import java.util.function.Supplier;
+
 /**
  * Hadoop2 implementation of MetricsRegionServerSource.
  *
@@ -88,6 +90,57 @@ public class MetricsRegionServerSourceImpl
   private final MutableFastCounter warnPauseThresholdExceeded;
   private final MetricHistogram pausesWithGc;
   private final MetricHistogram pausesWithoutGc;
+
+  private final ThreadLocal<MetricHistogram> wholeStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
+    @Override
+    public MetricHistogram get() {
+      return getMetricsRegistry().newTimeHistogram("wholeStage_" + Thread.currentThread().getId());
+    }
+  });
+  private final ThreadLocal<MetricHistogram> selectStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
+    @Override
+    public MetricHistogram get() {
+      return getMetricsRegistry().newTimeHistogram("selectStage_" + Thread.currentThread().getId());
+    }
+  });
+  private final ThreadLocal<MetricHistogram> prepareStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
+    @Override
+    public MetricHistogram get() {
+      return getMetricsRegistry().newTimeHistogram("prepareStage_" + Thread.currentThread().getId());
+    }
+  });
+  private final ThreadLocal<MetricHistogram> flushStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
+    @Override
+    public MetricHistogram get() {
+      return getMetricsRegistry().newTimeHistogram("flushStage_" + Thread.currentThread().getId());
+    }
+  });
+  private final ThreadLocal<MetricHistogram> commitStage = ThreadLocal.withInitial(new Supplier<MetricHistogram>() {
+    @Override
+    public MetricHistogram get() {
+      return getMetricsRegistry().newTimeHistogram("commitStage_" + Thread.currentThread().getId());
+    }
+  });
+
+  public void updateWholeStage(long t) {
+    wholeStage.get().add(t);
+  }
+
+  public void updateSelectStage(long t) {
+    selectStage.get().add(t);
+  }
+
+  public void updatePrepareStage(long t) {
+    prepareStage.get().add(t);
+  }
+
+  public void updateFlushStage(long t) {
+    flushStage.get().add(t);
+  }
+
+  public void updateCommitStage(long t) {
+    commitStage.get().add(t);
+  }
 
   public MetricsRegionServerSourceImpl(MetricsRegionServerWrapper rsWrap) {
     this(METRICS_NAME, METRICS_DESCRIPTION, METRICS_CONTEXT, METRICS_JMX_CONTEXT, rsWrap);

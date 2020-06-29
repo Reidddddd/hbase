@@ -261,7 +261,10 @@ class MemStoreFlusher implements FlushRequester {
             continue;
           }
           FlushRegionEntry fre = (FlushRegionEntry) fqe;
+          long start = System.nanoTime();
           if (!flushRegion(fre)) {
+            HRegion r = (HRegion)((FlushRegionEntry) fqe).region;
+            r.getRegionServerServices().getMetrics().updateWholeStage(System.nanoTime() - start);
             break;
           }
         } catch (InterruptedException ex) {

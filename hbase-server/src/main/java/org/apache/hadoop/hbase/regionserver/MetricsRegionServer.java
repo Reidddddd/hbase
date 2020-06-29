@@ -245,4 +245,20 @@ public class MetricsRegionServer {
     }
     this.serverWriteQueryMeter.mark();
   }
+
+  public void updateWholeStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).updateWholeStage(t);
+  }
+  public void updateSelectStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).updateSelectStage(t);
+  }
+  public void updatePrepareStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).updatePrepareStage(t);
+  }
+  public void updateFlushStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).updateFlushStage(t);
+  }
+  public void updateCommitStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).updateCommitStage(t);
+  }
 }
