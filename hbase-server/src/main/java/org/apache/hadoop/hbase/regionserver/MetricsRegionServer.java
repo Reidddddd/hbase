@@ -261,4 +261,19 @@ public class MetricsRegionServer {
   public void updateCommitStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).updateCommitStage(t);
   }
+  public void createScannerStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).createScannerStage(t);
+  }
+  public void createWriterStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).createWriterStage(t);
+  }
+  public void peformFlushStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).peformFlushStage(t);
+  }
+  public void finalizeWriterStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).finalizeWriterStage(t);
+  }
+  public void validateStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).validateStage(t);
+  }
 }

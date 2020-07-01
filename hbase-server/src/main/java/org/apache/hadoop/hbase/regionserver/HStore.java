@@ -131,7 +131,7 @@ public class HStore implements Store {
 
   protected final MemStore memstore;
   // This stores directory in the filesystem.
-  private final HRegion region;
+  public final HRegion region;
   private final HColumnDescriptor family;
   private final HRegionFileSystem fs;
   private Configuration conf;
@@ -1004,10 +1004,12 @@ public class HStore implements Store {
             flusher.flushSnapshot(snapshot, logCacheFlushId, status, throughputController);
         Path lastPathName = null;
         try {
+          long start = System.nanoTime();
           for (Path pathName : pathNames) {
             lastPathName = pathName;
             validateStoreFile(pathName);
           }
+          region.getRegionServerServices().getMetrics().validateStage(System.nanoTime() - start);
           return pathNames;
         } catch (Exception e) {
           LOG.warn("Failed validating store file " + lastPathName + ", retrying num=" + i, e);

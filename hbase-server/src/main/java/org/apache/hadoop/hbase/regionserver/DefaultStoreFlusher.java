@@ -52,7 +52,9 @@ public class DefaultStoreFlusher extends StoreFlusher {
 
     // Use a store scanner to find which rows to flush.
     long smallestReadPoint = store.getSmallestReadPoint();
+    long cs = System.nanoTime();
     InternalScanner scanner = createScanner(snapshot.getScanner(), smallestReadPoint);
+    ((HStore) store).region.getRegionServerServices().getMetrics().createScannerStage(System.nanoTime() - cs);
     if (scanner == null) {
       return result; // NULL scanner returned from coprocessor hooks means skip normal processing
     }
@@ -64,15 +66,19 @@ public class DefaultStoreFlusher extends StoreFlusher {
       synchronized (flushLock) {
         status.setStatus("Flushing " + store + ": creating writer");
         // Write the map out to the disk
+        long cw = System.nanoTime();
         writer = store.createWriterInTmp(cellsCount, store.getFamily().getCompression(),
             /* isCompaction = */ false,
             /* includeMVCCReadpoint = */ true,
             /* includesTags = */ snapshot.isTagsPresent(),
             /* shouldDropBehind = */ false,
             snapshot.getTimeRangeTracker());
+        ((HStore) store).region.getRegionServerServices().getMetrics().createWriterStage(System.nanoTime() - cw);
         IOException e = null;
         try {
+          long pf = System.nanoTime();
           performFlush(scanner, writer, smallestReadPoint, throughputController);
+          ((HStore) store).region.getRegionServerServices().getMetrics().peformFlushStage(System.nanoTime() - pf);
         } catch (IOException ioe) {
           e = ioe;
           // throw the exception out
@@ -81,7 +87,9 @@ public class DefaultStoreFlusher extends StoreFlusher {
           if (e != null) {
             writer.close();
           } else {
+            long fw = System.nanoTime();
             finalizeWriter(writer, cacheFlushId, status);
+            ((HStore) store).region.getRegionServerServices().getMetrics().finalizeWriterStage(System.nanoTime() - fw);
           }
         }
       }
