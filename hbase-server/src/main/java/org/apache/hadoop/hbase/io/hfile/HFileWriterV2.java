@@ -399,12 +399,21 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     trailer.setLastDataBlockOffset(lastDataBlockOffset);
     trailer.setComparatorClass(comparator.getClass());
     trailer.setDataIndexCount(dataBlockIndexWriter.getNumRootEntries());
-
-
-    finishClose(trailer);
-
-    fsBlockWriter.release();
+    trailer.setMetaIndexCount(metaNames.size());
+    trailer.setTotalUncompressedBytes(totalUncompressedBytes+ trailer.getTrailerSize());
+    trailer.setEntryCount(entryCount);
+    trailer.setCompressionCodec(hFileContext.getCompression());
+    trailer.serialize(outputStream);
     metrics.trailerBlockStage(System.nanoTime() - tt);
+
+    long ct = System.nanoTime();
+    finishClose(trailer);
+    metrics.finishCloseStage(System.nanoTime() - ct);
+
+    long rt = System.nanoTime();
+    fsBlockWriter.release();
+    metrics.releaseStage(System.nanoTime() - rt);
+
   }
 
   @Override

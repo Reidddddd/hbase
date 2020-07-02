@@ -71,7 +71,7 @@ abstract class StoreFlusher {
     writer.appendMetadata(cacheFlushSeqNum, false);
     metrics.appendMetaDataStage(System.nanoTime() - amt);
     status.setStatus("Flushing " + store + ": closing flushed file");
-    writer.close();
+    writer.close(metrics);
   }
 
 

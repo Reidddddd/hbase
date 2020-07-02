@@ -313,4 +313,10 @@ public class MetricsRegionServer {
   public void trailerBlockStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).trailerBlockStage(t);
   }
+  public void finishCloseStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).finishCloseStage(t);
+  }
+  public void releaseStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).releaseStage(t);
+  }
 }

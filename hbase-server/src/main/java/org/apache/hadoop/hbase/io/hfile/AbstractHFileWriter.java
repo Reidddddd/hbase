@@ -105,11 +105,11 @@ public abstract class AbstractHFileWriter implements HFile.Writer {
    * {@link NoOpDataBlockEncoder#INSTANCE} if there is no encoding.
    */
   protected final HFileDataBlockEncoder blockEncoder;
-  
+
   protected final HFileContext hFileContext;
 
   public AbstractHFileWriter(CacheConfig cacheConf,
-      FSDataOutputStream outputStream, Path path, 
+      FSDataOutputStream outputStream, Path path,
       KVComparator comparator, HFileContext fileContext) {
     this.outputStream = outputStream;
     this.path = path;
@@ -237,12 +237,6 @@ public abstract class AbstractHFileWriter implements HFile.Writer {
    * closes the output stream.
    */
   protected void finishClose(FixedFileTrailer trailer) throws IOException {
-    trailer.setMetaIndexCount(metaNames.size());
-    trailer.setTotalUncompressedBytes(totalUncompressedBytes+ trailer.getTrailerSize());
-    trailer.setEntryCount(entryCount);
-    trailer.setCompressionCodec(hFileContext.getCompression());
-
-    trailer.serialize(outputStream);
 
     if (closeOutputStream) {
       outputStream.close();

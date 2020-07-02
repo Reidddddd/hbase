@@ -117,6 +117,8 @@ public class MetricsRegionServerSourceImpl
   private final Map<Long, MetricHistogram> fileInfoBlockMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> loadOnOpenBlockMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> trailerBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> finishCloseMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> releaseMap = new ConcurrentHashMap<>();
 
   // V4 profile
   public void appendMetaDataStage(long t) {
@@ -144,8 +146,13 @@ public class MetricsRegionServerSourceImpl
     updateStage(t, loadOnOpenBlockMap, "loadOnOpenBlock_");
   }
   public void trailerBlockStage(long t) {
-    updateStage(t, trailerBlockMap, "trailerBlock_v" +
-        "");
+    updateStage(t, trailerBlockMap, "trailerBlock_");
+  }
+  public void finishCloseStage(long t) {
+    updateStage(t, finishCloseMap, "finishClose_");
+  }
+  public void releaseStage(long t) {
+    updateStage(t, releaseMap, "release_");
   }
 
   // V3 profile
