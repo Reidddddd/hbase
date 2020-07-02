@@ -1207,7 +1207,7 @@ public class StoreFile {
         metrics.closeBloomStage(System.nanoTime() - bf);
       }
 
-      writer.close();
+      ((HFileWriterV2)writer).close(metrics);
 
       // Log final Bloom filter statistics. This needs to be done after close()
       // because compound Bloom filters might be finalized as part of closing.

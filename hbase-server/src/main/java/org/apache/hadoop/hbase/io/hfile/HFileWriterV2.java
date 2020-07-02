@@ -313,7 +313,7 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     this.maxMemstoreTS = Math.max(this.maxMemstoreTS, cell.getSequenceId());
   }
 
-  private void close(MetricsRegionServer metrics) throws IOException {
+  public void close(MetricsRegionServer metrics) throws IOException {
     if (outputStream == null) {
       return;
     }
