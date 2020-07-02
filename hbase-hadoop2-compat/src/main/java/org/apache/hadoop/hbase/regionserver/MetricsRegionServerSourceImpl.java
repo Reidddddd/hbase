@@ -97,104 +97,65 @@ public class MetricsRegionServerSourceImpl
   private final Map<Long, MetricHistogram> prepareMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> flushMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> commitMap = new ConcurrentHashMap<>();
+
   private final Map<Long, MetricHistogram> createScannerMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> createWriterMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> peformFlushMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> finalizeWriterMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> validateMap = new ConcurrentHashMap<>();
 
+
+  private final Map<Long, MetricHistogram> nextKVMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> appendKVMap = new ConcurrentHashMap<>();
+
+  // V3 profile
+  public void nextKVStage(long t) {
+    updateStage(t, nextKVMap, "nextKV_");
+  }
+  public void appendKVStage(long t) {
+    updateStage(t, appendKVMap, "appendKV_");
+  }
+
+  // V2 profile
   public void createScannerStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = createScannerMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("createScanner_" + id);
-      selectMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, createScannerMap, "createScanner_");
   }
   public void createWriterStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = createWriterMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("createWriter_" + id);
-      selectMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, createWriterMap, "createWriter_");
   }
   public void peformFlushStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = peformFlushMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("peformFlush_" + id);
-      selectMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, peformFlushMap, "peformFlush_");
   }
   public void finalizeWriterStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = finalizeWriterMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("finalizeWriter_" + id);
-      selectMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, finalizeWriterMap, "finalizeWriter_");
   }
   public void validateStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = validateMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("validate_" + id);
-      selectMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, validateMap, "validate_");
   }
 
+  // V1 profile
   public void updateWholeStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = wholeMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("wholeStage_" + id);
-      wholeMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, wholeMap, "wholeStage_");
   }
-
   public void updateSelectStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = selectMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("selectStage_" + id);
-      selectMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, selectMap, "selectStage_");
   }
-
   public void updatePrepareStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = prepareMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("prepareStage_" + id);
-      prepareMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, prepareMap, "prepareStage_");
   }
-
   public void updateFlushStage(long t) {
-    long id = Thread.currentThread().getId();
-    MetricHistogram histogram = flushMap.get(id);
-    if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("flushStage_" + id);
-      flushMap.put(id, histogram);
-    }
-    histogram.add(t);
+    updateStage(t, flushMap, "flushStage_");
+  }
+  public void updateCommitStage(long t) {
+    updateStage(t, commitMap, "commitStage_");
   }
 
-  public void updateCommitStage(long t) {
+  private void updateStage(long t, Map<Long, MetricHistogram> map, String prefix) {
     long id = Thread.currentThread().getId();
-    MetricHistogram histogram = commitMap.get(id);
+    MetricHistogram histogram = map.get(id);
     if (histogram == null) {
-      histogram = getMetricsRegistry().newTimeHistogram("commitStage_" + id);
-      commitMap.put(id, histogram);
+      histogram = getMetricsRegistry().newTimeHistogram(prefix + id);
+      map.put(id, histogram);
     }
     histogram.add(t);
   }

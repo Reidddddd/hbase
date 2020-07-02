@@ -246,6 +246,7 @@ public class MetricsRegionServer {
     this.serverWriteQueryMeter.mark();
   }
 
+  // V1 profile
   public void updateWholeStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).updateWholeStage(t);
   }
@@ -261,6 +262,7 @@ public class MetricsRegionServer {
   public void updateCommitStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).updateCommitStage(t);
   }
+  // V2 profile
   public void createScannerStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).createScannerStage(t);
   }
@@ -275,5 +277,12 @@ public class MetricsRegionServer {
   }
   public void validateStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).validateStage(t);
+  }
+  // V3 profile
+  public void nextKVStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).nextKVStage(t);
+  }
+  public void appendKVStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).appendKVStage(t);
   }
 }

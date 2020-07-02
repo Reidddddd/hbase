@@ -130,8 +130,11 @@ abstract class StoreFlusher {
     }
     try {
       do {
+        long kvt = System.nanoTime();
         hasMore = scanner.next(kvs, scannerContext);
+        ((HStore) store).region.getRegionServerServices().getMetrics().nextKVStage(System.nanoTime() - kvt);
         if (!kvs.isEmpty()) {
+          long at = System.nanoTime();
           for (Cell c : kvs) {
             // If we know that this KV is going to be included always, then let us
             // set its memstoreTS to 0. This will help us save space when writing to
@@ -143,6 +146,7 @@ abstract class StoreFlusher {
             }
           }
           kvs.clear();
+          ((HStore) store).region.getRegionServerServices().getMetrics().appendKVStage(System.nanoTime() - at);
         }
       } while (hasMore);
     } catch (InterruptedException e) {
