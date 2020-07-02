@@ -1199,9 +1199,13 @@ public class StoreFile {
       return hasDeleteFamilyBloom;
     }
 
-    public void close() throws IOException {
+    public void close(MetricsRegionServer metrics) throws IOException {
+      long bf = System.nanoTime();
       boolean hasGeneralBloom = this.closeGeneralBloomFilter();
       boolean hasDeleteFamilyBloom = this.closeDeleteFamilyBloomFilter();
+      if (metrics != null) {
+        metrics.closeBloomStage(System.nanoTime() - bf);
+      }
 
       writer.close();
 
@@ -1209,10 +1213,13 @@ public class StoreFile {
       // because compound Bloom filters might be finalized as part of closing.
       if (StoreFile.LOG.isTraceEnabled()) {
         StoreFile.LOG.trace((hasGeneralBloom ? "" : "NO ") + "General Bloom and " +
-          (hasDeleteFamilyBloom ? "" : "NO ") + "DeleteFamily" + " was added to HFile " +
-          getPath());
+            (hasDeleteFamilyBloom ? "" : "NO ") + "DeleteFamily" + " was added to HFile " +
+            getPath());
       }
+    }
 
+    public void close() throws IOException {
+      close(null);
     }
 
     public void appendFileInfo(byte[] key, byte[] value) throws IOException {

@@ -285,4 +285,32 @@ public class MetricsRegionServer {
   public void appendKVStage(long t) {
     ((MetricsRegionServerSourceImpl)serverSource).appendKVStage(t);
   }
+  // V4 profile
+  public void appendMetaDataStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).appendMetaDataStage(t);
+  }
+  public void closeBloomStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).closeBloomStage(t);
+  }
+  public void finishBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).finishBlockStage(t);
+  }
+  public void inlineBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).writeInlineBlockStage(t);
+  }
+  public void levelIndexBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).levelIndexBlockStage(t);
+  }
+  public void rootIndexBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).rootIndexBlockStage(t);
+  }
+  public void fileInfoBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).fileInfoBlockStage(t);
+  }
+  public void loadOnOpenBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).loadOnOpenBlockStage(t);
+  }
+  public void trailerBlockStage(long t) {
+    ((MetricsRegionServerSourceImpl)serverSource).trailerBlockStage(t);
+  }
 }

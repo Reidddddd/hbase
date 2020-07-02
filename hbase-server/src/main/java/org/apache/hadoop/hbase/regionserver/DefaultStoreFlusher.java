@@ -88,7 +88,7 @@ public class DefaultStoreFlusher extends StoreFlusher {
             writer.close();
           } else {
             long fw = System.nanoTime();
-            finalizeWriter(writer, cacheFlushId, status);
+            finalizeWriter(writer, cacheFlushId, status, ((HStore) store).region.getRegionServerServices().getMetrics());
             ((HStore) store).region.getRegionServerServices().getMetrics().finalizeWriterStage(System.nanoTime() - fw);
           }
         }

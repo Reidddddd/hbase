@@ -38,6 +38,7 @@ import org.apache.hadoop.hbase.KeyValue.KVComparator;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.io.hfile.HFile.Writer;
 import org.apache.hadoop.hbase.io.hfile.HFileBlock.BlockWritable;
+import org.apache.hadoop.hbase.regionserver.MetricsRegionServer;
 import org.apache.hadoop.hbase.util.BloomFilterWriter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Writable;
@@ -312,8 +313,7 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     this.maxMemstoreTS = Math.max(this.maxMemstoreTS, cell.getSequenceId());
   }
 
-  @Override
-  public void close() throws IOException {
+  private void close(MetricsRegionServer metrics) throws IOException {
     if (outputStream == null) {
       return;
     }
@@ -322,8 +322,12 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     // Write out the end of the data blocks, then write meta data blocks.
     // followed by fileinfo, data block index and meta block index.
 
+    long fb = System.nanoTime();
     finishBlock();
+    metrics.finishBlockStage(System.nanoTime() - fb);
+    long wib = System.nanoTime();
     writeInlineBlocks(true);
+    metrics.inlineBlockStage(System.nanoTime() - wib);
 
     FixedFileTrailer trailer = new FixedFileTrailer(getMajorVersion(), getMinorVersion());
 
@@ -353,16 +357,20 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     // block index. We call a function that writes intermediate-level blocks
     // first, then root level, and returns the offset of the root level block
     // index.
-
+    long lit = System.nanoTime();
     long rootIndexOffset = dataBlockIndexWriter.writeIndexBlocks(outputStream);
     trailer.setLoadOnOpenOffset(rootIndexOffset);
+    metrics.levelIndexBlockStage(System.nanoTime() - lit);
 
     // Meta block index.
+    long rit = System.nanoTime();
     metaBlockIndexWriter.writeSingleLevelIndex(fsBlockWriter.startWriting(
         BlockType.ROOT_INDEX), "meta");
     fsBlockWriter.writeHeaderAndData(outputStream);
     totalUncompressedBytes += fsBlockWriter.getUncompressedSizeWithHeader();
+    metrics.rootIndexBlockStage(System.nanoTime() - rit);
 
+    long fbt = System.nanoTime();
     if (this.hFileContext.isIncludesMvcc()) {
       appendFileInfo(MAX_MEMSTORE_TS_KEY, Bytes.toBytes(maxMemstoreTS));
       appendFileInfo(KEY_VALUE_VERSION, Bytes.toBytes(KEY_VALUE_VER_WITH_MEMSTORE));
@@ -372,14 +380,18 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     writeFileInfo(trailer, fsBlockWriter.startWriting(BlockType.FILE_INFO));
     fsBlockWriter.writeHeaderAndData(outputStream);
     totalUncompressedBytes += fsBlockWriter.getUncompressedSizeWithHeader();
+    metrics.fileInfoBlockStage(System.nanoTime() - fbt);
 
     // Load-on-open data supplied by higher levels, e.g. Bloom filters.
+    long lopt = System.nanoTime();
     for (BlockWritable w : additionalLoadOnOpenData){
       fsBlockWriter.writeBlock(w, outputStream);
       totalUncompressedBytes += fsBlockWriter.getUncompressedSizeWithHeader();
     }
+    metrics.loadOnOpenBlockStage(System.nanoTime() - lopt);
 
     // Now finish off the trailer.
+    long tt = System.nanoTime();
     trailer.setNumDataIndexLevels(dataBlockIndexWriter.getNumLevels());
     trailer.setUncompressedDataIndexSize(
         dataBlockIndexWriter.getTotalUncompressedSize());
@@ -392,6 +404,12 @@ public class HFileWriterV2 extends AbstractHFileWriter {
     finishClose(trailer);
 
     fsBlockWriter.release();
+    metrics.trailerBlockStage(System.nanoTime() - tt);
+  }
+
+  @Override
+  public void close() throws IOException {
+    close(null);
   }
 
   @Override

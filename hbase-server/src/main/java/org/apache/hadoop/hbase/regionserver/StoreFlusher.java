@@ -62,12 +62,14 @@ abstract class StoreFlusher {
       MonitoredTask status, ThroughputController throughputController) throws IOException;
 
   protected void finalizeWriter(StoreFile.Writer writer, long cacheFlushSeqNum,
-      MonitoredTask status) throws IOException {
+                                MonitoredTask status, MetricsRegionServer metrics) throws IOException {
     // Write out the log sequence number that corresponds to this output
     // hfile. Also write current time in metadata as minFlushTime.
     // The hfile is current up to and including cacheFlushSeqNum.
     status.setStatus("Flushing " + store + ": appending metadata");
+    long amt = System.nanoTime();
     writer.appendMetadata(cacheFlushSeqNum, false);
+    metrics.appendMetaDataStage(System.nanoTime() - amt);
     status.setStatus("Flushing " + store + ": closing flushed file");
     writer.close();
   }

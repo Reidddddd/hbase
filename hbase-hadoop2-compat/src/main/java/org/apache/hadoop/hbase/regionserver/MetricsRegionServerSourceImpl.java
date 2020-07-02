@@ -108,6 +108,46 @@ public class MetricsRegionServerSourceImpl
   private final Map<Long, MetricHistogram> nextKVMap = new ConcurrentHashMap<>();
   private final Map<Long, MetricHistogram> appendKVMap = new ConcurrentHashMap<>();
 
+  private final Map<Long, MetricHistogram> appendMetaMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> closeBloomMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> finishBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> writeInlineBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> levelIndexBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> rootIndexBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> fileInfoBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> loadOnOpenBlockMap = new ConcurrentHashMap<>();
+  private final Map<Long, MetricHistogram> trailerBlockMap = new ConcurrentHashMap<>();
+
+  // V4 profile
+  public void appendMetaDataStage(long t) {
+    updateStage(t, appendMetaMap, "appendMeta_");
+  }
+  public void closeBloomStage(long t) {
+    updateStage(t, closeBloomMap, "closeBloom_");
+  }
+  public void finishBlockStage(long t) {
+    updateStage(t, finishBlockMap, "finishBlock_");
+  }
+  public void writeInlineBlockStage(long t) {
+    updateStage(t, writeInlineBlockMap, "inlineBlock_");
+  }
+  public void levelIndexBlockStage(long t) {
+    updateStage(t, levelIndexBlockMap, "levelIndexBlock_");
+  }
+  public void rootIndexBlockStage(long t) {
+    updateStage(t, rootIndexBlockMap, "rootIndexBlock_");
+  }
+  public void fileInfoBlockStage(long t) {
+    updateStage(t, fileInfoBlockMap, "fileInfoBlock_");
+  }
+  public void loadOnOpenBlockStage(long t) {
+    updateStage(t, loadOnOpenBlockMap, "loadOnOpenBlock_");
+  }
+  public void trailerBlockStage(long t) {
+    updateStage(t, trailerBlockMap, "trailerBlock_v" +
+        "");
+  }
+
   // V3 profile
   public void nextKVStage(long t) {
     updateStage(t, nextKVMap, "nextKV_");
