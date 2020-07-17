@@ -512,6 +512,27 @@ public final class ByteBufferUtils {
   }
 
   /**
+   * Copies bytes from given array's offset to length part into the given buffer. Puts the bytes
+   * to buffer's given position. This doesn't affact the position of buffer.
+   * @param out
+   * @param in
+   * @param inOffset
+   * @param length
+   */
+  public static void copyFromArrayToBuffer(ByteBuffer out, int outOffset, byte[] in, int inOffset,
+                                           int length) {
+    if (out.hasArray()) {
+      System.arraycopy(in, inOffset, out.array(), out.arrayOffset() + outOffset, length);
+    } else if (UNSAFE_AVAIL) {
+      UnsafeAccess.copy(in, inOffset, out, outOffset, length);
+    } else {
+      ByteBuffer outDup = out.duplicate();
+      outDup.position(outOffset);
+      outDup.put(in, inOffset, length);
+    }
+  }
+
+  /**
    * Copies specified number of bytes from given offset of 'in' ByteBuffer to
    * the array.
    * @param out
