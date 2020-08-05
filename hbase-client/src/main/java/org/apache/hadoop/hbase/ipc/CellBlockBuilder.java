@@ -245,7 +245,16 @@ class CellBlockBuilder {
    */
   public CellScanner createCellScanner(final Codec codec, final CompressionCodec compressor,
       final byte[] cellBlock) throws IOException {
-    return createCellScanner(codec, compressor, ByteBuffer.wrap(cellBlock));
+    // Use this method from Client side to create the CellScanner
+    ByteBuffer cellBlockBuf = ByteBuffer.wrap(cellBlock);
+    if (compressor != null) {
+      cellBlockBuf = decompress(compressor, cellBlockBuf);
+    }
+    // Not making the Decoder over the ByteBuffer purposefully. The Decoder over the BB will
+    // make Cells directly over the passed BB. This method is called at client side and we don't
+    // want the Cells to share the same byte[] where the RPC response is being read. Caching of any
+    // of the Cells at user's app level will make it not possible to GC the response byte[]
+    return codec.getDecoder(new ByteBufferInputStream(cellBlockBuf));
   }
 
   /**
@@ -253,10 +262,12 @@ class CellBlockBuilder {
    * @param cellBlock ByteBuffer containing the cells written by the Codec. The buffer should be
    *          position()'ed at the start of the cell block and limit()'ed at the end.
    * @return CellScanner to work against the content of <code>cellBlock</code>
+   * All cells created out of the CellScanner will share the same ByteBuffer being passed.
    * @throws IOException
    */
-  public CellScanner createCellScanner(final Codec codec, final CompressionCodec compressor,
+  public CellScanner createCellScannerReusingBuffers(final Codec codec, final CompressionCodec compressor,
       ByteBuffer cellBlock) throws IOException {
+    // Use this method from HRS to create the CellScanner
     if (compressor != null) {
       cellBlock = decompress(compressor, cellBlock);
     }
@@ -264,7 +275,7 @@ class CellBlockBuilder {
     // make Cells directly over the passed BB. This method is called at client side and we don't
     // want the Cells to share the same byte[] where the RPC response is being read. Caching of any
     // of the Cells at user's app level will make it not possible to GC the response byte[]
-    return codec.getDecoder(new ByteBufferInputStream(cellBlock));
+    return codec.getDecoder(cellBlock);
   }
 
   private ByteBuffer decompress(CompressionCodec compressor, ByteBuffer cellBlock)

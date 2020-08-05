@@ -219,7 +219,8 @@ public class TestTags {
           CellScanner cellScanner = result.cellScanner();
           cellScanner.advance();
           KeyValue current = (KeyValue) cellScanner.current();
-          assertTrue(current.getValueOffset() + current.getValueLength() == current.getLength());
+          assertTrue(current.getValueOffset() + current.getValueLength() == current.getOffset()
+              + current.getLength());
         }
       } finally {
         if (scanner != null)
@@ -237,7 +238,8 @@ public class TestTags {
           CellScanner cellScanner = result.cellScanner();
           cellScanner.advance();
           KeyValue current = (KeyValue) cellScanner.current();
-          assertTrue(current.getValueOffset() + current.getValueLength() == current.getLength());
+          assertTrue(current.getValueOffset() + current.getValueLength() == current.getOffset()
+              + current.getLength());
         }
       } finally {
         if (scanner != null) {

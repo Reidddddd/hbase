@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.codec;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.CellScanner;
@@ -49,5 +50,6 @@ public interface Codec {
   interface Decoder extends CellScanner {};
 
   Decoder getDecoder(InputStream is);
+  Decoder getDecoder(ByteBuffer buf);
   Encoder getEncoder(OutputStream os);
 }
