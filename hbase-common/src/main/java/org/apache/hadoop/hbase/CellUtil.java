@@ -114,10 +114,24 @@ public final class CellUtil {
     return destinationOffset + cell.getRowLength();
   }
 
+  public static int copyRowTo(Cell cell, ByteBuffer destination, int destinationOffset) {
+    short rowLen = cell.getRowLength();
+    ByteBufferUtils.copyFromArrayToBuffer(destination, destinationOffset, cell.getRowArray(),
+        cell.getRowOffset(), rowLen);
+    return destinationOffset + rowLen;
+  }
+
   public static int copyFamilyTo(Cell cell, byte[] destination, int destinationOffset) {
     System.arraycopy(cell.getFamilyArray(), cell.getFamilyOffset(), destination, destinationOffset,
       cell.getFamilyLength());
     return destinationOffset + cell.getFamilyLength();
+  }
+
+  public static int copyFamilyTo(Cell cell, ByteBuffer destination, int destinationOffset) {
+    byte fLen = cell.getFamilyLength();
+    ByteBufferUtils.copyFromArrayToBuffer(destination, destinationOffset, cell.getFamilyArray(),
+        cell.getFamilyOffset(), fLen);
+    return destinationOffset + fLen;
   }
 
   public static int copyQualifierTo(Cell cell, byte[] destination, int destinationOffset) {
@@ -126,10 +140,24 @@ public final class CellUtil {
     return destinationOffset + cell.getQualifierLength();
   }
 
+  public static int copyQualifierTo(Cell cell, ByteBuffer destination, int destinationOffset) {
+    int qlen = cell.getQualifierLength();
+    ByteBufferUtils.copyFromArrayToBuffer(destination, destinationOffset,
+        cell.getQualifierArray(), cell.getQualifierOffset(), qlen);
+    return destinationOffset + qlen;
+  }
+
   public static int copyValueTo(Cell cell, byte[] destination, int destinationOffset) {
     System.arraycopy(cell.getValueArray(), cell.getValueOffset(), destination, destinationOffset,
         cell.getValueLength());
     return destinationOffset + cell.getValueLength();
+  }
+
+  public static int copyValueTo(Cell cell, ByteBuffer destination, int destinationOffset) {
+    int vlen = cell.getValueLength();
+    ByteBufferUtils.copyFromArrayToBuffer(destination, destinationOffset, cell.getValueArray(),
+        cell.getValueOffset(), vlen);
+    return destinationOffset + vlen;
   }
 
   /**
@@ -143,6 +171,13 @@ public final class CellUtil {
     System.arraycopy(cell.getTagsArray(), cell.getTagsOffset(), destination, destinationOffset,
         cell.getTagsLength());
     return destinationOffset + cell.getTagsLength();
+  }
+
+  public static int copyTagTo(Cell cell, ByteBuffer destination, int destinationOffset) {
+    int tlen = cell.getTagsLength();
+    ByteBufferUtils.copyFromArrayToBuffer(destination, destinationOffset, cell.getTagsArray(),
+        cell.getTagsOffset(), tlen);
+    return destinationOffset + tlen;
   }
 
   /********************* misc *************************************/
@@ -988,5 +1023,21 @@ public final class CellUtil {
 
   public static boolean matchingType(Cell a, Cell b) {
     return a.getTypeByte() == b.getTypeByte();
+  }
+
+  /**
+   * Clone the passed cell by copying its data into the passed buf
+   */
+  public static Cell copyCellTo(Cell cell, ByteBuffer buf, int offset, int len) {
+    KeyValueUtil.appendCellTo(cell, buf, offset);
+    if (buf.hasArray()) {
+      int tagsLen = cell.getTagsLength();
+      KeyValue newKv = tagsLen == 0 ?
+          new NoTagsKeyValue(buf.array(), buf.arrayOffset() + offset, len) :
+          new KeyValue(buf.array(), buf.arrayOffset() + offset, len);
+      newKv.setSequenceId(cell.getSequenceId());
+      return newKv;
+    }
+    return new ByteBufferKeyValue(buf, offset, len, cell.getSequenceId());
   }
 }

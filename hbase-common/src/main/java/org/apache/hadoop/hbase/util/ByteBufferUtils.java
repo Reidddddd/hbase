@@ -454,6 +454,15 @@ public final class ByteBufferUtils {
     return fitInBytes;
   }
 
+  public static int putByte(ByteBuffer buffer, int offset, byte b) {
+    if (UNSAFE_AVAIL) {
+      return UnsafeAccess.putByte(buffer, offset, b);
+    } else {
+      buffer.put(offset, b);
+      return offset + 1;
+    }
+  }
+
   /**
    * Check how many bytes are required to store value.
    * @param value Value which size will be tested.
@@ -930,6 +939,13 @@ public final class ByteBufferUtils {
     return ConverterHolder.BEST_CONVERTER.putShort(buffer, index, val);
   }
 
+  public static int putAsShort(ByteBuffer buf, int index, int val) {
+    buf.put(index + 1, (byte) val);
+    val >>= 8;
+    buf.put(index, (byte) val);
+    return index + Bytes.SIZEOF_SHORT;
+  }
+
   /**
    * Put a long value out to the given ByteBuffer's current position in big-endian format.
    * This also advances the position in buffer by long size.
@@ -985,5 +1001,18 @@ public final class ByteBufferUtils {
       inDup.position(sourceOffset);
       inDup.get(out, destinationOffset, length);
     }
+  }
+
+  /**
+   * @param buf ByteBuffer to hash
+   * @param offset offset to start from
+   * @param length length to hash
+   */
+  public static int hashCode(ByteBuffer buf, int offset, int length) {
+    int hash = 1;
+    for (int i = offset; i < offset + length; i++) {
+      hash = (31 * hash) + (int) toByte(buf, i);
+    }
+    return hash;
   }
 }

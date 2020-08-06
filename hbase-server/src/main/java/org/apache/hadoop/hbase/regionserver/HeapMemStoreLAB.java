@@ -26,6 +26,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.KeyValueUtil;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.util.ByteRange;
@@ -111,7 +115,8 @@ public class HeapMemStoreLAB implements MemStoreLAB {
    * allocator, returns null.
    */
   @Override
-  public ByteRange allocateBytes(int size) {
+  public Cell allocateBytes(Cell cell) {
+    int size = KeyValueUtil.length(cell);
     Preconditions.checkArgument(size >= 0, "negative size");
 
     // Callers should satisfy large allocations directly from JVM since they
@@ -128,7 +133,7 @@ public class HeapMemStoreLAB implements MemStoreLAB {
       if (allocOffset != -1) {
         // We succeeded - this is the common case - small alloc
         // from a big buffer
-        return new SimpleMutableByteRange(c.data, allocOffset, size);
+        return CellUtil.copyCellTo(cell, c.getData(), allocOffset, size);
       }
 
       // not enough space!
@@ -204,7 +209,7 @@ public class HeapMemStoreLAB implements MemStoreLAB {
       // No current chunk, so we want to allocate one. We race
       // against other allocators to CAS in an uninitialized chunk
       // (which is cheap to allocate)
-      c = (chunkPool != null) ? chunkPool.getChunk() : new Chunk(chunkSize);
+      c = (chunkPool != null) ? chunkPool.getChunk() : new OnHeapChunk(chunkSize);
       if (curChunk.compareAndSet(null, c)) {
         // we won race - now we need to actually do the expensive
         // allocation step
@@ -234,115 +239,4 @@ public class HeapMemStoreLAB implements MemStoreLAB {
     return this.chunkQueue;
   }
 
-  /**
-   * A chunk of memory out of which allocations are sliced.
-   */
-  static class Chunk {
-    /** Actual underlying data */
-    private byte[] data;
-
-    private static final int UNINITIALIZED = -1;
-    private static final int OOM = -2;
-    /**
-     * Offset for the next allocation, or the sentinel value -1
-     * which implies that the chunk is still uninitialized.
-     * */
-    private AtomicInteger nextFreeOffset = new AtomicInteger(UNINITIALIZED);
-
-    /** Total number of allocations satisfied from this buffer */
-    private AtomicInteger allocCount = new AtomicInteger();
-
-    /** Size of chunk in bytes */
-    private final int size;
-
-    /**
-     * Create an uninitialized chunk. Note that memory is not allocated yet, so
-     * this is cheap.
-     * @param size in bytes
-     */
-    Chunk(int size) {
-      this.size = size;
-    }
-
-    /**
-     * Actually claim the memory for this chunk. This should only be called from
-     * the thread that constructed the chunk. It is thread-safe against other
-     * threads calling alloc(), who will block until the allocation is complete.
-     */
-    public void init() {
-      assert nextFreeOffset.get() == UNINITIALIZED;
-      try {
-        if (data == null) {
-          data = new byte[size];
-        }
-      } catch (OutOfMemoryError e) {
-        boolean failInit = nextFreeOffset.compareAndSet(UNINITIALIZED, OOM);
-        assert failInit; // should be true.
-        throw e;
-      }
-      // Mark that it's ready for use
-      boolean initted = nextFreeOffset.compareAndSet(
-          UNINITIALIZED, 0);
-      // We should always succeed the above CAS since only one thread
-      // calls init()!
-      Preconditions.checkState(initted,
-          "Multiple threads tried to init same chunk");
-    }
-
-    /**
-     * Reset the offset to UNINITIALIZED before before reusing an old chunk
-     */
-    void reset() {
-      if (nextFreeOffset.get() != UNINITIALIZED) {
-        nextFreeOffset.set(UNINITIALIZED);
-        allocCount.set(0);
-      }
-    }
-
-    /**
-     * Try to allocate <code>size</code> bytes from the chunk.
-     * @return the offset of the successful allocation, or -1 to indicate not-enough-space
-     */
-    public int alloc(int size) {
-      while (true) {
-        int oldOffset = nextFreeOffset.get();
-        if (oldOffset == UNINITIALIZED) {
-          // The chunk doesn't have its data allocated yet.
-          // Since we found this in curChunk, we know that whoever
-          // CAS-ed it there is allocating it right now. So spin-loop
-          // shouldn't spin long!
-          Thread.yield();
-          continue;
-        }
-        if (oldOffset == OOM) {
-          // doh we ran out of ram. return -1 to chuck this away.
-          return -1;
-        }
-
-        if (oldOffset + size > data.length) {
-          return -1; // alloc doesn't fit
-        }
-
-        // Try to atomically claim this chunk
-        if (nextFreeOffset.compareAndSet(oldOffset, oldOffset + size)) {
-          // we got the alloc
-          allocCount.incrementAndGet();
-          return oldOffset;
-        }
-        // we raced and lost alloc, try again
-      }
-    }
-
-    @Override
-    public String toString() {
-      return "Chunk@" + System.identityHashCode(this) +
-        " allocs=" + allocCount.get() + "waste=" +
-        (data.length - nextFreeOffset.get());
-    }
-
-    @VisibleForTesting
-    int getNextFreeOffset() {
-      return this.nextFreeOffset.get();
-    }
-  }
 }

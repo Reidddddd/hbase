@@ -26,6 +26,7 @@ import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.KeyValueUtil;
 import org.apache.hadoop.hbase.exceptions.UnexpectedStateException;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.ByteRange;
@@ -71,18 +72,22 @@ public class TestMemStoreChunkPool {
     MemStoreLAB mslab = new HeapMemStoreLAB(conf);
     int expectedOff = 0;
     byte[] lastBuffer = null;
+    final byte[] rk = Bytes.toBytes("r1");
+    final byte[] cf = Bytes.toBytes("f");
+    final byte[] q = Bytes.toBytes("q");
     // Randomly allocate some bytes
     for (int i = 0; i < 100; i++) {
-      int size = rand.nextInt(1000);
-      ByteRange alloc = mslab.allocateBytes(size);
-
-      if (alloc.getBytes() != lastBuffer) {
+      int valSize = rand.nextInt(1000);
+      KeyValue kv = new KeyValue(rk, cf, q, new byte[valSize]);
+      int size = KeyValueUtil.length(kv);
+      KeyValue newKv = (KeyValue) mslab.allocateBytes(kv);
+      if (newKv.getBuffer() != lastBuffer) {
         expectedOff = 0;
-        lastBuffer = alloc.getBytes();
+        lastBuffer = newKv.getBuffer();
       }
-      assertEquals(expectedOff, alloc.getOffset());
-      assertTrue("Allocation overruns buffer", alloc.getOffset()
-          + size <= alloc.getBytes().length);
+      assertEquals(expectedOff, newKv.getOffset());
+      assertTrue("Allocation overruns buffer", newKv.getOffset()
+          + size <= newKv.getBuffer().length);
       expectedOff += size;
     }
     // chunks will be put back to pool after close
@@ -92,7 +97,8 @@ public class TestMemStoreChunkPool {
     // reconstruct mslab
     mslab = new HeapMemStoreLAB(conf);
     // chunk should be got from the pool, so we can reuse it.
-    mslab.allocateBytes(1000);
+    KeyValue kv = new KeyValue(rk, cf, q, new byte[10]);
+    mslab.allocateBytes(kv);
     assertEquals(chunkCount - 1, chunkPool.getPoolSize());
   }
 
