@@ -36,6 +36,8 @@ public class HeapMemorySizeUtil {
       "hbase.regionserver.global.memstore.size.lower.limit";
   public static final String MEMSTORE_SIZE_LOWER_LIMIT_OLD_KEY =
       "hbase.regionserver.global.memstore.lowerLimit";
+  public static final String OFFHEAP_MEMSTORE_SIZE_KEY =
+      "hbase.regionserver.offheap.global.memstore.size";
 
   public static final float DEFAULT_MEMSTORE_SIZE = 0.4f;
   // Default lower water mark limit is 95% size of memstore size.
@@ -220,6 +222,24 @@ public class HeapMemorySizeUtil {
       bucketCacheSize = (long)(bucketCachePercentage * 1024 * 1024);
     }
     return bucketCacheSize;
+  }
+
+  /**
+   * @return true if it is enable, false otherwise
+   */
+  public static boolean useOffheap(final Configuration conf) {
+    return conf.get(OFFHEAP_MEMSTORE_SIZE_KEY) != null &&
+           conf.getLong(OFFHEAP_MEMSTORE_SIZE_KEY, 0) > 0;
+  }
+
+  /**
+   * This method should be guarded by {@link #useOffheap(Configuration)}.
+   * @return the size of offheap memory in bytes
+   */
+  public static long getOffHeapMemorySize(Configuration conf) {
+    long offheapMSGlobal = conf.getLong(OFFHEAP_MEMSTORE_SIZE_KEY, 0); // Size in MB
+    assert offheapMSGlobal > 0;
+    return offheapMSGlobal * 1024 * 1024;
   }
 
 }

@@ -264,18 +264,8 @@ public class DefaultMemStore implements MemStore {
       return cell;
     }
 
-    int len = getCellLength(cell);
-    ByteRange alloc = activeSection.getMemStoreLAB().allocateBytes(len);
-    if (alloc == null) {
-      // The allocation was too large, allocator decided
-      // not to do anything with it.
-      return cell;
-    }
-    assert alloc.getBytes() != null;
-    KeyValueUtil.appendToByteArray(cell, alloc.getBytes(), alloc.getOffset());
-    KeyValue newKv = new KeyValue(alloc.getBytes(), alloc.getOffset(), len);
-    newKv.setSequenceId(cell.getSequenceId());
-    return newKv;
+    Cell cellFromMslab = activeSection.getMemStoreLAB().allocateBytes(cell);
+    return cellFromMslab == null ? cell : cellFromMslab;
   }
 
   /**
@@ -711,7 +701,7 @@ public class DefaultMemStore implements MemStore {
     // last iterated Cells for cellSet and snapshot (to restore iterator state after reseek)
     private Cell cellSetItRow = null;
     private Cell snapshotItRow = null;
-    
+
     // iterator based scanning.
     private Iterator<Cell> cellSetIt;
     private Iterator<Cell> snapshotIt;

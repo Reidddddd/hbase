@@ -284,7 +284,7 @@ public class KeyValueUtil {
     return new KeyValue(row, roffset, rlength, family, foffset, flength, qualifier, qoffset,
         qlength, HConstants.OLDEST_TIMESTAMP, Type.Minimum, null, 0, 0);
   }
-  
+
   /**
    * Creates a keyValue for the specified keyvalue larger than or equal to all other possible
    * KeyValues that have the same row, family, qualifer.  Used for reseeking
@@ -303,7 +303,7 @@ public class KeyValueUtil {
    * the returned KV is always empty). Used in creating "fake keys" for the
    * multi-column Bloom filter optimization to skip the row/column we already
    * know is not in the file. Not to be returned to clients.
-   * 
+   *
    * @param kv - cell
    * @return the last key on the row/column of the given key-value pair
    */
@@ -320,7 +320,7 @@ public class KeyValueUtil {
    * the lowest possible for this combination of row, family, qualifier, and
    * timestamp. This KV's own timestamp is ignored. While this function copies
    * the value from this KV, it is normally used on key-only KVs.
-   * 
+   *
    * @param kv - cell
    * @param ts
    */
@@ -330,7 +330,7 @@ public class KeyValueUtil {
         kv.getQualifierOffset(), kv.getQualifierLength(), ts, Type.Maximum, kv.getValueArray(),
         kv.getValueOffset(), kv.getValueLength());
   }
-  
+
   /**
    * Create a KeyValue that is smaller than all other possible KeyValues
    * for the given row. That is any (valid) KeyValue on 'row' would sort
@@ -343,7 +343,7 @@ public class KeyValueUtil {
     return new KeyValue(row, roffset, rlength,
         null, 0, 0, null, 0, 0, HConstants.LATEST_TIMESTAMP, Type.Maximum, null, 0, 0);
   }
-  
+
 
   /**
    * Creates a KeyValue that is last on the specified row id. That is,
@@ -657,5 +657,59 @@ public class KeyValueUtil {
         out.write(cell.getTagsArray(), cell.getTagsOffset(), tlen);
       }
     }
+  }
+
+  /**
+   * @return A KeyValue made of a byte array that holds the key-only part.
+   *         Needed to convert hfile index members to KeyValues.
+   */
+  public static KeyValue createKeyValueFromKey(final byte[] b) {
+    return createKeyValueFromKey(b, 0, b.length);
+  }
+
+  /**
+   * @return A KeyValue made of a byte buffer that holds the key-only part.
+   *         Needed to convert hfile index members to KeyValues.
+   */
+  public static KeyValue createKeyValueFromKey(final ByteBuffer bb) {
+    return createKeyValueFromKey(bb.array(), bb.arrayOffset(), bb.limit());
+  }
+
+  /**
+   * @return A KeyValue made of a byte array that holds the key-only part.
+   *         Needed to convert hfile index members to KeyValues.
+   */
+  public static KeyValue createKeyValueFromKey(final byte[] b, final int o, final int l) {
+    byte[] newb = new byte[l + KeyValue.ROW_OFFSET];
+    System.arraycopy(b, o, newb, KeyValue.ROW_OFFSET, l);
+    Bytes.putInt(newb, 0, l);
+    Bytes.putInt(newb, Bytes.SIZEOF_INT, 0);
+    return new KeyValue(newb);
+  }
+
+  /**
+   * Write the given cell in KeyValue serialization format into the given ByteBuffer
+   * @param cell source cell
+   * @param buf destination buf
+   * @param offset start offset of the buf
+   * @return offset after copy
+   */
+  public static int appendCellTo(Cell cell, ByteBuffer buf, int offset) {
+    offset = ByteBufferUtils.putInt(buf, offset, keyLength(cell)); // Key length
+    offset = ByteBufferUtils.putInt(buf, offset, cell.getValueLength()); // Value length
+    offset = ByteBufferUtils.putShort(buf, offset, cell.getRowLength()); // RK length
+    offset = CellUtil.copyRowTo(cell, buf, offset); // Row bytes
+    offset = ByteBufferUtils.putByte(buf, offset, cell.getFamilyLength()); // CF length
+    offset = CellUtil.copyFamilyTo(cell, buf, offset); // CF bytes
+    offset = CellUtil.copyQualifierTo(cell, buf, offset); // Qualifier bytes
+    offset = ByteBufferUtils.putLong(buf, offset, cell.getTimestamp()); // TS
+    offset = ByteBufferUtils.putByte(buf, offset, cell.getTypeByte()); // Type
+    offset = CellUtil.copyValueTo(cell, buf, offset); // Value bytes
+    int tagsLen = cell.getTagsLength();
+    if (tagsLen > 0) {
+      offset = ByteBufferUtils.putAsShort(buf, offset, tagsLen); // Tags length
+      offset = CellUtil.copyTagTo(cell, buf, offset); // Tags bytes
+    }
+    return offset;
   }
 }

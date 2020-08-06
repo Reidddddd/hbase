@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.util.ByteRange;
 
 /**
  * A memstore-local allocation buffer.
@@ -39,12 +39,12 @@ import org.apache.hadoop.hbase.util.ByteRange;
 public interface MemStoreLAB {
 
   /**
-   * Allocate a slice of the given length. If the size is larger than the maximum size specified for
-   * this allocator, returns null.
-   * @param size
-   * @return {@link ByteRange}
+   * Allocate a slice LAB memory for cell. If the cell size is larger than the maximum size
+   * specified for this allocator, returns null.
+   * @param cell source cell
+   * @return a {@link Cell} wrapped by LAB
    */
-  ByteRange allocateBytes(int size);
+  Cell allocateBytes(Cell cell);
 
   /**
    * Close instance since it won't be used any more, try to put the chunks back to pool

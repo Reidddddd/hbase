@@ -137,6 +137,8 @@ public class KeyValue implements Cell, HeapSize, Cloneable, SettableSequenceId, 
     Bytes.SIZEOF_INT /*keylength*/ +
     Bytes.SIZEOF_INT /*valuelength*/;
 
+  public static final int ROW_KEY_OFFSET = ROW_OFFSET + ROW_LENGTH_SIZE;
+
   // Size of the length ints in a KeyValue datastructure.
   public static final int KEYVALUE_INFRASTRUCTURE_SIZE = ROW_OFFSET;
 
@@ -766,7 +768,7 @@ public class KeyValue implements Cell, HeapSize, Cloneable, SettableSequenceId, 
    *
    * @param row - row key (arbitrary byte array)
    * @return First possible KeyValue on passed <code>row</code>
-   * @deprecated Since 0.99.2. Use {@link KeyValueUtil#createFirstOnRow(byte [])} instead
+   * @deprecated Since 0.99.2. Use {@link KeyValueUtil#createFirstOnRow(byte[])}} instead
    */
   @Deprecated
   public static KeyValue createFirstOnRow(final byte [] row) {

@@ -31,22 +31,21 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
-import org.apache.hadoop.hbase.regionserver.HeapMemStoreLAB.Chunk;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
- * A pool of {@link HeapMemStoreLAB.Chunk} instances.
- * 
+ * A pool of {@link Chunk} instances.
+ *
  * MemStoreChunkPool caches a number of retired chunks for reusing, it could
  * decrease allocating bytes when writing, thereby optimizing the garbage
  * collection on JVM.
- * 
+ *
  * The pool instance is globally unique and could be obtained through
  * {@link MemStoreChunkPool#getPool(Configuration)}
- * 
+ *
  * {@link MemStoreChunkPool#getChunk()} is called when MemStoreLAB allocating
  * bytes, and {@link MemStoreChunkPool#putbackChunks(BlockingQueue)} is called
  * when MemStore clearing snapshot for flush
@@ -70,6 +69,7 @@ public class MemStoreChunkPool {
   // A queue of reclaimed chunks
   private final BlockingQueue<Chunk> reclaimedChunks;
   private final int chunkSize;
+  private final boolean offheap;
 
   /** Statistics thread schedule pool */
   private final ScheduledExecutorService scheduleThreadPool;
@@ -79,13 +79,14 @@ public class MemStoreChunkPool {
   private AtomicLong reusedChunkCount = new AtomicLong();
   private AtomicLong requestedChunkCount = new AtomicLong();
 
-  MemStoreChunkPool(Configuration conf, int chunkSize, int maxCount,
+  MemStoreChunkPool(boolean offheap, int chunkSize, int maxCount,
       int initialCount) {
     this.maxCount = maxCount;
     this.chunkSize = chunkSize;
-    this.reclaimedChunks = new LinkedBlockingQueue<Chunk>();
+    this.offheap = offheap;
+    this.reclaimedChunks = new LinkedBlockingQueue<>();
     for (int i = 0; i < initialCount; i++) {
-      Chunk chunk = new Chunk(chunkSize);
+      Chunk chunk = offheap ? new OffHeapChunk(chunkSize) : new OnHeapChunk(chunkSize);
       chunk.init();
       reclaimedChunks.add(chunk);
     }
@@ -106,7 +107,7 @@ public class MemStoreChunkPool {
     requestedChunkCount.incrementAndGet();
     Chunk chunk = reclaimedChunks.poll();
     if (chunk == null) {
-      chunk = new Chunk(chunkSize);
+      chunk = offheap ? new OffHeapChunk(chunkSize) : new OnHeapChunk(chunkSize);
       createdChunkCount.incrementAndGet();
     } else {
       chunk.reset();
@@ -212,7 +213,12 @@ public class MemStoreChunkPool {
         heapMax = usage.getMax();
       }
       long globalMemStoreLimit = (long) (heapMax * HeapMemorySizeUtil.getGlobalMemStorePercent(conf,
-          false));
+        false));
+      boolean offheap = HeapMemorySizeUtil.useOffheap(conf);
+      if (offheap) {
+        poolSizePercentage = 1.0f;
+        globalMemStoreLimit = HeapMemorySizeUtil.getOffHeapMemorySize(conf);
+      }
       int chunkSize = conf.getInt(HeapMemStoreLAB.CHUNK_SIZE_KEY,
           HeapMemStoreLAB.CHUNK_SIZE_DEFAULT);
       int maxCount = (int) (globalMemStoreLimit * poolSizePercentage / chunkSize);
@@ -227,7 +233,7 @@ public class MemStoreChunkPool {
       int initialCount = (int) (initialCountPercentage * maxCount);
       LOG.info("Allocating MemStoreChunkPool with chunk size " + StringUtils.byteDesc(chunkSize)
           + ", max count " + maxCount + ", initial count " + initialCount);
-      GLOBAL_INSTANCE = new MemStoreChunkPool(conf, chunkSize, maxCount, initialCount);
+      GLOBAL_INSTANCE = new MemStoreChunkPool(offheap, chunkSize, maxCount, initialCount);
       return GLOBAL_INSTANCE;
     }
   }
