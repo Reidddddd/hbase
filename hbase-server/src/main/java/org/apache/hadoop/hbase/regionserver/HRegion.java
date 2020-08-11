@@ -3250,11 +3250,14 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     long mvccNum = 0;
     long addedSize = 0;
     final ObservedExceptionsInBatch observedExceptions = new ObservedExceptionsInBatch();
+
+    MetricsRegionServerSourceImpl impl = (MetricsRegionServerSourceImpl) rsServices.getMetrics().getServerSource();
     try {
       // ------------------------------------
       // STEP 1. Try to acquire as many locks as we can, and ensure
       // we acquire at least one.
       // ----------------------------------
+      long start = System.nanoTime();
       int numReadyToWrite = 0;
       long now = EnvironmentEdgeManager.currentTime();
       while (lastIndexExclusive < batchOp.operations.length) {
@@ -3373,6 +3376,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           }
         }
       }
+      impl.setAcquireLockHisto(System.nanoTime() - start);
 
       // we should record the timestamp only after we have acquired the rowLock,
       // otherwise, newer puts/deletes are not guaranteed to have a newer timestamp
@@ -3387,6 +3391,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       // ------------------------------------
       // STEP 2. Update any LATEST_TIMESTAMP timestamps
       // ----------------------------------
+      start = System.nanoTime();
       for (int i = firstIndex; !isInReplay && i < lastIndexExclusive; i++) {
         // skip invalid
         if (batchOp.retCodeDetails[i].getOperationStatusCode()
@@ -3460,10 +3465,12 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           }
         }
       }
+      impl.setUpdateTsHisto(System.nanoTime() - start);
 
       // ------------------------------------
       // STEP 3. Build WAL edit
       // ----------------------------------
+      start = System.nanoTime();
       walEdit = new WALEdit(cellCount, isInReplay);
       Durability durability = Durability.USE_DEFAULT;
       for (int i = firstIndex; i < lastIndexExclusive; i++) {
@@ -3515,10 +3522,12 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         }
         addFamilyMapToWALEdit(familyMaps[i], walEdit);
       }
+      impl.setBuildWALHisto(System.nanoTime() - start);
 
       // -------------------------
       // STEP 4. Append the final edit to WAL. Do not sync wal.
       // -------------------------
+      start = System.nanoTime();
       Mutation mutation = batchOp.getMutation(firstIndex);
       if (isInReplay) {
         // use wal key from the original
@@ -3556,6 +3565,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       } else {
         mvccNum = batchOp.getReplaySequenceId();
       }
+      impl.setAppendWALHisto(System.nanoTime() - start);
 
       // ------------------------------------
       // STEP 5. Write back to memstore
@@ -3566,6 +3576,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       // visible to scanners till we update the MVCC. The MVCC is
       // moved only when the sync is complete.
       // ----------------------------------
+      start = System.nanoTime();
       for (int i = firstIndex; i < lastIndexExclusive; i++) {
         if (batchOp.retCodeDetails[i].getOperationStatusCode()
             != OperationStatusCode.NOT_RUN) {
@@ -3586,19 +3597,23 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         doRollBackMemstore = true; // If we have a failure, we need to clean what we wrote
         addedSize += applyFamilyMapToMemstore(familyMaps[i]);
       }
+      impl.setWriteMemstoreHisto(System.nanoTime() - start);
 
       // -------------------------------
       // STEP 6. Release row locks, etc.
       // -------------------------------
+      start = System.nanoTime();
       if (locked) {
         this.updatesLock.readLock().unlock();
         locked = false;
       }
       releaseRowLocks(acquiredRowLocks);
+      impl.setReleaseLockHisto(System.nanoTime() - start);
 
       // -------------------------
       // STEP 7. Sync wal.
       // -------------------------
+      start = System.nanoTime();
       if (txid != 0) {
         syncOrDefer(txid, durability);
       }
@@ -3614,10 +3629,12 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           batchOp.retCodeDetails, batchOp.walEditsFromCoprocessors, firstIndex, lastIndexExclusive);
         coprocessorHost.postBatchMutate(miniBatchOp);
       }
+      impl.setSyncWALHisto(System.nanoTime() - start);
 
       // ------------------------------------------------------------------
       // STEP 8. Advance mvcc. This will make this put visible to scanners and getters.
       // ------------------------------------------------------------------
+      start = System.nanoTime();
       if (writeEntry != null) {
         mvcc.completeAndWait(writeEntry);
         writeEntry = null;
@@ -3651,6 +3668,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           }
         }
       }
+      impl.setAdvanceMVCCHisto(System.nanoTime() - start);
 
       success = true;
       return addedSize;

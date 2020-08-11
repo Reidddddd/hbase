@@ -245,4 +245,8 @@ public class MetricsRegionServer {
     }
     this.serverWriteQueryMeter.mark();
   }
+
+  public MetricsRegionServerSourceImpl getServerSource() {
+    return (MetricsRegionServerSourceImpl) serverSource;
+  }
 }

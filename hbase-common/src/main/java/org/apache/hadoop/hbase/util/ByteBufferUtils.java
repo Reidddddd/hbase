@@ -181,7 +181,7 @@ public final class ByteBufferUtils {
         // yes, UnsafeComparer does implement Comparer<byte[]>
         @SuppressWarnings("unchecked")
         Converter converter = (Converter) theClass.getConstructor().newInstance();
-        return converter;
+        return PureJavaConverter.INSTANCE;
       } catch (Throwable t) { // ensure we really catch *everything*
         return PureJavaConverter.INSTANCE;
       }

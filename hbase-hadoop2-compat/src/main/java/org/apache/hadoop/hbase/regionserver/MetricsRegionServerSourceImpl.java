@@ -49,6 +49,15 @@ public class MetricsRegionServerSourceImpl
   private final MetricHistogram scanSizeHisto;
   private final MetricHistogram scanTimeHisto;
 
+  private final MetricHistogram acquireLockHisto;
+  private final MetricHistogram updateTsHisto;
+  private final MetricHistogram buildWALHisto;
+  private final MetricHistogram appendWALHisto;
+  private final MetricHistogram writeMemstoreHisto;
+  private final MetricHistogram releaseLockHisto;
+  private final MetricHistogram syncWALHisto;
+  private final MetricHistogram advanceMVCCHisto;
+
   private final MutableFastCounter slowPut;
   private final MutableFastCounter slowDelete;
   private final MutableFastCounter slowGet;
@@ -176,6 +185,15 @@ public class MetricsRegionServerSourceImpl
       WARN_THRESHOLD_COUNT_DESC, 0L);
     pausesWithGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITH_GC_KEY);
     pausesWithoutGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITHOUT_GC_KEY);
+
+    acquireLockHisto = getMetricsRegistry().newTimeHistogram("acquireLock");
+    updateTsHisto = getMetricsRegistry().newTimeHistogram("updateTs");
+    buildWALHisto = getMetricsRegistry().newTimeHistogram("buildWAL");
+    appendWALHisto = getMetricsRegistry().newTimeHistogram("appendWAL");
+    writeMemstoreHisto = getMetricsRegistry().newTimeHistogram("writeMemstore");
+    releaseLockHisto = getMetricsRegistry().newTimeHistogram("releaseLock");
+    syncWALHisto = getMetricsRegistry().newTimeHistogram("syncWAL");
+    advanceMVCCHisto = getMetricsRegistry().newTimeHistogram("advanceMVCC");
   }
 
   @Override
@@ -560,5 +578,30 @@ public class MetricsRegionServerSourceImpl
   @Override
   public void updatePutBatch(long t) {
     putBatchHisto.add(t);
+  }
+
+  public void setAcquireLockHisto(long delta) {
+    acquireLockHisto.add(delta);
+  }
+  public void setUpdateTsHisto(long delta) {
+    updateTsHisto.add(delta);
+  }
+  public void setBuildWALHisto(long delta) {
+    buildWALHisto.add(delta);
+  }
+  public void setAppendWALHisto(long delta) {
+    appendWALHisto.add(delta);
+  }
+  public void setWriteMemstoreHisto(long delta) {
+    writeMemstoreHisto.add(delta);
+  }
+  public void setReleaseLockHisto(long delta) {
+    releaseLockHisto.add(delta);
+  }
+  public void setSyncWALHisto(long delta) {
+    syncWALHisto.add(delta);
+  }
+  public void setAdvanceMVCCHisto(long delta) {
+    advanceMVCCHisto.add(delta);
   }
 }
