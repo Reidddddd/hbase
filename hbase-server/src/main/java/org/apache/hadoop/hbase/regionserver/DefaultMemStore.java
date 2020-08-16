@@ -181,9 +181,16 @@ public class DefaultMemStore implements MemStore {
    */
   @Override
   public long add(Cell cell) {
+    long start = System.nanoTime();
     Cell toAdd = maybeCloneWithAllocator(cell);
+    LOG.info("maybeCloneWithAllocator: " + (System.nanoTime() - start) + "ns");
     boolean mslabUsed = (toAdd != cell);
-    return internalAdd(toAdd, mslabUsed);
+    try {
+      start = System.nanoTime();
+      return internalAdd(toAdd, mslabUsed);
+    } finally {
+      LOG.info("internalAdd: " + (System.nanoTime() - start) + "ns");
+    }
   }
 
   @Override
@@ -235,8 +242,13 @@ public class DefaultMemStore implements MemStore {
    * @return the heap size change in bytes
    */
   private long internalAdd(final Cell toAdd, boolean mslabUsed) {
+    long start = System.nanoTime();
     boolean notPresent = addToCellSet(toAdd);
+    LOG.info("addToCellSet: " + (System.nanoTime() - start));
+    start = System.nanoTime();
     long s = heapSizeChange(toAdd, notPresent);
+    LOG.info("heapSizeChange: " + (System.nanoTime() - start));
+    start = System.nanoTime();
     if (notPresent) {
       activeSection.getCellsCount().incrementAndGet();
     }
@@ -248,6 +260,7 @@ public class DefaultMemStore implements MemStore {
     }
     activeSection.getTimeRangeTracker().includeTimestamp(toAdd);
     activeSection.getHeapSize().addAndGet(s);
+    LOG.info("rest: " + (System.nanoTime() - start));
     return s;
   }
 
