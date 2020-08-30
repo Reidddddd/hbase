@@ -27,6 +27,7 @@ import java.util.NavigableSet;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
@@ -48,14 +49,23 @@ import org.apache.hadoop.hbase.classification.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public class CellSkipListSet implements NavigableSet<Cell> {
-  private final ConcurrentNavigableMap<Cell, Cell> delegatee;
+  private ConcurrentNavigableMap<Cell, Cell> delegatee;
+  private ConcurrentSkipListSet<Cell> cellSet;
 
-  CellSkipListSet(final KeyValue.KVComparator c) {
-    this.delegatee = new ConcurrentSkipListMap<Cell, Cell>(c);
+  private final boolean newdelegate;
+
+  CellSkipListSet(final KeyValue.KVComparator c, boolean newdelegate) {
+    this.newdelegate = newdelegate;
+    if (newdelegate) {
+      cellSet = new ConcurrentSkipListSet<>(c);
+    } else {
+      delegatee = new ConcurrentSkipListMap<Cell, Cell>(c);
+    }
   }
 
-  CellSkipListSet(final ConcurrentNavigableMap<Cell, Cell> m) {
+  CellSkipListSet(final ConcurrentNavigableMap<Cell, Cell> m, boolean newdelegate) {
     this.delegatee = m;
+    this.newdelegate = newdelegate;
   }
 
   public Cell ceiling(Cell e) {
@@ -63,7 +73,7 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public Iterator<Cell> descendingIterator() {
-    return this.delegatee.descendingMap().values().iterator();
+    return newdelegate ? cellSet.descendingSet().iterator() : delegatee.descendingMap().values().iterator();
   }
 
   public NavigableSet<Cell> descendingSet() {
@@ -75,12 +85,13 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public SortedSet<Cell> headSet(final Cell toElement) {
-    return headSet(toElement, false);
+    return newdelegate ? cellSet.headSet(toElement) : headSet(toElement, false);
   }
 
   public NavigableSet<Cell> headSet(final Cell toElement,
       boolean inclusive) {
-    return new CellSkipListSet(this.delegatee.headMap(toElement, inclusive));
+    return newdelegate ? cellSet.headSet(toElement, inclusive) :
+        new CellSkipListSet(delegatee.headMap(toElement, inclusive), false);
   }
 
   public Cell higher(Cell e) {
@@ -88,7 +99,7 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public Iterator<Cell> iterator() {
-    return this.delegatee.values().iterator();
+    return newdelegate ? cellSet.iterator() : delegatee.values().iterator();
   }
 
   public Cell lower(Cell e) {
@@ -113,11 +124,12 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public SortedSet<Cell> tailSet(Cell fromElement) {
-    return tailSet(fromElement, true);
+    return newdelegate ? cellSet.tailSet(fromElement) : tailSet(fromElement, true);
   }
 
   public NavigableSet<Cell> tailSet(Cell fromElement, boolean inclusive) {
-    return new CellSkipListSet(this.delegatee.tailMap(fromElement, inclusive));
+    return newdelegate ? cellSet.tailSet(fromElement, inclusive) :
+        new CellSkipListSet(delegatee.tailMap(fromElement, inclusive), false);
   }
 
   public Comparator<? super Cell> comparator() {
@@ -125,14 +137,18 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public Cell first() {
-    return this.delegatee.firstEntry().getValue();
+    return newdelegate ? cellSet.first() : delegatee.firstEntry().getValue();
   }
 
   public Cell last() {
-    return this.delegatee.lastEntry().getValue();
+    return newdelegate ? cellSet.last() : delegatee.lastEntry().getValue();
   }
 
   public boolean add(Cell e) {
+    if (newdelegate) {
+      cellSet.remove(e);
+      return cellSet.add(e);
+    }
     return this.delegatee.put(e, e) == null;
   }
 
@@ -141,12 +157,16 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public void clear() {
-    this.delegatee.clear();
+    if (newdelegate) {
+      cellSet.clear();
+    } else {
+      delegatee.clear();
+    }
   }
 
   public boolean contains(Object o) {
     //noinspection SuspiciousMethodCalls
-    return this.delegatee.containsKey(o);
+    return newdelegate ? cellSet.contains(o) : delegatee.containsKey(o);
   }
 
   public boolean containsAll(Collection<?> c) {
@@ -154,11 +174,11 @@ public class CellSkipListSet implements NavigableSet<Cell> {
   }
 
   public boolean isEmpty() {
-    return this.delegatee.isEmpty();
+    return newdelegate ? cellSet.isEmpty() : delegatee.isEmpty();
   }
 
   public boolean remove(Object o) {
-    return this.delegatee.remove(o) != null;
+    return newdelegate ? cellSet.remove(o) : delegatee.remove(o) != null;
   }
 
   public boolean removeAll(Collection<?> c) {
@@ -169,15 +189,8 @@ public class CellSkipListSet implements NavigableSet<Cell> {
     throw new UnsupportedOperationException("Not implemented");
   }
 
-  public Cell get(Cell kv) {
-    return this.delegatee.get(kv);
-  }
-
   public int size() {
-    if (delegatee instanceof ConcurrentSkipListMap) {
-      throw new UnsupportedOperationException("ConcurrentSkipListMap.size() is time-consuming");
-    }
-    return this.delegatee.size();
+    return newdelegate ? cellSet.size() : delegatee.size();
   }
 
   public Object[] toArray() {
@@ -190,6 +203,6 @@ public class CellSkipListSet implements NavigableSet<Cell> {
 
   @VisibleForTesting
   int sizeForTests() {
-    return this.delegatee.size();
+    return cellSet.size();
   }
 }

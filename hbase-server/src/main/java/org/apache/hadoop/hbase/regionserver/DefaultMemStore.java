@@ -109,7 +109,7 @@ public class DefaultMemStore implements MemStore {
     this.conf = conf;
     this.comparator = c;
     this.activeSection = Section.newActiveSection(comparator, conf);
-    this.snapshotSection = Section.newSnapshotSection(comparator);
+    this.snapshotSection = Section.newSnapshotSection(comparator, conf);
   }
 
   /**
@@ -156,7 +156,7 @@ public class DefaultMemStore implements MemStore {
     }
     // OK. Passed in snapshot is same as current snapshot.
     MemStoreLAB tmpAllocator = snapshotSection.getMemStoreLAB();
-    snapshotSection = Section.newSnapshotSection(comparator);
+    snapshotSection = Section.newSnapshotSection(comparator, conf);
     if (tmpAllocator != null) {
       tmpAllocator.close();
     }
@@ -296,8 +296,7 @@ public class DefaultMemStore implements MemStore {
     // not the snapshot. The flush of this snapshot to disk has not
     // yet started because Store.flush() waits for all rwcc transactions to
     // commit before starting the flush to disk.
-    Cell found = snapshotSection.getCellSkipListSet().get(cell);
-    if (found != null && found.getSequenceId() == cell.getSequenceId()) {
+    if (snapshotSection.getCellSkipListSet().contains(cell)) {
       snapshotSection.getCellSkipListSet().remove(cell);
       long sz = heapSizeChange(cell, true);
       snapshotSection.getHeapSize().addAndGet(-sz);
@@ -305,10 +304,9 @@ public class DefaultMemStore implements MemStore {
     }
 
     // If the key is in the memstore, delete it. Update this.size.
-    found = activeSection.getCellSkipListSet().get(cell);
-    if (found != null && found.getSequenceId() == cell.getSequenceId()) {
-      removeFromCellSet(found);
-      long sz = heapSizeChange(found, true);
+    if (activeSection.getCellSkipListSet().contains(cell)) {
+      removeFromCellSet(cell);
+      long sz = heapSizeChange(cell, true);
       activeSection.getHeapSize().addAndGet(-sz);
       activeSection.getCellsCount().decrementAndGet();
     }
@@ -1142,8 +1140,8 @@ public class DefaultMemStore implements MemStore {
     private final AtomicInteger cellCount;
     private final MemStoreLAB allocator;
 
-    static Section newSnapshotSection(final KeyValue.KVComparator c) {
-      return new Section(c, null, 0);
+    static Section newSnapshotSection(final KeyValue.KVComparator c, Configuration conf) {
+      return new Section(c, conf, 0);
     }
 
     static Section newActiveSection(final KeyValue.KVComparator c,
@@ -1153,7 +1151,7 @@ public class DefaultMemStore implements MemStore {
 
     private Section(final KeyValue.KVComparator c,
             final Configuration conf, long initHeapSize) {
-      this.cellSet = new CellSkipListSet(c);
+      this.cellSet = new CellSkipListSet(c, conf.getBoolean("hbase.regionserver.memstore.new.delegate", false));
       this.heapSize = new AtomicLong(initHeapSize);
       this.cellCount = new AtomicInteger(0);
       if (conf != null && conf.getBoolean(USEMSLAB_KEY, USEMSLAB_DEFAULT)) {
