@@ -132,7 +132,7 @@ public class StochasticLoadBalancer extends BaseLoadBalancer {
 
   private CandidateGenerator[] candidateGenerators;
   private CostFromRegionLoadFunction[] regionLoadFunctions;
-  private CostFunction[] costFunctions; // FindBugs: Wants this protected; IS2_INCONSISTENT_SYNC
+  private List<CostFunction> costFunctions; // FindBugs: Wants this protected; IS2_INCONSISTENT_SYNC
 
   // to save and report costs to JMX
   private Double curOverallCost = 0d;
@@ -203,24 +203,26 @@ public class StochasticLoadBalancer extends BaseLoadBalancer {
     regionReplicaHostCostFunction = new RegionReplicaHostCostFunction(conf);
     regionReplicaRackCostFunction = new RegionReplicaRackCostFunction(conf);
 
-    costFunctions = new CostFunction[]{
-      new RegionCountSkewCostFunction(conf),
-      new PrimaryRegionCountSkewCostFunction(conf),
-      new MoveCostFunction(conf),
-      localityCost,
-      rackLocalityCost,
-      new TableSkewCostFunction(conf),
-      regionReplicaHostCostFunction,
-      regionReplicaRackCostFunction,
-      regionLoadFunctions[0],
-      regionLoadFunctions[1],
-      regionLoadFunctions[2],
-      regionLoadFunctions[3],
-    };
+    costFunctions = new ArrayList<>();
+    addCostFunction(new RegionCountSkewCostFunction(conf));
+    addCostFunction(new PrimaryRegionCountSkewCostFunction(conf));
+    addCostFunction(new MoveCostFunction(conf));
+    addCostFunction(localityCost);
+    addCostFunction(rackLocalityCost);
+    addCostFunction(new TableSkewCostFunction(conf));
+    addCostFunction(regionReplicaHostCostFunction);
+    addCostFunction(regionReplicaRackCostFunction);
+    addCostFunction(regionLoadFunctions[0]);
+    addCostFunction(regionLoadFunctions[1]);
+    addCostFunction(regionLoadFunctions[2]);
+    addCostFunction(regionLoadFunctions[3]);
 
-    curFunctionCosts= new Double[costFunctions.length];
-    tempFunctionCosts= new Double[costFunctions.length];
+    curFunctionCosts = new Double[costFunctions.size()];
+    tempFunctionCosts = new Double[costFunctions.size()];
 
+    LOG.info("Loaded config; maxSteps=" + maxSteps + ", stepsPerRegion=" + stepsPerRegion +
+            ", maxRunningTime=" + maxRunningTime + ", isByTable=" + isByTable + ", CostFunctions=" +
+            Arrays.toString(getCostFunctionNames()) + " etc.");
   }
 
   @Override
@@ -477,14 +479,20 @@ public class StochasticLoadBalancer extends BaseLoadBalancer {
         "Overall", "Overall cost", overall);
 
       // each cost function
-      for (int i = 0; i < costFunctions.length; i++) {
-        CostFunction costFunction = costFunctions[i];
+      for (int i = 0; i < costFunctions.size(); i++) {
+        CostFunction costFunction = costFunctions.get(i);
         String costFunctionName = costFunction.getClass().getSimpleName();
         Double costPercent = (overall == 0) ? 0 : (subCosts[i] / overall);
         // TODO: cost function may need a specific description
         balancer.updateStochasticCost(tableName.getNameAsString(), costFunctionName,
           "The percent of " + costFunctionName, costPercent);
       }
+    }
+  }
+
+  private void addCostFunction(CostFunction costFunction) {
+    if (costFunction.getMultiplier() > 0) {
+      costFunctions.add(costFunction);
     }
   }
 
@@ -581,9 +589,9 @@ public class StochasticLoadBalancer extends BaseLoadBalancer {
    */
   public String[] getCostFunctionNames() {
     if (costFunctions == null) return null;
-    String[] ret = new String[costFunctions.length];
-    for (int i = 0; i < costFunctions.length; i++) {
-      CostFunction c = costFunctions[i];
+    String[] ret = new String[costFunctions.size()];
+    for (int i = 0; i < costFunctions.size(); i++) {
+      CostFunction c = costFunctions.get(i);
       ret[i] = c.getClass().getSimpleName();
     }
 
@@ -602,8 +610,8 @@ public class StochasticLoadBalancer extends BaseLoadBalancer {
   protected double computeCost(Cluster cluster, double previousCost) {
     double total = 0;
 
-    for (int i = 0; i < costFunctions.length; i++) {
-      CostFunction c = costFunctions[i];
+    for (int i = 0; i < costFunctions.size(); i++) {
+      CostFunction c = costFunctions.get(i);
       this.tempFunctionCosts[i] = 0.0;
 
       if (c.getMultiplier() <= 0) {
