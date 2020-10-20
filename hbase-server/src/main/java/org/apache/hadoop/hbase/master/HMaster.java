@@ -1877,6 +1877,16 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       warnOrThrowExceptionForFailure(logWarn, CONF_KEY, message, null);
     }
 
+    String storagePolicy = htd.getStoragePolicy();
+    if (storagePolicy != null) {
+      if (!storagePolicy.equals("NONE") && !storagePolicy.equals("LAZY_PERSIST") &&
+          !storagePolicy.equals("HOT") && !storagePolicy.equals("COLD") && !storagePolicy.equals("WARM") &&
+          !storagePolicy.equals("ALL_SSD") && !storagePolicy.equals("ONE_SSD")) {
+        String message = "Unknown/Unsupported storage type";
+        warnOrThrowExceptionForFailure(logWarn, CONF_KEY, message, null);
+      }
+    }
+
     for (HColumnDescriptor hcd : htd.getColumnFamilies()) {
       if (hcd.getTimeToLive() <= 0) {
         String message = "TTL for column family " + hcd.getNameAsString() + " must be positive.";

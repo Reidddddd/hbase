@@ -29,6 +29,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -45,10 +47,12 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.executor.EventType;
 import org.apache.hadoop.hbase.master.MasterCoprocessorHost;
+import org.apache.hadoop.hbase.master.MasterFileSystem;
 import org.apache.hadoop.hbase.procedure2.StateMachineProcedure;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProcedureProtos;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProcedureProtos.ModifyTableState;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -305,6 +309,12 @@ public class ModifyTableProcedure
       if (modifiedHTableDescriptor.getRegionReplication() != unmodifiedHTableDescriptor
           .getRegionReplication()) {
         throw new IOException("REGION_REPLICATION change is not supported for enabled tables");
+      }
+
+      if (!modifiedHTableDescriptor.getStoragePolicy().equals(unmodifiedHTableDescriptor.getStoragePolicy())) {
+        MasterFileSystem mfs = env.getMasterServices().getMasterFileSystem();
+        Path tableDir = FSUtils.getTableDir(mfs.getRootDir(), modifiedHTableDescriptor.getTableName());
+        FSUtils.setStoragePolicy(mfs.getFileSystem(), tableDir, modifiedHTableDescriptor.getStoragePolicy());
       }
     }
 
