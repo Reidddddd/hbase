@@ -35,7 +35,8 @@ import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.codec.Codec;
-import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
+import org.apache.hadoop.hbase.io.ByteBuffOutputStream;
+import org.apache.hadoop.hbase.io.ByteBuffPool;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
 import org.apache.hadoop.hbase.util.ClassSize;
@@ -204,6 +205,7 @@ class CellBlockBuilder {
    * @param cellScanner
    * @param pool Pool of ByteBuffers to make use of. Can be null and then we'll allocate our own
    *          ByteBuffer.
+   * @param responseCellSize repsonse cell sizes.
    * @return Null or byte buffer filled with a cellblock filled with passed-in Cells encoded using
    *         passed in <code>codec</code> and/or <code>compressor</code>; the returned buffer has
    *         been flipped and is ready for reading. Use limit to find total size. If
@@ -212,26 +214,18 @@ class CellBlockBuilder {
    * @throws IOException
    */
   public ByteBuffer buildCellBlock(Codec codec, CompressionCodec compressor,
-      CellScanner cellScanner, BoundedByteBufferPool pool) throws IOException {
+      CellScanner cellScanner, ByteBuffPool pool, int responseCellSize) throws IOException {
     if (cellScanner == null) {
       return null;
     }
     if (codec == null) {
       throw new CellScannerButNoCodecException();
     }
-    ByteBufferOutputStream bbos;
-    ByteBuffer bb = null;
-    if (pool != null) {
-      bb = pool.getBuffer();
-      bbos = new ByteBufferOutputStream(bb);
-    } else {
-      bbos = new ByteBufferOutputStream(cellBlockBuildingInitialBufferSize);
-    }
+    ByteBuffer bb = pool.claimBuffer(responseCellSize);
+    ByteBuffOutputStream bbos = pool.createResizableByteBufferOutputStream(bb);
     encodeCellsTo(bbos, cellScanner, codec, compressor);
     if (bbos.size() == 0) {
-      if (pool != null) {
-        pool.putBuffer(bb);
-      }
+      pool.reclaimBuffer(bb);
       return null;
     }
     return bbos.getByteBuffer();
