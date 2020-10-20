@@ -197,6 +197,71 @@ public abstract class FSUtils {
   }
 
   /**
+   * Sets storage policy for given path directly.
+   * If the passed path is a directory, we'll set the storage policy for all files
+   * created in the future in said directory. Note that this change in storage
+   * policy takes place at the HDFS level; it will persist beyond this RS's lifecycle.
+   * If we're running on a version of HDFS that doesn't support the given storage policy
+   * (or storage policies at all), then we'll issue a log message and continue.
+   *
+   * See https://hadoop.apache.org/docs/r2.10.1/hadoop-project-dist/hadoop-hdfs/ArchivalStorage.html
+   *
+   * @param fs We only do anything if an instance of DistributedFileSystem
+   * @param path the Path whose storage policy is to be set
+   * @param storagePolicy usually should be the policy NONE to delegate to HDFS
+   */
+  public static void setStoragePolicy(final FileSystem fs, final Path path, final String storagePolicy) {
+    if (fs instanceof DistributedFileSystem) {
+      DistributedFileSystem dfs = (DistributedFileSystem)fs;
+      // Once our minimum supported Hadoop version is 2.6.0 we can remove reflection.
+      Class<? extends DistributedFileSystem> dfsClass = dfs.getClass();
+      Method m = null;
+      try {
+        m = dfsClass.getDeclaredMethod("setStoragePolicy",
+            new Class<?>[] { Path.class, String.class });
+        m.setAccessible(true);
+      } catch (NoSuchMethodException e) {
+        LOG.info("FileSystem doesn't support"
+            + " setStoragePolicy; --HDFS-6584 not available");
+      } catch (SecurityException e) {
+        LOG.info("Doesn't have access to setStoragePolicy on "
+            + "FileSystems --HDFS-6584 not available", e);
+        m = null; // could happen on setAccessible()
+      }
+      if (m != null) {
+        try {
+          m.invoke(dfs, path, storagePolicy);
+          LOG.info("set " + storagePolicy + " for " + path);
+        } catch (Exception e) {
+          // check for lack of HDFS-7228
+          boolean probablyBadPolicy = false;
+          if (e instanceof InvocationTargetException) {
+            final Throwable exception = e.getCause();
+            if (exception instanceof RemoteException &&
+                HadoopIllegalArgumentException.class.getName().equals(
+                    ((RemoteException)exception).getClassName())) {
+              LOG.warn("Given storage policy, '" + storagePolicy + "', was rejected and probably " +
+                  "isn't a valid policy for the version of Hadoop you're running. I.e. if you're " +
+                  "trying to use SSD related policies then you're likely missing HDFS-7228. For " +
+                  "more information see the 'ArchivalStorage' docs for your Hadoop release.");
+              LOG.debug("More information about the invalid storage policy.", exception);
+              probablyBadPolicy = true;
+            }
+          }
+          if (!probablyBadPolicy) {
+            // This swallows FNFE, should we be throwing it? seems more likely to indicate dev
+            // misuse than a runtime problem with HDFS.
+            LOG.warn("Unable to set " + storagePolicy + " for " + path, e);
+          }
+        }
+      }
+    } else {
+      LOG.info("FileSystem isn't an instance of DistributedFileSystem; presuming it doesn't " +
+          "support setStoragePolicy.");
+    }
+  }
+
+  /**
    * @return True is <code>fs</code> is instance of DistributedFileSystem
    * @throws IOException
    */
@@ -209,7 +274,7 @@ public abstract class FSUtils {
     }
     return fileSystem instanceof DistributedFileSystem;
   }
- 
+
   /**
    * Compare of path component. Does not consider schema; i.e. if schemas
    * different but <code>path</code> starts with <code>rootPath</code>,

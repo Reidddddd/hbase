@@ -1010,7 +1010,7 @@ module Hbase
       end
 
       return servernames
-    end 
+    end
 
     # Apply config specific to a table/column to its descriptor
     def set_descriptor_config(descriptor, config)
@@ -1174,6 +1174,7 @@ module Hbase
       htd.setRegionMemstoreReplication(JBoolean.valueOf(arg.delete(org.apache.hadoop.hbase.HTableDescriptor::REGION_MEMSTORE_REPLICATION))) if arg.include?(org.apache.hadoop.hbase.HTableDescriptor::REGION_MEMSTORE_REPLICATION)
       htd.setRegionSplitPolicyClassName(arg.delete(org.apache.hadoop.hbase.HTableDescriptor::SPLIT_POLICY)) if arg.include?(org.apache.hadoop.hbase.HTableDescriptor::SPLIT_POLICY)
       htd.setRegionReplication(JInteger.valueOf(arg.delete(org.apache.hadoop.hbase.HTableDescriptor::REGION_REPLICATION))) if arg.include?(org.apache.hadoop.hbase.HTableDescriptor::REGION_REPLICATION)
+      htd.setStoragePolicy(arg.delete(org.apache.hadoop.hbase.HTableDescriptor::STORAGE_POLICY)) if arg.include?(org.apache.hadoop.hbase.HTableDescriptor::STORAGE_POLICY)
       set_user_metadata(htd, arg.delete(METADATA)) if arg[METADATA]
       set_descriptor_config(htd, arg.delete(CONFIGURATION)) if arg[CONFIGURATION]
     end

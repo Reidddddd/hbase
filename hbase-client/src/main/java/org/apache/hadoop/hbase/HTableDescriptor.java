@@ -216,6 +216,10 @@ public class HTableDescriptor implements WritableComparable<HTableDescriptor> {
   private static final ImmutableBytesWritable PRIORITY_KEY =
     new ImmutableBytesWritable(Bytes.toBytes(PRIORITY));
 
+  public static final String STORAGE_POLICY = "STORAGE_POLICY";
+  private static final ImmutableBytesWritable STORAGE_POLICY_KEY =
+    new ImmutableBytesWritable(Bytes.toBytes(STORAGE_POLICY));
+
   /** Relative priority of the table used for rpc scheduling */
   private static final int DEFAULT_PRIORITY = HConstants.NORMAL_QOS;
 
@@ -257,6 +261,8 @@ public class HTableDescriptor implements WritableComparable<HTableDescriptor> {
 
   public static final boolean DEFAULT_REGION_MEMSTORE_REPLICATION = true;
 
+  public static final String DEFAULT_STORAGE_POLICY = "NONE";
+
   private final static Map<String, String> DEFAULT_VALUES
     = new HashMap<String, String>();
   private final static Set<ImmutableBytesWritable> RESERVED_KEYWORDS
@@ -273,6 +279,7 @@ public class HTableDescriptor implements WritableComparable<HTableDescriptor> {
     DEFAULT_VALUES.put(REGION_REPLICATION, String.valueOf(DEFAULT_REGION_REPLICATION));
     DEFAULT_VALUES.put(NORMALIZATION_ENABLED, String.valueOf(DEFAULT_NORMALIZATION_ENABLED));
     DEFAULT_VALUES.put(PRIORITY, String.valueOf(DEFAULT_PRIORITY));
+    DEFAULT_VALUES.put(STORAGE_POLICY, DEFAULT_STORAGE_POLICY);
     for (String s : DEFAULT_VALUES.keySet()) {
       RESERVED_KEYWORDS.add(new ImmutableBytesWritable(Bytes.toBytes(s)));
     }
@@ -642,6 +649,24 @@ public class HTableDescriptor implements WritableComparable<HTableDescriptor> {
    */
   public HTableDescriptor setReadOnly(final boolean readOnly) {
     return setValue(READONLY_KEY, readOnly? TRUE: FALSE);
+  }
+
+  /**
+   * Please refer to https://hadoop.apache.org/docs/r2.10.1/hadoop-project-dist/hadoop-hdfs/ArchivalStorage.html
+   * for storage policy information.
+   * @param storagePolicy storage policy.
+   * @return
+   */
+  public HTableDescriptor setStoragePolicy(final String storagePolicy) {
+    return setValue(STORAGE_POLICY_KEY, storagePolicy.toUpperCase());
+  }
+
+  /**
+   * Returns the storage policy for the table.
+   * @return null means table uses fs default storage policy, or the fs itself doesn't support storage policy.
+   */
+  public String getStoragePolicy() {
+    return getValue(STORAGE_POLICY);
   }
 
   /**

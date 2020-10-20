@@ -401,6 +401,10 @@ public class CreateTableProcedure
       throw new IOException("Unable to move table from temp=" + tempTableDir +
         " to hbase root=" + tableDir);
     }
+    if (hTableDescriptor.getStoragePolicy() != null && // For BC, older client doesn't have this attribute, can skip.
+        !hTableDescriptor.getStoragePolicy().equalsIgnoreCase(HTableDescriptor.DEFAULT_STORAGE_POLICY)) {
+      FSUtils.setStoragePolicy(fs, tableDir, hTableDescriptor.getStoragePolicy());
+    }
     return newRegions;
   }
 
