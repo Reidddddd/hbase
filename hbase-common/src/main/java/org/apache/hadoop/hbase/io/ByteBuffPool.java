@@ -82,11 +82,45 @@ public class ByteBuffPool {
   }
 
   /**
-   * Claim ByteBuffer with estimated size
+   * Claim ByteBuffer with exact size, and it is claimed from on-heap. It should be used when size is clear and sure.
+   * @param size exact size
+   * @return a byte buffer
+   */
+  public ByteBuffer claimBufferExactly(int size) {
+    // BufferSizeManager for this should not be cleaned. And it doesn't respect the min max.
+    if (!useReservoir) {
+      return ByteBuffer.allocate(size);
+    }
+
+    BufferSizeManager manager = bufferManagers.get(size);
+    if (manager == null) {
+      manager = new BufferSizeManager(size, false, true);
+      if (!bufferManagers.containsKey(size)) {
+        bufferManagers.put(size, manager);
+      }
+    }
+    // Get again, for cocurrency concern.
+    manager = bufferManagers.get(size);
+    return manager.allocate();
+  }
+
+  /**
+   * Claim ByteBuffer with estimated size, use direct or not is determined by reservoir.
+   * It should be used in Requests/Response.
    * @param size estimated size
    * @return a byte buffer
    */
   public ByteBuffer claimBuffer(int size) {
+    return claimBuffer(size, directBuffer);
+  }
+
+  /**
+   * Claim ByteBuffer with estimated size. It should be used in Requests/Response.
+   * @param size estimated size
+   * @param direct use direct ByteBuffer if true. If reservoir is disabled, it will allocate on-heap ByteBuffer
+   * @return a byte buffer
+   */
+  public ByteBuffer claimBuffer(int size, boolean direct) {
     if (!useReservoir) {
       return ByteBuffer.allocate(size);
     }
@@ -103,7 +137,7 @@ public class ByteBuffPool {
 
     BufferSizeManager manager = bufferManagers.get(actualSize);
     if (manager == null) {
-      manager = new BufferSizeManager(actualSize);
+      manager = new BufferSizeManager(actualSize, direct, false);
       if (!bufferManagers.containsKey(size)) {
         bufferManagers.put(actualSize, manager);
       }
@@ -118,12 +152,16 @@ public class ByteBuffPool {
    * @param buf return byte buffer
    */
   public void reclaimBuffer(ByteBuffer buf) {
-    if (!useReservoir ||
-        buf.capacity() > maxByteBufferSizeToCache) {
+    if (!useReservoir) {
       return;
     }
 
     BufferSizeManager manager = bufferManagers.get(buf.capacity());
+    if (manager == null) {
+      // e.g., if buf was larger than maxByteBufferSizeToCache
+      // there would be no BufferSizeManager.
+      return;
+    }
     manager.recycle(buf);
   }
 
@@ -143,6 +181,10 @@ public class ByteBuffPool {
       boolean cleaned = false;
       long currentT = EnvironmentEdgeManager.currentTime();
       for (BufferSizeManager bsm : bufferManagers.values()) {
+        if (bsm.direct || bsm.noNeedToClean) {
+          continue; // allocate direct memory is expensive. And it doesn't effect GC, just leave it.
+        }
+
         bsm.lock.lock();
         try {
           if (currentT - bsm.lastTouch < ttl || bsm.pool.size() == 0) {
@@ -233,11 +275,15 @@ public class ByteBuffPool {
     final int bufferSize;
     final ReentrantLock lock =  new ReentrantLock();
     final Queue<ByteBuffer> pool = new LinkedList<>();
+    final boolean direct;
+    final boolean noNeedToClean;
 
     volatile long lastTouch = -1;
 
-    BufferSizeManager(int bufferSize) {
+    BufferSizeManager(int bufferSize, boolean direct, boolean noNeedToClean) {
       this.bufferSize = bufferSize;
+      this.direct = direct;
+      this.noNeedToClean = noNeedToClean;
     }
 
     ByteBuffer allocate() {
@@ -245,7 +291,7 @@ public class ByteBuffPool {
       try {
         ByteBuffer buf = pool.poll();
         return buf != null ? buf :
-            directBuffer ? ByteBuffer.allocateDirect(bufferSize) : ByteBuffer.allocate(bufferSize);
+            direct ? ByteBuffer.allocateDirect(bufferSize) : ByteBuffer.allocate(bufferSize);
       } finally {
         touch();
         lock.unlock();
@@ -253,6 +299,7 @@ public class ByteBuffPool {
     }
 
     void recycle(ByteBuffer buf) {
+      buf.clear();
       lock.lock();
       try {
         pool.offer(buf);

@@ -386,9 +386,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="IS2_INCONSISTENT_SYNC",
         justification="Presume the lock on processing request held by caller is protection enough")
     void done() {
-      if (this.cellBlock != null) {
-        // Return buffer to reservoir now we are done with it.
-        reservoir.reclaimBuffer(this.cellBlock);
+      if (this.response != null) {
+        for (ByteBuffer buffer : response.getBuffers()) {
+          reservoir.reclaimBuffer(buffer);
+        }
+        this.response = null;
         this.cellBlock = null;
       }
       this.connection.decRpcCount();  // Say that we're done with this call.
@@ -481,16 +483,16 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         Message header = headerBuilder.build();
 
-        byte[] b = createHeaderAndMessageBytes(result, header);
+        ByteBuffer b = createHeaderAndMessageBytes(result, header);
 
-        bc = new BufferChain(ByteBuffer.wrap(b), this.cellBlock);
+        bc = new BufferChain(b, this.cellBlock);
       } catch (IOException e) {
         LOG.warn("Exception while creating response " + e);
       }
       this.response = bc;
     }
 
-    private byte[] createHeaderAndMessageBytes(Message result, Message header)
+    private ByteBuffer createHeaderAndMessageBytes(Message result, Message header)
         throws IOException {
       // Organize the response as a set of bytebuffers rather than collect it all together inside
       // one big byte array; save on allocations.
@@ -509,8 +511,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           + (resultSerializedSize + resultVintSize)
           + (this.cellBlock == null ? 0 : this.cellBlock.limit());
       // The byte[] should also hold the totalSize of the header, message and the cellblock
-      byte[] b = new byte[headerSerializedSize + headerVintSize + resultSerializedSize
-          + resultVintSize + Bytes.SIZEOF_INT];
+      int size = headerSerializedSize + headerVintSize + resultSerializedSize + resultVintSize + Bytes.SIZEOF_INT;
+      ByteBuffer bb = reservoir.claimBuffer(size, false);
+      byte[] b = bb.array();
       // The RpcClient expects the int to be in a format that code be decoded by
       // the DataInputStream#readInt(). Hence going with the Bytes.toBytes(int)
       // form of writing int.
@@ -525,7 +528,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       }
       cos.flush();
       cos.checkNoSpaceLeft();
-      return b;
+      bb.flip();
+      bb.limit(b.length);
+      return bb;
     }
 
     private synchronized void wrapWithSasl() throws IOException {
