@@ -39,8 +39,8 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
   private final MutableFastCounter authenticationSuccesses;
   private final MutableFastCounter authenticationFailures;
   private final MutableFastCounter authenticationFallbacks;
-  private final MutableFastCounter sentBytes;
-  private final MutableFastCounter receivedBytes;
+  private final MetricHistogram sentBytes;
+  private final MetricHistogram receivedBytes;
 
 
   private MetricHistogram queueCallTime;
@@ -67,10 +67,10 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
         AUTHENTICATION_FAILURES_DESC, 0L);
     this.authenticationFallbacks = this.getMetricsRegistry().newCounter(
         AUTHENTICATION_FALLBACKS_NAME, AUTHENTICATION_FALLBACKS_DESC, 0L);
-    this.sentBytes = this.getMetricsRegistry().newCounter(SENT_BYTES_NAME,
-        SENT_BYTES_DESC, 0L);
-    this.receivedBytes = this.getMetricsRegistry().newCounter(RECEIVED_BYTES_NAME,
-        RECEIVED_BYTES_DESC, 0L);
+    this.sentBytes = this.getMetricsRegistry().newSizeHistogram(SENT_BYTES_NAME,
+        SENT_BYTES_DESC);
+    this.receivedBytes = this.getMetricsRegistry().newSizeHistogram(RECEIVED_BYTES_NAME,
+        RECEIVED_BYTES_DESC);
     this.queueCallTime = this.getMetricsRegistry().newTimeHistogram(QUEUE_CALL_TIME_NAME,
         QUEUE_CALL_TIME_DESC);
     this.processCallTime = this.getMetricsRegistry().newTimeHistogram(PROCESS_CALL_TIME_NAME,
@@ -110,12 +110,12 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
 
   @Override
   public void sentBytes(long count) {
-    this.sentBytes.incr(count);
+    this.sentBytes.add(count);
   }
 
   @Override
   public void receivedBytes(int count) {
-    this.receivedBytes.incr(count);
+    this.receivedBytes.add(count);
   }
 
   @Override
