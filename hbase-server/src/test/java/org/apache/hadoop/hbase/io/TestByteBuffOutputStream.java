@@ -38,7 +38,7 @@ public class TestByteBuffOutputStream {
     Random random = new Random();
     ByteBuffer bb = reservoir.claimBuffer(64);
     assertEquals(64, bb.capacity());
-    ByteBuffOutputStream bbos = reservoir.createResizableByteBufferOutputStream(bb);
+    ByteBuffOutputStream bbos = reservoir.createByteBuffOutputStream(bb);
     byte[] writeMoreThan64 = new byte[120];
     for (int i = 0; i < 120; i++) {
       writeMoreThan64[i] = (byte) random.nextInt(10);

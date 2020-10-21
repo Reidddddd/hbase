@@ -43,7 +43,7 @@ import com.google.common.annotations.VisibleForTesting;
  * This intention is to align memory buffer and not to fragile the memory.
  *
  * <p>There's no limit on the number of ByteBuffer in pool, but there's one chore in this pool intervally
- * clean no time no use ByteBuffer in 2 hours.
+ * clean no time no use ByteBuffer in 3 hours.
  *
  * <p>This class is thread safe.
  */
@@ -144,7 +144,9 @@ public class ByteBuffPool {
     }
     // Get again, for cocurrency concern.
     manager = bufferManagers.get(actualSize);
-    return manager.allocate();
+    ByteBuffer buf = manager.allocate();
+    buf.limit(size);
+    return buf;
   }
 
   /**
@@ -152,7 +154,7 @@ public class ByteBuffPool {
    * @param buf return byte buffer
    */
   public void reclaimBuffer(ByteBuffer buf) {
-    if (!useReservoir) {
+    if (!useReservoir || buf == null) {
       return;
     }
 
@@ -165,8 +167,19 @@ public class ByteBuffPool {
     manager.recycle(buf);
   }
 
-  public ByteBuffOutputStream createResizableByteBufferOutputStream(ByteBuffer buf) {
+  /**
+   * It is resizeable, if buf provided is not suffcient for write.
+   * close will not reclaim the ByteBuffer. Need to explicitly call #reclaimBuffer.
+   */
+  public ByteBuffOutputStream createByteBuffOutputStream(ByteBuffer buf) {
     return new ByteBuffOutputStream(buf, this);
+  }
+
+  /**
+   * ByteBuffInputStream, close will automatically reclaim the buf.
+   */
+  public ByteBuffInputStream createByteBuffInputStream(ByteBuffer buf) {
+    return new ByteBuffInputStream(buf, this);
   }
 
   private class CleanByteBufferTask extends TimerTask {

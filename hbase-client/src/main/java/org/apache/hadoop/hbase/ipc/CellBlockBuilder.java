@@ -222,7 +222,7 @@ class CellBlockBuilder {
       throw new CellScannerButNoCodecException();
     }
     ByteBuffer bb = pool.claimBuffer(responseCellSize);
-    ByteBuffOutputStream bbos = pool.createResizableByteBufferOutputStream(bb);
+    ByteBuffOutputStream bbos = pool.createByteBuffOutputStream(bb);
     encodeCellsTo(bbos, cellScanner, codec, compressor);
     if (bbos.size() == 0) {
       pool.reclaimBuffer(bb);
@@ -261,6 +261,23 @@ class CellBlockBuilder {
     return codec.getDecoder(new ByteBufferInputStream(cellBlock));
   }
 
+  /**
+   * This should be used in server side.
+   * @param codec
+   * @param cellBlock ByteBuffer containing the cells written by the Codec. The buffer should be
+   *          position()'ed at the start of the cell block and limit()'ed at the end.
+   * @param pool ByteBuffer pool
+   * @return CellScanner to work against the content of <code>cellBlock</code>
+   * @throws IOException
+   */
+  public CellScanner createCellScanner(final Codec codec, final CompressionCodec compressor,
+                                       ByteBuffer cellBlock, ByteBuffPool pool) throws IOException {
+    if (compressor != null) {
+      cellBlock = decompress(compressor, cellBlock, pool);
+    }
+    return codec.getDecoder(pool.createByteBuffInputStream(cellBlock));
+  }
+
   private ByteBuffer decompress(CompressionCodec compressor, ByteBuffer cellBlock)
       throws IOException {
     // GZIPCodec fails w/ NPE if no configuration.
@@ -284,4 +301,28 @@ class CellBlockBuilder {
     }
     return cellBlock;
   }
+
+  private ByteBuffer decompress(CompressionCodec compressor, ByteBuffer cellBlock, ByteBuffPool pool)
+      throws IOException {
+    // GZIPCodec fails w/ NPE if no configuration.
+    if (compressor instanceof Configurable) {
+      ((Configurable) compressor).setConf(this.conf);
+    }
+    Decompressor poolDecompressor = CodecPool.getDecompressor(compressor);
+    CompressionInputStream cis =
+        compressor.createInputStream(pool.createByteBuffInputStream(cellBlock), poolDecompressor);
+    ByteBuffOutputStream bbos;
+    try {
+      ByteBuffer bb = pool.claimBuffer(
+          cellBlock.remaining() * this.cellBlockDecompressionMultiplier, false);
+      bbos = pool.createByteBuffOutputStream(bb);
+      IOUtils.copy(cis, bbos);
+      cis.close();
+      cellBlock = bbos.getByteBuffer();
+    } finally {
+      CodecPool.returnDecompressor(poolDecompressor);
+    }
+    return cellBlock;
+  }
+
 }

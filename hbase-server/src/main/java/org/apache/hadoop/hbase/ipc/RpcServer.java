@@ -88,6 +88,7 @@ import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.classification.InterfaceStability;
 import org.apache.hadoop.hbase.client.NeedUnmanagedConnectionException;
 import org.apache.hadoop.hbase.client.VersionInfoUtil;
+import org.apache.hadoop.hbase.codec.BaseDecoder;
 import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.exceptions.RegionMovedException;
@@ -518,8 +519,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       // the DataInputStream#readInt(). Hence going with the Bytes.toBytes(int)
       // form of writing int.
       Bytes.putInt(b, 0, totalSize);
-      CodedOutputStream cos = CodedOutputStream.newInstance(b, Bytes.SIZEOF_INT,
-          b.length - Bytes.SIZEOF_INT);
+      CodedOutputStream cos = CodedOutputStream.newInstance(b, Bytes.SIZEOF_INT, size - Bytes.SIZEOF_INT);
       if (header != null) {
         cos.writeMessageNoTag(header);
       }
@@ -528,8 +528,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       }
       cos.flush();
       cos.checkNoSpaceLeft();
-      bb.flip();
-      bb.limit(b.length);
       return bb;
     }
 
@@ -1370,7 +1368,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.channel = channel;
       this.lastContact = lastContact;
       this.data = null;
-      this.dataLengthBuffer = ByteBuffer.allocate(4);
+      this.dataLengthBuffer = reservoir.claimBufferExactly(4);
       this.socket = channel.socket();
       this.addr = socket.getInetAddress();
       if (addr == null) {
@@ -1781,8 +1779,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             // Close the connection
             return -1;
           }
-
-          data = ByteBuffer.allocate(dataLength);
+          // Make sure we avoid creating direct buffer here.
+          data = reservoir.claimBuffer(dataLength, false);
 
           // Increment the rpc count. This counter will be decreased when we write
           //  the response.  If we want the connection to be detected as idle properly, we
@@ -1819,7 +1817,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
       } finally {
         dataLengthBuffer.clear(); // Clean for the next call
-        data = null; // For the GC
+        reservoir.reclaimBuffer(data);
       }
     }
 
@@ -2045,7 +2043,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         if (header.hasCellBlockMeta()) {
           buf.position(offset);
-          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf);
+          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf, reservoir);
         }
       } catch (Throwable t) {
         InetSocketAddress address = getListenerAddress();
@@ -2123,7 +2121,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     protected synchronized void close() {
       disposeSasl();
-      data = null;
+      reservoir.reclaimBuffer(data);
+      reservoir.reclaimBuffer(dataLengthBuffer);
       if (!channel.isOpen())
         return;
       try {socket.shutdownOutput();} catch(Exception ignored) {
@@ -2399,7 +2398,14 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       //get an instance of the method arg type
       HBaseRpcController controller = new HBaseRpcControllerImpl(cellScanner);
       controller.setCallTimeout(timeout);
+      boolean isWriteRequest = cellScanner != null; // Only multi request will bring cellScanner.
       Message result = service.callBlockingMethod(md, controller, param);
+      if (isWriteRequest) {
+        // The purpose is to close the underlying stream, so the IPC reservior can reclaim ByteBuffer.
+        // This doesn't affect scan, get, append, increment, checkAndXXX, etc.
+        // Because these calls contain no cellScanner, they can't enter this if branch.
+        ((BaseDecoder) cellScanner).close();
+      }
       long endTime = System.currentTimeMillis();
       int processingTime = (int) (endTime - startTime);
       int qTime = (int) (startTime - receiveTime);
