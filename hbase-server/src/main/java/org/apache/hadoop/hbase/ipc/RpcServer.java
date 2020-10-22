@@ -2234,6 +2234,15 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     this.minClientRequestTimeout = conf.getInt(MIN_CLIENT_REQUEST_TIMEOUT,
         DEFAULT_MIN_CLIENT_REQUEST_TIMEOUT);
     this.maxRequestSize = conf.getInt(MAX_REQUEST_SIZE, DEFAULT_MAX_REQUEST_SIZE);
+    String noBufferLimit = conf.get("hbase.ipc.transfer.chunksize");
+    if (noBufferLimit != null) {
+      try {
+        NIO_BUFFER_LIMIT = Integer.parseInt(noBufferLimit);
+      } catch (Exception e) {
+        // in case any exception, like number format exception
+        // should just ignore
+      }
+    }
 
     // Start the listener here and let it bind to the port
     listener = new Listener(name);
