@@ -474,7 +474,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         // high when we can avoid a big buffer allocation on each rpc.
         this.cellBlock = cellBlockBuilder.buildCellBlock(this.connection.codec,
           this.connection.compressionCodec, cells, reservoir,
-            result.getSerializedSize() + (int) RpcServer.getCurrentCall().getResponseCellSize());
+            (result != null ? result.getSerializedSize() : 0) +
+                (int) responseCellSize);
 
         if (this.cellBlock != null) {
           CellBlockMeta.Builder cellBlockBuilder = CellBlockMeta.newBuilder();
@@ -1609,7 +1610,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     private int readPreamble() throws IOException {
       if (preambleBuffer == null) {
-        preambleBuffer = ByteBuffer.allocate(6);
+        preambleBuffer = reservoir.claimBufferExactly(6);
       }
       int count = channelRead(channel, preambleBuffer);
       if (count < 0 || preambleBuffer.remaining() > 0) {
@@ -1660,6 +1661,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         useSasl = true;
       }
 
+      reservoir.reclaimBuffer(preambleBuffer);
       preambleBuffer = null; // do not need it anymore
       connectionPreambleRead = true;
       return count;
@@ -1822,7 +1824,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
       } finally {
         dataLengthBuffer.clear(); // Clean for the next call
-        reservoir.reclaimBuffer(data);
+        data = null;
       }
     }
 
@@ -1848,7 +1850,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     // Reads the connection header following version
     private void processConnectionHeader(ByteBuffer buf) throws IOException {
       this.connectionHeader = ConnectionHeader.parseFrom(
-        new ByteBufferInputStream(buf));
+        reservoir.createByteBuffInputStream(buf));
       String serviceName = connectionHeader.getServiceName();
       if (serviceName == null) throw new EmptyServiceNameException();
       this.service = getService(services, serviceName);
@@ -2412,9 +2414,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       //get an instance of the method arg type
       HBaseRpcController controller = new HBaseRpcControllerImpl(cellScanner);
       controller.setCallTimeout(timeout);
-      boolean isWriteRequest = cellScanner != null; // Only multi request will bring cellScanner.
+      boolean isMultiRequest = cellScanner != null; // Only multi request will bring cellScanner.
       Message result = service.callBlockingMethod(md, controller, param);
-      if (isWriteRequest) {
+      if (isMultiRequest) {
         // The purpose is to close the underlying stream, so the IPC reservior can reclaim ByteBuffer.
         // This doesn't affect scan, get, append, increment, checkAndXXX, etc.
         // Because these calls contain no cellScanner, they can't enter this if branch.

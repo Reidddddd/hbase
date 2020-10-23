@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
 @InterfaceAudience.Private
 public class ByteBuffInputStream extends InputStream {
 
-  private final ByteBuffer buf;
+  private ByteBuffer buf;
   private final ByteBuffPool pool;
 
 
@@ -113,6 +113,7 @@ public class ByteBuffInputStream extends InputStream {
   @Override
   public void close() throws IOException {
     pool.reclaimBuffer(buf);
+    buf = null;
   }
 
 }

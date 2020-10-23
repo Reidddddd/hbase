@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hbase.io;
 
 import java.nio.ByteBuffer;
@@ -59,7 +60,11 @@ public class ByteBuffPool {
   // Use directy ByteBuffer or not
   private boolean directBuffer;
 
-  private final Map<Integer, BufferSizeManager> bufferManagers = new ConcurrentHashMap<>();
+  private final Map<Integer, BufferSizeManager> onheapManagers = new ConcurrentHashMap<>();
+  private final Map<Integer, BufferSizeManager> offheapManagers = new ConcurrentHashMap<>();
+
+  private final ReentrantLock onheapUpdateLock = new ReentrantLock();
+  private final ReentrantLock offheapUpdateLock = new ReentrantLock();
 
   private boolean useReservoir = false;
 
@@ -92,15 +97,21 @@ public class ByteBuffPool {
       return ByteBuffer.allocate(size);
     }
 
-    BufferSizeManager manager = bufferManagers.get(size);
-    if (manager == null) {
+    BufferSizeManager manager;
+    if (!onheapManagers.containsKey(size)) {
       manager = new BufferSizeManager(size, false, true);
-      if (!bufferManagers.containsKey(size)) {
-        bufferManagers.put(size, manager);
+      onheapUpdateLock.lock();
+      try {
+        if (!onheapManagers.containsKey(size)) {
+          onheapManagers.put(size, manager);
+        }
+      } finally {
+        onheapUpdateLock.unlock();
       }
     }
-    // Get again, for cocurrency concern.
-    manager = bufferManagers.get(size);
+
+    manager = onheapManagers.get(size);
+    ByteBuffer buf = manager.allocate();
     return manager.allocate();
   }
 
@@ -130,19 +141,27 @@ public class ByteBuffPool {
     // if size is too big, let's say larger than maxByteBufferSizeToCache.
     // We still allocate it, but without BufferSizeManager.
     if (actualSize > maxByteBufferSizeToCache) {
-      return directBuffer ?
-        ByteBuffer.allocateDirect(actualSize) :
-        ByteBuffer.allocate(actualSize);
+      return direct ?
+        ByteBuffer.allocateDirect(size) :
+        ByteBuffer.allocate(size);
     }
 
-    BufferSizeManager manager = bufferManagers.get(actualSize);
-    if (manager == null) {
+    Map<Integer, BufferSizeManager> bufferManagers = direct ? offheapManagers : onheapManagers;
+    ReentrantLock lock = direct ? offheapUpdateLock : onheapUpdateLock;
+
+    BufferSizeManager manager;
+    if (!bufferManagers.containsKey(actualSize)) {
       manager = new BufferSizeManager(actualSize, direct, false);
-      if (!bufferManagers.containsKey(size)) {
-        bufferManagers.put(actualSize, manager);
+      lock.lock();
+      try {
+        if (!bufferManagers.containsKey(actualSize)) {
+          bufferManagers.put(actualSize, manager);
+        }
+      } finally {
+        lock.unlock();
       }
     }
-    // Get again, for cocurrency concern.
+
     manager = bufferManagers.get(actualSize);
     ByteBuffer buf = manager.allocate();
     buf.limit(size);
@@ -158,6 +177,7 @@ public class ByteBuffPool {
       return;
     }
 
+    Map<Integer, BufferSizeManager> bufferManagers = buf.hasArray() ? onheapManagers : offheapManagers;
     BufferSizeManager manager = bufferManagers.get(buf.capacity());
     if (manager == null) {
       // e.g., if buf was larger than maxByteBufferSizeToCache
@@ -193,9 +213,10 @@ public class ByteBuffPool {
     public void run() {
       boolean cleaned = false;
       long currentT = EnvironmentEdgeManager.currentTime();
-      for (BufferSizeManager bsm : bufferManagers.values()) {
-        if (bsm.direct || bsm.noNeedToClean) {
-          continue; // allocate direct memory is expensive. And it doesn't effect GC, just leave it.
+      // allocate direct memory is expensive. And it doesn't effect GC, just leave it.
+      for (BufferSizeManager bsm : onheapManagers.values()) {
+        if (bsm.noNeedToClean) {
+          continue;
         }
 
         bsm.lock.lock();
@@ -214,7 +235,7 @@ public class ByteBuffPool {
         }
       }
       if (!cleaned) {
-        for (BufferSizeManager bsm : bufferManagers.values()) {
+        for (BufferSizeManager bsm : onheapManagers.values()) {
           if (bsm.pool.size() == 0) {
             continue;
           }
@@ -248,7 +269,10 @@ public class ByteBuffPool {
   @VisibleForTesting
   int getBufferInPoolNum() {
     int num = 0;
-    for (BufferSizeManager bsm : bufferManagers.values()) {
+    for (BufferSizeManager bsm : onheapManagers.values()) {
+      num += bsm.pool.size();
+    }
+    for (BufferSizeManager bsm : offheapManagers.values()) {
       num += bsm.pool.size();
     }
     return num;
