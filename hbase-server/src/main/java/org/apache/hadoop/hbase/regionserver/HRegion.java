@@ -106,6 +106,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValueUtil;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
+import org.apache.hadoop.hbase.NoTagsByteBufferKeyValue;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.RegionTooBusyException;
 import org.apache.hadoop.hbase.TableName;
@@ -140,6 +141,7 @@ import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.FilterWrapper;
 import org.apache.hadoop.hbase.filter.IncompatibleFilterException;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
+import org.apache.hadoop.hbase.io.ByteBuffPool;
 import org.apache.hadoop.hbase.io.HFileLink;
 import org.apache.hadoop.hbase.io.HeapSize;
 import org.apache.hadoop.hbase.io.TimeRange;
@@ -3673,6 +3675,15 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         this.updatesLock.readLock().unlock();
       }
       releaseRowLocks(acquiredRowLocks);
+
+      for (int j = 0; j < familyMaps.length; j++) {
+        for(List<Cell> cells : familyMaps[j].values()) {
+          for (Cell cell : cells) {
+            NoTagsByteBufferKeyValue nbkv = (NoTagsByteBufferKeyValue) cell;
+            ByteBuffPool.getInstance().reclaimBuffer(nbkv.getByteBuffer());
+          }
+        }
+      }
 
       // See if the column families were consistent through the whole thing.
       // if they were then keep them. If they were not then pass a null.
