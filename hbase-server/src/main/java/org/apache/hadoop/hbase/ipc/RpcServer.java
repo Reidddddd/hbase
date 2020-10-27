@@ -2233,6 +2233,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     this.minClientRequestTimeout = conf.getInt(MIN_CLIENT_REQUEST_TIMEOUT,
         DEFAULT_MIN_CLIENT_REQUEST_TIMEOUT);
     this.maxRequestSize = conf.getInt(MAX_REQUEST_SIZE, DEFAULT_MAX_REQUEST_SIZE);
+    this.readBufferLimit = conf.getInt("hbase.ipc.read.buffer.size", 64 * 1024);
+    this.writeBufferLimit = conf.getInt("hbase.ipc.write.buffer.size", 64 * 1024);
 
     // Start the listener here and let it bind to the port
     listener = new Listener(name);
@@ -2640,11 +2642,17 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   }
 
   /**
-   * When the read or write buffer size is larger than this limit, i/o will be
-   * done in chunks of this size. Most RPC requests and responses would be
-   * be smaller.
+   * When the read buffer size is larger than this limit, i/o will be
+   * done in chunks of this size.
    */
-  private static int NIO_BUFFER_LIMIT = 64 * 1024; //should not be more than 64KB.
+  private int readBufferLimit;
+
+  /**
+   * When the write buffer 7size is larger than this limit, i/o will be
+   * done in chunks of this size.
+   */
+  private int writeBufferLimit;
+
 
   /**
    * This is a wrapper around {@link java.nio.channels.WritableByteChannel#write(java.nio.ByteBuffer)}.
@@ -2662,7 +2670,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
    */
   protected long channelWrite(GatheringByteChannel channel, BufferChain bufferChain)
   throws IOException {
-    long count =  bufferChain.write(channel, NIO_BUFFER_LIMIT);
+    long count =  bufferChain.write(channel, writeBufferLimit);
     if (count > 0) this.metrics.sentBytes(count);
     return count;
   }
@@ -2682,8 +2690,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   protected int channelRead(ReadableByteChannel channel,
                                    ByteBuffer buffer) throws IOException {
 
-    int count = (buffer.remaining() <= NIO_BUFFER_LIMIT) ?
-           channel.read(buffer) : channelIO(channel, null, buffer);
+    int count = (buffer.remaining() <= readBufferLimit) ?
+           channel.read(buffer) : channelIO(channel, null, buffer, readBufferLimit);
     if (count > 0) {
       metrics.receivedBytes(count);
     }
@@ -2698,6 +2706,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
    * @param readCh read channel
    * @param writeCh write channel
    * @param buf buffer to read or write into/out of
+   * @param chunkSize chunk size for buf read, in case of large buf
    * @return bytes written
    * @throws java.io.IOException e
    * @see #channelRead(java.nio.channels.ReadableByteChannel, java.nio.ByteBuffer)
@@ -2705,7 +2714,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
    */
   private static int channelIO(ReadableByteChannel readCh,
                                WritableByteChannel writeCh,
-                               ByteBuffer buf) throws IOException {
+                               ByteBuffer buf,
+                               int chunkSize) throws IOException {
 
     int originalLimit = buf.limit();
     int initialRemaining = buf.remaining();
@@ -2713,7 +2723,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     while (buf.remaining() > 0) {
       try {
-        int ioSize = Math.min(buf.remaining(), NIO_BUFFER_LIMIT);
+        int ioSize = Math.min(buf.remaining(), chunkSize);
         buf.limit(buf.position() + ioSize);
 
         ret = (readCh == null) ? writeCh.write(buf) : readCh.read(buf);
