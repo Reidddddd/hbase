@@ -1150,6 +1150,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           }
           Call call = connection.responseQueue.peekFirst();
           if (call != null && now > call.timestamp + purgeTimeout) {
+            metrics.removeCallFromResponseQueue(call.response.getRemaining());
             conWithOldCalls.add(call.connection);
           }
         }
@@ -1245,8 +1246,10 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           if (call == null) {
             return true;
           }
+          metrics.removeCallFromResponseQueue(call.response.getRemaining());
           if (!processResponse(call)) {
             connection.responseQueue.addFirst(call);
+            metrics.addCallToResponseQueue(call.response.getRemaining());
             return false;
           }
         }
@@ -1277,6 +1280,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             }
             // Too big to fit, putting ahead.
             call.connection.responseQueue.addFirst(call);
+            metrics.addCallToResponseQueue(call.response.getRemaining());
             added = true; // We will register to the selector later, outside of the lock.
           }
         } finally {
@@ -1286,6 +1290,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
       if (!added) {
         call.connection.responseQueue.addLast(call);
+        metrics.addCallToResponseQueue(call.response.getRemaining());
       }
       call.responder.registerForWrite(call.connection);
 
