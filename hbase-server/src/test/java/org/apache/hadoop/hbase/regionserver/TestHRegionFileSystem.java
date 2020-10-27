@@ -60,9 +60,10 @@ import org.junit.experimental.categories.Category;
 public class TestHRegionFileSystem {
   private static HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
   private static final Log LOG = LogFactory.getLog(TestHRegionFileSystem.class);
+  private static final byte[] FAMILY_NAME = Bytes.toBytes("info");
   private static final byte[][] FAMILIES = {
-      Bytes.add(PerformanceEvaluation.FAMILY_NAME, Bytes.toBytes("-A")),
-      Bytes.add(PerformanceEvaluation.FAMILY_NAME, Bytes.toBytes("-B")) };
+      Bytes.add(FAMILY_NAME, Bytes.toBytes("-A")),
+      Bytes.add(FAMILY_NAME, Bytes.toBytes("-B")) };
   private static final TableName TABLE_NAME = TableName.valueOf("TestTable");
 
   @Test
