@@ -105,4 +105,14 @@ public abstract class BaseDecoder implements Codec.Decoder {
   public Cell current() {
     return this.current;
   }
+
+  public void close() {
+    try {
+      in.close();
+    } catch (IOException e) {
+      // We don't throw exception out, because it is new added, to avoid anything uncontrollable.
+      LOG.warn("Error occurs in closing " + this.getClass().getSimpleName());
+    }
+  }
+
 }

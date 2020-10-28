@@ -59,7 +59,6 @@ import java.util.NavigableSet;
 import java.util.RandomAccess;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
@@ -140,6 +139,8 @@ import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.FilterWrapper;
 import org.apache.hadoop.hbase.filter.IncompatibleFilterException;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
+import org.apache.hadoop.hbase.io.ByteBuffPool;
+import org.apache.hadoop.hbase.io.ByteBufferBack;
 import org.apache.hadoop.hbase.io.HFileLink;
 import org.apache.hadoop.hbase.io.HeapSize;
 import org.apache.hadoop.hbase.io.TimeRange;
@@ -3673,6 +3674,17 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         this.updatesLock.readLock().unlock();
       }
       releaseRowLocks(acquiredRowLocks);
+
+      for (int j = 0; j < familyMaps.length; j++) {
+        for(List<Cell> cells : familyMaps[j].values()) {
+          for (Cell cell : cells) {
+            if (cell instanceof ByteBufferBack) {
+              ByteBufferBack bbc = (ByteBufferBack) cell;
+              ByteBuffPool.getInstance().reclaimBuffer(bbc.getByteBuffer());
+            }
+          }
+        }
+      }
 
       // See if the column families were consistent through the whole thing.
       // if they were then keep them. If they were not then pass a null.
