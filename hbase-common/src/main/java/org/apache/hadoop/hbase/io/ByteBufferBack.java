@@ -17,44 +17,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase;
+package org.apache.hadoop.hbase.io;
 
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.io.ByteBufferBack;
 
 import java.nio.ByteBuffer;
 
 /**
- * An extension of the KeyValue where the tags length is always 0
+ * Implementations should be able to accept an array or ByteBuffer (on-heap)
+ * <p>
+ * The original purpose of this interface is for allowing IPC reservior reclaim reclaimable cell
+ * <p>
  */
 @InterfaceAudience.Private
-public class NoTagsKeyValue extends KeyValue implements ByteBufferBack {
+public interface ByteBufferBack {
 
-  private ByteBuffer buffer;
+  /**
+   * @return true if it is back by a ByteBuffer
+   */
+  boolean isByteBufferBack();
 
-  public NoTagsKeyValue(byte[] bytes, int offset, int length) {
-    super(bytes, offset, length);
-    buffer = null;
-  }
-
-  public NoTagsKeyValue(ByteBuffer buffer, int offset, int length) {
-    super(buffer.array(), offset, length);
-    this.buffer = buffer;
-  }
-
-  @Override
-  public int getTagsLength() {
-    return 0;
-  }
-
-  @Override
-  public boolean isByteBufferBack() {
-    return buffer != null;
-  }
-
-  @Override
-  public ByteBuffer getByteBuffer() {
-    return buffer;
-  }
+  /**
+   * @return null if it is not a ByteBufferBack.
+   */
+  ByteBuffer getByteBuffer();
 
 }

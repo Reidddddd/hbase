@@ -118,4 +118,8 @@ class BufferChain {
       }
     }
   }
+
+  public ByteBuffer[] getBuffers() {
+    return buffers;
+  }
 }

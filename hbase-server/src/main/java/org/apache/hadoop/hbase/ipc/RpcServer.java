@@ -88,12 +88,12 @@ import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.classification.InterfaceStability;
 import org.apache.hadoop.hbase.client.NeedUnmanagedConnectionException;
 import org.apache.hadoop.hbase.client.VersionInfoUtil;
+import org.apache.hadoop.hbase.codec.BaseDecoder;
 import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.exceptions.RegionMovedException;
 import org.apache.hadoop.hbase.exceptions.RequestTooBigException;
-import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
-import org.apache.hadoop.hbase.io.ByteBufferInputStream;
+import org.apache.hadoop.hbase.io.ByteBuffPool;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
@@ -299,7 +299,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
   private UserProvider userProvider;
 
-  private final BoundedByteBufferPool reservoir;
+  private final ByteBuffPool reservoir;
 
   private volatile boolean allowFallbackToSimpleAuth;
 
@@ -385,9 +385,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="IS2_INCONSISTENT_SYNC",
         justification="Presume the lock on processing request held by caller is protection enough")
     void done() {
-      if (this.cellBlock != null && reservoir != null) {
-        // Return buffer to reservoir now we are done with it.
-        reservoir.putBuffer(this.cellBlock);
+      if (this.response != null) {
+        for (ByteBuffer buffer : response.getBuffers()) {
+          reservoir.reclaimBuffer(buffer);
+        }
+        this.response = null;
         this.cellBlock = null;
       }
       this.connection.decRpcCount();  // Say that we're done with this call.
@@ -469,7 +471,10 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         // reservoir when finished. This is hacky and the hack is not contained but benefits are
         // high when we can avoid a big buffer allocation on each rpc.
         this.cellBlock = cellBlockBuilder.buildCellBlock(this.connection.codec,
-          this.connection.compressionCodec, cells, reservoir);
+          this.connection.compressionCodec, cells, reservoir,
+            (result != null ? result.getSerializedSize() : 0) +
+                (int) responseCellSize);
+
         if (this.cellBlock != null) {
           CellBlockMeta.Builder cellBlockBuilder = CellBlockMeta.newBuilder();
           // Presumes the cellBlock bytebuffer has been flipped so limit has total size in it.
@@ -478,16 +483,16 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         Message header = headerBuilder.build();
 
-        byte[] b = createHeaderAndMessageBytes(result, header);
+        ByteBuffer b = createHeaderAndMessageBytes(result, header);
 
-        bc = new BufferChain(ByteBuffer.wrap(b), this.cellBlock);
+        bc = new BufferChain(b, this.cellBlock);
       } catch (IOException e) {
         LOG.warn("Exception while creating response " + e);
       }
       this.response = bc;
     }
 
-    private byte[] createHeaderAndMessageBytes(Message result, Message header)
+    private ByteBuffer createHeaderAndMessageBytes(Message result, Message header)
         throws IOException {
       // Organize the response as a set of bytebuffers rather than collect it all together inside
       // one big byte array; save on allocations.
@@ -506,14 +511,14 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           + (resultSerializedSize + resultVintSize)
           + (this.cellBlock == null ? 0 : this.cellBlock.limit());
       // The byte[] should also hold the totalSize of the header, message and the cellblock
-      byte[] b = new byte[headerSerializedSize + headerVintSize + resultSerializedSize
-          + resultVintSize + Bytes.SIZEOF_INT];
+      int size = headerSerializedSize + headerVintSize + resultSerializedSize + resultVintSize + Bytes.SIZEOF_INT;
+      ByteBuffer bb = reservoir.claimOnheapBuffer(size);
+      byte[] b = bb.array();
       // The RpcClient expects the int to be in a format that code be decoded by
       // the DataInputStream#readInt(). Hence going with the Bytes.toBytes(int)
       // form of writing int.
       Bytes.putInt(b, 0, totalSize);
-      CodedOutputStream cos = CodedOutputStream.newInstance(b, Bytes.SIZEOF_INT,
-          b.length - Bytes.SIZEOF_INT);
+      CodedOutputStream cos = CodedOutputStream.newInstance(b, Bytes.SIZEOF_INT, size - Bytes.SIZEOF_INT);
       if (header != null) {
         cos.writeMessageNoTag(header);
       }
@@ -522,7 +527,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       }
       cos.flush();
       cos.checkNoSpaceLeft();
-      return b;
+      return bb;
     }
 
     private synchronized void wrapWithSasl() throws IOException {
@@ -1374,7 +1379,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.channel = channel;
       this.lastContact = lastContact;
       this.data = null;
-      this.dataLengthBuffer = ByteBuffer.allocate(4);
+      this.dataLengthBuffer = reservoir.claimBufferExactly(4);
       this.socket = channel.socket();
       this.addr = socket.getInetAddress();
       if (addr == null) {
@@ -1610,7 +1615,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     private int readPreamble() throws IOException {
       if (preambleBuffer == null) {
-        preambleBuffer = ByteBuffer.allocate(6);
+        preambleBuffer = reservoir.claimBufferExactly(6);
       }
       int count = channelRead(channel, preambleBuffer);
       if (count < 0 || preambleBuffer.remaining() > 0) {
@@ -1661,6 +1666,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         useSasl = true;
       }
 
+      reservoir.reclaimBuffer(preambleBuffer);
       preambleBuffer = null; // do not need it anymore
       connectionPreambleRead = true;
       return count;
@@ -1785,8 +1791,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             // Close the connection
             return -1;
           }
-
-          data = ByteBuffer.allocate(dataLength);
+          // Make sure we avoid creating direct buffer here.
+          data = reservoir.claimOnheapBuffer(dataLength);
 
           // Increment the rpc count. This counter will be decreased when we write
           //  the response.  If we want the connection to be detected as idle properly, we
@@ -1824,6 +1830,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       } finally {
         dataLengthBuffer.clear(); // Clean for the next call
         data = null; // For the GC
+        // We can't reclaim data, because data is being processed, but dereference is fine.
       }
     }
 
@@ -1849,7 +1856,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     // Reads the connection header following version
     private void processConnectionHeader(ByteBuffer buf) throws IOException {
       this.connectionHeader = ConnectionHeader.parseFrom(
-        new ByteBufferInputStream(buf));
+        reservoir.createByteBuffInputStream(buf));
       String serviceName = connectionHeader.getServiceName();
       if (serviceName == null) throw new EmptyServiceNameException();
       this.service = getService(services, serviceName);
@@ -2049,7 +2056,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         if (header.hasCellBlockMeta()) {
           buf.position(offset);
-          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf);
+          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf, reservoir);
         }
       } catch (Throwable t) {
         InetSocketAddress address = getListenerAddress();
@@ -2127,7 +2134,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     protected synchronized void close() {
       disposeSasl();
-      data = null;
+      reservoir.reclaimBuffer(data);
+      reservoir.reclaimBuffer(dataLengthBuffer);
       if (!channel.isOpen())
         return;
       try {socket.shutdownOutput();} catch(Exception ignored) {
@@ -2214,19 +2222,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       final InetSocketAddress bindAddress, Configuration conf,
       RpcScheduler scheduler)
       throws IOException {
-    if (conf.getBoolean("hbase.ipc.server.reservoir.enabled", true)) {
-      this.reservoir = new BoundedByteBufferPool(
-          conf.getInt("hbase.ipc.server.reservoir.max.buffer.size", 1024 * 1024),
-          conf.getInt("hbase.ipc.server.reservoir.initial.buffer.size", 16 * 1024),
-          // Make the max twice the number of handlers to be safe.
-          conf.getInt("hbase.ipc.server.reservoir.initial.max",
-              conf.getInt(HConstants.REGION_SERVER_HANDLER_COUNT,
-                  HConstants.DEFAULT_REGION_SERVER_HANDLER_COUNT) * 2),
-          // By default make direct byte buffers from the buffer pool.
-          conf.getBoolean("hbase.ipc.server.reservoir.direct.buffer", false));
-    } else {
-      reservoir = null;
-    }
+    this.reservoir = ByteBuffPool.getInstance();
+    this.reservoir.initialize(conf);
     this.server = server;
     this.services = services;
     this.bindAddress = bindAddress;
@@ -2416,7 +2413,14 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       //get an instance of the method arg type
       HBaseRpcController controller = new HBaseRpcControllerImpl(cellScanner);
       controller.setCallTimeout(timeout);
+      boolean isMultiRequest = cellScanner != null; // Only multi request will bring cellScanner.
       Message result = service.callBlockingMethod(md, controller, param);
+      if (isMultiRequest) {
+        // The purpose is to close the underlying stream, so the IPC reservior can reclaim ByteBuffer.
+        // This doesn't affect scan, get, append, increment, checkAndXXX, etc.
+        // Because these calls contain no cellScanner, they can't enter this if branch.
+        ((BaseDecoder) cellScanner).close();
+      }
       long endTime = System.currentTimeMillis();
       int processingTime = (int) (endTime - startTime);
       int qTime = (int) (startTime - receiveTime);

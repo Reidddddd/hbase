@@ -28,6 +28,7 @@ import java.util.List;
 
 import org.apache.hadoop.hbase.KeyValue.Type;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.io.ByteBuffPool;
 import org.apache.hadoop.hbase.io.util.StreamUtils;
 import org.apache.hadoop.hbase.util.ByteBufferUtils;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -284,7 +285,7 @@ public class KeyValueUtil {
     return new KeyValue(row, roffset, rlength, family, foffset, flength, qualifier, qoffset,
         qlength, HConstants.OLDEST_TIMESTAMP, Type.Minimum, null, 0, 0);
   }
-  
+
   /**
    * Creates a keyValue for the specified keyvalue larger than or equal to all other possible
    * KeyValues that have the same row, family, qualifer.  Used for reseeking
@@ -303,7 +304,7 @@ public class KeyValueUtil {
    * the returned KV is always empty). Used in creating "fake keys" for the
    * multi-column Bloom filter optimization to skip the row/column we already
    * know is not in the file. Not to be returned to clients.
-   * 
+   *
    * @param kv - cell
    * @return the last key on the row/column of the given key-value pair
    */
@@ -320,7 +321,7 @@ public class KeyValueUtil {
    * the lowest possible for this combination of row, family, qualifier, and
    * timestamp. This KV's own timestamp is ignored. While this function copies
    * the value from this KV, it is normally used on key-only KVs.
-   * 
+   *
    * @param kv - cell
    * @param ts
    */
@@ -330,7 +331,7 @@ public class KeyValueUtil {
         kv.getQualifierOffset(), kv.getQualifierLength(), ts, Type.Maximum, kv.getValueArray(),
         kv.getValueOffset(), kv.getValueLength());
   }
-  
+
   /**
    * Create a KeyValue that is smaller than all other possible KeyValues
    * for the given row. That is any (valid) KeyValue on 'row' would sort
@@ -343,7 +344,7 @@ public class KeyValueUtil {
     return new KeyValue(row, roffset, rlength,
         null, 0, 0, null, 0, 0, HConstants.LATEST_TIMESTAMP, Type.Maximum, null, 0, 0);
   }
-  
+
 
   /**
    * Creates a KeyValue that is last on the specified row id. That is,
@@ -594,7 +595,9 @@ public class KeyValueUtil {
    * @throws IOException
    */
   public static KeyValue iscreate(final InputStream in, boolean withTags) throws IOException {
-    byte[] intBytes = new byte[Bytes.SIZEOF_INT];
+    ByteBuffPool pool = ByteBuffPool.getInstance();
+    ByteBuffer buf = pool.claimBufferExactly(Bytes.SIZEOF_INT);
+    byte[] intBytes = buf.array();
     int bytesRead = 0;
     while (bytesRead < intBytes.length) {
       int n = in.read(intBytes, bytesRead, intBytes.length - bytesRead);
@@ -606,13 +609,17 @@ public class KeyValueUtil {
       }
       bytesRead += n;
     }
+    int len = Bytes.toInt(intBytes);
+    pool.reclaimBuffer(buf);
+
     // TODO: perhaps some sanity check is needed here.
-    byte[] bytes = new byte[Bytes.toInt(intBytes)];
-    IOUtils.readFully(in, bytes, 0, bytes.length);
+    buf = pool.claimOnheapBuffer(len);
+    byte[] bytes = buf.array();
+    IOUtils.readFully(in, bytes, 0, len);
     if (withTags) {
-      return new KeyValue(bytes, 0, bytes.length);
+      return new KeyValue(bytes, 0, len);
     } else {
-      return new NoTagsKeyValue(bytes, 0, bytes.length);
+      return new NoTagsKeyValue(buf, 0, len);
     }
   }
 
