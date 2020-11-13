@@ -92,9 +92,9 @@ import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.exceptions.RegionMovedException;
 import org.apache.hadoop.hbase.exceptions.RequestTooBigException;
-import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
+import org.apache.hadoop.hbase.io.IPCReservoir;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
@@ -299,7 +299,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
   private UserProvider userProvider;
 
-  private final BoundedByteBufferPool reservoir;
+  private final IPCReservoir reservoir = IPCReservoir.getInstance();
 
   private volatile boolean allowFallbackToSimpleAuth;
 
@@ -387,7 +387,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     void done() {
       if (this.cellBlock != null && reservoir != null) {
         // Return buffer to reservoir now we are done with it.
-        reservoir.putBuffer(this.cellBlock);
+        reservoir.reclaimBuffer(this.cellBlock);
         this.cellBlock = null;
       }
       this.connection.decRpcCount();  // Say that we're done with this call.
@@ -469,7 +469,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         // reservoir when finished. This is hacky and the hack is not contained but benefits are
         // high when we can avoid a big buffer allocation on each rpc.
         this.cellBlock = cellBlockBuilder.buildCellBlock(this.connection.codec,
-          this.connection.compressionCodec, cells, reservoir);
+          this.connection.compressionCodec, cells, reservoir, (int) responseCellSize +
+                (result != null ? result.getSerializedSize() : 0));
         if (this.cellBlock != null) {
           CellBlockMeta.Builder cellBlockBuilder = CellBlockMeta.newBuilder();
           // Presumes the cellBlock bytebuffer has been flipped so limit has total size in it.
@@ -2202,19 +2203,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       final InetSocketAddress bindAddress, Configuration conf,
       RpcScheduler scheduler)
       throws IOException {
-    if (conf.getBoolean("hbase.ipc.server.reservoir.enabled", true)) {
-      this.reservoir = new BoundedByteBufferPool(
-          conf.getInt("hbase.ipc.server.reservoir.max.buffer.size", 1024 * 1024),
-          conf.getInt("hbase.ipc.server.reservoir.initial.buffer.size", 16 * 1024),
-          // Make the max twice the number of handlers to be safe.
-          conf.getInt("hbase.ipc.server.reservoir.initial.max",
-              conf.getInt(HConstants.REGION_SERVER_HANDLER_COUNT,
-                  HConstants.DEFAULT_REGION_SERVER_HANDLER_COUNT) * 2),
-          // By default make direct byte buffers from the buffer pool.
-          conf.getBoolean("hbase.ipc.server.reservoir.direct.buffer", false));
-    } else {
-      reservoir = null;
-    }
+    reservoir.initialize(conf);
     this.server = server;
     this.services = services;
     this.bindAddress = bindAddress;
