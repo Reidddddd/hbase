@@ -88,7 +88,7 @@ public abstract class BaseDecoder implements Codec.Decoder {
     throw eofEx;
   }
 
-  protected InputStream getInputStream() {
+  public InputStream getInputStream() {
     return in;
   }
 

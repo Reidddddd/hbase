@@ -92,6 +92,7 @@ import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.exceptions.RegionMovedException;
 import org.apache.hadoop.hbase.exceptions.RequestTooBigException;
+import org.apache.hadoop.hbase.io.ByteBuffInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
 import org.apache.hadoop.hbase.io.IPCReservoir;
@@ -1775,7 +1776,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             return -1;
           }
 
-          data = ByteBuffer.allocate(dataLength);
+          data = reservoir.claimBuffer(dataLength);
 
           // Increment the rpc count. This counter will be decreased when we write
           //  the response.  If we want the connection to be detected as idle properly, we
@@ -1837,8 +1838,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     // Reads the connection header following version
     private void processConnectionHeader(ByteBuffer buf) throws IOException {
-      this.connectionHeader = ConnectionHeader.parseFrom(
-        new ByteBufferInputStream(buf));
+      ByteBuffInputStream bbis = reservoir.createByteBuffInputStream(buf);
+      this.connectionHeader = ConnectionHeader.parseFrom(bbis);
       String serviceName = connectionHeader.getServiceName();
       if (serviceName == null) throw new EmptyServiceNameException();
       this.service = getService(services, serviceName);
@@ -1892,8 +1893,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         AUDITLOG.info("Connection from " + this.hostAddress + " port: " + this.remotePort
             + " with unknown version info");
       }
-
-
+      bbis.reclaimByteBuffer();
     }
 
     /**
@@ -1983,11 +1983,13 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
      * @throws InterruptedException
      */
     protected void processRequest(ByteBuffer buf) throws IOException, InterruptedException {
-      long totalRequestSize = buf.limit();
+      int totalRequestSize = buf.limit();
       int offset = 0;
       // Here we read in the header.  We avoid having pb
       // do its default 4k allocation for CodedInputStream.  We force it to use backing array.
-      CodedInputStream cis = CodedInputStream.newInstance(buf.array(), offset, buf.limit());
+      ByteBuffInputStream bbis = reservoir.createByteBuffInputStream(buf);
+      CodedInputStream cis = CodedInputStream.newInstance(bbis);
+      cis.setSizeLimit(totalRequestSize);
       int headerSize = cis.readRawVarint32();
       offset = cis.getTotalBytesRead();
       Message.Builder builder = RequestHeader.newBuilder();
@@ -2021,7 +2023,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           md = this.service.getDescriptorForType().findMethodByName(header.getMethodName());
           if (md == null) throw new UnsupportedOperationException(header.getMethodName());
           builder = this.service.getRequestPrototype(md).newBuilderForType();
-          cis.resetSizeCounter();
           int paramSize = cis.readRawVarint32();
           offset += cis.getTotalBytesRead();
           if (builder != null) {
@@ -2038,7 +2039,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         if (header.hasCellBlockMeta()) {
           buf.position(offset);
-          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf);
+          cellScanner = cellBlockBuilder.createCellScanner(codec, compressionCodec, reservoir, buf);
         }
       } catch (Throwable t) {
         InetSocketAddress address = getListenerAddress();

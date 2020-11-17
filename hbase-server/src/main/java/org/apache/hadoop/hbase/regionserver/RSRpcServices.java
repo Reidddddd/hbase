@@ -29,6 +29,7 @@ import com.google.protobuf.TextFormat;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
@@ -83,6 +84,7 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.RowMutations;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.VersionInfoUtil;
+import org.apache.hadoop.hbase.codec.BaseDecoder;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.coordination.CloseRegionCoordination;
 import org.apache.hadoop.hbase.coordination.OpenRegionCoordination;
@@ -93,6 +95,7 @@ import org.apache.hadoop.hbase.exceptions.OutOfOrderScannerNextException;
 import org.apache.hadoop.hbase.exceptions.ScannerResetException;
 import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
+import org.apache.hadoop.hbase.io.ByteBuffInputStream;
 import org.apache.hadoop.hbase.ipc.HBaseRPCErrorHandler;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.ipc.PriorityFunction;
@@ -950,6 +953,14 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
           skipCellsForMutation(mutation, cells);
         }
         builder.addResultOrException(getResultOrException(ie, mutation.getIndex()));
+      }
+    }
+    if (cells instanceof BaseDecoder) {
+      BaseDecoder decoder = (BaseDecoder) cells;
+      InputStream is = decoder.getInputStream();
+      if (is instanceof ByteBuffInputStream) {
+        ByteBuffInputStream bbis = (ByteBuffInputStream) is;
+        bbis.reclaimByteBuffer();
       }
     }
     if (regionServer.metricsRegionServer != null) {
