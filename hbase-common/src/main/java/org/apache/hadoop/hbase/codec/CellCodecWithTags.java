@@ -34,7 +34,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * <b>Use this Codec only at server side.</b>
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class CellCodecWithTags implements Codec {
+public class CellCodecWithTags extends AbstractDecoder {
   static class CellEncoder extends BaseEncoder {
     CellEncoder(final OutputStream out) {
       super(out);

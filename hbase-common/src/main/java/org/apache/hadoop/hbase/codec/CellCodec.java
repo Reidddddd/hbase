@@ -34,7 +34,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * Note: This will not write tags of a Cell.
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class CellCodec implements Codec {
+public class CellCodec extends AbstractDecoder {
   static class CellEncoder extends BaseEncoder {
     CellEncoder(final OutputStream out) {
       super(out);

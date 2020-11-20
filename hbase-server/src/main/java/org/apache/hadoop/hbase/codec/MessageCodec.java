@@ -33,7 +33,7 @@ import org.apache.hadoop.hbase.protobuf.generated.CellProtos;
  * Use a different codec if you want that in the stream.
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class MessageCodec implements Codec {
+public class MessageCodec extends AbstractDecoder {
   static class MessageEncoder extends BaseEncoder {
     MessageEncoder(final OutputStream out) {
       super(out);

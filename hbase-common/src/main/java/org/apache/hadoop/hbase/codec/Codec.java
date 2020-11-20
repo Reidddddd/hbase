@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.codec;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.CellScanner;
@@ -28,8 +29,8 @@ import org.apache.hadoop.hbase.io.CellOutputStream;
 /**
  * Encoder/Decoder for Cell.
  *
- * <p>Like {@link org.apache.hadoop.hbase.io.encoding.DataBlockEncoder} 
- * only Cell-based rather than KeyValue version 1 based and without presuming 
+ * <p>Like {@link org.apache.hadoop.hbase.io.encoding.DataBlockEncoder}
+ * only Cell-based rather than KeyValue version 1 based and without presuming
  * an hfile context.  Intent is an Interface that will work for hfile and rpc.
  */
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX})
@@ -50,4 +51,5 @@ public interface Codec {
 
   Decoder getDecoder(InputStream is);
   Encoder getEncoder(OutputStream os);
+  Decoder getDecoder(ByteBuffer buf);
 }

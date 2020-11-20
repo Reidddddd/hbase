@@ -20,16 +20,22 @@ package org.apache.hadoop.hbase.codec;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValueUtil;
+import org.apache.hadoop.hbase.io.IPCReservoir;
+import org.apache.hadoop.hbase.util.ByteBufferUtils;
+import org.apache.hadoop.hbase.util.Bytes;
 
 /**
  * Codec that does KeyValue version 1 serialization.
- * 
+ *
  * <p>Encodes Cell as serialized in KeyValue with total length prefix.
  * This is how KVs were serialized in Puts, Deletes and Results pre-0.96.  Its what would
  * happen if you called the Writable#write KeyValue implementation.  This encoder will fail
@@ -45,7 +51,7 @@ import org.apache.hadoop.hbase.KeyValueUtil;
  * </pre>
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class KeyValueCodec implements Codec {
+public class KeyValueCodec extends AbstractDecoder {
   public static class KeyValueEncoder extends BaseEncoder {
     public KeyValueEncoder(final OutputStream out) {
       super(out);
@@ -82,4 +88,51 @@ public class KeyValueCodec implements Codec {
   public Encoder getEncoder(OutputStream os) {
     return new KeyValueEncoder(os);
   }
+
+  @Override
+  public Decoder getDecoder(ByteBuffer buf) {
+    return new ByteBufferKeyValueDecoder(buf);
+  }
+
+  @InterfaceAudience.Private
+  public static class ByteBufferKeyValueDecoder implements Codec.Decoder  {
+    final IPCReservoir reservoir;
+    Cell current;
+    ByteBuffer buf;
+    boolean remaining;
+
+    public ByteBufferKeyValueDecoder(ByteBuffer buf) {
+      this.buf = buf;
+      this.reservoir = IPCReservoir.getInstance();
+      this.remaining = true;
+    }
+
+    @Override
+    public Cell current() {
+      return current;
+    }
+
+    @Override
+    public boolean advance() throws IOException {
+      if (!remaining) {
+        return false;
+      }
+      try {
+        int len = buf.getInt();
+        int currentPos = buf.position();
+        byte[] kv = new byte[len];
+        ByteBufferUtils.copyFromBufferToArray(kv, buf, currentPos, 0, len);
+        current = new KeyValue(kv, 0, len);
+        buf.position(currentPos + len);
+        return true;
+      } finally {
+        remaining = buf.hasRemaining();
+        if (!remaining) {
+          reservoir.reclaimBuffer(buf);
+          buf = null;
+        }
+      }
+    }
+  }
+
 }

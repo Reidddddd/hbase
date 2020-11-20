@@ -159,8 +159,12 @@ public final class IPCReservoir {
     manager.recycle(buffer);
   }
 
-  public ByteBuffOutputStream creatByteBuffOutputStream(ByteBuffer buffer) {
+  public ByteBuffOutputStream createByteBuffOutputStream(ByteBuffer buffer) {
     return new ByteBuffOutputStream(buffer, this);
+  }
+
+  public ByteBuffInputStream createByteBuffInputStream(ByteBuffer buffer) {
+    return new ByteBuffInputStream(buffer, this);
   }
 
   class BufferSizeManager {

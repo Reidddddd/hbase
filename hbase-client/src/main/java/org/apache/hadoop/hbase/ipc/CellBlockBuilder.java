@@ -35,7 +35,7 @@ import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.codec.Codec;
-import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
+import org.apache.hadoop.hbase.io.ByteBuffInputStream;
 import org.apache.hadoop.hbase.io.ByteBuffOutputStream;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
@@ -222,7 +222,7 @@ class CellBlockBuilder {
       throw new CellScannerButNoCodecException();
     }
     ByteBuffer bb = reservoir.claimBuffer(responseCellSize);
-    ByteBuffOutputStream bbos = reservoir.creatByteBuffOutputStream(bb);
+    ByteBuffOutputStream bbos = reservoir.createByteBuffOutputStream(bb);
     encodeCellsTo(bbos, cellScanner, codec, compressor);
     if (bbos.size() == 0) {
       reservoir.reclaimBuffer(bb);
@@ -284,4 +284,36 @@ class CellBlockBuilder {
     }
     return cellBlock;
   }
+
+  public CellScanner createCellScanner(final Codec codec, final CompressionCodec compressor,
+      final IPCReservoir reservoir, ByteBuffer cellBlock) throws IOException {
+    if (compressor != null) {
+      cellBlock = decompress(compressor, reservoir, cellBlock);
+    }
+    return codec.getDecoder(cellBlock);
+  }
+
+  private ByteBuffer decompress(CompressionCodec compressor, IPCReservoir reservoir,
+      ByteBuffer cellBlock) throws IOException {
+    // GZIPCodec fails w/ NPE if no configuration.
+    if (compressor instanceof Configurable) {
+      ((Configurable) compressor).setConf(this.conf);
+    }
+    Decompressor poolDecompressor = CodecPool.getDecompressor(compressor);
+    ByteBuffInputStream bbis = reservoir.createByteBuffInputStream(cellBlock);
+    CompressionInputStream cis = compressor.createInputStream(bbis, poolDecompressor);
+    ByteBuffOutputStream bbos;
+    try {
+      ByteBuffer outBuff = reservoir.claimBuffer(cellBlock.remaining() *
+          this.cellBlockDecompressionMultiplier);
+      bbos = reservoir.createByteBuffOutputStream(outBuff);
+      IOUtils.copy(cis, bbos);
+      bbis.reclaimByteBuffer();
+      cellBlock = bbos.getByteBuffer();
+    } finally {
+      CodecPool.returnDecompressor(poolDecompressor);
+    }
+    return cellBlock;
+  }
+
 }
