@@ -51,5 +51,5 @@ public interface Codec {
 
   Decoder getDecoder(InputStream is);
   Encoder getEncoder(OutputStream os);
-  Decoder getDecoder(ByteBuffer buf);
+  Decoder getDecoder(ByteBuffer buf, BytesGenerator generator);
 }

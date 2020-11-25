@@ -35,11 +35,13 @@ import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.codec.Codec;
+import org.apache.hadoop.hbase.codec.DefaultBytesGenerator;
 import org.apache.hadoop.hbase.io.ByteBuffInputStream;
 import org.apache.hadoop.hbase.io.ByteBuffOutputStream;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
 import org.apache.hadoop.hbase.io.IPCReservoir;
+import org.apache.hadoop.hbase.io.IntermediateCellPond;
 import org.apache.hadoop.hbase.util.ClassSize;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -65,6 +67,8 @@ class CellBlockBuilder {
 
   private final int cellBlockBuildingInitialBufferSize;
 
+  private final boolean useCellPond;
+
   public CellBlockBuilder(Configuration conf) {
     this.conf = conf;
     this.cellBlockDecompressionMultiplier =
@@ -74,6 +78,8 @@ class CellBlockBuilder {
     // #buildCellBlock.
     this.cellBlockBuildingInitialBufferSize =
         ClassSize.align(conf.getInt("hbase.ipc.cellblock.building.initial.buffersize", 16 * 1024));
+
+    useCellPond = conf.getBoolean("hbase.use.intermediate.cell.pond", false);
   }
 
   private interface OutputStreamSupplier {
@@ -290,7 +296,9 @@ class CellBlockBuilder {
     if (compressor != null) {
       cellBlock = decompress(compressor, reservoir, cellBlock);
     }
-    return codec.getDecoder(cellBlock);
+    return codec.getDecoder(cellBlock, useCellPond ?
+            new IntermediateCellPond.CellPondBytesGenerator() :
+            new DefaultBytesGenerator());
   }
 
   private ByteBuffer decompress(CompressionCodec compressor, IPCReservoir reservoir,

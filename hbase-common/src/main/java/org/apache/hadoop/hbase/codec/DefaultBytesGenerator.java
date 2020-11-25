@@ -15,20 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.hbase.codec;
 
-import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 
-import java.nio.ByteBuffer;
-
-@InterfaceAudience.LimitedPrivate({ HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX})
-public abstract class AbstractDecoder implements Codec {
+@InterfaceAudience.Private
+public class DefaultBytesGenerator implements BytesGenerator {
 
   @Override
-  public Decoder getDecoder(ByteBuffer buf, BytesGenerator generator) {
-    return null;
+  public byte[] getBytes(int len) {
+    return new byte[len];
+  }
+
+  @Override
+  public int getOffset() {
+    return 0;
   }
 
 }

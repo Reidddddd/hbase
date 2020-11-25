@@ -89,21 +89,24 @@ public class KeyValueCodec extends AbstractDecoder {
     return new KeyValueEncoder(os);
   }
 
+  @InterfaceAudience.Private
   @Override
-  public Decoder getDecoder(ByteBuffer buf) {
-    return new ByteBufferKeyValueDecoder(buf);
+  public Decoder getDecoder(ByteBuffer buf, BytesGenerator generator) {
+    return new ByteBufferKeyValueDecoder(buf, generator);
   }
 
   @InterfaceAudience.Private
   public static class ByteBufferKeyValueDecoder implements Codec.Decoder  {
     final IPCReservoir reservoir;
+    final BytesGenerator generator;
     Cell current;
     ByteBuffer buf;
     boolean remaining;
 
-    public ByteBufferKeyValueDecoder(ByteBuffer buf) {
+    public ByteBufferKeyValueDecoder(ByteBuffer buf, BytesGenerator generator) {
       this.buf = buf;
       this.reservoir = IPCReservoir.getInstance();
+      this.generator = generator;
       this.remaining = true;
     }
 
@@ -120,9 +123,10 @@ public class KeyValueCodec extends AbstractDecoder {
       try {
         int len = buf.getInt();
         int currentPos = buf.position();
-        byte[] kv = new byte[len];
-        ByteBufferUtils.copyFromBufferToArray(kv, buf, currentPos, 0, len);
-        current = new KeyValue(kv, 0, len);
+        byte[] kv = generator.getBytes(len);
+        int offset = generator.getOffset();
+        ByteBufferUtils.copyFromBufferToArray(kv, buf, currentPos, offset, len);
+        current = new KeyValue(kv, offset, len);
         buf.position(currentPos + len);
         return true;
       } finally {
