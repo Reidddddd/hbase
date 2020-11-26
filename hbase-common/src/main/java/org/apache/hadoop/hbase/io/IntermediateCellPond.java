@@ -67,7 +67,7 @@ public class IntermediateCellPond {
 
   public void initial(Configuration conf) {
     segmentSize = conf.getInt(SEGMENT_SIZE, 2 * 1024 * 1024);
-    segmentKeep = conf.getInt(SEGMENT_NUM, 5);
+    segmentKeep = conf.getInt(SEGMENT_NUM, 1);
     segmentKeepBeforeClean = conf.getLong(SEGMENT_ClEAN, 30 * 60 * 1000);
   }
 

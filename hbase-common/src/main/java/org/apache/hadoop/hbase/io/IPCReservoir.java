@@ -65,12 +65,6 @@ public final class IPCReservoir {
 
   private final ReentrantLock updateLock = new ReentrantLock();
 
-  /** Statistics thread schedule pool (for heavy debugging, could remove) */
-  private transient final ScheduledExecutorService scheduleThreadPool =
-      Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat("IPCReservoirStatsExecutor")
-              .setDaemon(true).build());
-
   /**
    * Initialize IPCReservoir
    */
@@ -83,19 +77,6 @@ public final class IPCReservoir {
       maxByteBufferNum = conf.getInt(MAX_IN_RESERVOIR,
           conf.getInt(HConstants.REGION_SERVER_HANDLER_COUNT,
               HConstants.DEFAULT_REGION_SERVER_HANDLER_COUNT));
-      scheduleThreadPool.scheduleAtFixedRate(new Runnable() {
-        @Override
-        public void run() {
-          StringBuilder b = new StringBuilder();
-          for (BufferSizeManager bsm : managers.values()) {
-            b.append(bsm).append("\t");
-          }
-          String info = b.toString();
-          if (!info.isEmpty()) {
-            LOG.info(info);
-          }
-        }
-      }, 30, 30, TimeUnit.SECONDS);
     }
   }
 
