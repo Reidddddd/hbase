@@ -23,13 +23,19 @@
   import="org.apache.hadoop.hbase.util.VersionInfo"
   import="java.util.Date"
 %>
+<%@ page import="org.apache.hadoop.hbase.thrift.ImplType" %>
 
 <%
 Configuration conf = (Configuration)getServletContext().getAttribute("hbase.conf");
 long startcode = conf.getLong("startcode", System.currentTimeMillis());
 String listenPort = conf.get("hbase.regionserver.thrift.port", "9090");
 String serverInfo = listenPort + "," + String.valueOf(startcode);
-String implType = conf.get("hbase.regionserver.thrift.server.type", "threadpool");
+String implType;
+if (conf.getBoolean("hbase.regionserver.thrift.http", false)) {
+  implType = "http";
+} else {
+  implType = conf.get("hbase.regionserver.thrift.server.type", "threadpool");
+}
 String compact = conf.get("hbase.regionserver.thrift.compact", "false");
 String framed = conf.get("hbase.regionserver.thrift.framed", "false");
 %>

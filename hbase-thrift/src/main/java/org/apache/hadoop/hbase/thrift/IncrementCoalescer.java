@@ -35,8 +35,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.thrift.ThriftServerRunner.HBaseHandler;
 import org.apache.hadoop.hbase.thrift.generated.TIncrement;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.MBeanUtil;
@@ -52,8 +52,8 @@ import org.apache.thrift.TException;
  * thrift server dies or is shut down before everything in the queue is drained.
  *
  */
+@InterfaceAudience.Private
 public class IncrementCoalescer implements IncrementCoalescerMBean {
-
   /**
    * Used to identify a cell that will be incremented.
    *
@@ -121,11 +121,20 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
       if (obj == null) return false;
       if (getClass() != obj.getClass()) return false;
       FullyQualifiedRow other = (FullyQualifiedRow) obj;
-      if (!Arrays.equals(family, other.family)) return false;
-      if (!Arrays.equals(qualifier, other.qualifier)) return false;
-      if (!Arrays.equals(rowKey, other.rowKey)) return false;
-      if (!Arrays.equals(table, other.table)) return false;
-      return true;
+
+      if (!Arrays.equals(family, other.family)) {
+        return false;
+      }
+      if (!Arrays.equals(qualifier, other.qualifier)) {
+        return false;
+      }
+      if (!Arrays.equals(rowKey, other.rowKey)) {
+        return false;
+      }
+      if (!Arrays.equals(table, other.table)) {
+        return false;
+      }
+      return Arrays.equals(table, other.table);
     }
 
   }
@@ -157,14 +166,14 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
   private final ConcurrentMap<FullyQualifiedRow, Long> countersMap =
       new ConcurrentHashMap<FullyQualifiedRow, Long>(100000, 0.75f, 1500);
   private final ThreadPoolExecutor pool;
-  private final HBaseHandler handler;
+  private final ThriftHBaseServiceHandler handler;
 
   private int maxQueueSize = 500000;
   private static final int CORE_POOL_SIZE = 1;
 
   private static final Log LOG = LogFactory.getLog(FullyQualifiedRow.class);
 
-  public IncrementCoalescer(HBaseHandler hand) {
+  public IncrementCoalescer(ThriftHBaseServiceHandler hand) {
     this.handler = hand;
     LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
     pool =

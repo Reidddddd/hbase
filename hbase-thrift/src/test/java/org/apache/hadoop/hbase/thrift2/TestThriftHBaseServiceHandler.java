@@ -48,6 +48,7 @@ import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.test.MetricsAssertHelper;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.thrift.ErrorThrowingGetObserver;
+import org.apache.hadoop.hbase.thrift.HbaseHandlerMetricsProxy;
 import org.apache.hadoop.hbase.thrift.ThriftMetrics;
 import org.apache.hadoop.hbase.thrift2.generated.TAppend;
 import org.apache.hadoop.hbase.thrift2.generated.TColumn;
@@ -863,7 +864,6 @@ public class TestThriftHBaseServiceHandler {
     TScan scan = new TScan();
     scan.setStartRow("testSmallScan".getBytes());
     scan.setStopRow("testSmallScan\uffff".getBytes());
-    scan.setSmall(true);
     scan.setCaching(2);
 
     // get scanner and rows
@@ -1096,7 +1096,7 @@ public class TestThriftHBaseServiceHandler {
     ThriftMetrics metrics = getMetrics(conf);
     ThriftHBaseServiceHandler hbaseHandler = createHandler();
     THBaseService.Iface handler =
-        ThriftHBaseServiceHandler.newInstance(hbaseHandler, metrics);
+        HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, conf);
     byte[] rowName = "testMetrics".getBytes();
     ByteBuffer table = wrap(tableAname);
 
@@ -1139,7 +1139,7 @@ public class TestThriftHBaseServiceHandler {
     ThriftHBaseServiceHandler hbaseHandler = createHandler();
     ThriftMetrics metrics = getMetrics(UTIL.getConfiguration());
     THBaseService.Iface handler =
-        ThriftHBaseServiceHandler.newInstance(hbaseHandler, metrics);
+        HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, null);
     ByteBuffer tTableName = wrap(tableName.getName());
 
     // check metrics increment with a successful get
@@ -1213,7 +1213,7 @@ public class TestThriftHBaseServiceHandler {
       ThriftHBaseServiceHandler hbaseHandler = createHandler();
       ThriftMetrics metrics = getMetrics(UTIL.getConfiguration());
       THBaseService.Iface handler =
-          ThriftHBaseServiceHandler.newInstance(hbaseHandler, metrics);
+          HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, null);
       ByteBuffer tTableName = wrap(tableName.getName());
 
       // check metrics latency with a successful get
