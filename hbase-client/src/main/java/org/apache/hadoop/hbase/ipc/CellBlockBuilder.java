@@ -290,4 +290,22 @@ class CellBlockBuilder {
     }
     return cellBlock;
   }
+
+  /**
+   * This method should be used on server side only.
+   * @param codec codec
+   * @param compressor compressor codec
+   * @param cellBlock byte buffer
+   * @return CellScanner
+   * @throws IOException
+   */
+  @InterfaceAudience.Private
+  public CellScanner createCellScannerForRequest(final Codec codec, final CompressionCodec compressor,
+      ByteBuffer cellBlock) throws IOException {
+    if (compressor != null) {
+      cellBlock = decompress(compressor, cellBlock);
+    }
+    return codec.getDecoder(cellBlock);
+  }
+
 }

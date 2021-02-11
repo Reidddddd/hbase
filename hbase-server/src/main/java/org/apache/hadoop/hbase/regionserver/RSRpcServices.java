@@ -93,6 +93,7 @@ import org.apache.hadoop.hbase.exceptions.OutOfOrderScannerNextException;
 import org.apache.hadoop.hbase.exceptions.ScannerResetException;
 import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
+import org.apache.hadoop.hbase.io.HByteBuffer;
 import org.apache.hadoop.hbase.ipc.HBaseRPCErrorHandler;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.ipc.PriorityFunction;
@@ -2412,6 +2413,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         cellsToReturn = doNonAtomicRegionMutation(region, quota, regionAction, cellScanner,
             regionActionResultBuilder, cellsToReturn, nonceGroup);
       }
+      HByteBuffer.getInstance().clearHandlerBuffer();
       responseBuilder.addRegionActionResult(regionActionResultBuilder.build());
       quota.close();
       ClientProtos.RegionLoadStats regionLoadStats = ((HRegion)region).getLoadStatistics();

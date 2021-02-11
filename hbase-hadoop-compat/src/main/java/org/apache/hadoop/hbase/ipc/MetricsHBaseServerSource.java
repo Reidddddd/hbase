@@ -109,4 +109,6 @@ public interface MetricsHBaseServerSource extends ExceptionTrackingSource {
   void processedCall(int processingTime);
 
   void queuedAndProcessedCall(int totalTime);
+
+  void time(long delta);
 }

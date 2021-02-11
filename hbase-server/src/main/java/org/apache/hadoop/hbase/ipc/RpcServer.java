@@ -95,6 +95,7 @@ import org.apache.hadoop.hbase.exceptions.RequestTooBigException;
 import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
+import org.apache.hadoop.hbase.io.HByteBuffer;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
@@ -118,6 +119,7 @@ import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManager;
+import org.apache.hadoop.hbase.util.ByteBufferUtils;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Counter;
 import org.apache.hadoop.hbase.util.GsonUtil;
@@ -308,6 +310,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
    * TODO try to figure out a better way and remove reference from regionserver package later.
    */
   private RSRpcServices rsRpcServices;
+
+  private final HByteBuffer bufferPool;
 
   /**
    * Datastructure that holds all necessary to a method invocation and then afterward, carries
@@ -1305,6 +1309,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     private boolean connectionHeaderRead = false;
     protected SocketChannel channel;
     private ByteBuffer data;
+    private volatile boolean isNewData = true;
     private ByteBuffer dataLengthBuffer;
     private ByteBuffer preambleBuffer;
     protected final ConcurrentLinkedDeque<Call> responseQueue = new ConcurrentLinkedDeque<Call>();
@@ -1361,7 +1366,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     public Connection(SocketChannel channel, long lastContact) {
       this.channel = channel;
       this.lastContact = lastContact;
-      this.data = null;
+      this.data = bufferPool.claimConnectionBuffer();
       this.dataLengthBuffer = ByteBuffer.allocate(4);
       this.socket = channel.socket();
       this.addr = socket.getInetAddress();
@@ -1710,7 +1715,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       synchronized(this) {
         // We have read a length and we have read the preamble.  It is either the connection header
         // or it is a request.
-        if (data == null) {
+        if (isNewData) {
           dataLengthBuffer.flip();
           int dataLength = dataLengthBuffer.getInt();
           if (dataLength == RpcClient.PING_CALL_ID) {
@@ -1774,7 +1779,12 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             return -1;
           }
 
-          data = ByteBuffer.allocate(dataLength);
+          if (dataLength > data.capacity()) {
+            data = ByteBuffer.allocate(dataLength);
+          } else {
+            data.limit(dataLength);
+          }
+          isNewData = false;
 
           // Increment the rpc count. This counter will be decreased when we write
           //  the response.  If we want the connection to be detected as idle properly, we
@@ -1811,7 +1821,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
       } finally {
         dataLengthBuffer.clear(); // Clean for the next call
-        data = null; // For the GC
+        data.clear();
+        isNewData = true;
       }
     }
 
@@ -1961,7 +1972,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     private void processOneRpc(ByteBuffer buf) throws IOException, InterruptedException {
       if (connectionHeaderRead) {
+        long start = System.nanoTime();
         processRequest(buf);
+        metrics.time(System.nanoTime() - start);
       } else {
         processConnectionHeader(buf);
         this.connectionHeaderRead = true;
@@ -2036,8 +2049,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           throw new DoNotRetryIOException(msg);
         }
         if (header.hasCellBlockMeta()) {
-          buf.position(offset);
-          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf);
+          ByteBuffer clone = ByteBuffer.allocate(buf.limit());
+          ByteBufferUtils.copyFromBufferToBuffer(clone, buf, 0, buf.limit());
+          clone.position(offset);
+          cellScanner = cellBlockBuilder.createCellScannerForRequest(
+              this.codec, this.compressionCodec, clone);
         }
       } catch (Throwable t) {
         InetSocketAddress address = getListenerAddress();
@@ -2115,7 +2131,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     protected synchronized void close() {
       disposeSasl();
-      data = null;
+      bufferPool.clearConnectionBuffer(data);
       if (!channel.isOpen())
         return;
       try {socket.shutdownOutput();} catch(Exception ignored) {
@@ -2258,6 +2274,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     this.scheduler = scheduler;
     this.scheduler.init(new RpcSchedulerContext(this));
+
+    this.bufferPool = HByteBuffer.getInstance();
+    this.bufferPool.initialize(conf);
   }
 
   @Override

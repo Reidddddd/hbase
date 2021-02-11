@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.MetricHistogram;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MutableFastCounter;
+import org.apache.hadoop.metrics2.lib.MutableTimeHistogram;
 
 @InterfaceAudience.Private
 public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
@@ -41,6 +42,7 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
   private final MutableFastCounter authenticationFallbacks;
   private final MutableFastCounter sentBytes;
   private final MutableFastCounter receivedBytes;
+  private final MutableTimeHistogram time;
 
 
   private MetricHistogram queueCallTime;
@@ -81,6 +83,7 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
         REQUEST_SIZE_DESC);
     this.responseSize = this.getMetricsRegistry().newSizeHistogram(RESPONSE_SIZE_NAME,
               RESPONSE_SIZE_DESC);
+    this.time = this.getMetricsRegistry().newTimeHistogram("elapsedTime", "For debug");
   }
 
   @Override
@@ -137,6 +140,11 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
   @Override
   public void queuedAndProcessedCall(int totalTime) {
     totalCallTime.add(totalTime);
+  }
+
+  @Override
+  public void time(long delta) {
+    time.add(delta);
   }
 
   @Override

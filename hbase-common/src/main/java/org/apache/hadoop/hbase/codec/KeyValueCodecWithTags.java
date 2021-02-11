@@ -51,7 +51,7 @@ import org.apache.hadoop.hbase.KeyValueUtil;
  * <b>Use this Codec only at server side.</b>
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class KeyValueCodecWithTags implements Codec {
+public class KeyValueCodecWithTags extends AbstractCodec {
   public static class KeyValueEncoder extends BaseEncoder {
     public KeyValueEncoder(final OutputStream out) {
       super(out);
