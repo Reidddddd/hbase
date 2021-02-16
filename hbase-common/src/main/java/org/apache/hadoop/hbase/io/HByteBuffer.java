@@ -24,15 +24,27 @@ import java.util.Queue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.util.Pair;
 
 @InterfaceAudience.Private
 public final class HByteBuffer {
+  private static Log LOG = LogFactory.getLog(HByteBuffer.class);
+
+  static final String ENABLE = "hbase.regionserver.bytebuffer.enable";
+  static final String SIZE = "hbase.regionserver.bytebuffer.buffer.size";
+  static final String RETAINED = "hbase.regionserver.bytebuffer.retained.for.connection";
+
+  private final Lock lock = new ReentrantLock();
 
   private int size;
   private boolean enable;
+  private int retainedForConnection;
+  private Queue<ByteBuffer> connectionBuffer = new ArrayDeque<>();
 
   private ThreadLocal<ByteBuffer> handlerByteBuffer = new ThreadLocal() {
     @Override
@@ -41,8 +53,6 @@ public final class HByteBuffer {
     }
   };
 
-  private final Lock lock = new ReentrantLock();
-  private final Queue<ByteBuffer> connectionBuffer = new ArrayDeque<>();
 
   private static class Singleton {
     private static final HByteBuffer HBB = new HByteBuffer();
@@ -56,8 +66,10 @@ public final class HByteBuffer {
   }
 
   public void initialize(Configuration conf) {
-    size = conf.getInt("hbase.handler.bytebuffer.buffer.size", 1024 * 1024 * 3);
-    enable = conf.getBoolean("hbase.handler.bytebuffer.enable", false);
+    enable = conf.getBoolean(ENABLE, false);
+    size = conf.getInt(SIZE, 1024 * 1024 * 3);
+    retainedForConnection = conf.getInt(RETAINED, 500);
+    connectionBuffer = new ArrayDeque<>(retainedForConnection);
   }
 
   public Pair<byte[], Integer> claimHandlerBuffer(int len) {
@@ -75,6 +87,9 @@ public final class HByteBuffer {
       }
       return new Pair<>(slice.array(), slice.arrayOffset());
     } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Encounter a large request which is more than " + size + " bytes");
+      }
       return new Pair<>(ByteBuffer.allocate(len).array(), 0);
     }
   }
@@ -82,16 +97,15 @@ public final class HByteBuffer {
 
   public void clearHandlerBuffer() {
     if (enable) {
-      ByteBuffer buf = handlerByteBuffer.get();
-      buf.clear();
+      handlerByteBuffer.get().clear();
     }
   }
 
-  public int sizeOfBuffer() {
-    return size;
-  }
-
   public ByteBuffer claimConnectionBuffer() {
+    if (!enable) {
+      return ByteBuffer.allocate(size);
+    }
+
     ByteBuffer buf;
     lock.lock();
     try {
@@ -102,18 +116,32 @@ public final class HByteBuffer {
     return buf == null ? ByteBuffer.allocate(size) : buf;
   }
 
-  public void clearConnectionBuffer(ByteBuffer buf) {
-    if (buf.capacity() > size) {
-      return;
+  public boolean clearConnectionBuffer(ByteBuffer buf) {
+    if (!enable || buf.capacity() > size) {
+      return false;
     }
 
     buf.clear();
     lock.lock();
     try {
+      if (connectionBuffer.size() >= retainedForConnection) {
+        return false;
+      }
       connectionBuffer.offer(buf);
     } finally {
       lock.unlock();
     }
+    return true;
+  }
+
+  /**
+   * For unit test only, and it isn't thread-safe, but for test there is only one thread,
+   * so it should be fine.
+   * Please do not call it in production env.
+   */
+  @VisibleForTesting
+  int size() {
+    return connectionBuffer.size();
   }
 
 }
