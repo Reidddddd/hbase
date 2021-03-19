@@ -83,15 +83,15 @@ public class HThreadedSelectorServerArgs extends TThreadedSelectorServer.Args {
         ACCEPT_POLICY_CONF_KEY, getAcceptPolicy().toString()).toUpperCase(Locale.ROOT));
 
     super.selectorThreads(selectorThreads)
-         .workerThreads(workerThreads)
-         .stopTimeoutVal(stopTimeoutVal)
-         .acceptQueueSizePerThread(acceptQueueSizePerThread)
-         .acceptPolicy(acceptPolicy);
+        .workerThreads(workerThreads)
+        .stopTimeoutVal(stopTimeoutVal)
+        .acceptQueueSizePerThread(acceptQueueSizePerThread)
+        .acceptPolicy(acceptPolicy);
 
     LOG.info("Read configuration selectorThreads:" + selectorThreads +
-             " workerThreads:" + workerThreads +
-             " stopTimeoutVal:" + stopTimeoutVal + "sec" +
-             " acceptQueueSizePerThread:" + acceptQueueSizePerThread +
-             " acceptPolicy:" + acceptPolicy);
+        " workerThreads:" + workerThreads +
+        " stopTimeoutVal:" + stopTimeoutVal + "sec" +
+        " acceptQueueSizePerThread:" + acceptQueueSizePerThread +
+        " acceptPolicy:" + acceptPolicy);
   }
 }

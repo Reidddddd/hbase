@@ -46,6 +46,8 @@ import org.apache.thrift.TProcessor;
  * ThriftServer - this class starts up a Thrift server which implements the HBase API specified in the
  * HbaseClient.thrift IDL file.
  */
+@edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "NM_SAME_SIMPLE_NAME_AS_SUPERCLASS",
+  justification = "Change the name will be an incompatible change, will do it later")
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.TOOLS)
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class ThriftServer extends org.apache.hadoop.hbase.thrift.ThriftServer {

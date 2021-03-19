@@ -59,7 +59,7 @@ public class ThriftMetrics  {
   private MetricsThriftServerSource source;
   private final long slowResponseTime;
   public static final String SLOW_RESPONSE_NANO_SEC =
-    "hbase.thrift.slow.response.nano.second";
+      "hbase.thrift.slow.response.nano.second";
   public static final long DEFAULT_SLOW_RESPONSE_NANO_SEC = 10 * 1000 * 1000;
   private final ThriftServerType thriftServerType;
 

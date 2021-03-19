@@ -88,12 +88,14 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.SaslServer;
 
+import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -136,8 +138,6 @@ import org.apache.thrift.transport.TSaslServerTransport;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TTransportFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import org.mortbay.jetty.Connector;
 import org.mortbay.jetty.Server;
@@ -444,7 +444,8 @@ public class ThriftServer extends Configured implements Tool{
     TTransportFactory transportFactory;
     if (conf.getBoolean(FRAMED_CONF_KEY, FRAMED_CONF_DEFAULT) || implType.isAlwaysFramed) {
       if (qop != null) {
-        throw new RuntimeException("Thrift server authentication" + " doesn't work with framed transport yet");
+        throw new RuntimeException("Thrift server authentication "
+            + "doesn't work with framed transport yet");
       }
       transportFactory = new TFramedTransport.Factory(
           conf.getInt(MAX_FRAME_SIZE_CONF_KEY, MAX_FRAME_SIZE_CONF_DEFAULT) * 1024 * 1024);
@@ -506,7 +507,8 @@ public class ThriftServer extends Configured implements Tool{
     }
 
     InetSocketAddress inetSocketAddress = new InetSocketAddress(getBindAddress(conf), listenPort);
-    if (implType == ImplType.HS_HA || implType == ImplType.NONBLOCKING || implType == ImplType.THREADED_SELECTOR) {
+    if (implType == ImplType.HS_HA || implType == ImplType.NONBLOCKING ||
+        implType == ImplType.THREADED_SELECTOR) {
       TNonblockingServerTransport serverTransport = new TNonblockingServerSocket(inetSocketAddress);
       if (implType == ImplType.NONBLOCKING) {
         tserver = getTNonBlockingServer(serverTransport, protocolFactory, processorToUse,
@@ -524,7 +526,8 @@ public class ThriftServer extends Configured implements Tool{
       this.tserver = getTThreadPoolServer(protocolFactory, processorToUse, transportFactory,
           inetSocketAddress);
     } else {
-      throw new AssertionError("Unsupported Thrift server implementation: " + implType.simpleClassName());
+      throw new AssertionError("Unsupported Thrift server implementation: " +
+          implType.simpleClassName());
     }
 
     // A sanity check that we instantiated the right type of server.
@@ -553,7 +556,8 @@ public class ThriftServer extends Configured implements Tool{
     THsHaServer.Args serverArgs = new THsHaServer.Args(serverTransport);
     int queueSize = conf.getInt(TBoundedThreadPoolServer.MAX_QUEUED_REQUESTS_CONF_KEY,
         TBoundedThreadPoolServer.DEFAULT_MAX_QUEUED_REQUESTS);
-    CallQueue callQueue = new CallQueue(new LinkedBlockingQueue<CallQueue.Call>(queueSize), metrics);
+    CallQueue callQueue =
+        new CallQueue(new LinkedBlockingQueue<CallQueue.Call>(queueSize), metrics);
     int workerThread = conf.getInt(TBoundedThreadPoolServer.MAX_WORKER_THREADS_CONF_KEY,
         serverArgs.getMaxWorkerThreads());
     ExecutorService executorService = createExecutor(
@@ -571,7 +575,8 @@ public class ThriftServer extends Configured implements Tool{
         new HThreadedSelectorServerArgs(serverTransport, conf);
     int queueSize = conf.getInt(TBoundedThreadPoolServer.MAX_QUEUED_REQUESTS_CONF_KEY,
         TBoundedThreadPoolServer.DEFAULT_MAX_QUEUED_REQUESTS);
-    CallQueue callQueue = new CallQueue(new LinkedBlockingQueue<CallQueue.Call>(queueSize), metrics);
+    CallQueue callQueue =
+        new CallQueue(new LinkedBlockingQueue<CallQueue.Call>(queueSize), metrics);
     int workerThreads = conf.getInt(TBoundedThreadPoolServer.MAX_WORKER_THREADS_CONF_KEY,
         serverArgs.getWorkerThreads());
     int selectorThreads = conf.getInt(THRIFT_SELECTOR_NUM, serverArgs.getSelectorThreads());
@@ -639,8 +644,9 @@ public class ThriftServer extends Configured implements Tool{
     if (filters != null) {
       List<String> filterPart = new ArrayList<String>();
       for (String filterClass : filters) {
-        for (String part: splitter.split(filterClass))
+        for (String part: splitter.split(filterClass)) {
           filterPart.add(part);
+        }
         if (filterPart.size() != 2) {
           LOG.warn("Invalid filter specification " + filterClass + " - skipping");
         } else {
@@ -718,7 +724,8 @@ public class ThriftServer extends Configured implements Tool{
         conf, TBoundedThreadPoolServer.MAX_WORKER_THREADS_CONF_KEY);
     optionToConf(cmd, MAX_QUEUE_SIZE_OPTION,
         conf, TBoundedThreadPoolServer.MAX_QUEUED_REQUESTS_CONF_KEY);
-    optionToConf(cmd, KEEP_ALIVE_SEC_OPTION, conf, TBoundedThreadPoolServer.THREAD_KEEP_ALIVE_TIME_SEC_CONF_KEY);
+    optionToConf(cmd, KEEP_ALIVE_SEC_OPTION, conf,
+        TBoundedThreadPoolServer.THREAD_KEEP_ALIVE_TIME_SEC_CONF_KEY);
     optionToConf(cmd, READ_TIMEOUT_OPTION, conf, THRIFT_SERVER_SOCKET_READ_TIMEOUT_KEY);
     optionToConf(cmd, SELECTOR_NUM_OPTION, conf, THRIFT_SELECTOR_NUM);
 

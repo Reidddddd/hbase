@@ -125,7 +125,7 @@ public class TBoundedThreadPoolServer extends TServer {
     @Override
     public String toString() {
       return "min worker threads=" + minWorkerThreads
-          + ", max worker threads=" + maxWorkerThreads 
+          + ", max worker threads=" + maxWorkerThreads
           + ", max queued requests=" + maxQueuedRequests;
     }
   }

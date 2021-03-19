@@ -60,9 +60,9 @@ public class ThriftUtilities {
   static public HColumnDescriptor colDescFromThrift(ColumnDescriptor in)
       throws IllegalArgument {
     Compression.Algorithm comp =
-      Compression.getCompressionAlgorithmByName(in.compression.toLowerCase(Locale.ROOT));
+        Compression.getCompressionAlgorithmByName(in.compression.toLowerCase(Locale.ROOT));
     BloomType bt =
-      BloomType.valueOf(in.bloomFilterType);
+        BloomType.valueOf(in.bloomFilterType);
 
     if (in.name == null || !in.name.hasRemaining()) {
       throw new IllegalArgument("column name is empty");
@@ -151,28 +151,28 @@ public class ThriftUtilities {
   static public List<TRowResult> rowResultFromHBase(Result[] in, boolean sortColumns) {
     List<TRowResult> results = new ArrayList<TRowResult>();
     for ( Result result_ : in) {
-        if(result_ == null || result_.isEmpty()) {
-            continue;
+      if(result_ == null || result_.isEmpty()) {
+        continue;
+      }
+      TRowResult result = new TRowResult();
+      result.row = ByteBuffer.wrap(result_.getRow());
+      if (sortColumns) {
+        result.sortedColumns = new ArrayList<TColumn>();
+        for (Cell kv : result_.rawCells()) {
+          result.sortedColumns.add(new TColumn(
+              ByteBuffer.wrap(KeyValue.makeColumn(CellUtil.cloneFamily(kv),
+                  CellUtil.cloneQualifier(kv))),
+              new TCell(ByteBuffer.wrap(CellUtil.cloneValue(kv)), kv.getTimestamp())));
         }
-        TRowResult result = new TRowResult();
-        result.row = ByteBuffer.wrap(result_.getRow());
-        if (sortColumns) {
-          result.sortedColumns = new ArrayList<TColumn>();
-          for (Cell kv : result_.rawCells()) {
-            result.sortedColumns.add(new TColumn(
-                ByteBuffer.wrap(KeyValue.makeColumn(CellUtil.cloneFamily(kv),
-                    CellUtil.cloneQualifier(kv))),
-                new TCell(ByteBuffer.wrap(CellUtil.cloneValue(kv)), kv.getTimestamp())));
-          }
-        } else {
-          result.columns = new TreeMap<ByteBuffer, TCell>();
-          for (Cell kv : result_.rawCells()) {
-            result.columns.put(
-                ByteBuffer.wrap(KeyValue.makeColumn(CellUtil.cloneFamily(kv),
-                    CellUtil.cloneQualifier(kv))),
-                new TCell(ByteBuffer.wrap(CellUtil.cloneValue(kv)), kv.getTimestamp()));
-          }
+      } else {
+        result.columns = new TreeMap<ByteBuffer, TCell>();
+        for (Cell kv : result_.rawCells()) {
+          result.columns.put(
+              ByteBuffer.wrap(KeyValue.makeColumn(CellUtil.cloneFamily(kv),
+                  CellUtil.cloneQualifier(kv))),
+              new TCell(ByteBuffer.wrap(CellUtil.cloneValue(kv)), kv.getTimestamp()));
         }
+      }
       results.add(result);
     }
     return results;

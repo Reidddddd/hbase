@@ -31,11 +31,11 @@ import java.util.Set;
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.KeepDeletedCells;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
+import org.apache.hadoop.hbase.KeepDeletedCells;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
@@ -45,7 +45,6 @@ import org.apache.hadoop.hbase.client.Consistency;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HRegionLocator;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.OperationWithAttributes;
@@ -71,7 +70,6 @@ import org.apache.hadoop.hbase.thrift2.generated.TAuthorization;
 import org.apache.hadoop.hbase.thrift2.generated.TBloomFilterType;
 import org.apache.hadoop.hbase.thrift2.generated.TCellVisibility;
 import org.apache.hadoop.hbase.thrift2.generated.TColumn;
-import org.apache.hadoop.hbase.thrift2.generated.TColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.thrift2.generated.TColumnIncrement;
 import org.apache.hadoop.hbase.thrift2.generated.TColumnValue;
 import org.apache.hadoop.hbase.thrift2.generated.TCompareOp;
@@ -81,24 +79,19 @@ import org.apache.hadoop.hbase.thrift2.generated.TDataBlockEncoding;
 import org.apache.hadoop.hbase.thrift2.generated.TDelete;
 import org.apache.hadoop.hbase.thrift2.generated.TDeleteType;
 import org.apache.hadoop.hbase.thrift2.generated.TDurability;
-import org.apache.hadoop.hbase.thrift2.generated.TFilterByOperator;
 import org.apache.hadoop.hbase.thrift2.generated.TGet;
 import org.apache.hadoop.hbase.thrift2.generated.THRegionInfo;
 import org.apache.hadoop.hbase.thrift2.generated.THRegionLocation;
 import org.apache.hadoop.hbase.thrift2.generated.TIncrement;
 import org.apache.hadoop.hbase.thrift2.generated.TKeepDeletedCells;
-import org.apache.hadoop.hbase.thrift2.generated.TLogQueryFilter;
-import org.apache.hadoop.hbase.thrift2.generated.TLogType;
 import org.apache.hadoop.hbase.thrift2.generated.TMutation;
 import org.apache.hadoop.hbase.thrift2.generated.TNamespaceDescriptor;
-import org.apache.hadoop.hbase.thrift2.generated.TOnlineLogRecord;
 import org.apache.hadoop.hbase.thrift2.generated.TPut;
 import org.apache.hadoop.hbase.thrift2.generated.TReadType;
 import org.apache.hadoop.hbase.thrift2.generated.TResult;
 import org.apache.hadoop.hbase.thrift2.generated.TRowMutations;
 import org.apache.hadoop.hbase.thrift2.generated.TScan;
 import org.apache.hadoop.hbase.thrift2.generated.TServerName;
-import org.apache.hadoop.hbase.thrift2.generated.TTableDescriptor;
 import org.apache.hadoop.hbase.thrift2.generated.TTableName;
 import org.apache.hadoop.hbase.thrift2.generated.TTimeRange;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -365,6 +358,8 @@ public class ThriftUtilities {
                     "Timestamp is required for TDelete with DeleteFamilyVersion type");
               }
               break;
+            default:
+              throw new IllegalArgumentException("Unknown DeleteType");
           }
         } else {
           throw new IllegalArgumentException("DeleteType is required for TDelete");
@@ -414,7 +409,8 @@ public class ThriftUtilities {
       case DeleteFamily: return TDeleteType.DELETE_FAMILY;
       case DeleteFamilyVersion: return TDeleteType.DELETE_FAMILY_VERSION;
       default: throw new IllegalArgumentException("Unknow delete type " + type);
-    }  }
+    }
+  }
 
   public static TDelete deleteFromHBase(Delete in) {
     TDelete out = new TDelete(ByteBuffer.wrap(in.getRow()));

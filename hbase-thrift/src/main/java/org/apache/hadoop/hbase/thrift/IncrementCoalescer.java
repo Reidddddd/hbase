@@ -117,9 +117,15 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
 
     @Override
     public boolean equals(Object obj) {
-      if (this == obj) return true;
-      if (obj == null) return false;
-      if (getClass() != obj.getClass()) return false;
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null) {
+        return false;
+      }
+      if (getClass() != obj.getClass()) {
+        return false;
+      }
       FullyQualifiedRow other = (FullyQualifiedRow) obj;
 
       if (!Arrays.equals(family, other.family)) {
@@ -154,8 +160,12 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
     @Override
     public Thread newThread(Runnable r) {
       Thread t = new Thread(group, r, namePrefix + threadNumber.getAndIncrement(), 0);
-      if (!t.isDaemon()) t.setDaemon(true);
-      if (t.getPriority() != Thread.NORM_PRIORITY) t.setPriority(Thread.NORM_PRIORITY);
+      if (!t.isDaemon()) {
+        t.setDaemon(true);
+      }
+      if (t.getPriority() != Thread.NORM_PRIORITY) {
+        t.setPriority(Thread.NORM_PRIORITY);
+      }
       return t;
     }
   }
@@ -206,10 +216,12 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
 
   private boolean internalQueueTincrement(TIncrement inc) throws TException {
     byte[][] famAndQf = KeyValue.parseColumn(inc.getColumn());
-    if (famAndQf.length != 2) return false;
+    if (famAndQf.length != 2) {
+      return false;
+    }
 
     return internalQueueIncrement(inc.getTable(), inc.getRow(), famAndQf[0], famAndQf[1],
-      inc.getAmmount());
+        inc.getAmmount());
   }
 
   private boolean internalQueueIncrement(byte[] tableName, byte[] rowKey, byte[] fam,
@@ -280,7 +292,7 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
               throw new IOException("Auto-Fail rest of ICVs");
             }
             table.incrementColumnValue(row.getRowKey(), row.getFamily(), row.getQualifier(),
-              counter);
+                counter);
           } catch (IOException e) {
             // log failure of increment
             failures++;
@@ -302,7 +314,7 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
   /**
    * This method samples the incoming requests and, if selected, will check if
    * the corePoolSize should be changed.
-   * @param countersMapSize
+   * @param countersMapSize a given integer.
    */
   private void dynamicallySetCoreSize(int countersMapSize) {
     // Here we are using countersMapSize as a random number, meaning this
@@ -311,9 +323,10 @@ public class IncrementCoalescer implements IncrementCoalescerMBean {
       return;
     }
     double currentRatio = (double) countersMapSize / (double) maxQueueSize;
-    int newValue = 1;
+    int newValue;
     if (currentRatio < 0.1) {
       // it's 1
+      newValue = 1;
     } else if (currentRatio < 0.3) {
       newValue = 2;
     } else if (currentRatio < 0.5) {

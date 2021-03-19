@@ -41,7 +41,7 @@ public class CallQueue implements BlockingQueue<Runnable> {
   private final ThriftMetrics metrics;
 
   public CallQueue(BlockingQueue<Call> underlyingQueue,
-                   ThriftMetrics metrics) {
+      ThriftMetrics metrics) {
     this.underlyingQueue = underlyingQueue;
     this.metrics = metrics;
   }
@@ -128,7 +128,7 @@ public class CallQueue implements BlockingQueue<Runnable> {
 
   @Override
   public int drainTo(Collection<? super Runnable> destination,
-                     int maxElements) {
+      int maxElements) {
     if (destination == this) {
       throw new IllegalArgumentException(
           "A BlockingQueue cannot drain to itself.");

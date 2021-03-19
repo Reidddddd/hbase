@@ -40,8 +40,8 @@ public final class HbaseHandlerMetricsProxy implements InvocationHandler {
   private final ThriftMetrics metrics;
 
   public static Hbase.Iface newInstance(Hbase.Iface handler,
-                                        ThriftMetrics metrics,
-                                        Configuration conf) {
+      ThriftMetrics metrics,
+      Configuration conf) {
     return (Hbase.Iface) Proxy.newProxyInstance(
         handler.getClass().getClassLoader(),
         new Class[]{Hbase.Iface.class},
@@ -85,7 +85,7 @@ public final class HbaseHandlerMetricsProxy implements InvocationHandler {
     }
     return result;
   }
-  
+
   private static long now() {
     return System.nanoTime();
   }

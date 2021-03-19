@@ -23,7 +23,7 @@ import org.apache.hadoop.hbase.classification.InterfaceAudience;
  * Thrift related constants.
  */
 @InterfaceAudience.Private
-public class Constants {
+public final class Constants {
   private Constants(){}
 
   public static final int DEFAULT_HTTP_MAX_HEADER_SIZE = 64 * 1024; // 64k
