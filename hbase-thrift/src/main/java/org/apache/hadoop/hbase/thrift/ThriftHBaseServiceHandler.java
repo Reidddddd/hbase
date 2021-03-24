@@ -33,6 +33,7 @@ import java.util.TreeMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -1219,6 +1220,7 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements Hb
 
   private static IOError getIOError(Throwable throwable) {
     IOError error = new IOErrorWithCause(throwable);
+    error.setCanRetry(!(throwable instanceof DoNotRetryIOException));
     error.setMessage(Throwables.getStackTraceAsString(throwable));
     return error;
   }
