@@ -75,6 +75,10 @@ public final class Constants {
   public static final String THRIFT_SPNEGO_PRINCIPAL_KEY = "hbase.thrift.spnego.principal";
   public static final String THRIFT_SPNEGO_KEYTAB_FILE_KEY = "hbase.thrift.spnego.keytab.file";
 
+  //ldap related configs
+  public static final String THRIFT_LDAP_AUTHENTICATION = "hbase.thrift.ldap.authentication";
+  public static final String THRIFT_LDAP_NAMESPACE = "hbase.thrift.ldap.namespace";
+  public static final String THRIFT_LDAP_URL = "hbase.thrift.ldap.url";
   /**
    * Amount of time in milliseconds before a server thread will timeout
    * waiting for client to send data on a connected socket. Currently,

@@ -57,6 +57,9 @@ import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_INFO_SERVER_PORT;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_INFO_SERVER_PORT_DEFAULT;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_LDAP_AUTHENTICATION;
+import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_LDAP_NAMESPACE;
+import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_LDAP_URL;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_QOP_KEY;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_SELECTOR_NUM;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_SERVER_SOCKET_READ_TIMEOUT_DEFAULT;
@@ -109,6 +112,7 @@ import org.apache.hadoop.hbase.security.SecurityUtil;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.thrift.generated.Hbase;
 
+import org.apache.hadoop.hbase.thrift.ldap.TLdapTransportFactory;
 import org.apache.hadoop.hbase.util.DNS;
 import org.apache.hadoop.hbase.util.HttpServerUtil;
 import org.apache.hadoop.hbase.util.JvmPauseMonitor;
@@ -251,7 +255,8 @@ public class ThriftServer extends Configured implements Tool{
             SaslUtil.QualityOfProtection.PRIVACY.name()));
       }
       checkHttpSecurity(qop, conf);
-      if (!securityEnabled) {
+      boolean useLdap = conf.getBoolean(THRIFT_LDAP_AUTHENTICATION, false);
+      if (!securityEnabled && !useLdap) {
         throw new IOException("Thrift server must run in secure mode to support authentication");
       }
     }
@@ -452,6 +457,25 @@ public class ThriftServer extends Configured implements Tool{
       LOG.debug("Using framed transport");
     } else if (qop == null) {
       transportFactory = new TTransportFactory();
+    } else if (conf.getBoolean(THRIFT_LDAP_AUTHENTICATION, false)) {
+      final String ldapUrl = conf.get(THRIFT_LDAP_URL);
+      final String namespaceFormat = conf.get(THRIFT_LDAP_NAMESPACE);
+      transportFactory = new TLdapTransportFactory(ldapUrl, namespaceFormat);
+      // Create a processor wrapper, to get the caller
+      processorToUse = new TProcessor() {
+        @Override
+        public void process(TProtocol inProt, TProtocol outProt) throws TException {
+          TSaslServerTransport saslServerTransport = (TSaslServerTransport) inProt.getTransport();
+          SaslServer saslServer = saslServerTransport.getSaslServer();
+          String principal = saslServer.getAuthorizationID();
+          if (principal == null) {
+            LOG.warn("LDAP Authentication failed.");
+          } else {
+            hBaseServiceHandler.setEffectiveUser(principal);
+            processor.process(inProt, outProt);
+          }
+        }
+      };
     } else {
       // Extract the name from the principal
       String thriftKerberosPrincipal = conf.get(THRIFT_KERBEROS_PRINCIPAL_KEY);
