@@ -86,6 +86,10 @@ public class MetricsHBaseServer {
     source.queuedAndProcessedCall(totalTime);
   }
 
+  public void incrLargeRequest(int size) {
+    source.incrLargeRequest(size);
+  }
+
   public void exception(Throwable throwable) {
     source.exception();
 

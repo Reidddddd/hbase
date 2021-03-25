@@ -85,6 +85,11 @@ public interface MetricsHBaseServerSource extends ExceptionTrackingSource {
   String NUM_LIFO_MODE_SWITCHES_NAME = "numLifoModeSwitches";
   String NUM_LIFO_MODE_SWITCHES_DESC = "Total number of calls in general queue which " +
     "were served from the tail of the queue";
+  String NUM_LARGE_REQUEST_NAME = "numLargeRequest";
+  String NUM_LARGE_REQUEST_DESC = "Total number of requests whose size is larger than " +
+    " specified";
+  String LARGE_REQUEST_SIZE_NAME = "largeRequestSize";
+  String LARGE_REQUEST_SIZE_DESC = "Size of large requests";
 
   void authorizationSuccess();
 
@@ -109,4 +114,6 @@ public interface MetricsHBaseServerSource extends ExceptionTrackingSource {
   void processedCall(int processingTime);
 
   void queuedAndProcessedCall(int totalTime);
+
+  void incrLargeRequest(int size);
 }

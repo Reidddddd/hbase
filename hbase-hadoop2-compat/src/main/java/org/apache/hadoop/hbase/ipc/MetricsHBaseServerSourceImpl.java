@@ -41,6 +41,7 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
   private final MutableFastCounter authenticationFallbacks;
   private final MutableFastCounter sentBytes;
   private final MutableFastCounter receivedBytes;
+  private final MutableFastCounter largeRequest;
 
 
   private MetricHistogram queueCallTime;
@@ -48,6 +49,7 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
   private MetricHistogram totalCallTime;
   private MetricHistogram requestSize;
   private MetricHistogram responseSize;
+  private MetricHistogram largeRequestSize;
 
   public MetricsHBaseServerSourceImpl(String metricsName,
                                       String metricsDescription,
@@ -81,6 +83,10 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
         REQUEST_SIZE_DESC);
     this.responseSize = this.getMetricsRegistry().newSizeHistogram(RESPONSE_SIZE_NAME,
               RESPONSE_SIZE_DESC);
+    this.largeRequest = this.getMetricsRegistry().newCounter(NUM_LARGE_REQUEST_NAME,
+        NUM_LARGE_REQUEST_DESC, 0L);
+    this.largeRequestSize = this.getMetricsRegistry().newSizeHistogram(LARGE_REQUEST_SIZE_NAME,
+        LARGE_REQUEST_SIZE_DESC);
   }
 
   @Override
@@ -137,6 +143,12 @@ public class MetricsHBaseServerSourceImpl extends ExceptionTrackingSourceImpl
   @Override
   public void queuedAndProcessedCall(int totalTime) {
     totalCallTime.add(totalTime);
+  }
+
+  @Override
+  public void incrLargeRequest(int size) {
+    largeRequest.incr();
+    largeRequestSize.add(size);
   }
 
   @Override

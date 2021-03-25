@@ -93,6 +93,7 @@ import org.apache.hadoop.hbase.exceptions.OutOfOrderScannerNextException;
 import org.apache.hadoop.hbase.exceptions.ScannerResetException;
 import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
+import org.apache.hadoop.hbase.io.HandlerLAB;
 import org.apache.hadoop.hbase.ipc.HBaseRPCErrorHandler;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.ipc.PriorityFunction;
@@ -200,8 +201,6 @@ import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.zookeeper.ZKSplitLog;
 import org.apache.zookeeper.KeeperException;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * Implements the regionserver RPC services.
  */
@@ -287,6 +286,8 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
    * Row size threshold for multi requests above which a warning is logged
    */
   private final int rowSizeWarnThreshold;
+
+  private final HandlerLAB bufferPool;
 
   /**
    * Holder class which holds the RegionScanner, nextCallSeq and RpcCallbacks together.
@@ -1155,6 +1156,9 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
 
     closedScanners = CacheBuilder.newBuilder()
         .expireAfterAccess(scannerLeaseTimeoutPeriod, TimeUnit.MILLISECONDS).build();
+
+    bufferPool = HandlerLAB.getInstance();
+    bufferPool.initialize(rs.conf);
   }
 
   @Override
@@ -2419,6 +2423,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         regionStats.put(regionSpecifier, regionLoadStats);
       }
     }
+    HandlerLAB.getInstance().clearHandlerLAB();
     // Load the controller with the Cells to return.
     if (cellsToReturn != null && !cellsToReturn.isEmpty() && controller != null) {
       controller.setCellScanner(CellUtil.createCellScanner(cellsToReturn));

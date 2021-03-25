@@ -95,6 +95,7 @@ import org.apache.hadoop.hbase.exceptions.RequestTooBigException;
 import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
 import org.apache.hadoop.hbase.io.ByteBufferInputStream;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
+import org.apache.hadoop.hbase.io.HandlerLAB;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
@@ -302,6 +303,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   private final BoundedByteBufferPool reservoir;
 
   private volatile boolean allowFallbackToSimpleAuth;
+
+  private final int largeKVsSize;
 
   /**
    * Used to get details for scan with a scanner_id<br/>
@@ -2037,7 +2040,10 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         if (header.hasCellBlockMeta()) {
           buf.position(offset);
-          cellScanner = cellBlockBuilder.createCellScanner(this.codec, this.compressionCodec, buf);
+          if (buf.remaining() > largeKVsSize) {
+            metrics.incrLargeRequest(buf.remaining());
+          }
+          cellScanner = cellBlockBuilder.createCellScannerForRequest(this.codec, this.compressionCodec, buf);
         }
       } catch (Throwable t) {
         InetSocketAddress address = getListenerAddress();
@@ -2258,6 +2264,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     this.scheduler = scheduler;
     this.scheduler.init(new RpcSchedulerContext(this));
+
+    this.largeKVsSize = conf.getInt(HandlerLAB.SIZE, HandlerLAB.SIZE_DEFAULT);
   }
 
   @Override
