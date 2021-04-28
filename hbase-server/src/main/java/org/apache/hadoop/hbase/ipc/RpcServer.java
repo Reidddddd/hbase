@@ -67,6 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -366,7 +367,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.param = param;
       this.cellScanner = cellScanner;
       this.connection = connection;
-      this.timestamp = System.currentTimeMillis();
+      this.timestamp = System.nanoTime();
       this.response = null;
       this.responder = responder;
       this.isError = false;
@@ -377,7 +378,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.saslWrapDone = false;
       this.retryImmediatelySupported =
           connection == null? null: connection.retryImmediatelySupported;
-      this.timeout = timeout;
+      this.timeout = (int) TimeUnit.MILLISECONDS.toNanos(timeout);
       this.deadline = this.timeout > 0 ? this.timestamp + this.timeout : Long.MAX_VALUE;
     }
 
@@ -2411,9 +2412,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       status.resume("Servicing call");
       //get an instance of the method arg type
       HBaseRpcController controller = new HBaseRpcControllerImpl(cellScanner);
-      controller.setCallTimeout(timeout);
+      controller.setCallTimeout((int) (TimeUnit.NANOSECONDS.toMillis(timeout)));
       Message result = service.callBlockingMethod(md, controller, param);
-      long endTime = System.currentTimeMillis();
+      long endTime = System.nanoTime();
       int processingTime = (int) (endTime - startTime);
       int qTime = (int) (startTime - receiveTime);
       int totalTime = (int) (endTime - receiveTime);
