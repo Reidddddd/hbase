@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.ipc;
 
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -260,7 +261,7 @@ public class RWQueueRpcExecutor extends RpcExecutor {
       queueIndex = numWriteQueues + readBalancer.getNextQueue();
     }
 
-    BlockingQueue<CallRunner> queue = queues.get(queueIndex);
+    Queue<CallRunner> queue = queues.get(queueIndex);
     if (queue.size() >= currentQueueLimit) {
       return false;
     }

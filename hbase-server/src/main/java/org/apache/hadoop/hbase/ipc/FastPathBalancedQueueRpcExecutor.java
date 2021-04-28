@@ -18,7 +18,7 @@
 package org.apache.hadoop.hbase.ipc;
 
 import java.util.Deque;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +58,7 @@ public class FastPathBalancedQueueRpcExecutor extends BalancedQueueRpcExecutor {
 
   @Override
   protected Handler getHandler(String name, double handlerFailureThreshhold,
-      BlockingQueue<CallRunner> q, AtomicInteger activeHandlerCount) {
+      Queue<CallRunner> q, AtomicInteger activeHandlerCount) {
     return new FastPathHandler(name, handlerFailureThreshhold, q, activeHandlerCount,
         fastPathHandlerStack);
   }
@@ -85,7 +85,7 @@ public class FastPathBalancedQueueRpcExecutor extends BalancedQueueRpcExecutor {
     // The task we get when fast-pathing.
     private CallRunner loadedCallRunner;
 
-    FastPathHandler(String name, double handlerFailureThreshhold, BlockingQueue<CallRunner> q,
+    FastPathHandler(String name, double handlerFailureThreshhold, Queue<CallRunner> q,
         final AtomicInteger activeHandlerCount,
         final Deque<FastPathHandler> fastPathHandlerStack) {
       super(name, handlerFailureThreshhold, q, activeHandlerCount);
