@@ -42,12 +42,14 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValueUtil;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.exceptions.UnexpectedStateException;
+import org.apache.hadoop.hbase.io.HandlerLAB;
 import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.util.ByteRange;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.ClassSize;
 import org.apache.hadoop.hbase.util.CollectionBackedScanner;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.ReflectionUtils;
 import org.apache.htrace.Trace;
 
@@ -181,9 +183,8 @@ public class DefaultMemStore implements MemStore {
    */
   @Override
   public long add(Cell cell) {
-    Cell toAdd = maybeCloneWithAllocator(cell);
-    boolean mslabUsed = (toAdd != cell);
-    return internalAdd(toAdd, mslabUsed);
+    Pair<? extends Cell, Boolean> pair = maybeCloneWithAllocator(cell);
+    return internalAdd(pair.getFirst(), pair.getSecond());
   }
 
   @Override
@@ -259,9 +260,13 @@ public class DefaultMemStore implements MemStore {
     return KeyValueUtil.length(cell);
   }
 
-  private Cell maybeCloneWithAllocator(Cell cell) {
+  /**
+   * Return a pair, the first is the cell, the second is a boolean indicating whether it
+   * uses mslab or not.
+   */
+  private Pair<? extends Cell, Boolean> maybeCloneWithAllocator(Cell cell) {
     if (activeSection.getMemStoreLAB() == null) {
-      return cell;
+      return new Pair<>(cell, false);
     }
 
     int len = getCellLength(cell);
@@ -269,13 +274,20 @@ public class DefaultMemStore implements MemStore {
     if (alloc == null) {
       // The allocation was too large, allocator decided
       // not to do anything with it.
-      return cell;
+      if (HandlerLAB.getInstance().isEnable()) {
+        // If allocation is null, but HLAB is enable
+        // we can't return the original cell, because it will be cleared before flush
+        // which will lead to data mess-up.
+        // So when HLAB is enable, we need to copy a new one here.
+        return new Pair<>(KeyValueUtil.copyToNewKeyValue(cell), false);
+      }
+      return new Pair<>(cell, false);
     }
     assert alloc.getBytes() != null;
     KeyValueUtil.appendToByteArray(cell, alloc.getBytes(), alloc.getOffset());
     KeyValue newKv = new KeyValue(alloc.getBytes(), alloc.getOffset(), len);
     newKv.setSequenceId(cell.getSequenceId());
-    return newKv;
+    return new Pair<>(newKv, true);
   }
 
   /**
@@ -318,9 +330,8 @@ public class DefaultMemStore implements MemStore {
    */
   @Override
   public long delete(Cell deleteCell) {
-    Cell toAdd = maybeCloneWithAllocator(deleteCell);
-    boolean mslabUsed = (toAdd != deleteCell);
-    return internalAdd(toAdd, mslabUsed);
+    Pair<? extends Cell, Boolean> pair = maybeCloneWithAllocator(deleteCell);
+    return internalAdd(pair.getFirst(), pair.getSecond());
   }
 
   /**
@@ -711,7 +722,7 @@ public class DefaultMemStore implements MemStore {
     // last iterated Cells for cellSet and snapshot (to restore iterator state after reseek)
     private Cell cellSetItRow = null;
     private Cell snapshotItRow = null;
-    
+
     // iterator based scanning.
     private Iterator<Cell> cellSetIt;
     private Iterator<Cell> snapshotIt;

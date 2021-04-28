@@ -75,7 +75,8 @@ public final class HandlerLAB {
       enable = false;
     }
     size = conf.getInt(SIZE, SIZE_DEFAULT);
-    LOG.info("HandlerLAB is enabled. Size of LAB is " + size + " bytes.");
+    String msg = "HandlerLAB is " + (enable ? "enable" : "disable");
+    LOG.info(msg + (enable ? ". Size of LAB is " + size + " bytes." : "."));
   }
 
   public int defaultSize() {
@@ -102,9 +103,13 @@ public final class HandlerLAB {
   }
 
   public void clearHandlerLAB() {
-    if (enable) {
+    if (isEnable()) {
       handlerByteArray.get().clear();
     }
+  }
+
+  public boolean isEnable() {
+    return enable;
   }
 
   public static class ByteArrayAndOffset {
