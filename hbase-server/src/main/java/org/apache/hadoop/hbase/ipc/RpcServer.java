@@ -279,7 +279,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
   /** Default value for above params */
   public static final int DEFAULT_MAX_REQUEST_SIZE = DEFAULT_MAX_CALLQUEUE_SIZE / 4; // 256M
-  private static final int DEFAULT_WARN_RESPONSE_TIME = 10000; // milliseconds
+  private static final long DEFAULT_WARN_RESPONSE_TIME = 10000; // milliseconds
   private static final int DEFAULT_WARN_RESPONSE_SIZE = 100 * 1024 * 1024;
 
   protected static final Gson GSON = GsonUtil.createGson().create();
@@ -289,7 +289,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   protected static final String KEY_WORD_TRUNCATED = " <TRUNCATED>";
 
   private final int maxRequestSize;
-  private final int warnResponseTime;
+  private final long warnResponseTime;
   private final int warnResponseSize;
 
   private final int minClientRequestTimeout;
@@ -2235,7 +2235,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     this.thresholdIdleConnections = conf.getInt("hbase.ipc.client.idlethreshold", 4000);
     this.purgeTimeout = conf.getLong("hbase.ipc.client.call.purge.timeout",
       2 * HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
-    this.warnResponseTime = conf.getInt(WARN_RESPONSE_TIME, DEFAULT_WARN_RESPONSE_TIME);
+    long warnResponseTimeMs = conf.getLong(WARN_RESPONSE_TIME, DEFAULT_WARN_RESPONSE_TIME);
+    this.warnResponseTime = TimeUnit.MILLISECONDS.toNanos(warnResponseTimeMs);
     this.warnResponseSize = conf.getInt(WARN_RESPONSE_SIZE, DEFAULT_WARN_RESPONSE_SIZE);
     this.minClientRequestTimeout = conf.getInt(MIN_CLIENT_REQUEST_TIMEOUT,
         DEFAULT_MIN_CLIENT_REQUEST_TIMEOUT);
@@ -2449,7 +2450,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         logResponse(param,
             md.getName(), md.getName() + "(" + param.getClass().getName() + ")",
             (tooLarge ? "TooLarge" : "TooSlow"),
-            status.getClient(), startTime, processingTime, qTime,
+            status.getClient(), TimeUnit.NANOSECONDS.toMillis(startTime),
+            TimeUnit.NANOSECONDS.toMillis(processingTime),
+            TimeUnit.NANOSECONDS.toMillis(qTime),
             responseSize);
       }
       return new Pair<Message, CellScanner>(result, controller.cellScanner());
@@ -2490,7 +2493,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
    * @param responseSize    The size in bytes of the response buffer.
    */
   void logResponse(Message param, String methodName, String call, String tag,
-      String clientAddress, long startTime, int processingTime, int qTime,
+      String clientAddress, long startTime, long processingTime, long qTime,
       long responseSize)
           throws IOException {
     // base information that is reported regardless of type of call
