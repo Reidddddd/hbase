@@ -173,7 +173,7 @@ public abstract class RpcExecutor {
       queueClass = AdaptiveLifoCoDelCallQueue.class;
     } else {
       this.name += ".Fifo";
-      queueInitArgs = new Object[] {};
+      queueInitArgs = new Object[] { maxQueueLength };
       queueClass = ConcurrentLinkedQueue.class;
     }
 
@@ -192,8 +192,11 @@ public abstract class RpcExecutor {
       queueInitArgs[0] = Math.max((int) queueInitArgs[0], DEFAULT_CALL_QUEUE_SIZE_HARD_LIMIT);
     }
     for (int i = 0; i < numQueues; ++i) {
-      queues
-          .add((Queue<CallRunner>) ReflectionUtils.newInstance(queueClass, queueInitArgs));
+      if (queueClass == ConcurrentLinkedQueue.class) {
+        queues.add(new ConcurrentLinkedQueue<CallRunner>());
+      } else {
+        queues.add((Queue<CallRunner>) ReflectionUtils.newInstance(queueClass, queueInitArgs));
+      }
     }
   }
 
