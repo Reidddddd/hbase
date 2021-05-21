@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -174,7 +175,11 @@ public abstract class RpcExecutor {
     } else {
       this.name += ".Fifo";
       queueInitArgs = new Object[] { maxQueueLength };
-      queueClass = ConcurrentLinkedQueue.class;
+      if (conf.getDouble(RWQueueRpcExecutor.CALL_QUEUE_READ_SHARE_CONF_KEY, 0) > 0) {
+        queueClass = LinkedBlockingQueue.class;
+      } else {
+        queueClass = ConcurrentLinkedQueue.class;
+      }
     }
 
     LOG.info("RpcExecutor " + " name " + " using " + callQueueType
