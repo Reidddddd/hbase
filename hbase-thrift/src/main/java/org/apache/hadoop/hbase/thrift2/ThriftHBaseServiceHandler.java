@@ -61,12 +61,16 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.access.AccessControlClient;
+import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.thrift.HBaseServiceHandler;
+import org.apache.hadoop.hbase.thrift2.generated.TAccessControlEntity;
 import org.apache.hadoop.hbase.thrift2.generated.TAppend;
 import org.apache.hadoop.hbase.thrift2.generated.TColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.thrift2.generated.TCompareOp;
@@ -80,6 +84,8 @@ import org.apache.hadoop.hbase.thrift2.generated.TIncrement;
 import org.apache.hadoop.hbase.thrift2.generated.TLogQueryFilter;
 import org.apache.hadoop.hbase.thrift2.generated.TNamespaceDescriptor;
 import org.apache.hadoop.hbase.thrift2.generated.TOnlineLogRecord;
+import org.apache.hadoop.hbase.thrift2.generated.TPermissionOps;
+import org.apache.hadoop.hbase.thrift2.generated.TPermissionScope;
 import org.apache.hadoop.hbase.thrift2.generated.TPut;
 import org.apache.hadoop.hbase.thrift2.generated.TResult;
 import org.apache.hadoop.hbase.thrift2.generated.TRowMutations;
@@ -828,5 +834,45 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
   @Override public List<Boolean> clearSlowLogResponses(Set<TServerName> serverNames)
       throws TIOError, TException {
     throw new NotImplementedException();
+  }
+
+  @Override
+  public boolean performPermissions(TAccessControlEntity info) throws TIOError {
+    Permission.Action[] actions = ThriftUtilities.permissionActionsFromString(info.actions);
+    try {
+      if (info.scope == TPermissionScope.NAMESPACE) {
+        performNamespacePermissions(info.op, info.username, info.nsName, actions,
+            connectionCache.getAdmin().getConnection());
+      } else if (info.scope == TPermissionScope.TABLE) {
+        TableName tableName = ThriftUtilities.tableNameFromThrift(info.getTableName());
+        performTablePermissions(info.op, tableName, info.username, actions,
+            connectionCache.getAdmin().getConnection());
+      }
+    } catch (Throwable t) {
+      if (t instanceof IOException) {
+        throw getTIOError((IOException) t);
+      } else {
+        throw getTIOError(new DoNotRetryIOException(t.getMessage()));
+      }
+    }
+    return true;
+  }
+
+  private static void performNamespacePermissions(TPermissionOps op, String username,
+      String namespace, Permission.Action[] actions, Connection connection) throws Throwable {
+    if (op == TPermissionOps.GRANT) {
+      AccessControlClient.grant(connection, namespace, username, actions);
+    } else if (op == TPermissionOps.REVOKE) {
+      AccessControlClient.revoke(connection, namespace, username, actions);
+    }
+  }
+
+  private static void performTablePermissions(TPermissionOps op, TableName tableName,
+      String username, Permission.Action[] actions, Connection connection) throws Throwable {
+    if (op == TPermissionOps.GRANT) {
+      AccessControlClient.grant(connection, tableName, username, null, null, actions);
+    } else if (op == TPermissionOps.REVOKE) {
+      AccessControlClient.revoke(connection, tableName, username, null, null, actions);
+    }
   }
 }

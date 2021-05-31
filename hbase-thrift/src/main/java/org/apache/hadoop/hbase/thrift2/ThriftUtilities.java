@@ -23,6 +23,7 @@ import static org.apache.hadoop.hbase.util.Bytes.getBytes;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -66,6 +67,8 @@ import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.FilterProtos;
 import org.apache.hadoop.hbase.regionserver.BloomType;
+import org.apache.hadoop.hbase.security.access.AccessControlClient;
+import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.visibility.Authorizations;
 import org.apache.hadoop.hbase.security.visibility.CellVisibility;
 import org.apache.hadoop.hbase.thrift2.generated.TAppend;
@@ -90,6 +93,7 @@ import org.apache.hadoop.hbase.thrift2.generated.TIncrement;
 import org.apache.hadoop.hbase.thrift2.generated.TKeepDeletedCells;
 import org.apache.hadoop.hbase.thrift2.generated.TMutation;
 import org.apache.hadoop.hbase.thrift2.generated.TNamespaceDescriptor;
+import org.apache.hadoop.hbase.thrift2.generated.TPermissionOps;
 import org.apache.hadoop.hbase.thrift2.generated.TPut;
 import org.apache.hadoop.hbase.thrift2.generated.TReadType;
 import org.apache.hadoop.hbase.thrift2.generated.TResult;
@@ -1430,5 +1434,20 @@ public class ThriftUtilities {
       out.add(tableDescriptorFromHBase(descriptor));
     }
     return out;
+  }
+
+  public static Permission.Action[] permissionActionsFromString(String permission_actions) {
+    Set<Permission.Action> actions = new HashSet<>();
+    for (char c : permission_actions.toCharArray()) {
+      switch (c) {
+        case 'R': actions.add(Permission.Action.READ);   break;
+        case 'W': actions.add(Permission.Action.WRITE);  break;
+        case 'C': actions.add(Permission.Action.CREATE); break;
+        case 'X': actions.add(Permission.Action.EXEC);   break;
+        case 'A': actions.add(Permission.Action.ADMIN);  break;
+        default:                                         break;
+      }
+    }
+    return actions.toArray(new Permission.Action[0]);
   }
 }
