@@ -380,6 +380,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           connection == null? null: connection.retryImmediatelySupported;
       this.timeout = (int) TimeUnit.MILLISECONDS.toNanos(timeout);
       this.deadline = this.timeout > 0 ? this.timestamp + this.timeout : Long.MAX_VALUE;
+      if (this.deadline < 0) {
+        // while we changed the unit of metric to nanosecond, this value may be a negative value.
+        // change it to Long.MAX_VALUE if a overflow happened.
+        this.deadline = Long.MAX_VALUE;
+      }
     }
 
     /**
@@ -571,7 +576,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     @Override
     public long disconnectSince() {
       if (!connection.channel.isOpen()) {
-        return System.currentTimeMillis() - timestamp;
+        return System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(timestamp);
       } else {
         return -1L;
       }
@@ -612,7 +617,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     @Override
     public long getDeadline() {
-      return deadline;
+      // return deadline im milliseconds.
+      return TimeUnit.NANOSECONDS.toMillis(deadline);
     }
 
     public synchronized void sendResponseIfReady() throws IOException {
@@ -1153,7 +1159,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             throw new IllegalStateException("Coding error: SelectionKey key without attachment.");
           }
           Call call = connection.responseQueue.peekFirst();
-          if (call != null && now > call.timestamp + purgeTimeout) {
+          if (call != null && now > TimeUnit.NANOSECONDS.toMillis(call.timestamp) + purgeTimeout) {
             conWithOldCalls.add(call.connection);
           }
         }
@@ -1294,7 +1300,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       call.responder.registerForWrite(call.connection);
 
       // set the serve time when the response has to be sent later
-      call.timestamp = System.currentTimeMillis();
+      call.timestamp = System.nanoTime();
     }
   }
 

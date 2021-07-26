@@ -27,6 +27,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -413,8 +414,8 @@ public abstract class RpcExecutor {
       RpcServer.Call callB = b.getCall();
       long deadlineA = priority.getDeadline(callA.getHeader(), callA.param);
       long deadlineB = priority.getDeadline(callB.getHeader(), callB.param);
-      deadlineA = callA.timestamp + Math.min(deadlineA, maxDelay);
-      deadlineB = callB.timestamp + Math.min(deadlineB, maxDelay);
+      deadlineA = TimeUnit.NANOSECONDS.toMillis(callA.timestamp) + Math.min(deadlineA, maxDelay);
+      deadlineB = TimeUnit.NANOSECONDS.toMillis(callB.timestamp) + Math.min(deadlineB, maxDelay);
       return Long.compare(deadlineA, deadlineB);
     }
   }
