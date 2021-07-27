@@ -618,7 +618,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     @Override
     public long getDeadline() {
       // return deadline im milliseconds.
-      return TimeUnit.NANOSECONDS.toMillis(deadline);
+      return deadline == Long.MAX_VALUE ? Long.MAX_VALUE : TimeUnit.NANOSECONDS.toMillis(deadline);
+    }
+
+    public long getDeadlineInNano() {
+      return deadline;
     }
 
     public synchronized void sendResponseIfReady() throws IOException {
@@ -2429,9 +2433,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       if (LOG.isTraceEnabled()) {
         LOG.trace(CurCall.get().toString() +
             ", response " + TextFormat.shortDebugString(result) +
-            " queueTime: " + qTime +
-            " processingTime: " + processingTime +
-            " totalTime: " + totalTime);
+            " queueTime: " + TimeUnit.NANOSECONDS.toMillis(qTime) + "ms" +
+            " processingTime: " + TimeUnit.NANOSECONDS.toMillis(processingTime) + "ms" +
+            " totalTime: " + TimeUnit.NANOSECONDS.toMillis(totalTime) + "ms");
       }
       // Use the raw request call size for now.
       long requestSize = call.getSize();

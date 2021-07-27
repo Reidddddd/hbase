@@ -95,7 +95,7 @@ public class CallRunner {
         return;
       }
       call.startTime = System.nanoTime();
-      if (call.startTime > call.deadline) {
+      if (call.startTime > call.getDeadlineInNano()) {
         RpcServer.LOG.warn("Drop timeout call: " + call);
         return;
       }
