@@ -67,7 +67,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -279,7 +278,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
   /** Default value for above params */
   public static final int DEFAULT_MAX_REQUEST_SIZE = DEFAULT_MAX_CALLQUEUE_SIZE / 4; // 256M
-  private static final long DEFAULT_WARN_RESPONSE_TIME = 10000; // milliseconds
+  private static final int DEFAULT_WARN_RESPONSE_TIME = 10000; // milliseconds
   private static final int DEFAULT_WARN_RESPONSE_SIZE = 100 * 1024 * 1024;
 
   protected static final Gson GSON = GsonUtil.createGson().create();
@@ -289,7 +288,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   protected static final String KEY_WORD_TRUNCATED = " <TRUNCATED>";
 
   private final int maxRequestSize;
-  private final long warnResponseTime;
+  private final int warnResponseTime;
   private final int warnResponseSize;
 
   private final int minClientRequestTimeout;
@@ -367,7 +366,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.param = param;
       this.cellScanner = cellScanner;
       this.connection = connection;
-      this.timestamp = System.nanoTime();
+      this.timestamp = System.currentTimeMillis();
       this.response = null;
       this.responder = responder;
       this.isError = false;
@@ -378,13 +377,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.saslWrapDone = false;
       this.retryImmediatelySupported =
           connection == null? null: connection.retryImmediatelySupported;
-      this.timeout = (int) TimeUnit.MILLISECONDS.toNanos(timeout);
+      this.timeout = timeout;
       this.deadline = this.timeout > 0 ? this.timestamp + this.timeout : Long.MAX_VALUE;
-      if (this.deadline < 0) {
-        // while we changed the unit of metric to nanosecond, this value may be a negative value.
-        // change it to Long.MAX_VALUE if a overflow happened.
-        this.deadline = Long.MAX_VALUE;
-      }
     }
 
     /**
@@ -576,7 +570,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     @Override
     public long disconnectSince() {
       if (!connection.channel.isOpen()) {
-        return System.currentTimeMillis() - TimeUnit.NANOSECONDS.toMillis(timestamp);
+        return System.currentTimeMillis() - timestamp;
       } else {
         return -1L;
       }
@@ -617,11 +611,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     @Override
     public long getDeadline() {
-      // return deadline im milliseconds.
-      return deadline == Long.MAX_VALUE ? Long.MAX_VALUE : TimeUnit.NANOSECONDS.toMillis(deadline);
-    }
-
-    public long getDeadlineInNano() {
       return deadline;
     }
 
@@ -1163,7 +1152,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             throw new IllegalStateException("Coding error: SelectionKey key without attachment.");
           }
           Call call = connection.responseQueue.peekFirst();
-          if (call != null && now > TimeUnit.NANOSECONDS.toMillis(call.timestamp) + purgeTimeout) {
+          if (call != null && now > call.timestamp + purgeTimeout) {
             conWithOldCalls.add(call.connection);
           }
         }
@@ -1304,7 +1293,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       call.responder.registerForWrite(call.connection);
 
       // set the serve time when the response has to be sent later
-      call.timestamp = System.nanoTime();
+      call.timestamp = System.currentTimeMillis();
     }
   }
 
@@ -2245,8 +2234,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     this.thresholdIdleConnections = conf.getInt("hbase.ipc.client.idlethreshold", 4000);
     this.purgeTimeout = conf.getLong("hbase.ipc.client.call.purge.timeout",
       2 * HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
-    long warnResponseTimeMs = conf.getLong(WARN_RESPONSE_TIME, DEFAULT_WARN_RESPONSE_TIME);
-    this.warnResponseTime = TimeUnit.MILLISECONDS.toNanos(warnResponseTimeMs);
+    this.warnResponseTime = conf.getInt(WARN_RESPONSE_TIME, DEFAULT_WARN_RESPONSE_TIME);
     this.warnResponseSize = conf.getInt(WARN_RESPONSE_SIZE, DEFAULT_WARN_RESPONSE_SIZE);
     this.minClientRequestTimeout = conf.getInt(MIN_CLIENT_REQUEST_TIMEOUT,
         DEFAULT_MIN_CLIENT_REQUEST_TIMEOUT);
@@ -2423,9 +2411,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       status.resume("Servicing call");
       //get an instance of the method arg type
       HBaseRpcController controller = new HBaseRpcControllerImpl(cellScanner);
-      controller.setCallTimeout((int) (TimeUnit.NANOSECONDS.toMillis(timeout)));
+      controller.setCallTimeout(timeout);
       Message result = service.callBlockingMethod(md, controller, param);
-      long endTime = System.nanoTime();
+      long endTime = System.currentTimeMillis();
       int processingTime = (int) (endTime - startTime);
       int qTime = (int) (startTime - receiveTime);
       int totalTime = (int) (endTime - receiveTime);
@@ -2433,9 +2421,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       if (LOG.isTraceEnabled()) {
         LOG.trace(CurCall.get().toString() +
             ", response " + TextFormat.shortDebugString(result) +
-            " queueTime: " + TimeUnit.NANOSECONDS.toMillis(qTime) + "ms" +
-            " processingTime: " + TimeUnit.NANOSECONDS.toMillis(processingTime) + "ms" +
-            " totalTime: " + TimeUnit.NANOSECONDS.toMillis(totalTime) + "ms");
+            " queueTime: " + qTime +
+            " processingTime: " + processingTime +
+            " totalTime: " + totalTime);
       }
       // Use the raw request call size for now.
       long requestSize = call.getSize();
@@ -2460,9 +2448,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         logResponse(param,
             md.getName(), md.getName() + "(" + param.getClass().getName() + ")",
             (tooLarge ? "TooLarge" : "TooSlow"),
-            status.getClient(), TimeUnit.NANOSECONDS.toMillis(startTime),
-            TimeUnit.NANOSECONDS.toMillis(processingTime),
-            TimeUnit.NANOSECONDS.toMillis(qTime),
+            status.getClient(), startTime, processingTime, qTime,
             responseSize);
       }
       return new Pair<Message, CellScanner>(result, controller.cellScanner());
@@ -2503,7 +2489,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
    * @param responseSize    The size in bytes of the response buffer.
    */
   void logResponse(Message param, String methodName, String call, String tag,
-      String clientAddress, long startTime, long processingTime, long qTime,
+      String clientAddress, long startTime, int processingTime, int qTime,
       long responseSize)
           throws IOException {
     // base information that is reported regardless of type of call
