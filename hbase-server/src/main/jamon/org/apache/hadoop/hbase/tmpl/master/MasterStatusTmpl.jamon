@@ -30,6 +30,7 @@ AssignmentManager assignmentManager = null;
 </%args>
 <%import>
 java.util.*;
+java.net.URLEncoder;
 org.apache.hadoop.util.StringUtils;
 org.apache.hadoop.hbase.util.Bytes;
 org.apache.hadoop.hbase.util.JvmVersion;
@@ -55,6 +56,11 @@ org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 org.apache.hadoop.hbase.security.visibility.VisibilityConstants;
 org.apache.hadoop.hbase.security.access.AccessControlLists;
 org.apache.hadoop.hbase.quotas.QuotaUtil;
+org.apache.hadoop.hbase.net.Address;
+org.apache.hadoop.hbase.rsgroup.RSGroupAdminEndpoint;
+org.apache.hadoop.hbase.rsgroup.RSGroupInfo;
+org.apache.hadoop.hbase.rsgroup.RSGroupInfoManager;
+org.apache.hadoop.hbase.HRegionLocation;
 </%import>
 
 <%if format.equals("json") %>
@@ -199,6 +205,11 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
                 <& deadRegionServers &>
             </%if>
         </section>
+        <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null %>
+            <section>
+                <& RSGroupList &>
+            </section>
+        </%if>
         <section>
             <& BackupMasterStatusTmpl; master = master &>
         </section>
@@ -368,9 +379,8 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
                 $("#requestStatsTable").tablesorter();
                 $("#storeStatsTable").tablesorter();
                 $("#compactionStatsTable").tablesorter();
-                
                 $("#userTables").tablesorter();
-            } 
+            }
         );
         </script>
   </body>
@@ -430,14 +440,27 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
 <%def userTables>
 <%java>
    HTableDescriptor[] tables = null;
+   RSGroupInfoManager rsGroupInfoManager = null;
+   List<RSGroupInfo> rsGroups = null;
    try (Admin admin = master.getConnection().getAdmin()) {
      tables = master.isInitialized() ? admin.listTables() : null;
    }
+   Map<TableName, HTableDescriptor> tableMap = new HashMap<>();
+   for (HTableDescriptor hTableDescriptor : tables) {
+     tableMap.put(hTableDescriptor.getTableName(), hTableDescriptor);
+   }
+   if (master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null) {
+     rsGroupInfoManager = master.getMasterCoprocessorHost().findCoprocessors(RSGroupAdminEndpoint.class).get(0).getGroupInfoManager();
+     rsGroups = rsGroupInfoManager.listRSGroups();
+    }
 </%java>
 <%if (tables != null && tables.length > 0)%>
 <table id="userTables" class="tablesorter table table-striped">
 <thead>
     <tr>
+        <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null %>
+        <th>RSGroup</th>
+        </%if>
         <th>Namespace</th>
         <th>Table Name</th>
         <%if (frags != null) %>
@@ -473,6 +496,9 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
                      - splitRegionsCount;
     </%java>
     <tr>
+        <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null %>
+            <td><% master.getMasterCoprocessorHost().findCoprocessors(RSGroupAdminEndpoint.class).get(0).getGroupInfoManager().getRSGroupOfTable(tableName) %></td>
+        </%if>
         <td><% tableName.getNamespaceAsString() %></td>
         <td><a href=table.jsp?name=<% tableName.getNameAsString() %>><% tableName.getQualifierAsString() %></a> </td>
         <%if (frags != null) %>
@@ -554,4 +580,66 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
     </tr>
 </table>
 </%if>
+</%def>
+
+<%def RSGroupList>
+<h2>RSGroup</h2>
+<table class="table table-striped">
+    <tr>
+        <th>Group</th>
+        <th>RegionServer Num</th>
+        <th>Dead RegionServer Num</th>
+        <th>Table Num</th>
+        <th>Region Num</th>
+        <th>RequestPerSecond</th>
+        <th>StoreFileSize</th>
+    </tr>
+    <%java>
+        RSGroupInfoManager rsGroupInfoManager = master.getMasterCoprocessorHost().findCoprocessors(RSGroupAdminEndpoint.class).get(0).getGroupInfoManager();
+        List<RSGroupInfo> rsGroups = rsGroupInfoManager.listRSGroups();
+        Map<Address, ServerName> serverNameMap = new HashMap<>();
+            for(ServerName sn:servers) {
+                serverNameMap.put(sn.getAddress(), sn);
+            }
+        for (RSGroupInfo rsGroupInfo : rsGroups) {
+            String rsGroupName = rsGroupInfo.getName();
+            int onlineServers = 0;
+            int deadServers = 0;
+            int tables = 0;
+            long requestsPerSecond = 0;
+            int numRegionsOnline = 0;
+            int storeFileSize = 0;
+            Set<Address> groupServers = rsGroupInfo.getServers();
+            for (Address server : groupServers) {
+                ServerName sn = serverNameMap.get(server);
+                if (sn != null) {
+                    ServerLoad sl = master.getServerManager().getLoad(sn);
+                    if (sl != null) {
+                        requestsPerSecond += sl.getRequestsPerSecond();
+                        numRegionsOnline += sl.getNumberOfRegions();
+                        storeFileSize += sl.getStorefileSizeInMB();
+                        onlineServers++;
+                    } else {
+                        deadServers++;
+                    }
+                } else {
+                    deadServers++;
+                }
+            }
+            tables = rsGroupInfo.getTables().size();
+            String storeFileSizeDesc = StringUtils.byteDesc(storeFileSize * 1024l * 1024);
+    </%java>
+    <tr>
+    	<td><% rsGroupName %></td>
+        <td><% onlineServers %></td>
+        <td><% deadServers %></td>
+        <td><% tables %></td>
+        <td><% numRegionsOnline %></td>
+        <td><% requestsPerSecond %></td>
+        <td><% storeFileSizeDesc %></td>
+    </tr>
+    <%java>
+        }
+    </%java>
+</table>
 </%def>

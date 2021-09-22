@@ -34,6 +34,10 @@ HMaster master;
         org.apache.hadoop.hbase.HBaseConfiguration;
         org.apache.hadoop.hbase.util.VersionInfo;
         org.apache.hadoop.util.StringUtils.TraditionalBinaryPrefix;
+        org.apache.hadoop.hbase.net.Address;
+        org.apache.hadoop.hbase.rsgroup.RSGroupAdminEndpoint;
+        org.apache.hadoop.hbase.rsgroup.RSGroupInfo;
+        org.apache.hadoop.hbase.rsgroup.RSGroupInfoManager;
 </%import>
 
 
@@ -86,6 +90,9 @@ Arrays.sort(serverNames);
     <th>Version</th>
     <th>Requests Per Second</th>
     <th>Num. Regions</th>
+    <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null %>
+            <th>RSGroup</th>
+    </%if>
 </tr>
 </thead>
 <tbody> 
@@ -94,6 +101,7 @@ Arrays.sort(serverNames);
     int totalRequests = 0;
     int inconsistentNodeNum = 0;
     String masterVersion = VersionInfo.getVersion();
+    String rsGroupName = "default";
     for (ServerName serverName: serverNames) {
 
     ServerLoad sl = master.getServerManager().getLoad(serverName);
@@ -123,6 +131,9 @@ Arrays.sort(serverNames);
     <td><% version %></td>
     <td><% String.format("%.0f", requestsPerSecond) %></td>
     <td><% numRegionsOnline %></td>
+    <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null %>
+                <td><% master.getMasterCoprocessorHost().findCoprocessors(RSGroupAdminEndpoint.class).get(0).getGroupInfoManager().getRSGroupOfServer(Address.fromString(serverName.getHostAndPort())).getName() %></td>
+        </%if>
 </tr>
 <%java>
 }

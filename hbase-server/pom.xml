@@ -202,6 +202,7 @@
               <sources>
                 <source>${project.build.directory}/generated-jamon</source>
                 <source>${project.build.directory}/generated-sources/java</source>
+                <source>../hbase-rsgroup/src/main/java</source>
               </sources>
             </configuration>
           </execution>
