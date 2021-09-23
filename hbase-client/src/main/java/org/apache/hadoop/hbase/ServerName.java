@@ -48,10 +48,10 @@ import java.util.regex.Pattern;
  * For example, if hostname is <code>www.example.org</code>, port is <code>1234</code>,
  * and the startcode for the regionserver is <code>1212121212</code>, then
  * the {@link #toString()} would be <code>www.example.org,1234,1212121212</code>.
- * 
+ *
  * <p>You can obtain a versioned serialized form of this class by calling
  * {@link #getVersionedBytes()}.  To deserialize, call {@link #parseVersionedServerName(byte[])}
- * 
+ *
  * <p>Immutable.
  */
 @InterfaceAudience.Public
@@ -200,9 +200,23 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    */
   public synchronized byte [] getVersionedBytes() {
     if (this.bytes == null) {
-      this.bytes = Bytes.add(VERSION_BYTES, Bytes.toBytes(getServerName()));
+      this.bytes = Bytes.add(VERSION_BYTES, Bytes.toBytes(buildVersionStr()));
     }
     return this.bytes;
+  }
+
+  /**
+   * Version string of ServerName,
+   * we need to keep the original hostname instead of the toLowercase hostname.
+   */
+  private String buildVersionStr() {
+    StringBuilder builder = new StringBuilder();
+    builder.append(hostnameOnly)
+           .append(SERVERNAME_SEPARATOR)
+           .append(port)
+           .append(SERVERNAME_SEPARATOR)
+           .append(startcode);
+    return builder.toString();
   }
 
   public String getServerName() {
@@ -385,7 +399,7 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    * has a serialized {@link ServerName} in it.
    * @return Returns null if <code>data</code> is null else converts passed data
    * to a ServerName instance.
-   * @throws DeserializationException 
+   * @throws DeserializationException
    */
   public static ServerName parseFrom(final byte [] data) throws DeserializationException {
     if (data == null || data.length <= 0) return null;
