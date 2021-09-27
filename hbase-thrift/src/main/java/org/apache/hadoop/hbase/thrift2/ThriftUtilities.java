@@ -94,6 +94,7 @@ import org.apache.hadoop.hbase.thrift2.generated.TKeepDeletedCells;
 import org.apache.hadoop.hbase.thrift2.generated.TMutation;
 import org.apache.hadoop.hbase.thrift2.generated.TNamespaceDescriptor;
 import org.apache.hadoop.hbase.thrift2.generated.TPermissionOps;
+import org.apache.hadoop.hbase.thrift2.generated.TPermissionScope;
 import org.apache.hadoop.hbase.thrift2.generated.TPut;
 import org.apache.hadoop.hbase.thrift2.generated.TReadType;
 import org.apache.hadoop.hbase.thrift2.generated.TResult;
@@ -105,6 +106,7 @@ import org.apache.hadoop.hbase.thrift2.generated.TTableName;
 import org.apache.hadoop.hbase.thrift2.generated.TTimeRange;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CollectionUtils;
+import org.apache.hadoop.util.StringUtils;
 
 @InterfaceAudience.Private
 public class ThriftUtilities {
@@ -1449,5 +1451,22 @@ public class ThriftUtilities {
       }
     }
     return actions.toArray(new Permission.Action[0]);
+  }
+
+  public static String permissionActionsToString(Permission.Action[] actions) {
+    List<String> acts = new ArrayList<>(actions.length);
+    for (Permission.Action action : actions) {
+      acts.add(action.name());
+    }
+    return StringUtils.join(',', acts);
+  }
+
+  public static String getTableOrNsInString(String name, TPermissionScope scope) {
+    if (scope == TPermissionScope.NAMESPACE && name.charAt(0) != '@') {
+      return '@' + name;
+    } else if (scope == TPermissionScope.TABLE && name.charAt(0) == '@'){
+      return name.substring(name.lastIndexOf('@') + 1);
+    }
+    return name;
   }
 }
