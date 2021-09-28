@@ -55,6 +55,7 @@ import org.apache.hadoop.hbase.master.ServerManager;
 import org.apache.hadoop.hbase.master.TableLockManager.TableLock;
 import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
+import org.apache.hadoop.metrics2.util.MBeans;
 
 /**
  * Service to support Region Server Grouping (HBase-6721)
@@ -74,6 +75,14 @@ public class RSGroupAdminServer implements RSGroupAdmin {
                             RSGroupInfoManager RSGroupInfoManager) throws IOException {
     this.master = master;
     this.rsGroupInfoManager = RSGroupInfoManager;
+    registerMBean();
+  }
+
+  private void registerMBean() {
+    RSGroupMXBeanImpl mxBeanInfo =
+        RSGroupMXBeanImpl.init(this, master);
+    MBeans.register("HBase", "Master,sub=RSGroup", mxBeanInfo);
+    LOG.info("Registered RSGroup MXBean");
   }
 
   @Override
