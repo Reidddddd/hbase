@@ -19,7 +19,6 @@ package org.apache.hadoop.hbase.net;
 
 import static org.junit.Assert.assertEquals;
 
-import org.apache.commons.math3.analysis.function.Add;
 import org.apache.hadoop.hbase.testclassification.MiscTests;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.commons.lang3.StringUtils;
@@ -37,10 +36,6 @@ public class TestAddress {
         toStringWithoutDomain(Address.fromParts("1.b.c", 123)));
     assertEquals("123.456.789.1:123",
         toStringWithoutDomain(Address.fromParts("123.456.789.1", 123)));
-    assertEquals("[2001:db8::1]:80",
-        toStringWithoutDomain(Address.fromParts("[2001:db8::1]:", 80)));
-    assertEquals("[2001:db8::1]:80",
-        toStringWithoutDomain(Address.fromParts("[2001:db8::1]:", 80)));
   }
 
   private String toStringWithoutDomain(Address address) {
