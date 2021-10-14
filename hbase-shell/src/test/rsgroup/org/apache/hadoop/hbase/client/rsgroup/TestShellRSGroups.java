@@ -83,7 +83,7 @@ public class TestShellRSGroups {
     List<String> loadPaths = new ArrayList<>();
     loadPaths.add(basePath+"/src/main/ruby");
     loadPaths.add(basePath+"/src/test/ruby");
-    jruby.getProvider().setLoadPaths(loadPaths);
+    jruby.setLoadPaths(loadPaths);
     jruby.put("$TEST_CLUSTER", TEST_UTIL);
     System.setProperty("jruby.jit.logging.verbose", "true");
     System.setProperty("jruby.jit.logging", "true");
@@ -99,6 +99,7 @@ public class TestShellRSGroups {
   public void testRunShellTests() throws IOException {
     try {
       // Start only GroupShellTest
+      LOG.info(basePath);
       System.setProperty("shell.test", "Hbase::RSGroupShellTest");
       jruby.runScriptlet(PathType.ABSOLUTE,
           basePath + "/src/test/ruby/tests_runner.rb");
