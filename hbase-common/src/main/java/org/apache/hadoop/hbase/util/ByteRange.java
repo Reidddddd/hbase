@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hbase.util;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Lightweight, reusable class for specifying ranges of byte[]'s.

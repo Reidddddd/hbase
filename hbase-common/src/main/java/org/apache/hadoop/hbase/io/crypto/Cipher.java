@@ -21,8 +21,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.Key;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * A common interface for a cryptographic algorithm.

@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.Record;
 import org.apache.hadoop.hbase.hbtop.field.Field;
 import org.apache.hadoop.hbase.hbtop.field.FieldInfo;

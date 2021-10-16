@@ -26,7 +26,7 @@ import java.io.InputStream;
 import java.util.Arrays;
 
 import org.apache.hadoop.hbase.util.ByteStringer;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

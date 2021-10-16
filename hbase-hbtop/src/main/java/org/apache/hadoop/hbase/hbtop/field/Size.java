@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.hbtop.field;
 import java.math.BigDecimal;
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * It is used to represent the size with different units.

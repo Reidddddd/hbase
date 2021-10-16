@@ -21,7 +21,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hbase.util.ByteStringer;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.executor.EventType;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;

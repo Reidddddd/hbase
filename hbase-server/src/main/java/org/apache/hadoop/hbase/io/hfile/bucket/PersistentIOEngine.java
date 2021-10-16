@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hbase.io.hfile.bucket;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A class implementing PersistentIOEngine interface supports persistent and file integrity verify

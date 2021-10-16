@@ -24,7 +24,7 @@ import java.lang.ClassNotFoundException;
 import java.util.zip.Checksum;
 import java.lang.reflect.Constructor;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Utility class that is used to generate a Checksum object.

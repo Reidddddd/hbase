@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.util;
 
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 import com.google.common.annotations.VisibleForTesting;
 

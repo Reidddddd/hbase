@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hbase.hbtop.terminal.impl;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.terminal.Color;
 
 /**

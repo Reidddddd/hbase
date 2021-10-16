@@ -28,7 +28,7 @@ import com.yammer.metrics.core.Timer;
 import com.yammer.metrics.reporting.JmxReporter;
 import com.yammer.metrics.util.RatioGauge;
 import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutateRequest;

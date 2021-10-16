@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.hbtop.field;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Represents a value of a field.

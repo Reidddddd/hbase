@@ -21,10 +21,10 @@
   -->
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>hbase</artifactId>
+    <artifactId>hbase-build-configuration</artifactId>
     <groupId>org.apache.hbase</groupId>
     <version>1.4.12</version>
-    <relativePath>..</relativePath>
+    <relativePath>../hbase-build-configuration</relativePath>
   </parent>
 
   <artifactId>hbase-metrics</artifactId>
@@ -73,17 +73,6 @@
   </build>
 
   <dependencies>
-    <!-- Intra-project dependencies -->
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-common</artifactId>

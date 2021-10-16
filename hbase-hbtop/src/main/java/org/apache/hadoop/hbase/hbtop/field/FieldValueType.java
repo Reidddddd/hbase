@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hbase.hbtop.field;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Represents the type of a {@link FieldValue}.

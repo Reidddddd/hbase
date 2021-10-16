@@ -28,7 +28,7 @@ import com.google.common.collect.ImmutableCollection;
 
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Manages the store files and basic metadata about that that determines the logical structure

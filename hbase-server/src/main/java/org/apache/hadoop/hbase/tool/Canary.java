@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Public
 public interface Canary {

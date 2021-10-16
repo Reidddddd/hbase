@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hbase.hbtop.terminal;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The interface responsible for printing to the terminal.

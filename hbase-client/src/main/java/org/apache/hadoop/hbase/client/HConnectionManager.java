@@ -21,8 +21,8 @@ package org.apache.hadoop.hbase.client;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.logging.Log;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.User;
 

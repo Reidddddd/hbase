@@ -23,9 +23,10 @@ import java.io.IOException;
 import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.ServletOutputStream;
+import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
 public class GZIPResponseStream extends ServletOutputStream
@@ -74,5 +75,15 @@ public class GZIPResponseStream extends ServletOutputStream
 
   public void finish() throws IOException {
     out.finish();
+  }
+
+  @Override
+  public boolean isReady() {
+    throw new UnsupportedOperationException("Asynchonous operation is not supported.");
+  }
+
+  @Override
+  public void setWriteListener(WriteListener writeListener) {
+    throw new UnsupportedOperationException("Asynchonous operation is not supported.");
   }
 }

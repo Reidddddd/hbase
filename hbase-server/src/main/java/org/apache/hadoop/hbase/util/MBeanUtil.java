@@ -25,7 +25,7 @@ import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import javax.management.InstanceAlreadyExistsException;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
 public class MBeanUtil {

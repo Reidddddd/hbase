@@ -23,7 +23,7 @@ import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.field.Field;
 import org.apache.hadoop.hbase.hbtop.field.FieldValue;
 import org.apache.hadoop.hbase.hbtop.field.FieldValueType;

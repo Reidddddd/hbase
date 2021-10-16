@@ -22,8 +22,8 @@ import java.io.Serializable;
 import java.util.Comparator;
 
 import org.apache.hadoop.hbase.KeyValue.Type;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import com.google.common.primitives.Longs;

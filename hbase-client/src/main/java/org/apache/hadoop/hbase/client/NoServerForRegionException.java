@@ -18,8 +18,8 @@
  */
 package org.apache.hadoop.hbase.client;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Thrown when no region server can be found for a region

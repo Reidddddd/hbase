@@ -16,8 +16,8 @@
  */
 package org.apache.hadoop.hbase.io.crypto;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 
 /**

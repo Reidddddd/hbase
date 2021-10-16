@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.hbtop.terminal;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Represents the user pressing a key on the keyboard.

@@ -24,7 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.metrics.MetricRegistries;
 import org.apache.hadoop.hbase.metrics.MetricRegistry;
 import org.apache.hadoop.hbase.metrics.MetricRegistryFactory;

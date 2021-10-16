@@ -30,8 +30,8 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * One or more variables that together maintain an initially zero

@@ -21,7 +21,7 @@ package org.apache.hadoop.hbase;
 import java.util.Collection;
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.RegionReplicaUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 

@@ -25,7 +25,7 @@ import static org.apache.hadoop.hbase.hbtop.terminal.impl.EscapeSequences.normal
 
 import java.io.PrintWriter;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.terminal.Attributes;
 import org.apache.hadoop.hbase.hbtop.terminal.CursorPosition;
 

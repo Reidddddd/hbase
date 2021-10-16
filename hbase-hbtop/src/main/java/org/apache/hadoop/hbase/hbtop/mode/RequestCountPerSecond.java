@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hbase.hbtop.mode;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Utility class for calculating request counts per second.

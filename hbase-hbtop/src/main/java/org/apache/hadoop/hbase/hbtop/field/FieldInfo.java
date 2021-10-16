@@ -19,7 +19,7 @@ package org.apache.hadoop.hbase.hbtop.field;
 
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Information about a field.

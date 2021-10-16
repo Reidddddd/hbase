@@ -24,7 +24,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.thrift.generated.Hbase;
 import org.apache.hadoop.hbase.thrift2.generated.THBaseService;
 

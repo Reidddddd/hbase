@@ -23,7 +23,7 @@ import java.io.InterruptedIOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 import com.google.common.annotations.VisibleForTesting;
 

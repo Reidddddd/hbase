@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * LossyCounting utility, bounded data structure that maintains approximate high frequency

@@ -21,7 +21,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.List;
 
 import org.apache.hadoop.hbase.ClusterStatus;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.Record;
 import org.apache.hadoop.hbase.hbtop.field.Field;
 import org.apache.hadoop.hbase.hbtop.field.FieldInfo;

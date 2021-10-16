@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hbase;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * This class defines constants for different classes of hbase limited private apis

@@ -27,7 +27,7 @@ package org.apache.hadoop.hbase.util;
 
 import java.util.Random;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A package-local class holding common representation and mechanics

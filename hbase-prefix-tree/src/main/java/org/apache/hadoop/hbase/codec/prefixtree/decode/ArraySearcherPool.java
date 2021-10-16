@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * <p>

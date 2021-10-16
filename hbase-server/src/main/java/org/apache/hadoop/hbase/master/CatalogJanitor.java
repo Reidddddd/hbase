@@ -40,7 +40,7 @@ import org.apache.hadoop.hbase.ScheduledChore;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.backup.HFileArchiver;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.MetaScanner;
 import org.apache.hadoop.hbase.client.MetaScanner.MetaScannerVisitor;

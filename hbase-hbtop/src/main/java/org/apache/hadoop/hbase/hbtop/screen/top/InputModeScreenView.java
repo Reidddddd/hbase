@@ -18,7 +18,7 @@
 package org.apache.hadoop.hbase.hbtop.screen.top;
 
 import java.util.List;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.screen.AbstractScreenView;
 import org.apache.hadoop.hbase.hbtop.screen.Screen;
 import org.apache.hadoop.hbase.hbtop.screen.ScreenView;

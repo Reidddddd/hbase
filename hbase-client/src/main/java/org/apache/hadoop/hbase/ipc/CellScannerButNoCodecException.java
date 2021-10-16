@@ -18,8 +18,8 @@
 package org.apache.hadoop.hbase.ipc;
 
 import org.apache.hadoop.hbase.HBaseIOException;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Thrown if a cellscanner but no codec to encode it with.

@@ -19,8 +19,8 @@ package org.apache.hadoop.hbase.io.encoding;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**

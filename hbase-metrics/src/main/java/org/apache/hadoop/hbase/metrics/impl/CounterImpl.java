@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hbase.metrics.impl;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.metrics.Counter;
 import org.apache.hadoop.hbase.util.LongAdder;
 

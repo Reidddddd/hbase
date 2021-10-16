@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.hbtop.terminal;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.Closeable;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The terminal interface that is an abstraction of terminal screen.

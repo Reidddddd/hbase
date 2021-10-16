@@ -19,7 +19,7 @@
  */
 package org.apache.hadoop.hbase.zookeeper.lock;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.InterProcessLock.MetadataHandler;
 import org.apache.hadoop.hbase.InterProcessReadWriteLock;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;

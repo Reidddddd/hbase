@@ -19,10 +19,10 @@ limitations under the License.
 -->
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>hbase</artifactId>
+    <artifactId>hbase-build-configuration</artifactId>
     <groupId>org.apache.hbase</groupId>
     <version>1.4.12</version>
-    <relativePath>..</relativePath>
+    <relativePath>../hbase-build-configuration</relativePath>
   </parent>
 
   <artifactId>hbase-hadoop2-compat</artifactId>
@@ -140,22 +140,6 @@ limitations under the License.
   </build>
 
   <dependencies>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>jdk.tools</groupId>
-          <artifactId>jdk.tools</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-hadoop-compat</artifactId>

@@ -19,7 +19,7 @@ package org.apache.hadoop.hbase.hbtop.screen;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.terminal.KeyPress;
 
 /**

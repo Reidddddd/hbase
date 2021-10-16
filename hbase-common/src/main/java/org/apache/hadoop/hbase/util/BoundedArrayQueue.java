@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.util;
 import java.util.AbstractQueue;
 import java.util.Iterator;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A bounded non-thread safe implementation of {@link java.util.Queue}.

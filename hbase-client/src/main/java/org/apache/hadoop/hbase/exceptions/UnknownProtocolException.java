@@ -19,8 +19,8 @@
 
 package org.apache.hadoop.hbase.exceptions;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * An error requesting an RPC protocol that the server is not serving.

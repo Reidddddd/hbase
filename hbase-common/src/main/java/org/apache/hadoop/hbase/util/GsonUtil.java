@@ -19,7 +19,7 @@ package org.apache.hadoop.hbase.util;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hbase.thirdparty.com.google.gson.GsonBuilder;
 import org.apache.hbase.thirdparty.com.google.gson.LongSerializationPolicy;
 import org.apache.hbase.thirdparty.com.google.gson.TypeAdapter;

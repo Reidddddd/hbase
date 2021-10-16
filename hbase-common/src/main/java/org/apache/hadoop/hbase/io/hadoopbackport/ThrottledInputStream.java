@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.apache.hadoop.fs.PositionedReadable;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The ThrottleInputStream provides bandwidth throttling on a specified

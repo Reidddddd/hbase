@@ -19,7 +19,7 @@ package org.apache.hadoop.hbase.hbtop.terminal.impl;
 
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.terminal.Attributes;
 import org.apache.hadoop.hbase.hbtop.terminal.Color;
 

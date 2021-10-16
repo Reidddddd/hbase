@@ -25,7 +25,7 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 import java.util.Map;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 import com.google.common.annotations.VisibleForTesting;
 

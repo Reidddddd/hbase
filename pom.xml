@@ -84,6 +84,7 @@
     <module>hbase-metrics-api</module>
     <module>hbase-metrics</module>
     <module>hbase-hbtop</module>
+    <module>hbase-build-configuration</module>
   </modules>
   <!--Add apache snapshots in case we want to use unreleased versions of plugins:
       e.g. surefire 2.18-SNAPSHOT-->
@@ -464,7 +465,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
-          <version>2.4.1</version>
+          <version>3.2.4</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1262,6 +1263,7 @@
     <hadoop.version>${hadoop-two.version}</hadoop.version>
     <compat.module>hbase-hadoop2-compat</compat.module>
     <assembly.file>src/main/assembly/hadoop-two-compat.xml</assembly.file>
+    <audience-annotations.version>0.5.0</audience-annotations.version>
     <!-- end HBASE-15925 default hadoop compatibility values -->
     <avro.version>1.7.7</avro.version>
     <commons-cli.version>1.2</commons-cli.version>
@@ -1281,14 +1283,18 @@
     <http-components-client.version>4.5.2</http-components-client.version>
     <metrics-core.version>2.2.0</metrics-core.version>
     <guava.version>12.0.1</guava.version>
+    <jackson.version>2.10.1</jackson.version>
     <jackson1.version>1.9.13</jackson1.version>
-    <jackson2.version>2.9.10</jackson2.version>
+    <jackson2.version>2.23.2</jackson2.version>
     <jackson2.databind.version>2.9.10.1</jackson2.databind.version>
     <jasper.version>5.5.23</jasper.version>
     <jaxb-api.version>2.2.2</jaxb-api.version>
-    <jetty.version>6.1.26</jetty.version>
+    <jetty.version>9.3.8.v20160314</jetty.version>
+    <jetty-jsp.version>9.2.19.v20160908</jetty-jsp.version>
+    <servlet.api.version>3.1.0</servlet.api.version>
+    <jersey.version>2.22.2</jersey.version>
+    <jetty6.version>6.1.26</jetty6.version>
     <jetty.jspapi.version>6.1.14</jetty.jspapi.version>
-    <jersey.version>1.9</jersey.version>
     <jruby.version>9.2.0.0</jruby.version>
     <junit.version>4.12</junit.version>
     <hamcrest.version>1.3</hamcrest.version>
@@ -1314,7 +1320,7 @@
     <!-- Plugin Dependencies -->
     <error-prone.version>2.1.1</error-prone.version>
     <maven.assembly.version>3.1.1</maven.assembly.version>
-    <maven.antrun.version>1.6</maven.antrun.version>
+    <maven.antrun.version>1.8</maven.antrun.version>
     <maven.compiler.version>3.6.1</maven.compiler.version>
     <jamon.plugin.version>2.4.1</jamon.plugin.version>
     <findbugs-annotations>1.3.9-1</findbugs-annotations>
@@ -1325,7 +1331,7 @@
     <plexus.errorprone.javac.version>2.8.2</plexus.errorprone.javac.version>
     <spotbugs.version>3.1.0-RC1</spotbugs.version>
     <maven.dependency.version>3.0.1</maven.dependency.version>
-    <maven.enforcer.version>3.0.0-M1</maven.enforcer.version>
+    <maven.enforcer.version>3.0.0-M3</maven.enforcer.version>
     <!-- General Packaging -->
     <package.prefix>/usr</package.prefix>
     <package.conf.dir>/etc/hbase</package.conf.dir>
@@ -1371,7 +1377,7 @@
     <!-- Surefire argLine defaults to Linux, cygwin argLine is used in the os.windows profile -->
     <argLine>${hbase-surefire.argLine}</argLine>
     <jacoco.version>0.7.5.201505241946</jacoco.version>
-    <extra.enforcer.version>1.0-beta-6</extra.enforcer.version>
+    <extra.enforcer.version>1.3</extra.enforcer.version>
     <!-- Location of test resources -->
     <test.build.classes>${project.build.directory}/test-classes</test.build.classes>
     <shell-executable>bash</shell-executable>
@@ -1391,13 +1397,13 @@
         <groupId>org.apache.hbase</groupId>
         <artifactId>hbase-annotations</artifactId>
         <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hbase</groupId>
-        <artifactId>hbase-annotations</artifactId>
-        <version>${project.version}</version>
         <type>test-jar</type>
         <!--Was test scope only but if we want to run hbase-it tests, need the annotations test jar-->
+      </dependency>
+      <dependency>
+        <groupId>org.apache.yetus</groupId>
+        <artifactId>audience-annotations</artifactId>
+        <version>${audience-annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hbase</groupId>
@@ -1712,6 +1718,10 @@
             <groupId>io.netty</groupId>
             <artifactId>netty</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1736,17 +1746,6 @@
         <version>${jruby.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.mortbay.jetty</groupId>
-        <artifactId>jetty</artifactId>
-        <version>${jetty.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.mortbay.jetty</groupId>
-            <artifactId>servlet-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
         <groupId>org.jruby.jcodings</groupId>
         <artifactId>jcodings</artifactId>
         <version>${jcodings.version}</version>
@@ -1755,41 +1754,6 @@
         <groupId>org.jruby.joni</groupId>
         <artifactId>joni</artifactId>
         <version>${joni.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mortbay.jetty</groupId>
-        <artifactId>jetty-util</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mortbay.jetty</groupId>
-        <artifactId>jetty-sslengine</artifactId>
-        <version>${jetty.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mortbay.jetty</groupId>
-        <artifactId>jsp-2.1</artifactId>
-        <version>${jetty.jspapi.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.eclipse.jdt</groupId>
-            <artifactId>core</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>ant</groupId>
-            <artifactId>ant</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.mortbay.jetty</groupId>
-        <artifactId>jsp-api-2.1</artifactId>
-        <version>${jetty.jspapi.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mortbay.jetty</groupId>
-        <artifactId>servlet-api-2.5</artifactId>
-        <version>${jetty.jspapi.version}</version>
       </dependency>
       <!-- While jackson is also a dependency of jersey it
            can bring in jars from different, incompatible versions. We force
@@ -1817,17 +1781,23 @@
       <dependency>
         <groupId>com.fasterxml.jackson.jaxrs</groupId>
         <artifactId>jackson-jaxrs-json-provider</artifactId>
-        <version>${jackson2.version}</version>
+        <version>${jackson.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-jaxb-annotations</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
-        <version>${jackson2.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
-        <version>${jackson2.version}</version>
+        <version>${jackson.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
@@ -1884,30 +1854,80 @@
       </dependency>
       <!-- REST dependencies -->
       <dependency>
+        <groupId>javax.servlet</groupId>
+        <artifactId>javax.servlet-api</artifactId>
+        <version>${servlet.api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${jetty.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>servlet-api</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-security</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-http</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-io</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-jsp</artifactId>
+        <version>${jetty-jsp.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-jmx</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util-ajax</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
         <version>${protobuf.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-core</artifactId>
+        <groupId>org.glassfish.jersey.containers</groupId>
+        <artifactId>jersey-container-servlet-core</artifactId>
         <version>${jersey.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-json</artifactId>
-        <version>${jersey.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>stax</groupId>
-            <artifactId>stax-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-server</artifactId>
-        <version>${jersey.version}</version>
+        <groupId>org.glassfish.jersey.media</groupId>
+        <artifactId>jersey-media-json-jackson1</artifactId>
+        <version>${jackson2.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.xml.bind</groupId>
@@ -2236,6 +2256,10 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty</artifactId>
               </exclusion>
+              <exclusion>
+                <groupId>javax.servlet</groupId>
+                <artifactId>servlet-api</artifactId>
+              </exclusion>
             </exclusions>
           </dependency>
           <dependency>
@@ -2246,6 +2270,10 @@
               <exclusion>
                 <groupId>io.netty</groupId>
                 <artifactId>netty</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>javax.servlet</groupId>
+                <artifactId>servlet-api</artifactId>
               </exclusion>
             </exclusions>
           </dependency>
@@ -2259,6 +2287,10 @@
               <exclusion>
                 <groupId>io.netty</groupId>
                 <artifactId>netty</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>javax.servlet</groupId>
+                <artifactId>servlet-api</artifactId>
               </exclusion>
             </exclusions>
           </dependency>
@@ -2936,12 +2968,12 @@
             </reports>
             <configuration>
               <doclet>
-                org.apache.hadoop.hbase.classification.tools.IncludePublicAnnotationsStandardDoclet
+                org.apache.yetus.audience.tools.IncludePublicAnnotationsStandardDoclet
               </doclet>
               <docletArtifact>
-                <groupId>org.apache.hbase</groupId>
-                <artifactId>hbase-annotations</artifactId>
-                <version>${project.version}</version>
+                <groupId>org.apache.yetus</groupId>
+                <artifactId>audience-annotations</artifactId>
+                <version>${audience-annotations.version}</version>
               </docletArtifact>
               <destDir>apidocs</destDir>
               <name>User API</name>
@@ -2952,11 +2984,7 @@
               <!-- switch on dependency-driven aggregation -->
               <includeDependencySources>false</includeDependencySources>
               <locale>en_US</locale>
-              <dependencySourceIncludes>
-                <!-- include ONLY dependencies I control -->
-                <dependencySourceInclude>org.apache.hbase:hbase-annotations
-                </dependencySourceInclude>
-              </dependencySourceIncludes>
+
             </configuration>
           </reportSet>
         </reportSets>

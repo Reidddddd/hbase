@@ -24,7 +24,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 
 import javax.security.sasl.SaslClient;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Unwrap sasl messages. Should be placed after a

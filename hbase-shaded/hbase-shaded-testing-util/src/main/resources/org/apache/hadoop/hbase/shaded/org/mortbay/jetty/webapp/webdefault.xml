@@ -183,7 +183,7 @@ limitations under the License.
 
   <!-- ==================================================================== -->
   <!-- JSP Servlet                                                          -->
-  <!-- This is the jasper JSP servlet from the jakarta project              -->
+  <!-- This is the jasper JSP servlet from the  project              -->
   <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  -->
   <!-- The JSP page compiler and execution servlet, which is the mechanism  -->
   <!-- used by Glassfish to support JSP pages.  Traditionally, this servlet -->

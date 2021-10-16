@@ -21,7 +21,7 @@ package org.apache.hadoop.hbase.regionserver;
 import java.io.IOException;
 import java.util.Collection;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Utility functions for region server storage layer.

@@ -27,7 +27,7 @@ import org.apache.hadoop.hbase.KeyValue.KVComparator;
 import org.apache.hadoop.hbase.KeyValue.Type;
 import org.apache.hadoop.hbase.KeyValueUtil;
 import org.apache.hadoop.hbase.SettableSequenceId;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.codec.prefixtree.decode.DecoderFactory;
 import org.apache.hadoop.hbase.codec.prefixtree.decode.PrefixTreeArraySearcher;
 import org.apache.hadoop.hbase.codec.prefixtree.scanner.CellScannerPosition;

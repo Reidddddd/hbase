@@ -22,8 +22,8 @@ package org.apache.hadoop.hbase.client;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Parameters for instantiating a {@link BufferedMutator}.

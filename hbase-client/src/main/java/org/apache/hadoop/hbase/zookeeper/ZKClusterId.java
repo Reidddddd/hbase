@@ -21,7 +21,7 @@ package org.apache.hadoop.hbase.zookeeper;
 
 import java.util.UUID;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.Abortable;
 import org.apache.hadoop.hbase.ClusterId;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;

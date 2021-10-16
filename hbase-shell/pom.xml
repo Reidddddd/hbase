@@ -21,10 +21,10 @@
 -->
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>hbase</artifactId>
+    <artifactId>hbase-build-configuration</artifactId>
     <groupId>org.apache.hbase</groupId>
     <version>1.4.12</version>
-    <relativePath>..</relativePath>
+    <relativePath>../hbase-build-configuration</relativePath>
   </parent>
   <artifactId>hbase-shell</artifactId>
   <name>Apache HBase - Shell</name>
@@ -217,19 +217,13 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-protocol</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
-      <scope>test</scope>
-    </dependency>
+<!--    <dependency>-->
+<!--      <groupId>org.codehaus.jackson</groupId>-->
+<!--      <artifactId>jackson-mapper-asl</artifactId>-->
+<!--      <scope>test</scope>-->
+<!--    </dependency>-->
     <dependency>
       <groupId>com.fasterxml.jackson.jaxrs</groupId>
       <artifactId>jackson-jaxrs-json-provider</artifactId>

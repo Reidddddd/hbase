@@ -22,10 +22,10 @@
   -->
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>hbase</artifactId>
+    <artifactId>hbase-build-configuration</artifactId>
     <groupId>org.apache.hbase</groupId>
     <version>1.4.12</version>
-    <relativePath>..</relativePath>
+    <relativePath>../hbase-build-configuration</relativePath>
   </parent>
 
   <artifactId>hbase-client</artifactId>
@@ -105,23 +105,6 @@
   </build>
 
   <dependencies>
-    <!-- Intra-project dependencies -->
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>jdk.tools</groupId>
-          <artifactId>jdk.tools</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-annotations</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-common</artifactId>
@@ -162,26 +145,26 @@
           <groupId>org.apache.avro</groupId>
           <artifactId>avro</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.jaxrs</groupId>
-          <artifactId>jackson-jaxrs-json-provider</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-mapper-asl</artifactId>
-        </exclusion>
+<!--        <exclusion>-->
+<!--          <groupId>com.fasterxml.jackson.jaxrs</groupId>-->
+<!--          <artifactId>jackson-jaxrs-json-provider</artifactId>-->
+<!--        </exclusion>-->
+<!--        <exclusion>-->
+<!--          <groupId>com.fasterxml.jackson.core</groupId>-->
+<!--          <artifactId>jackson-annotations</artifactId>-->
+<!--        </exclusion>-->
+<!--        <exclusion>-->
+<!--          <groupId>com.fasterxml.jackson.core</groupId>-->
+<!--          <artifactId>jackson-core</artifactId>-->
+<!--        </exclusion>-->
+<!--        <exclusion>-->
+<!--          <groupId>com.fasterxml.jackson.core</groupId>-->
+<!--          <artifactId>jackson-databind</artifactId>-->
+<!--        </exclusion>-->
+<!--        <exclusion>-->
+<!--          <groupId>org.codehaus.jackson</groupId>-->
+<!--          <artifactId>jackson-mapper-asl</artifactId>-->
+<!--        </exclusion>-->
       </exclusions>
     </dependency>
     <dependency>
@@ -225,11 +208,11 @@
       <groupId>org.apache.htrace</groupId>
       <artifactId>htrace-core</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <scope>provided</scope>
-    </dependency>
+<!--    <dependency>-->
+<!--      <groupId>com.fasterxml.jackson.core</groupId>-->
+<!--      <artifactId>jackson-databind</artifactId>-->
+<!--      <scope>provided</scope>-->
+<!--    </dependency>-->
     <dependency>
       <groupId>org.jruby.jcodings</groupId>
       <artifactId>jcodings</artifactId>

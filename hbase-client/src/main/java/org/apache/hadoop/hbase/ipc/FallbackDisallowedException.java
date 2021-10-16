@@ -18,8 +18,8 @@
 package org.apache.hadoop.hbase.ipc;
 
 import org.apache.hadoop.hbase.HBaseIOException;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Indicate that the rpc server tells client to fallback to simple auth but client is disabled to do

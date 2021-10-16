@@ -19,7 +19,7 @@ package org.apache.hadoop.hbase.hbtop.terminal;
 
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The attributes of text in the terminal.

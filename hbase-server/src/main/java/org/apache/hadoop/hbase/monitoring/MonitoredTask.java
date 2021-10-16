@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
 public interface MonitoredTask extends Cloneable {

@@ -27,7 +27,7 @@ import java.text.NumberFormat;
 import java.util.Random;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValue.KVComparator;
 import org.apache.hadoop.io.Writable;

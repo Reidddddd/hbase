@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.hbtop.terminal.CursorPosition;
 import org.apache.hadoop.hbase.hbtop.terminal.KeyPress;
 import org.apache.hadoop.hbase.hbtop.terminal.Terminal;

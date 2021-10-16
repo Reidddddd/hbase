@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Represents a description of a command that we can execute in the top screen.

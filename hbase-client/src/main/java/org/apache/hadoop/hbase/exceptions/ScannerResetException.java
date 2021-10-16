@@ -19,8 +19,8 @@
 package org.apache.hadoop.hbase.exceptions;
 
 import org.apache.hadoop.hbase.DoNotRetryIOException;
-import org.apache.hadoop.hbase.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.classification.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Thrown when the server side has received an Exception, and asks the Client to reset the scanner
