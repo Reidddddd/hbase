@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.codec;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.Cell;
@@ -85,7 +86,24 @@ public class KeyValueCodecWithTags extends AbstractCodec {
   }
 
   @Override
+  public Decoder getDecoder(final ByteBuffer buf) {
+    return new ByteBufferKeyValueDecoder(buf);
+  }
+
+  @Override
   public Encoder getEncoder(OutputStream os) {
     return new KeyValueEncoder(os);
+  }
+
+  public static class ByteBufferKeyValueDecoder extends KeyValueCodec.ByteBufferKeyValueDecoder {
+
+    public ByteBufferKeyValueDecoder(ByteBuffer buf) {
+      super(buf);
+    }
+
+    @Override
+    protected Cell createCell(byte[] buf, int offset, int len) {
+      return new KeyValue(buf, offset, len);
+    }
   }
 }

@@ -25,7 +25,7 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.NoTagsKeyValue;
 import org.apache.hadoop.hbase.KeyValueUtil;
 import org.apache.hadoop.hbase.io.HandlerLAB;
 import org.apache.hadoop.hbase.util.ByteBufferUtils;
@@ -120,9 +120,13 @@ public class KeyValueCodec extends AbstractCodec {
       arrayAndOffset = bufferPool.claimBytesFromHandlerLAB(len);
       ByteBufferUtils.copyFromBufferToArray(arrayAndOffset.array(), buf,
           currentPos, arrayAndOffset.offset(), len);
-      current = new KeyValue(arrayAndOffset.array(), arrayAndOffset.offset(), len);
+      current = createCell(arrayAndOffset.array(), arrayAndOffset.offset(), len);
       buf.position(currentPos + len);
       return true;
+    }
+
+    protected Cell createCell(byte[] buf, int offset, int len) {
+      return new NoTagsKeyValue(buf, offset, len);
     }
   }
 
