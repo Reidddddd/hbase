@@ -1369,6 +1369,20 @@
     <hbase-surefire.argLine>-enableassertions -Dhbase.test -Xmx${surefire.Xmx}
       ${maxpermsize} -Djava.security.egd=file:/dev/./urandom -Djava.net.preferIPv4Stack=true
       -Djava.awt.headless=true -Djdk.net.URLClassPath.disableClassPathURLCheck=true
+      --add-opens java.base/java.io=ALL-UNNAMED
+      --add-opens java.base/java.lang=ALL-UNNAMED
+      --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+      --add-opens java.base/java.nio=ALL-UNNAMED
+      --add-opens java.base/java.util.regex=ALL-UNNAMED
+      --add-opens java.base/java.util.zip=ALL-UNNAMED
+      --add-opens java.base/java.util=ALL-UNNAMED
+      --add-opens java.base/java.net=ALL-UNNAMED
+      --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED
+      --add-opens java.base/sun.nio.ch=ALL-UNNAMED
+      --add-opens java.base/sun.nio.cs=ALL-UNNAMED
+      --add-opens java.base/javax.crypto=ALL-UNNAMED
+      --add-opens java.base/java.security=ALL-UNNAMED
+      --add-opens java.base/java.util.concurrent.atomic=ALL_UNNAMED
     </hbase-surefire.argLine>
     <hbase-surefire.cygwin-argLine>-enableassertions -Xmx${surefire.cygwinXmx} ${maxpermsize}
       -Djava.security.egd=file:/dev/./urandom -Djava.net.preferIPv4Stack=true
