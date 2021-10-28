@@ -218,9 +218,13 @@ public class ClassSize {
     ARRAYLIST = align(OBJECT + REFERENCE + (2 * Bytes.SIZEOF_INT)) + align(ARRAY);
 
     //noinspection PointlessArithmeticExpression
-    BYTE_BUFFER = align(OBJECT + REFERENCE +
-        (5 * Bytes.SIZEOF_INT) +
-        (3 * Bytes.SIZEOF_BOOLEAN) + Bytes.SIZEOF_LONG) + align(ARRAY);
+    BYTE_BUFFER = JVM.getJVMSpecVersion() < 15 ?
+        align(OBJECT + REFERENCE +
+            (5 * Bytes.SIZEOF_INT) +
+            (3 * Bytes.SIZEOF_BOOLEAN) + Bytes.SIZEOF_LONG) + align(ARRAY) :
+        align(OBJECT + 2 * REFERENCE +
+            (5 * Bytes.SIZEOF_INT) +
+            (3 * Bytes.SIZEOF_BOOLEAN) + Bytes.SIZEOF_LONG) + align(ARRAY);
 
     INTEGER = align(OBJECT + Bytes.SIZEOF_INT);
 
