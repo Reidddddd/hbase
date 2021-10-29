@@ -1599,7 +1599,7 @@ public class CanaryTool implements Tool, Canary {
           new ConnectStringParser(ZKConfig.getZKQuorumServersString(configuration));
       hosts = Lists.newArrayList();
       for (InetSocketAddress server : parser.getServerAddresses()) {
-        hosts.add(server.toString());
+        hosts.add(server.toString().replace("/<unresolved>", ""));
       }
       if (allowedFailures > (hosts.size() - 1) / 2) {
         LOG.warn("Confirm allowable number of failed ZooKeeper nodes, as quorum will " +
