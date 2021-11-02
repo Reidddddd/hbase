@@ -59,6 +59,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Waiter.ExplainingPredicate;
 import org.apache.hadoop.hbase.Waiter.Predicate;
+import org.apache.hadoop.hbase.util.ReflectionUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.Admin;
@@ -2721,7 +2722,7 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
       logDirField = TaskLog.class.getDeclaredField("LOG_DIR");
       logDirField.setAccessible(true);
 
-      Field modifiersField = Field.class.getDeclaredField("modifiers");
+      Field modifiersField = ReflectionUtils.getModifiersField();
       modifiersField.setAccessible(true);
       modifiersField.setInt(logDirField, logDirField.getModifiers() & ~Modifier.FINAL);
 
@@ -2729,7 +2730,6 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
     } catch (SecurityException e) {
       throw new RuntimeException(e);
     } catch (NoSuchFieldException e) {
-      // TODO Auto-generated catch block
       throw new RuntimeException(e);
     } catch (IllegalArgumentException e) {
       throw new RuntimeException(e);

@@ -559,7 +559,7 @@ Release Notes - HBase - Version 1.4.2 2/28/2018
     * [HBASE-19917] - Improve RSGroupBasedLoadBalancer#filterServers() to be more efficient
 
 ** Test
-    * [HBASE-19949] - TestRSGroupsWithACL fails with ExceptionInInitializerError
+    * [HBASE-19949] - TestRSGroupsWithACL fails with jackson.versionError
 
 
 Release Notes - HBase - Version 1.4.1 2/2/2018
