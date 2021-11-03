@@ -21,10 +21,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.BindException;
 import java.net.DatagramSocket;
@@ -32,7 +36,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,6 +55,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -4358,6 +4365,7 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
         dir = new File(getDataTestDir("kdc").toUri().getPath());
         kdc = new MiniKdc(conf, dir);
         kdc.start();
+        modifyKdcConf(kdc);
       } catch (BindException e) {
         FileUtils.deleteDirectory(dir);  // clean directory
         numTries++;
@@ -4371,6 +4379,37 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
     } while (bindException);
     HBaseKerberosUtils.setKeytabFileForTesting(keytabFile.getAbsolutePath());
     return kdc;
+  }
+
+  private void modifyKdcConf(MiniKdc miniKdc)
+      throws Exception {
+    StringBuilder sb = new StringBuilder();
+    ClassLoader cl = Thread.currentThread().getContextClassLoader();
+    InputStream is2 = cl.getResourceAsStream("minikdc-krb5.conf");
+    File targetFile = miniKdc.getKrb5conf();
+    BufferedReader r = null;
+    try {
+      r = new BufferedReader(new InputStreamReader(is2, StandardCharsets.UTF_8));
+      for(String line = r.readLine(); line != null; line = r.readLine()) {
+        sb.append(line).append("{3}");
+      }
+    } finally {
+      IOUtils.closeQuietly(r);
+      IOUtils.closeQuietly(is2);
+    }
+    FileUtils.writeStringToFile(targetFile,
+        MessageFormat.format(sb.toString(),
+        miniKdc.getRealm(), miniKdc.getHost(),
+        Integer.toString(miniKdc.getPort()), System.getProperty("line.separator")));
+    Class classRef;
+    if (System.getProperty("java.vendor").contains("IBM")) {
+      classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+    } else {
+      classRef = Class.forName("sun.security.krb5.Config");
+    }
+
+    Method refreshMethod = classRef.getMethod("refresh");
+    refreshMethod.invoke(classRef);
   }
 
   public int getNumHFiles(final TableName tableName, final byte[] family) {
