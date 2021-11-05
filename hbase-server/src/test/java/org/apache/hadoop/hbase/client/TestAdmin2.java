@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -60,11 +59,7 @@ import org.apache.hadoop.hbase.regionserver.Region;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
-import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -76,51 +71,14 @@ import com.google.protobuf.ServiceException;
  * Add any testing of HBaseAdmin functionality here.
  */
 @Category(LargeTests.class)
-public class TestAdmin2 {
+public class TestAdmin2 extends TestAdminBase {
   private static final Log LOG = LogFactory.getLog(TestAdmin2.class);
-  private final static HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
-  private Admin admin;
-
-  @BeforeClass
-  public static void setUpBeforeClass() throws Exception {
-    TEST_UTIL.getConfiguration().setBoolean("hbase.online.schema.update.enable", true);
-    TEST_UTIL.getConfiguration().setInt("hbase.regionserver.msginterval", 100);
-    TEST_UTIL.getConfiguration().setInt("hbase.client.pause", 250);
-    TEST_UTIL.getConfiguration().setInt("hbase.client.retries.number", 6);
-    TEST_UTIL.getConfiguration().setInt("hbase.regionserver.metahandler.count", 30);
-    TEST_UTIL.getConfiguration().setBoolean(
-        "hbase.master.enabletable.roundrobin", true);
-    //Set a very short keeptime for processedServers, see HBASE-18014
-    TEST_UTIL.getConfiguration().setLong("hbase.master.maximum.logsplit.keeptime", 100);
-    //HBASE-18014, don't Know why @Test (timeout=30000) attribute doesn't work when
-    //calling enableTable.So I have to set the sync wait time to a short time to timeout
-    //the test of testEnableTableAfterprocessedServersCleaned
-    TEST_UTIL.getConfiguration().setInt("hbase.client.sync.wait.timeout.msec", 30000);
-    TEST_UTIL.startMiniCluster(3);
-  }
-
-  @AfterClass
-  public static void tearDownAfterClass() throws Exception {
-    TEST_UTIL.shutdownMiniCluster();
-  }
-
-  @Before
-  public void setUp() throws Exception {
-    this.admin = TEST_UTIL.getHBaseAdmin();
-  }
-
-  @After
-  public void tearDown() throws Exception {
-    for (HTableDescriptor htd : this.admin.listTables()) {
-      TEST_UTIL.deleteTable(htd.getName());
-    }
-  }
 
   @Test (timeout=300000)
   public void testCreateBadTables() throws IOException {
     String msg = null;
     try {
-      this.admin.createTable(new HTableDescriptor(TableName.META_TABLE_NAME));
+      admin.createTable(new HTableDescriptor(TableName.META_TABLE_NAME));
     } catch(TableExistsException e) {
       msg = e.toString();
     }
@@ -136,7 +94,7 @@ public class TestAdmin2 {
     Thread [] threads = new Thread [count];
     final AtomicInteger successes = new AtomicInteger(0);
     final AtomicInteger failures = new AtomicInteger(0);
-    final Admin localAdmin = this.admin;
+    final Admin localAdmin = admin;
     for (int i = 0; i < count; i++) {
       threads[i] = new Thread(Integer.toString(i)) {
         @Override
@@ -280,8 +238,8 @@ public class TestAdmin2 {
   public void testTableNotEnabledExceptionWithATable() throws IOException {
     final TableName name = TableName.valueOf("testTableNotEnabledExceptionWithATable");
     TEST_UTIL.createTable(name, HConstants.CATALOG_FAMILY).close();
-    this.admin.disableTable(name);
-    this.admin.disableTable(name);
+    admin.disableTable(name);
+    admin.disableTable(name);
   }
 
   /**
@@ -293,7 +251,7 @@ public class TestAdmin2 {
     final TableName name = TableName.valueOf("testTableNotDisabledExceptionWithATable");
     Table t = TEST_UTIL.createTable(name, HConstants.CATALOG_FAMILY);
     try {
-    this.admin.enableTable(name);
+    admin.enableTable(name);
     }finally {
        t.close();
     }
@@ -694,7 +652,7 @@ public class TestAdmin2 {
   @Test (timeout=300000)
   public void testDisableCatalogTable() throws Exception {
     try {
-      this.admin.disableTable(TableName.META_TABLE_NAME);
+      admin.disableTable(TableName.META_TABLE_NAME);
       fail("Expected to throw ConstraintException");
     } catch (ConstraintException e) {
     }
