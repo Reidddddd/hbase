@@ -1287,6 +1287,7 @@
     <jackson1.version>1.9.13</jackson1.version>
     <jackson2.version>2.23.2</jackson2.version>
     <jackson2.databind.version>2.9.10.1</jackson2.databind.version>
+    <jackson2-module-jaxb-annotations.version>2.9.10</jackson2-module-jaxb-annotations.version>
     <jasper.version>5.5.23</jasper.version>
     <jaxb-api.version>2.2.2</jaxb-api.version>
     <jetty.version>9.3.8.v20160314</jetty.version>
@@ -1817,6 +1818,11 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>${jackson2.databind.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.module</groupId>
+        <artifactId>jackson-module-jaxb-annotations</artifactId>
+        <version>${jackson2-module-jaxb-annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hbase.thirdparty</groupId>
