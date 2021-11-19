@@ -666,7 +666,7 @@
       </properties>
     </profile>
     <profile>
-      <id>jdk17</id>
+      <id>jdk15</id>
       <build>
           <plugins>
               <plugin>
@@ -683,7 +683,7 @@
           </plugins>
       </build>
       <properties>
-          <compileSource>17</compileSource>
+          <compileSource>15</compileSource>
       </properties>
     </profile>
   </profiles>
