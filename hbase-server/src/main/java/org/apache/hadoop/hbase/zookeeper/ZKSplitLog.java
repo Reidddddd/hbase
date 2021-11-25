@@ -30,13 +30,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.protobuf.generated.ClusterStatusProtos.RegionStoreSequenceIds;
 import org.apache.zookeeper.KeeperException;
 
 /**
- * Common methods and attributes used by 
- * {@link org.apache.hadoop.hbase.master.SplitLogManager} and 
+ * Common methods and attributes used by
+ * {@link org.apache.hadoop.hbase.master.SplitLogManager} and
  * {@link org.apache.hadoop.hbase.regionserver.SplitLogWorker}
  * running distributed splitting of WAL logs.
  */
@@ -65,6 +66,17 @@ public class ZKSplitLog {
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException("URLENCODER doesn't support UTF-8");
     }
+  }
+
+  /**
+   * The name format of a normal splitLog znode is servername,port,starttime/wal-file-name.
+   * There will be exception if it is a special node, like RESCAN splitLog node.
+   * @param node splitlog znode
+   * @return parsed server name.
+   */
+  public static String getServerHostname(String node) {
+    String serverName = decode(node);
+    return ServerName.parseHostname(serverName.substring(0, serverName.indexOf('/')));
   }
 
   static String decode(String s) {

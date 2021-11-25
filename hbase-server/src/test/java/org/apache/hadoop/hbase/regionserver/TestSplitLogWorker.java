@@ -38,6 +38,7 @@ import org.apache.hadoop.hbase.CoordinatedStateManagerFactory;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.coordination.DataCenterTopology;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
@@ -470,6 +471,185 @@ public class TestSplitLogWorker {
     when(mockedServer.getExecutorService()).thenReturn(executorService);
 
     return mockedServer;
+  }
+
+  @Test(timeout=60000)
+  public void testLogFromCrossDCWontBeAccepted() throws Exception {
+    LOG.info("testLogFromCrossDCWontBeAccepted");
+
+    final int maxTasks = 3;
+    Configuration testConf = HBaseConfiguration.create(TEST_UTIL.getConfiguration());
+    testConf.setBoolean("hbase.regionserver.splitlog.check.topology", true);
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.class", TestTopology.class.getName());
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.script", "/a/fake/script");
+    testConf.setInt("hbase.regionserver.wal.max.splitters", maxTasks);
+
+    SplitLogCounters.resetCounters();
+    // WAL from DC2
+    final String walFromDC2 = "rs_at_dc2,123,456/regionserverfile";
+    // SplitLogWorker from DC1
+    final ServerName rs = ServerName.valueOf("rs@dc1,123,456");
+    RegionServerServices mockedRS = getRegionServer(rs);
+    for (int i = 0; i < maxTasks; i++) {
+      zkw.getRecoverableZooKeeper().create(ZKSplitLog.getEncodedNodeName(zkw, walFromDC2 + i),
+          new SplitLogTask.Unassigned(ServerName.valueOf("mgr,1,1"), this.mode).toByteArray(),
+          Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    // mockedRS won't take tasks because it is not in the same DC as the failed server which is in DC2.
+    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    slw.start();
+    Thread.sleep(1000);
+    try {
+      for (int i = 0; i < maxTasks; i++) {
+        byte[] bytes = ZKUtil.getData(zkw, ZKSplitLog.getEncodedNodeName(zkw, walFromDC2 + i));
+        SplitLogTask slt = SplitLogTask.parseFrom(bytes);
+        assertTrue(slt.isUnassigned());
+      }
+    } finally {
+      stopSplitLogWorker(slw);
+    }
+  }
+
+  @Test(timeout=60000)
+  public void testSplitLogFromSameDCBeAccepted() throws Exception {
+    LOG.info("testSplitLogFromSameDCBeAccepted");
+
+    final int maxTasks = 3;
+    Configuration testConf = HBaseConfiguration.create(TEST_UTIL.getConfiguration());
+    testConf.setBoolean("hbase.regionserver.splitlog.check.topology", true);
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.class", TestTopology.class.getName());
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.script", "/a/fake/script");
+    testConf.setInt("hbase.regionserver.wal.max.splitters", maxTasks);
+
+    SplitLogCounters.resetCounters();
+    // WAL from DC2
+    final String walFromDC2 = "rs_at_dc2,123,456/regionserverfile";
+    // SplitLogWorker from DC2 as well
+    final ServerName rs = ServerName.valueOf("rs@dc2,789,012");
+    RegionServerServices mockedRS = getRegionServer(rs);
+    for (int i = 0; i < maxTasks; i++) {
+      zkw.getRecoverableZooKeeper().create(ZKSplitLog.getEncodedNodeName(zkw, walFromDC2 + i),
+          new SplitLogTask.Unassigned(ServerName.valueOf("mgr,1,1"), this.mode).toByteArray(),
+          Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    // mockedRS will take all tasks because it is in the same DC as the failed server.
+    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    slw.start();
+    Thread.sleep(1000);
+    try {
+      for (int i = 0; i < maxTasks; i++) {
+        byte[] bytes = ZKUtil.getData(zkw, ZKSplitLog.getEncodedNodeName(zkw, walFromDC2 + i));
+        SplitLogTask slt = SplitLogTask.parseFrom(bytes);
+        assertTrue(slt.isOwned(rs));
+      }
+    } finally {
+      stopSplitLogWorker(slw);
+    }
+  }
+
+  @Test(timeout=60000)
+  public void testFallbackToDefault() throws Exception {
+    LOG.info("testFallbackToDefault");
+
+    final int maxTasks = 3;
+    Configuration testConf = HBaseConfiguration.create(TEST_UTIL.getConfiguration());
+    testConf.setBoolean("hbase.regionserver.splitlog.check.topology", true);
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.class", TestTopology.class.getName());
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.script", "/a/fake/script");
+    testConf.setInt("hbase.regionserver.wal.max.splitters", maxTasks);
+
+    SplitLogCounters.resetCounters();
+    // WAL from DC3
+    final String walFromDC3 = "rs_at_dc3,123,456/regionserverfile";
+    // SplitLogWorker from DC1
+    final ServerName rs1 = ServerName.valueOf("rs@dc1,789,012");
+    // SplitLogWorker from DC2
+    final ServerName rs2 = ServerName.valueOf("rs@dc2,789,012");
+    RegionServerServices mockedRS1 = getRegionServer(rs1);
+    RegionServerServices mockedRS2 = getRegionServer(rs2);
+    for (int i = 0; i < maxTasks; i++) {
+      zkw.getRecoverableZooKeeper().create(ZKSplitLog.getEncodedNodeName(zkw, walFromDC3 + i),
+          new SplitLogTask.Unassigned(ServerName.valueOf("mgr,1,1"), this.mode).toByteArray(),
+          Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    // slw1 and slw2 will take all tasks because fallback to default mode
+    SplitLogWorker slw1 = new SplitLogWorker(ds, testConf, mockedRS1, neverEndingTask);
+    SplitLogWorker slw2 = new SplitLogWorker(ds, testConf, mockedRS2, neverEndingTask);
+    slw1.start();
+    slw2.start();
+    Thread.sleep(1000);
+    try {
+      for (int i = 0; i < maxTasks; i++) {
+        byte[] bytes = ZKUtil.getData(zkw, ZKSplitLog.getEncodedNodeName(zkw, walFromDC3 + i));
+        SplitLogTask slt = SplitLogTask.parseFrom(bytes);
+        assertTrue(!slt.isUnassigned());
+      }
+    } finally {
+      stopSplitLogWorker(slw1);
+      stopSplitLogWorker(slw2);
+    }
+  }
+
+  @Test(timeout=60000)
+  public void testUnResolvableThenFallbackToDefault() throws Exception {
+    LOG.info("testUnResolvableThenFallbackToDefault");
+
+    final int maxTasks = 3;
+    Configuration testConf = HBaseConfiguration.create(TEST_UTIL.getConfiguration());
+    testConf.setBoolean("hbase.regionserver.splitlog.check.topology", true);
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.class", TestTopology.class.getName());
+    testConf.set("hbase.regionserver.splitlog.topology.resolver.script", "/a/fake/script");
+    testConf.setInt("hbase.regionserver.wal.max.splitters", maxTasks);
+
+    SplitLogCounters.resetCounters();
+    final String walFromDC3 = "rs_at_dc3,123,456/regionserverfile";
+    final ServerName rs = ServerName.valueOf("rs@dc2,789,012");
+    RegionServerServices mockedRS = getRegionServer(rs);
+    for (int i = 0; i < maxTasks; i++) {
+      zkw.getRecoverableZooKeeper().create(ZKSplitLog.getEncodedNodeName(zkw, walFromDC3 + i),
+          new SplitLogTask.Unassigned(ServerName.valueOf("mgr,1,1"), this.mode).toByteArray(),
+          Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    // mockedRS will take all tasks because WALs from DC3 is unresolvable and fall back to default mode
+    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    slw.start();
+    Thread.sleep(1000);
+    try {
+      for (int i = 0; i < maxTasks; i++) {
+        byte[] bytes = ZKUtil.getData(zkw, ZKSplitLog.getEncodedNodeName(zkw, walFromDC3 + i));
+        SplitLogTask slt = SplitLogTask.parseFrom(bytes);
+        assertTrue(slt.isOwned(rs));
+      }
+    } finally {
+      stopSplitLogWorker(slw);
+    }
+  }
+
+  public static class TestTopology extends DataCenterTopology {
+
+    public TestTopology(Configuration conf, String localhostname) {
+      super(conf, localhostname);
+    }
+
+    @Override
+    public String getDataCenter(String hostname) {
+      if (hostname.contains("dc1")) {
+        return "dc1";
+      }
+      if (hostname.contains("dc2")) {
+        return "dc2";
+      }
+      return UNRESOLVABLE;
+    }
+
+    @Override
+    public boolean isInSameDataCenter(String dataCenter) {
+      return localDataCenter.equals(dataCenter);
+    }
   }
 
 }

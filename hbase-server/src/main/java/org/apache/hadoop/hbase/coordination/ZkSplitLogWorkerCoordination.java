@@ -49,6 +49,7 @@ import org.apache.hadoop.hbase.regionserver.handler.FinishRegionRecoveringHandle
 import org.apache.hadoop.hbase.regionserver.handler.WALSplitterHandler;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.hadoop.hbase.util.ReflectionUtils;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.ZKSplitLog;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -88,6 +89,8 @@ public class ZkSplitLogWorkerCoordination extends ZooKeeperListener implements
   private RegionServerServices server = null;
   protected final AtomicInteger tasksInProgress = new AtomicInteger(0);
   private int maxConcurrentTasks = 0;
+  private DataCenterTopology topology;
+  private boolean checkTopology;
 
   private final ZkCoordinatedStateManager manager;
 
@@ -144,6 +147,13 @@ public class ZkSplitLogWorkerCoordination extends ZooKeeperListener implements
         conf.getInt("hbase.splitlog.report.period",
           conf.getInt(HConstants.HBASE_SPLITLOG_MANAGER_TIMEOUT,
             ZKSplitLogManagerCoordination.DEFAULT_TIMEOUT) / 3);
+    checkTopology = conf.getBoolean("hbase.regionserver.splitlog.check.topology", false);
+    if (checkTopology) {
+      Class clazz = conf.getClass("hbase.regionserver.splitlog.topology.resolver.class", DataCenterTopology.class);
+      topology = ReflectionUtils.instantiateWithCustomCtor(clazz.getName(),
+          new Class[]{Configuration.class, String.class},
+          new Object[]{conf, server.getServerName().getHostname()});
+    }
   }
 
   /* Support functions for Zookeeper async callback */
@@ -412,7 +422,41 @@ public class ZkSplitLogWorkerCoordination extends ZooKeeperListener implements
               LOG.trace("Current region server " + server.getServerName()
                 + " is ready to take more tasks, will get task list and try grab tasks again.");
             }
+
             int idx = (i + offset) % paths.size();
+            String hostname;
+            boolean specialNode = false;
+            try {
+              hostname = ZKSplitLog.getServerHostname(paths.get(idx));
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Split Log from " + hostname);
+              }
+            } catch (Exception e) {
+              LOG.info("It is a special splitLog node: " + paths.get(idx));
+              // Like, RESCAN node is a special node
+              specialNode = true;
+              hostname = "";
+            }
+            if (checkTopology) {
+              String datacenter = topology.getDataCenter(hostname);
+              if (topology.isResolvable(datacenter)) {
+                if (!specialNode && !topology.isInSameDataCenter(datacenter)) {
+                  // avoid cross DC split logs
+                  if (LOG.isDebugEnabled()) {
+                    LOG.debug(hostname + " belongs to " + datacenter + ", but this SplitLogWorker belongs to "
+                        + topology.getLocalDataCenter());
+                  }
+                  break;
+                }
+              } else {
+                // else the datacenter is unresolvable, we could fall back to old way.
+                // but it should be barely happened, because each machine must be resolvable at init
+                // otherwise would throw IllegalArgumentException exception
+                LOG.warn("Unresolvable for " + hostname
+                    + " fall back to default, cross dc split log probably happens.");
+              }
+            }
+
             // don't call ZKSplitLog.getNodeName() because that will lead to
             // double encoding of the path name
             taskGrabbed |= grabTask(ZKUtil.joinZNode(watcher.splitLogZNode, paths.get(idx)));
