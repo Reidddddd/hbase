@@ -444,14 +444,17 @@ module Hbase
     #----------------------------------------------------------------------------------------------
     # Returns table's structure description
     def describe(table_name)
+      tableExists(table_name)
       @admin.getTableDescriptor(TableName.valueOf(table_name)).to_s
     end
 
     def get_column_families(table_name)
+      tableExists(table_name)
       @admin.getTableDescriptor(TableName.valueOf(table_name)).getColumnFamilies()
     end
 
     def get_table_attributes(table_name)
+      tableExists(table_name)
       @admin.getTableDescriptor(TableName.valueOf(table_name)).toStringTableAttributes
     end
 
@@ -841,7 +844,7 @@ module Hbase
         end
       end
       if arg.include?(org.apache.hadoop.hbase.HColumnDescriptor::BLOOMFILTER)
-        bloomtype = arg.delete(org.apache.hadoop.hbase.HColumnDescriptor::BLOOMFILTER).upcase
+        bloomtype = arg.delete(org.apache.hadoop.hbase.HColumnDescriptor::BLOOMFILTER).upcase.to_sym
         unless org.apache.hadoop.hbase.regionserver.BloomType.constants.include?(bloomtype)
           raise(ArgumentError, "BloomFilter type #{bloomtype} is not supported. Use one of " + org.apache.hadoop.hbase.regionserver.StoreFile::BloomType.constants.join(" "))
         else
@@ -849,7 +852,7 @@ module Hbase
         end
       end
       if arg.include?(org.apache.hadoop.hbase.HColumnDescriptor::COMPRESSION)
-        compression = arg.delete(org.apache.hadoop.hbase.HColumnDescriptor::COMPRESSION).upcase
+        compression = arg.delete(org.apache.hadoop.hbase.HColumnDescriptor::COMPRESSION).upcase.to_sym
         unless org.apache.hadoop.hbase.io.compress.Compression::Algorithm.constants.include?(compression)
           raise(ArgumentError, "Compression #{compression} is not supported. Use one of " + org.apache.hadoop.hbase.io.compress.Compression::Algorithm.constants.join(" "))
         else

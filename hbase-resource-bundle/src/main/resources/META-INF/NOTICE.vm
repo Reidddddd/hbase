@@ -177,8 +177,11 @@ JRuby's licence.
 
 ## skip bytelist, jnr-posix, jruby-openssl, jruby-readline, psych, and yydebug
 ## because they're covered by the jruby copyright and license
+
 ## skip rails benchmark javascript, because it's not in the complete jar
 ## jruby bundles asm, but we already ref that in our included deps
+
+## skip jline2, jzlib because BSD-3
 
 ## skip rake because MIT
 
@@ -192,6 +195,7 @@ JRuby's licence.
  version 2.0.
 
 ## Skip racc, json-generator, json-parser because it is under Ruby license
+
 ## jruby bundles jquery, but we already ref that above.
 #end
 ## first bundled source
