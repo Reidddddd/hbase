@@ -177,5 +177,5 @@ if [[ "$version" > "11" ]]; then
   HBASE_OPTS="$HBASE_OPTS --add-opens java.base/java.io=ALL-UNNAMED"
   HBASE_OPTS="$HBASE_OPTS --add-opens java.base/java.security=ALL-UNNAMED"
   HBASE_OPTS="$HBASE_OPTS --add-opens java.base/javax.crypto=ALL-UNNAMED"
-  HBASE_OPTS="$HBASE_OPTS --add-opens java.base/java.util.concurrent.atomic=ALL_UNNAMED"
+  HBASE_OPTS="$HBASE_OPTS --add-opens java.base/java.util.concurrent.atomic=ALL-UNNAMED"
 fi
