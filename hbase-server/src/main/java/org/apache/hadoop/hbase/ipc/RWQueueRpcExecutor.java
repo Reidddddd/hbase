@@ -252,15 +252,20 @@ public class RWQueueRpcExecutor extends RpcExecutor {
   @Override
   public boolean dispatch(final CallRunner callTask) throws InterruptedException {
     RpcServer.Call call = callTask.getCall();
+    return dispatchTo(isWriteRequest(call.getHeader(), call.param),
+        shouldDispatchToScanQueue(callTask), callTask);
+  }
+
+  protected boolean dispatchTo(boolean toWriteQueue, boolean toScanQueue,
+      final CallRunner callTask) {
     int queueIndex;
-    if (isWriteRequest(call.getHeader(), call.param)) {
+    if (toWriteQueue) {
       queueIndex = writeBalancer.getNextQueue();
-    } else if (numScanQueues > 0 && isScanRequest(call.getHeader(), call.param)) {
+    } else if (toScanQueue) {
       queueIndex = numWriteQueues + numReadQueues + scanBalancer.getNextQueue();
     } else {
       queueIndex = numWriteQueues + readBalancer.getNextQueue();
     }
-
     Queue<CallRunner> queue = queues.get(queueIndex);
     if (queue.size() >= currentQueueLimit) {
       return false;
@@ -317,7 +322,7 @@ public class RWQueueRpcExecutor extends RpcExecutor {
     return activeScanHandlerCount.get();
   }
 
-  private boolean isWriteRequest(final RequestHeader header, final Message param) {
+  protected boolean isWriteRequest(final RequestHeader header, final Message param) {
     // TODO: Is there a better way to do this?
     if (param instanceof MultiRequest) {
       MultiRequest multi = (MultiRequest)param;
@@ -350,8 +355,13 @@ public class RWQueueRpcExecutor extends RpcExecutor {
     return false;
   }
 
-  private boolean isScanRequest(final RequestHeader header, final Message param) {
+  protected boolean isScanRequest(final RequestHeader header, final Message param) {
     return param instanceof ScanRequest;
+  }
+
+  protected boolean shouldDispatchToScanQueue(final CallRunner task) {
+    RpcServer.Call call = task.getCall();
+    return numScanQueues > 0 && isScanRequest(call.getHeader(), call.param);
   }
 
   /*

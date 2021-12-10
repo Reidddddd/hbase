@@ -69,6 +69,10 @@ public abstract class RpcExecutor {
   public static final String CALL_QUEUE_TYPE_CONF_KEY = "hbase.ipc.server.callqueue.type";
   public static final String CALL_QUEUE_TYPE_CONF_DEFAULT = CALL_QUEUE_TYPE_FIFO_CONF_VALUE;
 
+  // This config is only for RWQueueExecutor. If not separate R/W, fast path is the default choice.
+  public static final String CALL_QUEUE_TYPE_FASTPATH_KEY = "hbase.ipc.server.callqueue.fastpath.enabled";
+  public static final boolean CALL_QUEUE_TYPE_FASTPATH_DEFAULT = true;
+
   // These 3 are only used by Codel executor
   public static final String CALL_QUEUE_CODEL_TARGET_DELAY = "hbase.ipc.server.callqueue.codel.target.delay";
   public static final String CALL_QUEUE_CODEL_INTERVAL = "hbase.ipc.server.callqueue.codel.interval";
@@ -91,12 +95,11 @@ public abstract class RpcExecutor {
   protected volatile int currentQueueLimit;
 
   private final AtomicInteger activeHandlerCount = new AtomicInteger(0);
-  private final List<Handler> handlers;
+  private final List<RpcHandler> handlers;
   private final int handlerCount;
   private final AtomicInteger failedHandlerCount = new AtomicInteger(0);
 
   private String name;
-  private boolean running;
 
   private Configuration conf = null;
   private Abortable abortable = null;
@@ -104,7 +107,7 @@ public abstract class RpcExecutor {
   @Deprecated
   public RpcExecutor(final String name, final int handlerCount, final int numCallQueues) {
     this.name = Strings.nullToEmpty(name);
-    this.handlers = new ArrayList<Handler>(handlerCount);
+    this.handlers = new ArrayList<RpcHandler>(handlerCount);
     this.handlerCount = handlerCount;
     this.numCallQueues = numCallQueues;
     this.queues = new ArrayList<>(this.numCallQueues);
@@ -175,10 +178,10 @@ public abstract class RpcExecutor {
     } else {
       this.name += ".Fifo";
       queueInitArgs = new Object[] { maxQueueLength };
-      if (conf.getDouble(RWQueueRpcExecutor.CALL_QUEUE_READ_SHARE_CONF_KEY, 0) > 0) {
-        queueClass = LinkedBlockingQueue.class;
-      } else {
+      if (conf.getBoolean(CALL_QUEUE_TYPE_FASTPATH_KEY, CALL_QUEUE_TYPE_FASTPATH_DEFAULT)) {
         queueClass = ConcurrentLinkedQueue.class;
+      } else {
+        queueClass = LinkedBlockingQueue.class;
       }
     }
 
@@ -206,14 +209,15 @@ public abstract class RpcExecutor {
   }
 
   public void start(final int port) {
-    running = true;
     startHandlers(port);
   }
 
   public void stop() {
-    running = false;
-    for (Thread handler : handlers) {
-      handler.interrupt();
+    for (RpcHandler handler : handlers) {
+      handler.stopRunning();
+      if (handler.isAlive()) {
+        handler.interrupt();
+      }
     }
   }
 
@@ -233,9 +237,11 @@ public abstract class RpcExecutor {
   /**
    * Override if providing alternate Handler implementation.
    */
-  protected Handler getHandler(final String name, final double handlerFailureThreshhold,
-      final Queue<CallRunner> q, final AtomicInteger activeHandlerCount) {
-    return new Handler(name, handlerFailureThreshhold, q, activeHandlerCount);
+  protected RpcHandler getHandler(final String name, final double handlerFailureThreshhold,
+      final Queue<CallRunner> q, final AtomicInteger activeHandlerCount,
+      final AtomicInteger failedHandlerCount, final int handlerCount, final Abortable abortable) {
+    return new RpcHandler(name, handlerFailureThreshhold, q, activeHandlerCount,
+        failedHandlerCount, handlerCount, abortable);
   }
 
   /**
@@ -252,100 +258,11 @@ public abstract class RpcExecutor {
       final int index = qindex + (i % qsize);
       String name = "RpcServer." + threadPrefix + ".handler=" + handlers.size() + ",queue=" + index
           + ",port=" + port;
-      Handler handler = getHandler(name, handlerFailureThreshhold, callQueues.get(index),
-        activeHandlerCount);
+      RpcHandler handler = getHandler(name, handlerFailureThreshhold, callQueues.get(index),
+        activeHandlerCount, failedHandlerCount, handlerCount, abortable);
       handler.start();
       LOG.debug("Started " + name);
       handlers.add(handler);
-    }
-  }
-
-  /**
-   * Handler thread run the {@link CallRunner#run()} in.
-   */
-  protected class Handler extends Thread {
-    /**
-     * Q to find CallRunners to run in.
-     */
-    final Queue<CallRunner> q;
-
-    final double handlerFailureThreshhold;
-
-    // metrics (shared with other handlers)
-    final AtomicInteger activeHandlerCount;
-
-    Handler(final String name, final double handlerFailureThreshhold,
-        final Queue<CallRunner> q, final AtomicInteger activeHandlerCount) {
-      super(name);
-      setDaemon(true);
-      this.q = q;
-      this.handlerFailureThreshhold = handlerFailureThreshhold;
-      this.activeHandlerCount = activeHandlerCount;
-    }
-
-    /**
-     * @return A {@link CallRunner}
-     * @throws InterruptedException
-     */
-    protected CallRunner getCallRunner() throws InterruptedException {
-      if (this.q instanceof BlockingQueue) {
-        BlockingQueue<CallRunner> bq = (BlockingQueue<CallRunner>) this.q;
-        return bq.take();
-      }
-      return this.q.poll();
-    }
-
-    @Override
-    public void run() {
-      boolean interrupted = false;
-      try {
-        while (running) {
-          try {
-            run(getCallRunner());
-          } catch (InterruptedException e) {
-            interrupted = true;
-          }
-        }
-      } catch (Exception e) {
-        LOG.warn(e);
-        throw e;
-      } finally {
-        if (interrupted) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
-
-    private void run(CallRunner cr) {
-      if (cr == null) return;
-      MonitoredRPCHandler status = RpcServer.getStatus();
-      cr.setStatus(status);
-      try {
-        this.activeHandlerCount.incrementAndGet();
-        cr.run();
-      } catch (Throwable e) {
-        if (e instanceof Error) {
-          int failedCount = failedHandlerCount.incrementAndGet();
-          if (this.handlerFailureThreshhold >= 0
-              && failedCount > handlerCount * this.handlerFailureThreshhold) {
-            String message = "Number of failed RpcServer handler runs exceeded threshhold "
-                + this.handlerFailureThreshhold + "; reason: " + StringUtils.stringifyException(e);
-            if (abortable != null) {
-              abortable.abort(message, e);
-            } else {
-              LOG.error("Error but can't abort because abortable is null: "
-                  + StringUtils.stringifyException(e));
-              throw e;
-            }
-          } else {
-            LOG.warn("Handler errors " + StringUtils.stringifyException(e));
-          }
-        } else {
-          LOG.warn("Handler  exception " + StringUtils.stringifyException(e));
-        }
-      } finally {
-        this.activeHandlerCount.decrementAndGet();
-      }
     }
   }
 
