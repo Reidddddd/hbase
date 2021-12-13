@@ -56,11 +56,9 @@ import java.nio.channels.WritableByteChannel;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -99,7 +97,6 @@ import org.apache.hadoop.hbase.io.HandlerLAB;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.VersionInfo;
 import org.apache.hadoop.hbase.protobuf.generated.RPCProtos.CellBlockMeta;
 import org.apache.hadoop.hbase.protobuf.generated.RPCProtos.ConnectionHeader;
@@ -119,6 +116,7 @@ import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManager;
+import org.apache.hadoop.hbase.util.AuditLogSyncer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Counter;
 import org.apache.hadoop.hbase.util.GsonUtil;
@@ -299,6 +297,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   private final RpcScheduler scheduler;
 
   private UserProvider userProvider;
+
+  private final AuditLogSyncer auditSyncer;
+
+  private final boolean securityAudit;
+  private boolean auditMore;
 
   private final BoundedByteBufferPool reservoir;
 
@@ -2266,6 +2269,13 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     this.scheduler.init(new RpcSchedulerContext(this));
 
     this.largeKVsSize = conf.getInt(HandlerLAB.SIZE, HandlerLAB.SIZE_DEFAULT);
+
+    this.securityAudit = conf.getBoolean(AuditLogSyncer.CONF_AUDIT, AuditLogSyncer.DEFAULT_AUDIT);
+    this.auditSyncer = new AuditLogSyncer(LOG, conf);
+
+    if (securityAudit) {
+      auditSyncer.enableAsyncAuditLog();
+    }
   }
 
   @Override
@@ -2404,6 +2414,11 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       Message param, CellScanner cellScanner, long receiveTime, MonitoredRPCHandler status,
       long startTime, int timeout)
   throws IOException {
+    int processingTime = -1;
+    int qTime = -1;
+    long requestSize = -1;
+    long responseSize = -1;
+    Throwable exception = null;
     try {
       status.setRPC(md.getName(), new Object[]{param}, receiveTime);
       // TODO: Review after we add in encoded data blocks.
@@ -2414,8 +2429,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       controller.setCallTimeout(timeout);
       Message result = service.callBlockingMethod(md, controller, param);
       long endTime = System.currentTimeMillis();
-      int processingTime = (int) (endTime - startTime);
-      int qTime = (int) (startTime - receiveTime);
+      processingTime = (int) (endTime - startTime);
+      qTime = (int) (startTime - receiveTime);
       int totalTime = (int) (endTime - receiveTime);
       Call call = CurCall.get();
       if (LOG.isTraceEnabled()) {
@@ -2426,8 +2441,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
             " totalTime: " + totalTime);
       }
       // Use the raw request call size for now.
-      long requestSize = call.getSize();
-      long responseSize = result.getSerializedSize();
+      requestSize = call.getSize();
+      responseSize = result.getSerializedSize();
       if (call.isClientCellBlockSupported()) {
         // Include the payload size in HBaseRpcController
         responseSize += call.getResponseCellSize();
@@ -2438,19 +2453,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       metrics.totalCall(totalTime);
       metrics.receivedRequest(requestSize);
       metrics.sentResponse(responseSize);
-      // log any RPC responses that are slower than the configured warn
-      // response time or larger than configured warning size
-      boolean tooSlow = (processingTime > warnResponseTime && warnResponseTime > -1);
-      boolean tooLarge = (responseSize > warnResponseSize && warnResponseSize > -1);
-      if (tooSlow || tooLarge) {
-        // when tagging, we let TooLarge trump TooSmall to keep output simple
-        // note that large responses will often also be slow.
-        logResponse(param,
-            md.getName(), md.getName() + "(" + param.getClass().getName() + ")",
-            (tooLarge ? "TooLarge" : "TooSlow"),
-            status.getClient(), startTime, processingTime, qTime,
-            responseSize);
-      }
       return new Pair<Message, CellScanner>(result, controller.cellScanner());
     } catch (Throwable e) {
       // The above callBlockingMethod will always return a SE.  Strip the SE wrapper before
@@ -2461,6 +2463,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           LOG.debug("Caught a ServiceException with null cause", e);
         } else {
           e = e.getCause();
+          exception = e;
         }
       }
 
@@ -2471,77 +2474,13 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       if (e instanceof IOException) throw (IOException)e;
       LOG.error("Unexpected throwable object ", e);
       throw new IOException(e.getMessage(), e);
-    }
-  }
-
-  /**
-   * Logs an RPC response to the LOG file, producing valid JSON objects for
-   * client Operations.
-   * @param param The parameters received in the call.
-   * @param methodName The name of the method invoked
-   * @param call The string representation of the call
-   * @param tag  The tag that will be used to indicate this event in the log.
-   * @param clientAddress   The address of the client who made this call.
-   * @param startTime       The time that the call was initiated, in ms.
-   * @param processingTime  The duration that the call took to run, in ms.
-   * @param qTime           The duration that the call spent on the queue
-   *                        prior to being initiated, in ms.
-   * @param responseSize    The size in bytes of the response buffer.
-   */
-  void logResponse(Message param, String methodName, String call, String tag,
-      String clientAddress, long startTime, int processingTime, int qTime,
-      long responseSize)
-          throws IOException {
-    // base information that is reported regardless of type of call
-    Map<String, Object> responseInfo = new HashMap<String, Object>();
-    responseInfo.put("starttimems", startTime);
-    responseInfo.put("processingtimems", processingTime);
-    responseInfo.put("queuetimems", qTime);
-    responseInfo.put("responsesize", responseSize);
-    responseInfo.put("client", clientAddress);
-    responseInfo.put("class", server == null? "": server.getClass().getSimpleName());
-    responseInfo.put("method", methodName);
-    responseInfo.put("call", call);
-    // The params could be really big, make sure they don't kill us at WARN
-    String stringifiedParam = ProtobufUtil.getShortTextFormat(param);
-    if (stringifiedParam.length() > 150) {
-      // Truncate to 1000 chars if TRACE is on, else to 150 chars
-      stringifiedParam = truncateTraceLog(stringifiedParam);
-    }
-    responseInfo.put("param", stringifiedParam);
-    if (param instanceof ClientProtos.ScanRequest && rsRpcServices != null) {
-      ClientProtos.ScanRequest request = ((ClientProtos.ScanRequest) param);
-      if (request.hasScannerId()) {
-        long scannerId = request.getScannerId();
-        String scanDetails = rsRpcServices.getScanDetailsWithId(scannerId);
-        if (scanDetails != null) {
-          responseInfo.put("scandetails", scanDetails);
-        }
+    } finally {
+      if (securityAudit) {
+        User user = getRequestUser();
+        auditSyncer.logResponse(startTime, qTime, warnResponseTime, warnResponseSize,
+                requestSize, responseSize, exception, user, md, param, status);
       }
     }
-    if (param instanceof ClientProtos.MultiRequest) {
-      int numGets = 0;
-      int numMutations = 0;
-      int numServiceCalls = 0;
-      ClientProtos.MultiRequest multi = (ClientProtos.MultiRequest)param;
-      for (ClientProtos.RegionAction regionAction : multi.getRegionActionList()) {
-        for (ClientProtos.Action action: regionAction.getActionList()) {
-          if (action.hasMutation()) {
-            numMutations++;
-          }
-          if (action.hasGet()) {
-            numGets++;
-          }
-          if (action.hasServiceCall()) {
-            numServiceCalls++;
-          }
-        }
-      }
-      responseInfo.put("multi.gets", numGets);
-      responseInfo.put("multi.mutations", numMutations);
-      responseInfo.put("multi.servicecalls", numServiceCalls);
-    }
-    LOG.warn("(response" + tag + "): " + GSON.toJson(responseInfo));
   }
 
   /** Stops the service.  No new calls will be handled after this is called. */
@@ -2557,6 +2496,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     listener.doStop();
     responder.interrupt();
     scheduler.stop();
+    auditSyncer.close();
     notifyAll();
   }
 
