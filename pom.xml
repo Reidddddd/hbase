@@ -1383,7 +1383,7 @@
       --add-opens java.base/sun.nio.cs=ALL-UNNAMED
       --add-opens java.base/javax.crypto=ALL-UNNAMED
       --add-opens java.base/java.security=ALL-UNNAMED
-      --add-opens java.base/java.util.concurrent.atomic=ALL_UNNAMED
+      --add-opens java.base/java.util.concurrent.atomic=ALL-UNNAMED
     </hbase-surefire.argLine>
     <hbase-surefire.cygwin-argLine>-enableassertions -Xmx${surefire.cygwinXmx} ${maxpermsize}
       -Djava.security.egd=file:/dev/./urandom -Djava.net.preferIPv4Stack=true
