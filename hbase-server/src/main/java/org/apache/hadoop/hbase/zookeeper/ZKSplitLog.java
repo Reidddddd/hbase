@@ -69,14 +69,15 @@ public class ZKSplitLog {
   }
 
   /**
-   * The name format of a normal splitLog znode is servername,port,starttime/wal-file-name.
+   * The name format of a normal splitLog znode is wals/servername,port,starttime-splitting/wal-file-name.
    * There will be exception if it is a special node, like RESCAN splitLog node.
    * @param node splitlog znode
    * @return parsed server name.
    */
   public static String getServerHostname(String node) {
-    String serverName = decode(node);
-    return ServerName.parseHostname(serverName.substring(0, serverName.indexOf('/')));
+    String taskName = decode(node);
+    String nameWithoutPrefix = taskName.substring(taskName.indexOf('/') + 1);
+    return ServerName.parseHostname(nameWithoutPrefix.substring(0, nameWithoutPrefix.indexOf('/')));
   }
 
   static String decode(String s) {

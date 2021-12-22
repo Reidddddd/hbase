@@ -486,7 +486,7 @@ public class TestSplitLogWorker {
 
     SplitLogCounters.resetCounters();
     // WAL from DC2
-    final String walFromDC2 = "rs_at_dc2,123,456/regionserverfile";
+    final String walFromDC2 = "WALs/rs_at_dc2,123,456-splitting/regionserverfile";
     // SplitLogWorker from DC1
     final ServerName rs = ServerName.valueOf("rs@dc1,123,456");
     RegionServerServices mockedRS = getRegionServer(rs);
@@ -524,7 +524,7 @@ public class TestSplitLogWorker {
 
     SplitLogCounters.resetCounters();
     // WAL from DC2
-    final String walFromDC2 = "rs_at_dc2,123,456/regionserverfile";
+    final String walFromDC2 = "WALs/rs_at_dc2,123,456-splitting/regionserverfile";
     // SplitLogWorker from DC2 as well
     final ServerName rs = ServerName.valueOf("rs@dc2,789,012");
     RegionServerServices mockedRS = getRegionServer(rs);
@@ -562,7 +562,7 @@ public class TestSplitLogWorker {
 
     SplitLogCounters.resetCounters();
     // WAL from DC3
-    final String walFromDC3 = "rs_at_dc3,123,456/regionserverfile";
+    final String walFromDC3 = "WALs/rs_at_dc3,123,456-splitting/regionserverfile";
     // SplitLogWorker from DC1
     final ServerName rs1 = ServerName.valueOf("rs@dc1,789,012");
     // SplitLogWorker from DC2
@@ -605,7 +605,7 @@ public class TestSplitLogWorker {
     testConf.setInt("hbase.regionserver.wal.max.splitters", maxTasks);
 
     SplitLogCounters.resetCounters();
-    final String walFromDC3 = "rs_at_dc3,123,456/regionserverfile";
+    final String walFromDC3 = "WALs/rs_at_dc3,123,456-splitting/regionserverfile";
     final ServerName rs = ServerName.valueOf("rs@dc2,789,012");
     RegionServerServices mockedRS = getRegionServer(rs);
     for (int i = 0; i < maxTasks; i++) {
