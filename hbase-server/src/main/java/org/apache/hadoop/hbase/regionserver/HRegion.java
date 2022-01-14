@@ -236,6 +236,9 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
   private static final String MAX_WAIT_FOR_SEQ_ID_KEY = "hbase.hregion.max.wait.for.sequenceid.ms";
   private static final int DEFAULT_MAX_WAIT_FOR_SEQ_ID = 30000;
 
+  public static final String REGION_STORAGE_POLICY_KEY = "hbase.hregion.block.storage.policy";
+  public static final String DEFAULT_REGION_STORAGE_POLICY = "HOT";
+
   /**
    * This is the global default value for durability. All tables/mutations not
    * defining a durability or using USE_DEFAULT will default to this value.
@@ -906,6 +909,9 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       status.setStatus("Running coprocessor pre-open hook");
       coprocessorHost.preOpen();
     }
+
+    String policyName = this.conf.get(REGION_STORAGE_POLICY_KEY, DEFAULT_REGION_STORAGE_POLICY);
+    this.fs.setStoragePolicy(policyName.trim());
 
     // Write HRI to a file in case we need to recover hbase:meta
     // Only the primary replica should write .regioninfo

@@ -194,6 +194,20 @@ public class HRegionFileSystem {
   }
 
   /**
+   * Set storage policy for a whole region.
+   * <p>
+   * If we're running on a version of HDFS that doesn't support the given storage policy
+   * (or storage policies at all), then we'll issue a log message and continue.
+   * See http://hadoop.apache.org/docs/r2.6.0/hadoop-project-dist/hadoop-hdfs/ArchivalStorage.html
+   * for possible list e.g 'COLD', 'WARM', 'HOT', 'ONE_SSD', 'ALL_SSD', 'LAZY_PERSIST'.
+   *
+   * @param policyName The name of the storage policy
+   */
+  public void setStoragePolicy(String policyName) {
+    FSUtils.setStoragePolicy(this.fs, getRegionDir(), policyName);
+  }
+
+  /**
    * Get the storage policy of the directory of CF.
    * @param familyName The name of column family.
    * @return Storage policy name, or {@code null} if not using {@link HFileSystem} or exception
