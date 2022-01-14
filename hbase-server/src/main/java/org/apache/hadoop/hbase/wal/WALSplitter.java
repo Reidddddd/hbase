@@ -571,6 +571,10 @@ public class WALSplitter {
 
     if (!walFS.exists(dir) && !walFS.mkdirs(dir)) {
       LOG.warn("mkdir failed on " + dir);
+    } else {
+      String storagePolicy =
+              conf.get(HConstants.WAL_STORAGE_POLICY, HConstants.DEFAULT_WAL_STORAGE_POLICY);
+      FSUtils.setStoragePolicy(walFS, dir, storagePolicy);
     }
     // Append fileBeingSplit to prevent name conflict since we may have duplicate wal entries now.
     // Append file name ends with RECOVERED_LOG_TMPFILE_SUFFIX to ensure
