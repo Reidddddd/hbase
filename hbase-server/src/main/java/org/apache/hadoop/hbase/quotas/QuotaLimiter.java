@@ -35,10 +35,10 @@ public interface QuotaLimiter {
    * @param estimateWriteSize the write size that will be checked against the available quota
    * @param readReqs the read requests that will be checked against the available quota
    * @param estimateReadSize the read size that will be checked against the available quota
-   * @throws ThrottlingException thrown if not enough avialable resources to perform operation.
+   * @throws RpcThrottlingException thrown if not enough avialable resources to perform operation.
    */
   void checkQuota(long writeReqs, long estimateWriteSize, long readReqs, long estimateReadSize)
-    throws ThrottlingException;
+    throws RpcThrottlingException;
 
   /**
    * Removes the specified write and read amount from the quota.
