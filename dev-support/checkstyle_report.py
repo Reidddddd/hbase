@@ -40,8 +40,14 @@ def error_name(x):
   error_class = x.attrib['source']
   return error_class[error_class.rfind(".") + 1:]
 
-def print_row(path, error, master_errors, patch_errors):
-    print '%s\t%s\t%s\t%s' % (path,error, master_errors,patch_errors)
+def line(x):
+    return x.attrib['line']
+
+def message(x):
+    return x.attrib['message']
+
+def print_row(path, error, error_count, line, message):
+    print '%s\t%s\t%s\t%s\t%s' % (path, error, error_count, line, message)
 
 master = etree.parse(sys.argv[1])
 patch = etree.parse(sys.argv[2])
@@ -72,9 +78,11 @@ for child in patch.getroot().getchildren():
             temp_dict[error] = 1
 
     file = path_key(child)
-    for error, count in temp_dict.iteritems():
-        if count > master_dict[(file, error)]:
-            print_row(file, error, master_dict[(file, error)], count)
-            ret_value = 1
+    for error_tag in child.getchildren():
+        err_name = error_name(error_tag)
+        for error, count in temp_dict.iteritems():
+            if count > master_dict[(file, error)] and err_name == error:
+                print_row(file, error, count, line(error_tag), message(error_tag))
+                ret_value = 1
 
 sys.exit(ret_value)
