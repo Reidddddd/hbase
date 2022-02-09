@@ -31,8 +31,8 @@ import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.rest.ProtobufMessageHandler;
 import org.apache.hadoop.hbase.rest.RESTServlet;
 import org.apache.hadoop.hbase.rest.protobuf.generated.VersionMessage.Version;
+import org.glassfish.jersey.servlet.ServletContainer;
 
-import com.sun.jersey.spi.container.servlet.ServletContainer;
 
 /**
  * A representation of the collection of versions of the REST gateway software

@@ -47,6 +47,7 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Strings;
 import org.apache.hadoop.hbase.util.VersionInfo;
 import org.apache.hadoop.util.StringUtils;
+import org.glassfish.jersey.servlet.ServletContainer;
 import org.mortbay.jetty.Connector;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.nio.SelectChannelConnector;
@@ -57,7 +58,6 @@ import org.mortbay.thread.QueuedThreadPool;
 
 import com.google.common.base.Preconditions;
 import com.sun.jersey.api.json.JSONConfiguration;
-import com.sun.jersey.spi.container.servlet.ServletContainer;
 
 /**
  * Main class for launching REST gateway as a servlet hosted by Jetty.

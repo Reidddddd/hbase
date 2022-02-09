@@ -26,12 +26,12 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.yetus.audience.InterfaceAudience;
 
-import com.sun.jersey.spi.container.servlet.ServletContainer;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.ProxyUsers;
 import org.apache.hadoop.conf.Configuration;
+import org.glassfish.jersey.servlet.ServletContainer;
 
 /**
  * REST servlet container. It is used to get the remote request user

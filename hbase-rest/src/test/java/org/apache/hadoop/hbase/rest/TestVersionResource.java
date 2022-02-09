@@ -42,11 +42,11 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import static org.junit.Assert.*;
 
+import org.glassfish.jersey.servlet.ServletContainer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.sun.jersey.spi.container.servlet.ServletContainer;
 import org.junit.experimental.categories.Category;
 
 @Category(MediumTests.class)

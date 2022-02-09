@@ -66,6 +66,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.Shell;
+import org.glassfish.jersey.server.ServerProperties;
+import org.glassfish.jersey.servlet.ServletContainer;
 import org.mortbay.io.Buffer;
 import org.mortbay.jetty.Connector;
 import org.mortbay.jetty.Handler;
@@ -90,7 +92,6 @@ import org.mortbay.util.MultiException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.sun.jersey.spi.container.servlet.ServletContainer;
 
 /**
  * Create a Jetty embedded server to answer http requests. The primary goal
@@ -785,9 +786,7 @@ public class HttpServer implements FilterContainer {
     LOG.info("addJerseyResourcePackage: packageName=" + packageName
         + ", pathSpec=" + pathSpec);
     final ServletHolder sh = new ServletHolder(ServletContainer.class);
-    sh.setInitParameter("com.sun.jersey.config.property.resourceConfigClass",
-        "com.sun.jersey.api.core.PackagesResourceConfig");
-    sh.setInitParameter("com.sun.jersey.config.property.packages", packageName);
+    sh.setInitParameter(ServerProperties.PROVIDER_PACKAGES, packageName);
     webAppContext.addServlet(sh, pathSpec);
   }
 
