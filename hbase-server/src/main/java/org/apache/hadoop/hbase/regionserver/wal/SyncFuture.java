@@ -113,7 +113,8 @@ class SyncFuture {
 
   @Override
   public synchronized String toString() {
-    return "done=" + isDone() + ", ringBufferSequence=" + this.ringBufferSequence;
+    return "done=" + isDone() + ", ringBufferSequence=" + this.ringBufferSequence +
+      " threadID=" + t.getId() + " threadName=" + t.getName();
   }
 
   synchronized long getRingBufferSequence() {
@@ -178,6 +179,15 @@ class SyncFuture {
     }
     if (this.throwable != null) throw new ExecutionException(this.throwable);
     return this.doneSequence;
+  }
+
+  /**
+   * Returns the thread that owned this sync future, use with caution as we return the reference to
+   * the actual thread object.
+   * @return the associated thread instance.
+   */
+  public Thread getThread() {
+    return t;
   }
 
   public Long get(long timeout, TimeUnit unit)
