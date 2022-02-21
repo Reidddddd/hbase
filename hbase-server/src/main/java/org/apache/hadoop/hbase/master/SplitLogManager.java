@@ -491,15 +491,19 @@ public class SplitLogManager {
           try {
             oldtask.wait();
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             LOG.warn("Interrupted when waiting for znode delete callback");
             // fall through to return failure
+            Thread.currentThread().interrupt();
             break;
           }
         }
         if (oldtask.status != DELETED) {
-          LOG.warn("Failure because previously failed task"
+          // caused by https://issues.apache.org/jira/browse/SUREFIRE-1815
+          // so here make the log msg at trace level temporarily that it won't be print in UTs to make CI all +1s
+          if (LOG.isTraceEnabled()) {
+            LOG.warn("Failure because previously failed task"
               + " state still present. Waiting for znode delete callback" + " path=" + path);
+          }
           return oldtask;
         }
         // reinsert the newTask and it must succeed this time
