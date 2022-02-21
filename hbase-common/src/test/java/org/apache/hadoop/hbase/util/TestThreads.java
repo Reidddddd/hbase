@@ -42,9 +42,7 @@ public class TestThreads {
     Thread sleeper = new Thread(new Runnable() {
       @Override
       public void run() {
-        LOG.debug("Sleeper thread: sleeping for " + SLEEP_TIME_MS);
         Threads.sleepWithoutInterrupt(SLEEP_TIME_MS);
-        LOG.debug("Sleeper thread: finished sleeping");
         wasInterrupted.set(Thread.currentThread().isInterrupted());
       }
     });
