@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.ipc;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
+import static org.apache.hadoop.hbase.security.User.HBASE_SECURITY_CONF_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -82,6 +83,8 @@ import org.apache.hadoop.hbase.HBaseIOException;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
+import org.apache.hadoop.hbase.security.token.AuthenticationTokenIdentifier;
+import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManagerV2;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.NeedUnmanagedConnectionException;
@@ -128,7 +131,6 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
@@ -254,7 +256,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   //of client connections
   private Listener listener = null;
   protected Responder responder = null;
-  protected AuthenticationTokenSecretManager authTokenSecretMgr = null;
+  protected SecretManager<AuthenticationTokenIdentifier> authTokenSecretMgr = null;
   protected int numConnections = 0;
 
   protected HBaseRPCErrorHandler errorHandler = null;
@@ -1864,27 +1866,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       } else {
         // user is authenticated
         ugi.setAuthenticationMethod(authMethod.authenticationMethod);
-        //Now we check if this is a proxy user case. If the protocol user is
-        //different from the 'user', it is a proxy user scenario. However,
-        //this is not allowed if user authenticated with DIGEST.
-        if ((protocolUser != null)
-            && (!protocolUser.getUserName().equals(ugi.getUserName()))) {
-          if (authMethod == AuthMethod.DIGEST) {
-            // Not allowed to doAs if token authentication is used
-            throw new AccessDeniedException("Authenticated user (" + ugi
-                + ") doesn't match what the client claims to be ("
-                + protocolUser + ")");
-          } else {
-            // Effective user can be different from authenticated user
-            // for simple auth or kerberos auth
-            // The user is the real user. Now we create a proxy user
-            UserGroupInformation realUser = ugi;
-            ugi = UserGroupInformation.createProxyUser(protocolUser
-                .getUserName(), realUser);
-            // Now the user is a proxy user, set Authentication method Proxy.
-            ugi.setAuthenticationMethod(AuthenticationMethod.PROXY);
-          }
-        }
       }
       if (connectionHeader.hasVersionInfo()) {
         // see if this connection will support RetryImmediatelyException
@@ -2356,7 +2337,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     authTokenSecretMgr = createSecretManager();
     if (authTokenSecretMgr != null) {
       setSecretManager(authTokenSecretMgr);
-      authTokenSecretMgr.start();
+      if (authTokenSecretMgr instanceof AuthenticationTokenSecretManager) {
+        ((AuthenticationTokenSecretManager) authTokenSecretMgr).start();
+      }
     }
     this.authManager = new ServiceAuthorizationManager();
     HBasePolicyProvider.init(conf, authManager);
@@ -2377,10 +2360,14 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     LOG.info("Refreshed super and proxy users successfully");
   }
 
-  private AuthenticationTokenSecretManager createSecretManager() {
+  private SecretManager<AuthenticationTokenIdentifier> createSecretManager() {
     if (!isSecurityEnabled) return null;
     if (server == null) return null;
     Configuration conf = server.getConfiguration();
+    boolean useDigest = "digest".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY));
+    if (useDigest) {
+      return new AuthenticationTokenSecretManagerV2();
+    }
     long keyUpdateInterval =
         conf.getLong("hbase.auth.key.update.interval", 24*60*60*1000);
     long maxAge =
@@ -2489,7 +2476,9 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     LOG.info("Stopping server on " + port);
     running = false;
     if (authTokenSecretMgr != null) {
-      authTokenSecretMgr.stop();
+      if (authTokenSecretMgr instanceof AuthenticationTokenSecretManager) {
+        ((AuthenticationTokenSecretManager)authTokenSecretMgr).stop();
+      }
       authTokenSecretMgr = null;
     }
     listener.interrupt();
