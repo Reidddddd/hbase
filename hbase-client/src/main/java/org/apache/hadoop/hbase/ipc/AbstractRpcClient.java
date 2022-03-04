@@ -54,14 +54,16 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
-import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.security.token.AuthenticationTokenSelector;
+import org.apache.hadoop.hbase.security.token.TokenUtil;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.hbase.client.MetricsConnection;
 import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.codec.KeyValueCodec;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos.TokenIdentifier.Kind;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
-import org.apache.hadoop.hbase.security.token.AuthenticationTokenSelector;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.PoolMap;
 import org.apache.hadoop.hbase.util.Threads;
@@ -69,6 +71,7 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenSelector;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Provides the basics for a RpcClient implementation like configuration and Logging.
@@ -103,7 +106,7 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="MS_MUTABLE_COLLECTION_PKGPROTECT",
       justification="the rest of the system which live in the different package can use")
-  protected final static Map<Kind, TokenSelector<? extends TokenIdentifier>> TOKEN_HANDLERS = new HashMap<>();
+  public final static Map<Kind, TokenSelector<? extends TokenIdentifier>> TOKEN_HANDLERS = new HashMap<>();
 
   static {
     TOKEN_HANDLERS.put(Kind.HBASE_AUTH_TOKEN, new AuthenticationTokenSelector());
@@ -358,12 +361,31 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
       }
       conn = connections.get(remoteId);
       if (conn == null) {
+        completeAuthInfoIfNotSet(remoteId);
         conn = createConnection(remoteId);
         connections.put(remoteId, conn);
       }
       conn.setLastTouched(EnvironmentEdgeManager.currentTime());
     }
     return conn;
+  }
+
+  private void completeAuthInfoIfNotSet(ConnectionId remoteId) throws IOException {
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      String loginService = "login-service";
+      TokenSelector<? extends TokenIdentifier> selector = TOKEN_HANDLERS.get(Kind.HBASE_AUTH_TOKEN);
+      Collection<Token<? extends TokenIdentifier>> tokens = remoteId.getTicket().getTokens();
+      if (selector.selectToken(new Text(clusterId), tokens) == null) {
+        Token<? extends TokenIdentifier> token =
+            selector.selectToken(new Text(loginService), tokens);
+        if (token == null) {
+          // Not set password
+          TokenUtil.setUserPassword(remoteId.getTicket(), conf.get(User.DIGEST_PASSWORD_KEY));
+          token = selector.selectToken(new Text(loginService), tokens);
+        }
+        token.setService(new Text(clusterId));
+      }
+    }
   }
 
   /**

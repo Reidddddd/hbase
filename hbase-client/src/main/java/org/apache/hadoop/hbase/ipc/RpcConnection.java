@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hbase.ipc;
 
-import static org.apache.hadoop.hbase.security.User.HBASE_SECURITY_CONF_KEY;
-
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
@@ -27,14 +25,11 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.security.token.AuthenticationTokenIdentifier;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
@@ -50,17 +45,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenSelector;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Base class for ipc connection.
  */
 @InterfaceAudience.Private
 abstract class RpcConnection {
-
-  // Only used when the authentication method is set digest.
-  private static final String DIGEST_USERNAME_KEY = "hbase.authentication.username";
-
-  private static final String DIGEST_PASSWORD_KEY = "hbase.authentication.password";
 
   private static final Log LOG = LogFactory.getLog(RpcConnection.class);
 
@@ -111,28 +102,18 @@ abstract class RpcConnection {
           LOG.debug("No token selector found for type " + tokenKind);
         }
       }
-      String serverKey = securityInfo.getServerPrincipal();
-      if (serverKey == null) {
-        throw new IOException("Can't obtain server Kerberos config key from SecurityInfo");
+      if (User.isHBaseKerberosAuthEnabled(conf)) {
+        String serverKey = securityInfo.getServerPrincipal();
+        if (serverKey == null) {
+          throw new IOException("Can't obtain server Kerberos config key from SecurityInfo");
+        }
+        serverPrincipal = SecurityUtil.getServerPrincipal(conf.get(serverKey),
+            remoteId.address.getAddress().getCanonicalHostName().toLowerCase());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("RPC Server Kerberos principal name for service=" + remoteId.getServiceName()
+              + " is " + serverPrincipal);
+        }
       }
-      serverPrincipal = SecurityUtil.getServerPrincipal(conf.get(serverKey),
-        remoteId.address.getAddress().getCanonicalHostName().toLowerCase());
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("RPC Server Kerberos principal name for service=" + remoteId.getServiceName()
-            + " is " + serverPrincipal);
-      }
-    }
-
-    // If we use digest authentication, we need to rewrite token.
-    if ("digest".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY))) {
-      String username = conf.get(DIGEST_USERNAME_KEY);
-      String password = conf.get(DIGEST_PASSWORD_KEY);
-      if (username == null || password == null) {
-        throw new NullArgumentException("Username and password must be set "
-            + "when sasl authentication is on.");
-      }
-      token = new Token(Bytes.toBytes(username), Bytes.toBytes(password),
-          AuthenticationTokenIdentifier.AUTH_TOKEN_TYPE, new Text(remoteId.getServiceName()));
     }
 
     this.token = token;

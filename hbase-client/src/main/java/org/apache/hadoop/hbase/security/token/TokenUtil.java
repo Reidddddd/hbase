@@ -18,24 +18,26 @@
 
 package org.apache.hadoop.hbase.security.token;
 
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
-
-import com.google.protobuf.ServiceException;
+import java.util.Objects;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.ipc.AbstractRpcClient;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos.TokenIdentifier.Kind;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
@@ -45,6 +47,8 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -369,6 +373,29 @@ public class TokenUtil {
       throw new IOException(e);
     } finally {
       zkw.close();
+    }
+  }
+
+  /**
+   * Set user's password, if there is no authentication token, will create one.
+   */
+  public static void setUserPassword(User user, String password) {
+    Objects.requireNonNull(user, "User is null, when set auth info.");
+    Objects.requireNonNull(password, "Null password is not allowed.");
+
+    Token<? extends TokenIdentifier> token =
+        AbstractRpcClient.TOKEN_HANDLERS.get(Kind.HBASE_AUTH_TOKEN)
+            .selectToken(new Text("login-service"), user.getTokens());
+    if (token == null) {
+      AuthenticationTokenIdentifier identifier =
+          new AuthenticationTokenIdentifier(user.getShortName());
+      Token<AuthenticationTokenIdentifier> newToken = new Token<>();
+
+      newToken.setID(identifier.getBytes());
+      newToken.setKind(identifier.getKind());
+      newToken.setPassword(Bytes.toBytes(password));
+      newToken.setService(new Text("login-service"));
+      user.addToken(newToken);
     }
   }
 }
