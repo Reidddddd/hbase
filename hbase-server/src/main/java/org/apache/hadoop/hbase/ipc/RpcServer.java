@@ -131,6 +131,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.ProxyUsers;
@@ -1866,6 +1867,27 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       } else {
         // user is authenticated
         ugi.setAuthenticationMethod(authMethod.authenticationMethod);
+        //Now we check if this is a proxy user case. If the protocol user is
+        //different from the 'user', it is a proxy user scenario. However,
+        //this is not allowed if user authenticated with DIGEST.
+        if ((protocolUser != null)
+            && (!protocolUser.getUserName().equals(ugi.getUserName()))) {
+          if (authMethod == AuthMethod.DIGEST) {
+            // Not allowed to doAs if token authentication is used
+            throw new AccessDeniedException("Authenticated user (" + ugi
+                + ") doesn't match what the client claims to be ("
+                + protocolUser + ")");
+          } else {
+            // Effective user can be different from authenticated user
+            // for simple auth or kerberos auth
+            // The user is the real user. Now we create a proxy user
+            UserGroupInformation realUser = ugi;
+            ugi = UserGroupInformation.createProxyUser(protocolUser
+                .getUserName(), realUser);
+            // Now the user is a proxy user, set Authentication method Proxy.
+            ugi.setAuthenticationMethod(AuthenticationMethod.PROXY);
+          }
+        }
       }
       if (connectionHeader.hasVersionInfo()) {
         // see if this connection will support RetryImmediatelyException
