@@ -18,41 +18,20 @@
 package org.apache.hadoop.hbase.security.token;
 
 import org.apache.hadoop.security.token.SecretManager;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
 
-/**
- * Manages an internal list of secret keys used to sign new authentication
- * tokens as they are generated, and to valid existing tokens used for
- * authentication.
- * Replace the ZK implementation in {@link AuthenticationTokenSecretManager}
- * with the mechanism based on system table 'hbase:secret'.
- */
 @InterfaceAudience.Private
-public class AuthenticationTokenSecretManagerV2
-    extends AbstractAuthenticationSecretManager {
+public abstract class AbstractAuthenticationSecretManager extends
+    SecretManager<AuthenticationTokenIdentifier> {
 
-  @Override
-  protected byte[] createPassword(AuthenticationTokenIdentifier authenticationTokenIdentifier) {
-    return new byte[0];
-  }
+  /**
+   * Start method for internal thread.
+   */
+  public abstract void start();
 
-  @Override
-  public byte[] retrievePassword(AuthenticationTokenIdentifier authenticationTokenIdentifier)
-      throws InvalidToken {
-    return new byte[0];
-  }
+  /**
+   * Stop method for internal thread.
+   */
+  public abstract void stop();
 
-  @Override
-  public AuthenticationTokenIdentifier createIdentifier() {
-    return null;
-  }
-
-  @Override
-  public void start() {
-  }
-
-  @Override
-  public void stop() {
-  }
 }

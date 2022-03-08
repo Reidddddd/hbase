@@ -83,6 +83,7 @@ import org.apache.hadoop.hbase.HBaseIOException;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
+import org.apache.hadoop.hbase.security.token.AbstractAuthenticationSecretManager;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenIdentifier;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManagerV2;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -257,7 +258,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   //of client connections
   private Listener listener = null;
   protected Responder responder = null;
-  protected SecretManager<AuthenticationTokenIdentifier> authTokenSecretMgr = null;
+  protected AbstractAuthenticationSecretManager authTokenSecretMgr = null;
   protected int numConnections = 0;
 
   protected HBaseRPCErrorHandler errorHandler = null;
@@ -2359,9 +2360,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     authTokenSecretMgr = createSecretManager();
     if (authTokenSecretMgr != null) {
       setSecretManager(authTokenSecretMgr);
-      if (authTokenSecretMgr instanceof AuthenticationTokenSecretManager) {
-        ((AuthenticationTokenSecretManager) authTokenSecretMgr).start();
-      }
+      authTokenSecretMgr.start();
     }
     this.authManager = new ServiceAuthorizationManager();
     HBasePolicyProvider.init(conf, authManager);
@@ -2382,7 +2381,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     LOG.info("Refreshed super and proxy users successfully");
   }
 
-  private SecretManager<AuthenticationTokenIdentifier> createSecretManager() {
+  private AbstractAuthenticationSecretManager createSecretManager() {
     if (!isSecurityEnabled) return null;
     if (server == null) return null;
     Configuration conf = server.getConfiguration();
@@ -2498,9 +2497,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     LOG.info("Stopping server on " + port);
     running = false;
     if (authTokenSecretMgr != null) {
-      if (authTokenSecretMgr instanceof AuthenticationTokenSecretManager) {
-        ((AuthenticationTokenSecretManager)authTokenSecretMgr).stop();
-      }
+      authTokenSecretMgr.stop();
       authTokenSecretMgr = null;
     }
     listener.interrupt();
