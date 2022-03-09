@@ -19,7 +19,6 @@
 package org.apache.hadoop.hbase.ipc;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
-import static org.apache.hadoop.hbase.security.User.HBASE_SECURITY_CONF_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -84,8 +83,7 @@ import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.security.token.AbstractAuthenticationSecretManager;
-import org.apache.hadoop.hbase.security.token.AuthenticationTokenIdentifier;
-import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManagerV2;
+import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.NeedUnmanagedConnectionException;
@@ -2385,9 +2383,8 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     if (!isSecurityEnabled) return null;
     if (server == null) return null;
     Configuration conf = server.getConfiguration();
-    boolean useDigest = "digest".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY));
-    if (useDigest) {
-      return new AuthenticationTokenSecretManagerV2();
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      return new SystemTableBasedSecretManager(this.server);
     }
     long keyUpdateInterval =
         conf.getLong("hbase.auth.key.update.interval", 24*60*60*1000);

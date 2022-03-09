@@ -35,7 +35,8 @@ import org.apache.yetus.audience.InterfaceAudience;
 public final class SecretTableAccessor {
   private static final Log LOG = LogFactory.getLog(SecretTableAccessor.class);
 
-  private static final String SECRET_TABLE_NAME = "hbase:secret";
+  public static final String SECRET_TABLE_NAME = "hbase:secret";
+
   private static final String SECRET_FAMILY_KEY = "i";                 // First letter in "info"
   private static final String SECRET_COLUMN_PASSWORD_KEY = "p";        // First letter in "password"
   private static final String SECRET_COLUMN_ALLOW_FALLBACK_KEY = "a";  // First letter in "allow"
