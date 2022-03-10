@@ -25,9 +25,12 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import java.io.IOException;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.AfterClass;
@@ -108,5 +111,25 @@ public class TestSecretTableAccessor {
     } catch (Exception e) {
       assertTrue(e instanceof IllegalArgumentException);
     }
+  }
+
+  @Test
+  public void testGetSecretTableName() {
+    TableName tableName = SecretTableAccessor.getSecretTableName();
+
+    assertEquals(tableName.getNamespaceAsString(), "hbase");
+    assertEquals(tableName.getNameAsString(), "hbase:secret");
+  }
+
+  @Test
+  public void testGetSecretTableColumn() {
+    HColumnDescriptor desc = SecretTableAccessor.getSecretTableColumn();
+    assertEquals(0, Bytes.compareTo(desc.getName(), Bytes.toBytes("i")));
+    assertEquals(1, desc.getMaxVersions());
+    assertTrue(desc.isInMemory());
+    assertTrue(desc.isBlockCacheEnabled());
+    assertEquals(8 * 1024, desc.getBlocksize());
+    assertEquals(BloomType.NONE, desc.getBloomFilterType());
+    assertEquals(HConstants.REPLICATION_SCOPE_LOCAL, desc.getScope());
   }
 }

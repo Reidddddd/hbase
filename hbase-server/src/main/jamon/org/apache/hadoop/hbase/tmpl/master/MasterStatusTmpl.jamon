@@ -428,6 +428,9 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
             " or size of requests in a given time frame.";
         } else if (tableName.equals(TableName.valueOf("hbase:rsgroup"))){
             description = "The hbase:rsgroup table holds information about regionserver groups";
+        } else if (tableName.equals(TableName.valueOf("hbase:secret"))){
+            description = "The hbase:secret table holds user secret information when we" +
+            " use DIGEST Authentication";
         }
     </%java>
     <td><% description %></td>

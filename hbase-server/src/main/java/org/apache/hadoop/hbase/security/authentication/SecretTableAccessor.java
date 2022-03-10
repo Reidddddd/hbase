@@ -20,9 +20,13 @@ package org.apache.hadoop.hbase.security.authentication;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -35,8 +39,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 public final class SecretTableAccessor {
   private static final Log LOG = LogFactory.getLog(SecretTableAccessor.class);
 
-  public static final String SECRET_TABLE_NAME = "hbase:secret";
-
+  private static final String SECRET_TABLE_NAME = "hbase:secret";
   private static final String SECRET_FAMILY_KEY = "i";                 // First letter in "info"
   private static final String SECRET_COLUMN_PASSWORD_KEY = "p";        // First letter in "password"
   private static final String SECRET_COLUMN_ALLOW_FALLBACK_KEY = "a";  // First letter in "allow"
@@ -108,5 +111,23 @@ public final class SecretTableAccessor {
       throw new IllegalArgumentException("SecretAccessor only accepts table hbase:secret."
           + " But got table with name : " + table.getName().getNameAsString());
     }
+  }
+
+  /**
+   * Util function for secret table initialization.
+   * @return A table name of secret table.
+   */
+  public static TableName getSecretTableName() {
+    return TableName.valueOf(SECRET_TABLE_NAME);
+  }
+
+  /**
+   * Util function for secret table initialization.
+   * @return A column descriptor of secret table.
+   */
+  public static HColumnDescriptor getSecretTableColumn() {
+    return new HColumnDescriptor(SECRET_FAMILY_KEY).setMaxVersions(1).setInMemory(true)
+        .setBlockCacheEnabled(true).setBlocksize(8 * 1024).setBloomFilterType(BloomType.NONE)
+        .setScope(HConstants.REPLICATION_SCOPE_LOCAL);
   }
 }

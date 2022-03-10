@@ -21,7 +21,6 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Server;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
@@ -74,8 +73,7 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
       }
 
       try {
-        authTable.set(connection.
-            getTable(TableName.valueOf(SecretTableAccessor.SECRET_TABLE_NAME)));
+        authTable.set(connection.getTable(SecretTableAccessor.getSecretTableName()));
       } catch (IOException e) {
         LOG.warn("Error detected when access hbase:secret table. ", e);
         return new byte[0];

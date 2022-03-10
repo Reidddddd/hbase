@@ -79,6 +79,7 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownRegionException;
+import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.MetaScanner;
@@ -362,6 +363,9 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
   // it is assigned after 'initialized' guard set to true, so should be volatile
   private volatile MasterQuotaManager quotaManager;
+
+  // Manager of secret table, which only serves DIGEST authentication.
+  private SecretTableManager secretTableManager;
 
   private ProcedureExecutor<MasterProcedureEnv> procedureExecutor;
   private WALProcedureStore procedureStore;
@@ -884,6 +888,11 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     status.setStatus("Starting namespace manager");
     initNamespace();
 
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      status.setStatus("Starting secret table manager");
+      initSecretTableManager();
+    }
+
     if (this.cpHost != null) {
       try {
         this.cpHost.preMasterInitialization();
@@ -949,6 +958,11 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       LOG.debug("Balancer post startup initialization complete, took " + (
           (System.currentTimeMillis() - start) / 1000) + " seconds");
     }
+  }
+
+  private void initSecretTableManager() throws IOException {
+    secretTableManager = new SecretTableManager(this);
+    secretTableManager.start();
   }
 
   private void initQuotaManager() throws IOException {
