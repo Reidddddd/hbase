@@ -79,6 +79,5 @@ public class TestTokenUtil {
       assertEquals(AuthenticationTokenIdentifier.AUTH_TOKEN_TYPE, token.getKind());
       assertEquals(0, Bytes.compareTo(Bytes.toBytes(password), token.getPassword()));
     }
-
   }
 }

@@ -385,7 +385,7 @@ public class TokenUtil {
 
     Token<? extends TokenIdentifier> token =
         AbstractRpcClient.TOKEN_HANDLERS.get(Kind.HBASE_AUTH_TOKEN)
-            .selectToken(new Text("login-service"), user.getTokens());
+            .selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), user.getTokens());
     if (token == null) {
       AuthenticationTokenIdentifier identifier =
           new AuthenticationTokenIdentifier(user.getShortName());
@@ -394,7 +394,7 @@ public class TokenUtil {
       newToken.setID(identifier.getBytes());
       newToken.setKind(identifier.getKind());
       newToken.setPassword(Bytes.toBytes(password));
-      newToken.setService(new Text("login-service"));
+      newToken.setService(new Text(HConstants.CLUSTER_ID_DEFAULT));
       user.addToken(newToken);
     }
   }

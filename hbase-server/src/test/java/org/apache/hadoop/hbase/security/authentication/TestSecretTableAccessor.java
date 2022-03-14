@@ -24,6 +24,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import java.io.IOException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
@@ -40,6 +42,7 @@ import org.junit.experimental.categories.Category;
 
 @Category(SmallTests.class)
 public class TestSecretTableAccessor {
+  private static final Log LOG = LogFactory.getLog(TestSecretTableAccessor.class);
   private static final HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
   private static final String TEST_USERNAME = "testuser";
   private static final String FAKE_USERNAME = "fake_username";

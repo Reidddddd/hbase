@@ -18,13 +18,22 @@
 package org.apache.hadoop.hbase.security.token;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.security.User;
+import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
+import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.MD5Hash;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -37,12 +46,28 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Private
 public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretManager {
   private static final Log LOG = LogFactory.getLog(SystemTableBasedSecretManager.class);
+  private static final byte[] CREDENTIAL_MAGIC_WORD = {'S', 'H', 'B', 'a', 's'};
 
   private final Server server;
   private final ThreadLocal<Table> authTable = new ThreadLocal<>();
 
+  private final transient Token<? extends TokenIdentifier> adminToken = new Token<>();
+
   public SystemTableBasedSecretManager(Server server) {
+    User adminUser;
     this.server = server;
+    try {
+      adminUser = UserProvider.instantiate(server.getConfiguration()).getCurrent();
+    } catch (IOException e) {
+      server.abort("Failed getting login user.", e);
+      return;
+    }
+    try {
+      String localCredential = server.getConfiguration().get(User.DIGEST_PASSWORD_KEY);
+      setLocalCredential(adminUser, localCredential);
+    } catch (InvalidToken e) {
+      server.abort("Invalid local credential detected. Regionserver abort. ", e);
+    }
   }
 
   /**
@@ -62,6 +87,10 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     String username = authenticationTokenIdentifier.getUsername();
     if (username == null || username.isEmpty()) {
       throw new InvalidToken("Username was not given when do authentication.");
+    }
+    if (Bytes.compareTo(authenticationTokenIdentifier.getBytes(),
+        adminToken.getIdentifier()) == 0) {
+      return adminToken.getPassword();
     }
 
     if (authTable.get() == null) {
@@ -92,6 +121,48 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     return password == null ? new byte[0] : password;
   }
 
+  private void setLocalCredential(User user, String code) throws InvalidToken {
+    if (code == null || code.isEmpty()) {
+      throw new InvalidToken("The local credential for user :" + user.getShortName()
+          + " is null. ");
+    }
+    byte[] decodedBytes = Base64.decode(code);
+
+    if (!isValidCredential(decodedBytes)) {
+      throw new InvalidToken("The local credential for user :" + user.getShortName()
+          + " is not valid. ");
+    }
+
+    ByteBuffer buffer = ByteBuffer.wrap(decodedBytes);
+    buffer.position(CREDENTIAL_MAGIC_WORD.length);
+
+    int nameLen = buffer.getInt();
+    byte[] username = new byte[nameLen];
+    buffer.get(username);
+
+    if (0 != Bytes.compareTo(
+        MD5Hash.getMD5AsBytes(Bytes.toBytes(user.getShortName())), username)) {
+      throw new InvalidToken("The local credential for user :" + user.getShortName()
+          + " is not valid. ");
+    }
+
+    byte[] password = new byte[buffer.remaining()];
+    buffer.get(password);
+
+    AuthenticationTokenIdentifier identifier =
+        new AuthenticationTokenIdentifier(user.getShortName());
+    adminToken.setID(identifier.getBytes());
+    adminToken.setPassword(password);
+    adminToken.setService(new Text(HConstants.CLUSTER_ID_DEFAULT));
+    adminToken.setKind(identifier.getKind());
+
+    user.addToken(adminToken);
+  }
+
+  private boolean isValidCredential(byte[] code) {
+    int len = CREDENTIAL_MAGIC_WORD.length;
+    return code.length >= len && 0 == Bytes.compareTo(code, 0, len, CREDENTIAL_MAGIC_WORD, 0, len);
+  }
   /**
    * Return a new created empty identifier.
    */

@@ -36,10 +36,11 @@ import org.apache.yetus.audience.InterfaceStability;
 @InterfaceStability.Stable
 public class MD5Hash {
   private static final Log LOG = LogFactory.getLog(MD5Hash.class);
+  private static final Hex hex = new Hex();
 
   /**
    * Given a byte array, returns in MD5 hash as a hex string.
-   * @param key
+   * @param key the key to hash (variable length byte array)
    * @return SHA1 hash as a 32 character hex string.
    */
   public static String getMD5AsHex(byte[] key) {
@@ -52,8 +53,8 @@ public class MD5Hash {
    * byte array are used.
    *
    * @param key the key to hash (variable length byte array)
-   * @param offset
-   * @param length 
+   * @param offset offset of the key
+   * @param length length of the input
    * @return MD5 hash as a 32 character hex string.
    */
   public static String getMD5AsHex(byte[] key, int offset, int length) {
@@ -62,6 +63,36 @@ public class MD5Hash {
       md.update(key, offset, length);
       byte[] digest = md.digest();
       return new String(Hex.encodeHex(digest));
+    } catch (NoSuchAlgorithmException e) {
+      // this should never happen unless the JDK is messed up.
+      throw new RuntimeException("Error computing MD5 hash", e);
+    }
+  }
+
+  /**
+   * Given a byte array, returns in MD5 hash as a hex string.
+   * @param key
+   * @return MD5 hash as a 128 bytes array.
+   */
+  public static byte[] getMD5AsBytes(byte[] key) {
+    return getMD5AsBytes(key, 0, key.length);
+  }
+
+  /**
+   * Given a byte array, returns its MD5 hash as a hex string.
+   * Only "length" number of bytes starting at "offset" within the
+   * byte array are used.
+   *
+   * @param key the key to hash (variable length byte array)
+   * @param offset offset of the key
+   * @param length length of the input
+   * @return MD5 hash as a 128 bytes array.
+   */
+  public static byte[] getMD5AsBytes(byte[] key, int offset, int length) {
+    try {
+      MessageDigest md = MessageDigest.getInstance("MD5");
+      md.update(key, offset, length);
+      return hex.encode(md.digest());
     } catch (NoSuchAlgorithmException e) {
       // this should never happen unless the JDK is messed up.
       throw new RuntimeException("Error computing MD5 hash", e);

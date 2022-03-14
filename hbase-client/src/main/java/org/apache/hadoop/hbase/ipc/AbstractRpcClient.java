@@ -54,6 +54,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSelector;
 import org.apache.hadoop.hbase.security.token.TokenUtil;
 import org.apache.hadoop.io.Text;
@@ -370,20 +372,56 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
     return conn;
   }
 
-  private void completeAuthInfoIfNotSet(ConnectionId remoteId) throws IOException {
+  /**
+   * This method is compatible with both client & region server usage.
+   * At client side, when we invoke this method there are two scenarios:
+   * 1. User invoked {@link TokenUtil#setUserPassword} before Connection creation.
+   * In this case, the current user has a Token with service name CLUSTER_ID_DEFAULT.
+   * 2. User did not set password. In this case, the current user has no auth token.
+   *
+   * For the case 1, we copy the existing token and set the service name to this.clusterId.
+   * For the case 2, we try to read password from local configuration and create one token and set
+   * the service name to this.cluster.
+   *
+   * In case 1, the client side user contains two Tokens, but it is ok as the default token won't be
+   * selected in the creation of {@link RpcConnection}.
+   *
+   * At server side, there will be {@link ClusterConnection}, whose clusterId is
+   * {@link HConstants#CLUSTER_ID_DEFAULT}, and normal {@link HConnection}, in which the clusterId
+   * is the actual cluster id.
+   * So that we first set the Token with CLUSTER_ID_DEFAULT in the RS initialization phase. The
+   * initial token will make {@link ClusterConnection} work. But when we met normal
+   * {@link HConnection} it doesn't work. Thus, we copy the content of the initial Token and set
+   * the service name to the real clusterId.
+   *
+   * At last, the process user at server side will contain two Tokens for both kinds of connection.
+   * This guarantees the cluster internal communication and is compatible with the client side
+   * usage.
+   */
+  private void completeAuthInfoIfNotSet(ConnectionId remoteId) {
     if (User.isHBaseDigestAuthEnabled(conf)) {
-      String loginService = "login-service";
       TokenSelector<? extends TokenIdentifier> selector = TOKEN_HANDLERS.get(Kind.HBASE_AUTH_TOKEN);
       Collection<Token<? extends TokenIdentifier>> tokens = remoteId.getTicket().getTokens();
       if (selector.selectToken(new Text(clusterId), tokens) == null) {
+        // If we arrive here, this.clusterId must not be CLUSTER_ID_DEFAULT.
         Token<? extends TokenIdentifier> token =
-            selector.selectToken(new Text(loginService), tokens);
+            selector.selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), tokens);
         if (token == null) {
-          // Not set password
+          // No valid token found. Only client will arrive here,
+          // as the region server has added the auth token at the RS initialization phase.
+          // So we directly read password from local configuration.
           TokenUtil.setUserPassword(remoteId.getTicket(), conf.get(User.DIGEST_PASSWORD_KEY));
-          token = selector.selectToken(new Text(loginService), tokens);
+          token = selector.selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), tokens);
+          token.setService(new Text(clusterId));
+        } else {
+          // We have found the token of CLUSTER_ID_DEFAULT, but it does not match out current
+          // clusterId. Here we copy the auth token with CLUSTER_ID_DEFAULT and set the service
+          // to our real clusterId. Current user will have two authTokens, one CLUSTER_ID_DEFAULT
+          // and another with this.clusterId respectively.
+          Token<? extends TokenIdentifier> newToken = new Token<>(token);
+          newToken.setService(new Text(clusterId));
+          remoteId.getTicket().addToken(newToken);
         }
-        token.setService(new Text(clusterId));
       }
     }
   }
