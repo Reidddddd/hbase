@@ -1859,6 +1859,15 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         }
         // audit logging for SASL authenticated users happens in saslReadAndProcess()
         if (authenticatedWithFallback) {
+          if (User.isHBaseDigestAuthEnabled(conf)) {
+            if (!((SystemTableBasedSecretManager)authTokenSecretMgr)
+                .isAllowedFallback(protocolUser.getShortUserName())) {
+              String msg = "User " + protocolUser.getShortUserName() +
+                  " is going to fallback to SIMPLE authentication but it is not allowed.";
+              LOG.warn(msg);
+              throw new AccessDeniedException(msg);
+            }
+          }
           LOG.warn("Allowed fallback to SIMPLE auth for " + ugi
               + " connecting from " + getHostAddress());
         }

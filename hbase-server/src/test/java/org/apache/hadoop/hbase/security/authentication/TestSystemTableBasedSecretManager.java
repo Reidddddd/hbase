@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.security.authentication;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import java.io.ByteArrayInputStream;
@@ -28,32 +29,45 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ChoreService;
 import org.apache.hadoop.hbase.CoordinatedStateManager;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenIdentifier;
 import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CollectionUtils;
+import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 @Category(SmallTests.class)
 public class TestSystemTableBasedSecretManager {
+  private static final HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
 
   private static final String VALID_USERNAME = "testuser";
   private static final String VALID_GROUP = "testgroup";
   private static final String VALID_PASSWORD = "123456";
   private static final String VALID_CREDENTIAL =
       "U0hCYXMAAAAgNWQ5YzY4YzZjNTBlZDNkMDJhMmZjZjU0ZjYzOTkzYjYxMjM0NTY=";
+
+  @AfterClass
+  public static void tearDown() throws Exception {
+    TEST_UTIL.shutdownMiniCluster();
+    TEST_UTIL.cleanupTestDir();
+  }
 
   @Test
   public void testEmptyLocalCredential() {
@@ -97,6 +111,37 @@ public class TestSystemTableBasedSecretManager {
     SystemTableBasedSecretManager secretManager = new SystemTableBasedSecretManager(server);
     assertTrue(server.isAborted());
     assertTrue(server.getAbortCause() instanceof InvalidToken);
+  }
+
+  @Test
+  public void testAllowFallback() throws Exception {
+    UserGroupInformation.setLoginUser(
+        UserGroupInformation.createUserForTesting(VALID_USERNAME, new String[] {VALID_GROUP}));
+
+    TEST_UTIL.getConfiguration().set(User.HBASE_SECURITY_CONF_KEY, "digest");
+    TEST_UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, VALID_CREDENTIAL);
+
+    TEST_UTIL.startMiniCluster();
+    SystemTableBasedSecretManager secretManager =
+        new SystemTableBasedSecretManager(TEST_UTIL.getHBaseCluster().getRegionServer(0));
+
+    // Wait for the initialization of the secret table.
+    Threads.sleep(10000);
+
+    assertTrue(secretManager.isAllowedFallback(VALID_USERNAME));
+
+    TableName tableName = SecretTableAccessor.getSecretTableName();
+    Table authTable = TEST_UTIL.getConnection().getTable(tableName);
+    Put put = new Put(Bytes.toBytes(VALID_USERNAME));
+    put.addColumn(Bytes.toBytes("i"), Bytes.toBytes("a"), Bytes.toBytes(false));
+    authTable.put(put);
+
+    assertFalse(secretManager.isAllowedFallback(VALID_USERNAME));
+
+    put.addColumn(Bytes.toBytes("i"), Bytes.toBytes("a"), Bytes.toBytes(true));
+    authTable.put(put);
+
+    assertTrue(secretManager.isAllowedFallback(VALID_USERNAME));
   }
 
   static class DummyServer implements Server {

@@ -93,27 +93,11 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
       return adminToken.getPassword();
     }
 
-    if (authTable.get() == null) {
-      ClusterConnection connection = server.getConnection();
-      if (connection == null) {
-        // We should never go here.
-        throw new IllegalStateException("The ClusterConnection in region server "
-            + "is not initialized.");
-      }
-
-      try {
-        authTable.set(connection.getTable(SecretTableAccessor.getSecretTableName()));
-      } catch (IOException e) {
-        LOG.warn("Error detected when access hbase:secret table. ", e);
-        return new byte[0];
-      }
-    }
-
     byte[] password = null;
     try {
-      password = SecretTableAccessor.getUserPassword(Bytes.toBytes(username), authTable.get());
+      password = SecretTableAccessor.getUserPassword(Bytes.toBytes(username), getAuthTable());
       if (password == null) {
-        LOG.warn("Password is null");
+        LOG.warn("Password of given user " + username + " is null. ");
       }
     } catch (IOException e) {
       LOG.error("Failed retrieving password for user " + username + "\n", e);
@@ -169,6 +153,36 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
   @Override
   public AuthenticationTokenIdentifier createIdentifier() {
     return new AuthenticationTokenIdentifier();
+  }
+
+  /**
+   * Returns whether a user is allowed to fallback to SIMPLE authentication.
+   */
+  public boolean isAllowedFallback(String username) {
+    if (username == null || username.isEmpty()) {
+      LOG.warn("No valid username is found when doing allowFallback check. ");
+      return false;
+    }
+
+    try {
+      return SecretTableAccessor.allowFallback(username, getAuthTable());
+    } catch (IOException e) {
+      LOG.warn("Error occurs when check allowFallback for user " + username + " \n", e);
+      return false;
+    }
+  }
+
+  private Table getAuthTable() throws IOException {
+    if (authTable.get() == null) {
+      ClusterConnection connection = server.getConnection();
+      if (connection == null) {
+        // We should never go here.
+        throw new IllegalStateException("The ClusterConnection in region server "
+            + "is not initialized.");
+      }
+      authTable.set(connection.getTable(SecretTableAccessor.getSecretTableName()));
+    }
+    return authTable.get();
   }
 
   @Override
