@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
+import org.apache.hadoop.hbase.security.User;
+import org.apache.hadoop.hbase.util.ConnectionCacheWithAuthToken;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Table;
@@ -49,8 +51,9 @@ public abstract class HBaseServiceHandler {
     this.conf = c;
     int cleanInterval = conf.getInt(CLEANUP_INTERVAL, 10 * 1000);
     int maxIdleTime = conf.getInt(MAX_IDLETIME, 10 * 60 * 1000);
-    connectionCache = new ConnectionCache(
-        conf, userProvider, cleanInterval, maxIdleTime);
+    connectionCache = User.isHBaseDigestAuthEnabled(conf) ?
+        new ConnectionCacheWithAuthToken(conf, userProvider, cleanInterval, maxIdleTime) :
+        new ConnectionCache(conf, userProvider, cleanInterval, maxIdleTime);
   }
 
   protected ThriftMetrics metrics = null;

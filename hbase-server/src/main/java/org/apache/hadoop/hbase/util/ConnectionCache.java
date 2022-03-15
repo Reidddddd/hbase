@@ -173,11 +173,7 @@ public class ConnectionCache {
       try {
         connInfo = connections.get(userName);
         if (connInfo == null) {
-          UserGroupInformation ugi = realUser;
-          if (!userName.equals(realUserName)) {
-            ugi = UserGroupInformation.createProxyUser(userName, realUser);
-          }
-          User user = userProvider.create(ugi);
+          User user = getConnectionUser(userName);
           Connection conn = ConnectionFactory.createConnection(conf, user);
           connInfo = new ConnectionInfo(conn, userName);
           connections.put(userName, connInfo);
@@ -187,6 +183,14 @@ public class ConnectionCache {
       }
     }
     return connInfo;
+  }
+
+  protected User getConnectionUser(String userName) {
+    UserGroupInformation ugi = realUser;
+    if (!userName.equals(realUserName)) {
+      ugi = UserGroupInformation.createProxyUser(userName, realUser);
+    }
+    return userProvider.create(ugi);
   }
 
   /**

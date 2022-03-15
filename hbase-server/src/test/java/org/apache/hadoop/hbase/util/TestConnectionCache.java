@@ -18,10 +18,14 @@
  */
 package org.apache.hadoop.hbase.util;
 
+import java.io.IOException;
 import junit.framework.TestCase;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -49,5 +53,27 @@ public class TestConnectionCache extends TestCase {
     UTIL.shutdownMiniCluster();
   }
 
+  /**
+   * Test for ConnectionCacheWithAuthToken setting authToken.
+   */
+  public void testConnectionSetToken() throws IOException {
+    String username = "testuser";
+    String password = "password";
+    UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, "digest");
+    UserProvider provider = UserProvider.instantiate(UTIL.getConfiguration());
+
+    ConnectionCacheWithAuthToken cache = new ConnectionCacheWithAuthToken(UTIL.getConfiguration(),
+        provider, 1000, 5000);
+    cache.setEffectiveUser(username);
+    cache.setPassword(password);
+
+    User actualUser = cache.getConnectionUser(username);
+    assertEquals(username, actualUser.getShortName());
+
+    Token<? extends TokenIdentifier> authToken = CollectionUtils.getFirst(actualUser.getTokens());
+    assertNotNull(authToken);
+    assertNotNull(authToken.getPassword());
+    assertEquals(0, Bytes.compareTo(authToken.getPassword(), Bytes.toBytes(password)));
+  }
 }
 
