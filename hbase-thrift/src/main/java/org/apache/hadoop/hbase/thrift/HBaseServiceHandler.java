@@ -66,6 +66,13 @@ public abstract class HBaseServiceHandler {
     connectionCache.setEffectiveUser(effectiveUser);
   }
 
+  public void setEffectivePassword(String password) {
+    if (!User.isHBaseDigestAuthEnabled(conf)) {
+      throw new IllegalStateException("Cannot set password when digest authentication is off. ");
+    }
+    ((ConnectionCacheWithAuthToken) connectionCache).setPassword(password);
+  }
+
   /**
    * Obtain HBaseAdmin. Creates the instance if it is not already created.
    */

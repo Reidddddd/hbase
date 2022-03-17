@@ -46,7 +46,9 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.ParseFilter;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.token.TokenUtil;
 import org.apache.hadoop.hbase.test.MetricsAssertHelper;
 import org.apache.hadoop.hbase.testclassification.ClientTests;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
@@ -65,6 +67,7 @@ import org.apache.hadoop.hbase.thrift.generated.TScan;
 import org.apache.hadoop.hbase.thrift.generated.TThriftServerType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Threads;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
@@ -148,6 +151,20 @@ public class TestThriftServer {
     doTestIncrements();
     doTestAppend();
     doTestCheckAndPut();
+  }
+
+  @Test
+  public void testAllWithDigestAuth() throws Exception {
+    String credential = "U0hCYXMAAAAgNWQ5YzY4YzZjNTBlZDNkMDJhMmZjZjU0ZjYzOTkzYjYxMjM0NTY=";
+    UTIL.shutdownMiniCluster();
+    UTIL.getConfiguration().set(User.HBASE_SECURITY_CONF_KEY, "digest");
+    UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, credential);
+    UserGroupInformation.setLoginUser(
+        UserGroupInformation.createUserForTesting("testuser", new String[] {"testusergroup"}));
+    TokenUtil.setUserPassword(User.getCurrent(), "123456");
+
+    UTIL.startMiniCluster(3);
+    testAll();
   }
 
   /**

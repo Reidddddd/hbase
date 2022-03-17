@@ -87,9 +87,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.NameCallback;
-import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.SaslServer;
@@ -107,7 +104,7 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.security.User;
-import org.apache.hadoop.hbase.util.ConnectionCacheWithAuthToken;
+import org.apache.hadoop.hbase.thrift.authentication.FacadeTransportFactory;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.filter.ParseFilter;
 import org.apache.hadoop.hbase.http.InfoServer;
@@ -261,7 +258,7 @@ public class ThriftServer extends Configured implements Tool{
       }
       checkHttpSecurity(qop, conf);
       boolean useLdap = conf.getBoolean(THRIFT_LDAP_AUTHENTICATION, false);
-      if (!securityEnabled && !useLdap) {
+      if (!securityEnabled && !useLdap && !User.isHBaseDigestAuthEnabled(conf)) {
         throw new IOException("Thrift server must run in secure mode to support authentication");
       }
     }
@@ -486,11 +483,7 @@ public class ThriftServer extends Configured implements Tool{
         }
       };
     } else if (User.isHBaseDigestAuthEnabled(conf)) {
-      TSaslServerTransport.Factory saslFactory = new TSaslServerTransport.Factory();
-      Map<String, String> saslProperties = SaslUtil.initSaslProperties(qop.name());
-      saslFactory.addServerDefinition("PLAIN", "plain", host, saslProperties,
-          new PlainCallbackHandler());
-      transportFactory = saslFactory;
+      transportFactory = new FacadeTransportFactory(hBaseServiceHandler);
     } else {
       // Extract the name from the principal
       String thriftKerberosPrincipal = conf.get(THRIFT_KERBEROS_PRINCIPAL_KEY);
@@ -574,50 +567,6 @@ public class ThriftServer extends Configured implements Tool{
       throw new AssertionError(
           "Expected to create Thrift server class " + implType.serverClass.getName() + " but got "
               + tserver.getClass().getName());
-    }
-  }
-
-  private class PlainCallbackHandler implements CallbackHandler {
-
-    @Override
-    public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
-      NameCallback nc = null;
-      PasswordCallback pc = null;
-      AuthorizeCallback ac = null;
-
-      for (Callback callback : callbacks) {
-        if (callback instanceof AuthorizeCallback) {
-          ac = (AuthorizeCallback) callback;
-        } else if (callback instanceof NameCallback) {
-          nc = (NameCallback) callback;
-        } else if (callback instanceof PasswordCallback) {
-          pc = (PasswordCallback) callback;
-        } else {
-          throw new UnsupportedCallbackException(callback,
-              "Unrecognized SASL PLAIN Callback");
-        }
-      }
-      String userName = null;
-      String password = null;
-      if (nc != null) {
-        userName = nc.getName();
-      }
-      if (pc != null) {
-        password = new String(pc.getPassword());
-      }
-      if (ac != null) {
-        if (userName != null && !userName.isEmpty() &&
-            password != null && !password.isEmpty()) {
-          ac.setAuthorized(true);
-          LOG.info("Effective user: " + userName);
-          ac.setAuthorizedID(userName);
-          hBaseServiceHandler.setEffectiveUser(userName);
-          ((ConnectionCacheWithAuthToken)hBaseServiceHandler.connectionCache)
-              .setPassword(password);
-        } else {
-          ac.setAuthorized(false);
-        }
-      }
     }
   }
 
