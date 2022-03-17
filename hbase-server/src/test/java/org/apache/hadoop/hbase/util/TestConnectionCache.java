@@ -75,5 +75,25 @@ public class TestConnectionCache extends TestCase {
     assertNotNull(authToken.getPassword());
     assertEquals(0, Bytes.compareTo(authToken.getPassword(), Bytes.toBytes(password)));
   }
+
+  public void testGetConnectionWithDifferentPassword() throws IOException {
+    String username = "testuser";
+    String password = "password";
+    String secondPassword = "invalidpassword";
+
+    UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, "digest");
+    UserProvider provider = UserProvider.instantiate(UTIL.getConfiguration());
+
+    ConnectionCacheWithAuthToken cache = new ConnectionCacheWithAuthToken(UTIL.getConfiguration(),
+        provider, 1000, 5000);
+    cache.setEffectiveUser(username);
+    cache.setPassword(password);
+
+    ConnectionCache.ConnectionInfo connectionInfoOne = cache.getCurrentConnection();
+    cache.setPassword(secondPassword);
+
+    ConnectionCache.ConnectionInfo connectionInfoTwo = cache.getCurrentConnection();
+    assertNotSame(connectionInfoOne, connectionInfoTwo);
+  }
 }
 

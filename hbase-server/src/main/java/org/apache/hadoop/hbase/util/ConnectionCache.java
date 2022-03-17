@@ -50,14 +50,14 @@ import org.apache.commons.logging.LogFactory;
 public class ConnectionCache {
   private static final Log LOG = LogFactory.getLog(ConnectionCache.class);
 
-  private final Map<String, ConnectionInfo>
+  protected final Map<String, ConnectionInfo>
    connections = new ConcurrentHashMap<String, ConnectionInfo>();
-  private final KeyLocker<String> locker = new KeyLocker<String>();
-  private final String realUserName;
-  private final UserGroupInformation realUser;
-  private final UserProvider userProvider;
-  private final Configuration conf;
-  private final ChoreService choreService;
+  protected final KeyLocker<String> locker = new KeyLocker<String>();
+  protected final String realUserName;
+  protected final UserGroupInformation realUser;
+  protected final UserProvider userProvider;
+  protected final Configuration conf;
+  protected final ChoreService choreService;
 
   private final ThreadLocal<String> effectiveUserNames =
       new ThreadLocal<String>() {

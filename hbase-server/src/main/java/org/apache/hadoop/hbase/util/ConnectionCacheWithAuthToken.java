@@ -19,10 +19,16 @@
 package org.apache.hadoop.hbase.util;
 
 import java.io.IOException;
+import java.util.concurrent.locks.Lock;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.security.token.TokenUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -31,6 +37,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public class ConnectionCacheWithAuthToken extends ConnectionCache {
+  private static final Log LOG = LogFactory.getLog(ConnectionCacheWithAuthToken.class);
 
   private final ThreadLocal<String> effectiveUserPassword =
       new ThreadLocal<String>() {
@@ -46,8 +53,44 @@ public class ConnectionCacheWithAuthToken extends ConnectionCache {
   }
 
   @Override
+  ConnectionInfo getCurrentConnection() throws IOException {
+    String userName = getEffectiveUser();
+    ConnectionInfoWithPassword connInfo = (ConnectionInfoWithPassword) connections.get(userName);
+    if (connInfo == null || !connInfo.updateAccessTime() ||
+        !connInfo.getPassword().equals(effectiveUserPassword.get())) {
+      Lock lock = locker.acquireLock(userName);
+      try {
+        connInfo = (ConnectionInfoWithPassword) connections.get(userName);
+        if (connInfo == null || !connInfo.getPassword().equals(effectiveUserPassword.get())) {
+          User user = getConnectionUser(userName);
+          Connection conn = ConnectionFactory.createConnection(conf, user);
+          connInfo = new ConnectionInfoWithPassword(conn, userName, effectiveUserPassword.get());
+          connections.put(userName, connInfo);
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+    return connInfo;
+  }
+
+
+  class ConnectionInfoWithPassword extends ConnectionInfo {
+    private final String password;
+
+    ConnectionInfoWithPassword(Connection conn, String user, String password) {
+      super(conn, user);
+      this.password = password;
+    }
+
+    private String getPassword() {
+      return password;
+    }
+  }
+
+  @Override
   protected User getConnectionUser(String username) {
-    User user = super.getConnectionUser(username);
+    User user = userProvider.create(UserGroupInformation.createRemoteUser(username));
     TokenUtil.setUserPassword(user, effectiveUserPassword.get());
     return user;
   }
@@ -55,5 +98,4 @@ public class ConnectionCacheWithAuthToken extends ConnectionCache {
   public void setPassword(String password) {
     effectiveUserPassword.set(password);
   }
-
 }
