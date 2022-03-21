@@ -82,6 +82,7 @@ import org.apache.hadoop.hbase.HBaseIOException;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
+import org.apache.hadoop.hbase.security.AuthenticationFailedException;
 import org.apache.hadoop.hbase.security.token.AbstractAuthenticationSecretManager;
 import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -1311,6 +1312,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     private boolean connectionPreambleRead = false;
     // If the connection header has been read or not.
     private boolean connectionHeaderRead = false;
+    private boolean isPersonAllowedFallback = true;
     protected SocketChannel channel;
     private ByteBuffer data;
     private ByteBuffer dataLengthBuffer;
@@ -1862,16 +1864,22 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           if (User.isHBaseDigestAuthEnabled(conf)) {
             if (!((SystemTableBasedSecretManager)authTokenSecretMgr)
                 .isAllowedFallback(protocolUser.getShortUserName())) {
-              String msg = "User " + protocolUser.getShortUserName() +
-                  " is going to fallback to SIMPLE authentication but it is not allowed.";
-              LOG.warn(msg);
-              throw new AccessDeniedException(msg);
+              LOG.warn("User " + protocolUser.getShortUserName() +
+                  " is going to fallback to SIMPLE authentication but it is not allowed.");
+              isPersonAllowedFallback = false;
+            } else {
+              isPersonAllowedFallback = true;
             }
+          } else {
+            LOG.warn("Allowed fallback to SIMPLE auth for " + ugi
+                + " connecting from " + getHostAddress());
           }
-          LOG.warn("Allowed fallback to SIMPLE auth for " + ugi
-              + " connecting from " + getHostAddress());
         }
-        AUDITLOG.info(AUTH_SUCCESSFUL_FOR + ugi);
+        if (isPersonAllowedFallback) {
+          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + ugi);
+        } else {
+          AUDITLOG.info(AUTH_FAILED_FOR + ugi);
+        }
       } else {
         // user is authenticated
         ugi.setAuthenticationMethod(authMethod.authenticationMethod);
@@ -2015,6 +2023,21 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         LOG.trace("RequestHeader " + TextFormat.shortDebugString(header) +
           " totalRequestSize: " + totalRequestSize + " bytes");
       }
+      // It is not ideal to do this check here.
+      // But we are dependent on protobuf to send back exception.
+      if (!isPersonAllowedFallback) {
+        final Call authenticationFailed =
+            new Call(id, this.service, null, null, null, null, this,
+                responder, totalRequestSize, null, null, 0);
+        AuthenticationFailedException ae =
+            new AuthenticationFailedException("User " + this.user.getShortName() +
+                " is not allowed to fallback to SIMPLE authentication. ");
+        metrics.exception(ae);
+        setupResponse(new ByteArrayOutputStream(), authenticationFailed, ae, ae.getMessage());
+        responder.doRespond(authenticationFailed);
+        return;
+      }
+
       // Enforcing the call queue size, this triggers a retry in the client
       // This is a bit late to be doing this check - we have already read in the total request.
       if ((totalRequestSize + callQueueSize.get()) > maxQueueSize) {
@@ -2029,6 +2052,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         responder.doRespond(callTooBig);
         return;
       }
+
       MethodDescriptor md = null;
       Message param = null;
       CellScanner cellScanner = null;
