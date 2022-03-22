@@ -84,7 +84,7 @@ import org.junit.rules.TestName;
 @Category({ClientTests.class, LargeTests.class})
 public class TestThriftServer {
 
-  private static final HBaseTestingUtility UTIL = new HBaseTestingUtility();
+  protected static final HBaseTestingUtility UTIL = new HBaseTestingUtility();
   private static final Log LOG = LogFactory.getLog(TestThriftServer.class);
   private static final MetricsAssertHelper metricsHelper = CompatibilityFactory
       .getInstance(MetricsAssertHelper.class);
@@ -217,6 +217,10 @@ public class TestThriftServer {
     Configuration conf = UTIL.getConfiguration();
     ThriftMetrics metrics = getMetrics(conf);
     Hbase.Iface handler = getHandlerForMetricsTest(metrics, conf);
+    doTestThriftMetrics(handler, metrics);
+  }
+
+  public void doTestThriftMetrics(Hbase.Iface handler, ThriftMetrics metrics) throws Exception {
     int currentCountCreateTable = getCurrentCount("createTable_num_ops", 2, metrics);
     int currentCountDeleteTable = getCurrentCount("deleteTable_num_ops", 2, metrics);
     int currentCountDisableTable = getCurrentCount("disableTable_num_ops", 2, metrics);
@@ -236,6 +240,7 @@ public class TestThriftServer {
       metricsHelper.assertGaugeLt("getTableNames_avg_time",6L * 1000 * 1000 * 1000, metrics.getSource());
     } catch (AssertionError e) {
       LOG.info("Fix me!  Why does this happen?  A concurrent cluster running?", e);
+      LOG.info("Metrics source is " + metrics.getSource());
     }
   }
 
@@ -318,8 +323,9 @@ public class TestThriftServer {
     lv = handler.get(tableAname, rowBname, columnAAname, null).get(0).value.getLong();
     assertEquals((100 + (3 * 7 * numIncrements)), lv);
 
-    assertTrue(handler.coalescer.getSuccessfulCoalescings() > 0);
-
+    if (handler.conf.getBoolean(COALESCE_INC_KEY, false)) {
+      assertTrue(handler.coalescer.getSuccessfulCoalescings() > 0);
+    }
   }
 
   /**
@@ -408,10 +414,15 @@ public class TestThriftServer {
    * @throws Exception
    */
   public void doTestTableTimestampsAndColumns() throws Exception {
-    // Setup
     ThriftHBaseServiceHandler handler =
         new ThriftHBaseServiceHandler(UTIL.getConfiguration(),
             UserProvider.instantiate(UTIL.getConfiguration()));
+    doTestTableTimestampsAndColumns(handler);
+  }
+
+  protected void doTestTableTimestampsAndColumns(ThriftHBaseServiceHandler handler)
+      throws Exception {
+    // Setup
     handler.createTable(tableAname, getColumnDescriptors());
 
     // Apply timestamped Mutations to rowA
@@ -488,10 +499,14 @@ public class TestThriftServer {
    * @throws Exception
    */
   public void doTestTableScanners() throws Exception {
-    // Setup
     ThriftHBaseServiceHandler handler =
         new ThriftHBaseServiceHandler(UTIL.getConfiguration(),
             UserProvider.instantiate(UTIL.getConfiguration()));
+    doTestTableScanners(handler);
+  }
+
+  protected void doTestTableScanners(ThriftHBaseServiceHandler handler) throws Exception {
+    // Setup
     handler.createTable(tableAname, getColumnDescriptors());
 
     // Apply timestamped Mutations to rowA
@@ -673,10 +688,14 @@ public class TestThriftServer {
    *
    * @throws Exception
    */
-  public static void doTestAppend() throws Exception {
+  public void doTestAppend() throws Exception {
     ThriftHBaseServiceHandler handler =
         new ThriftHBaseServiceHandler(UTIL.getConfiguration(),
             UserProvider.instantiate(UTIL.getConfiguration()));
+    doTestAppend(handler);
+  }
+
+  public static void doTestAppend(ThriftHBaseServiceHandler handler) throws Exception {
     handler.createTable(tableAname, getColumnDescriptors());
     try {
       List<Mutation> mutations = new ArrayList<>(1);
@@ -707,10 +726,14 @@ public class TestThriftServer {
    *
    * @throws Exception
    */
-  public static void doTestCheckAndPut() throws Exception {
+  public void doTestCheckAndPut() throws Exception {
     ThriftHBaseServiceHandler handler =
         new ThriftHBaseServiceHandler(UTIL.getConfiguration(),
             UserProvider.instantiate(UTIL.getConfiguration()));
+    doTestCheckAndPut(handler);
+  }
+
+  public static void doTestCheckAndPut(ThriftHBaseServiceHandler handler) throws Exception {
     handler.createTable(tableAname, getColumnDescriptors());
     try {
       List<Mutation> mutations = new ArrayList<>(1);
@@ -734,6 +757,13 @@ public class TestThriftServer {
 
   @Test
   public void testMetricsWithException() throws Exception {
+    ThriftHBaseServiceHandler hbaseHandler =
+        new ThriftHBaseServiceHandler(UTIL.getConfiguration(),
+            UserProvider.instantiate(UTIL.getConfiguration()));
+    testMetricsWithException(hbaseHandler);
+  }
+
+  public void testMetricsWithException(ThriftHBaseServiceHandler hbaseHandler) throws Exception {
     String rowkey = "row1";
     String family = "f";
     String col = "c";
@@ -750,9 +780,6 @@ public class TestThriftServer {
 
     Configuration conf = UTIL.getConfiguration();
     ThriftMetrics metrics = getMetrics(conf);
-    ThriftHBaseServiceHandler hbaseHandler =
-        new ThriftHBaseServiceHandler(UTIL.getConfiguration(),
-            UserProvider.instantiate(UTIL.getConfiguration()));
     Hbase.Iface handler = HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, conf);
 
     ByteBuffer tTableName = asByteBuffer(tableName.getNameAsString());
