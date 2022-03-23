@@ -198,7 +198,8 @@ public class HFileBlock implements Cacheable {
    * <p>This EXTRA came in with original commit of the bucketcache, HBASE-7404. Was formerly
    * known as EXTRA_SERIALIZATION_SPACE.
    */
-  static final int BLOCK_METADATA_SPACE = Bytes.SIZEOF_BYTE + Bytes.SIZEOF_LONG + Bytes.SIZEOF_INT;
+  public static final int BLOCK_METADATA_SPACE =
+      Bytes.SIZEOF_BYTE + Bytes.SIZEOF_LONG + Bytes.SIZEOF_INT;
 
   /**
    * Each checksum value is an integer that can be stored in 4 bytes.
@@ -1909,9 +1910,8 @@ public class HFileBlock implements Cacheable {
   /**
    * For use by bucketcache. This exposes internals.
    */
-  public ByteBuffer getMetaData() {
-    ByteBuffer bb = ByteBuffer.allocate(BLOCK_METADATA_SPACE);
-    bb = addMetaData(bb, true);
+  public ByteBuffer getMetaData(ByteBuffer bb) {
+    addMetaData(bb, true);
     bb.flip();
     return bb;
   }

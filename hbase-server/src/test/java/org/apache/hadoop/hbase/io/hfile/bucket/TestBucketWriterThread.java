@@ -32,6 +32,7 @@ import org.mockito.Mockito;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -138,7 +139,8 @@ public class TestBucketWriterThread {
     RAMQueueEntry spiedRqe = Mockito.spy(rqe);
     Mockito.doThrow(new IOException("Mocked!")).when(spiedRqe).
       writeToCache((IOEngine)Mockito.any(), (BucketAllocator)Mockito.any(),
-        (UniqueIndexMap<Integer>)Mockito.any(), (AtomicLong)Mockito.any());
+        (UniqueIndexMap<Integer>)Mockito.any(), (AtomicLong)Mockito.any(),
+        (ByteBuffer)Mockito.any());
     this.q.add(spiedRqe);
     doDrainOfOneEntry(bc, wt, q);
     // Cache disabled when ioes w/o ever healing.
@@ -161,7 +163,8 @@ public class TestBucketWriterThread {
     Mockito.doThrow(cfe).
       doReturn(mockedBucketEntry).
       when(spiedRqe).writeToCache((IOEngine)Mockito.any(), (BucketAllocator)Mockito.any(),
-        (UniqueIndexMap<Integer>)Mockito.any(), (AtomicLong)Mockito.any());
+        (UniqueIndexMap<Integer>)Mockito.any(), (AtomicLong)Mockito.any(),
+        (ByteBuffer)Mockito.any());
     this.q.add(spiedRqe);
     doDrainOfOneEntry(bc, wt, q);
   }

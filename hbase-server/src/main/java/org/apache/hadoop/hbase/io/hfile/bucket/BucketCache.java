@@ -844,6 +844,7 @@ public class BucketCache implements BlockCache, HeapSize {
   class WriterThread extends HasThread {
     private final BlockingQueue<RAMQueueEntry> inputQueue;
     private volatile boolean writerEnabled = true;
+    private final ByteBuffer metaBuff = ByteBuffer.allocate(HFileBlock.BLOCK_METADATA_SPACE);
 
     WriterThread(BlockingQueue<RAMQueueEntry> queue) {
       super("BucketCacheWriterThread");
@@ -937,8 +938,14 @@ public class BucketCache implements BlockCache, HeapSize {
             index++;
             continue;
           }
+          // Reset the position for reuse.
+          // It should be guaranteed that the data in the metaBuff has been transferred to the
+          // ioEngine safely. Otherwise, this reuse is problematic. Fortunately, the data is already
+          // transferred with our current IOEngines. Should take care, when we have new kinds of
+          // IOEngine in the future.
+          metaBuff.clear();
           BucketEntry bucketEntry =
-            re.writeToCache(ioEngine, bucketAllocator, deserialiserMap, realCacheSize);
+            re.writeToCache(ioEngine, bucketAllocator, deserialiserMap, realCacheSize, metaBuff);
           // Successfully added.  Up index and add bucketEntry. Clear io exceptions.
           bucketEntries[index] = bucketEntry;
           if (ioErrorStartTime > 0) {
@@ -1478,7 +1485,7 @@ public class BucketCache implements BlockCache, HeapSize {
     public BucketEntry writeToCache(final IOEngine ioEngine,
         final BucketAllocator bucketAllocator,
         final UniqueIndexMap<Integer> deserialiserMap,
-        final AtomicLong realCacheSize) throws CacheFullException, IOException,
+        final AtomicLong realCacheSize, ByteBuffer metaBuff) throws CacheFullException, IOException,
         BucketAllocatorException {
       int len = data.getSerializedLength();
       // This cacheable thing can't be serialized
@@ -1491,12 +1498,12 @@ public class BucketCache implements BlockCache, HeapSize {
           // If an instance of HFileBlock, save on some allocations.
           HFileBlock block = (HFileBlock)data;
           ByteBuffer sliceBuf = block.getBufferReadOnly();
-          ByteBuffer metadata = block.getMetaData();
+          block.getMetaData(metaBuff);
           if (LOG.isTraceEnabled()) {
             LOG.trace("Write offset=" + offset + ", len=" + len);
           }
           ioEngine.write(sliceBuf, offset);
-          ioEngine.write(metadata, offset + len - metadata.limit());
+          ioEngine.write(metaBuff, offset + len - metaBuff.limit());
         } else {
           ByteBuffer bb = ByteBuffer.allocate(len);
           data.serialize(bb, true);
