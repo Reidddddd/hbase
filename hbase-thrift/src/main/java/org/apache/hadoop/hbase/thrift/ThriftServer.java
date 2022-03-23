@@ -467,12 +467,16 @@ public class ThriftServer extends Configured implements Tool{
         public void process(TProtocol inProt, TProtocol outProt) throws TException {
           TSaslServerTransport saslServerTransport = (TSaslServerTransport) inProt.getTransport();
           SaslServer saslServer = saslServerTransport.getSaslServer();
-          String principal = saslServer.getAuthorizationID();
-          if (principal == null) {
-            LOG.warn("LDAP Authentication failed.");
+          if (saslServer == null) {
+            LOG.warn("LDAP Authentication failed because of null sasl server. ");
           } else {
-            hBaseServiceHandler.setEffectiveUser(principal);
-            processor.process(inProt, outProt);
+            String principal = saslServer.getAuthorizationID();
+            if (principal == null) {
+              LOG.warn("LDAP Authentication failed. ");
+            } else {
+              hBaseServiceHandler.setEffectiveUser(principal);
+              processor.process(inProt, outProt);
+            }
           }
         }
       };
