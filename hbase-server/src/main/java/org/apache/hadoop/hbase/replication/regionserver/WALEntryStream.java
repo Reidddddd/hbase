@@ -245,7 +245,7 @@ public class WALEntryStream implements Iterator<Entry>, Closeable, Iterable<Entr
             + ", which is too far away from reported file length " + stat.getLen()
             + ". Restarting WAL reading (see HBASE-15983 for details). " + getCurrentPathStat());
         setPosition(0);
-        resetReader();
+        openReader(currentPath, true);
         metrics.incrRestartedWALReading();
         metrics.incrRepeatedFileBytes(currentPosition);
         return false;
@@ -299,7 +299,7 @@ public class WALEntryStream implements Iterator<Entry>, Closeable, Iterable<Entr
   private boolean openNextLog() throws IOException {
     Path nextPath = logQueue.peek();
     if (nextPath != null) {
-      openReader(nextPath);
+      openReader(nextPath, false);
       if (reader != null) return true;
     }
     return false;
@@ -322,16 +322,19 @@ public class WALEntryStream implements Iterator<Entry>, Closeable, Iterable<Entr
     // If the log was archived, continue reading from there
     Path archivedLog = getArchivedLog(path);
     if (!path.equals(archivedLog)) {
-      openReader(archivedLog);
+      openReader(archivedLog, false);
     } else {
       throw fnfe;
     }
   }
-  private void openReader(Path path) throws IOException {
+
+  // In order to adapt to WAL Compression,
+  // we need to reset dictionary when resetting the position.
+  private void openReader(Path path, Boolean forceCreateReader) throws IOException {
     try {
       // Detect if this is a new file, if so get a new reader else
       // reset the current reader so that we see the new data
-      if (reader == null || !getCurrentPath().equals(path)) {
+      if (reader == null || !getCurrentPath().equals(path) || forceCreateReader) {
         closeReader();
         reader = WALFactory.createReader(fs, path, conf);
         seek();
@@ -384,7 +387,7 @@ public class WALEntryStream implements Iterator<Entry>, Closeable, Iterable<Entr
       // If the log was archived, continue reading from there
       Path archivedLog = getArchivedLog(currentPath);
       if (!currentPath.equals(archivedLog)) {
-        openReader(archivedLog);
+        openReader(archivedLog, false);
       } else {
         throw fnfe;
       }
