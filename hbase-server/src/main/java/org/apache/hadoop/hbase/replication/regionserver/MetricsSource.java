@@ -238,6 +238,15 @@ public class MetricsSource implements BaseSource {
     return lastTimestamp;
   }
 
+
+  /**
+   * Get the value of uncleanlyClosedWAL counter
+   * @return uncleanlyClosedWAL
+   */
+  public long getUncleanlyClosedWALs() {
+    return singleSourceSource.getUncleanlyClosedWALs();
+  }
+
   /**
    * Get the slave peer ID
    * @return peerID
@@ -341,6 +350,17 @@ public class MetricsSource implements BaseSource {
   public void updateHistogram(String name, long value) {
     singleSourceSource.updateHistogram(name, value);
     globalSourceSource.updateHistogram(name, value);
+  }
+
+  /*
+   Sets the age of oldest log file just for source.
+  */
+  public void setOldestWalAge(long age) {
+    singleSourceSource.setOldestWalAge(age);
+  }
+
+  public long getOldestWalAge() {
+    return singleSourceSource.getOldestWalAge();
   }
 
   @Override

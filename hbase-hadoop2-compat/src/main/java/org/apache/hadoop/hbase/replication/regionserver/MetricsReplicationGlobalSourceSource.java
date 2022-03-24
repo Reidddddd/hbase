@@ -172,6 +172,12 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
   public void incrUncleanlyClosedWALs() {
     uncleanlyClosedWAL.incr(1L);
   }
+
+  @Override
+  public long getUncleanlyClosedWALs() {
+    return uncleanlyClosedWAL.value();
+  }
+
   @Override
   public void incrBytesSkippedInUncleanlyClosedWALs(final long bytes) {
     uncleanlyClosedSkippedBytes.incr(bytes);
@@ -196,6 +202,18 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
   public void incrFailedRecoveryQueue() {
     failedRecoveryQueue.incr(1L);
   }
+
+  @Override
+  public void setOldestWalAge(long age) {
+    // Not implemented
+  }
+
+  @Override
+  public long getOldestWalAge() {
+    // Not implemented
+    return 0;
+  }
+
   @Override
   public void init() {
     rms.init();
