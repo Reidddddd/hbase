@@ -81,6 +81,31 @@ public class TokenUtil {
    */
   public static Token<AuthenticationTokenIdentifier> obtainToken(
       Connection conn) throws IOException {
+    // If we turn on the subjective digest RPC authentication,
+    // just acquire the token from local conf.
+    Configuration conf = conn.getConfiguration();
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      AuthenticationTokenIdentifier ident =
+          new AuthenticationTokenIdentifier(User.getCurrent().getShortName());
+      String localPassword = conf.get(User.DIGEST_PASSWORD_KEY);
+      Token<AuthenticationTokenIdentifier> token = new Token<>();
+      token.setID(ident.getBytes());
+      token.setKind(AuthenticationTokenIdentifier.AUTH_TOKEN_TYPE);
+      token.setPassword(Bytes.toBytes(localPassword));
+
+      try (ZooKeeperWatcher zkw =
+          new ZooKeeperWatcher(conf, "TokenUtil-getAuthToken", null)) {
+        String clusterId = ZKClusterId.readClusterIdZNode(zkw);
+        if (clusterId == null) {
+          throw new IOException("Failed to get cluster ID");
+        }
+        token.setService(new Text(clusterId));
+      } catch (KeeperException e) {
+        throw new IOException(e);
+      }
+      return token;
+    }
+    // Otherwise, we fetch token through one RPC.
     Table meta = null;
     try {
       meta = conn.getTable(TableName.META_TABLE_NAME);
