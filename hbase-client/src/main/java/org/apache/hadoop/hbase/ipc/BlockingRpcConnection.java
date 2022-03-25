@@ -55,6 +55,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
+import org.apache.hadoop.hbase.security.AuthenticationFailedException;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.exceptions.ConnectionClosingException;
 import org.apache.hadoop.hbase.io.ByteArrayOutputStream;
@@ -398,13 +399,17 @@ class BlockingRpcConnection extends RpcConnection implements Runnable {
           LOG.warn("Exception encountered while connecting to " + "the server : " + ex);
         }
         if (ex instanceof RemoteException) {
-          throw (RemoteException) ex;
+          RemoteException e = (RemoteException) ex;
+          if (e.getClassName().contains(SaslException.class.getSimpleName())) {
+            throw new AuthenticationFailedException(ex);
+          }
+          throw e;
         }
         if (ex instanceof SaslException) {
           String msg = "SASL authentication failed." +
               " The most likely cause is missing or invalid credentials." + " Consider 'kinit'.";
           LOG.fatal(msg, ex);
-          throw new RuntimeException(msg, ex);
+          throw new AuthenticationFailedException(ex);
         }
         throw new IOException(ex);
       }

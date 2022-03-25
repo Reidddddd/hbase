@@ -63,6 +63,7 @@ import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.RegionLocator;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -188,6 +189,14 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
   private TIOError getTIOError(IOException e) {
     TIOError err = new TIOErrorWithCause(e);
     err.setCanRetry(!(e instanceof DoNotRetryIOException));
+    if (e instanceof RetriesExhaustedWithDetailsException) {
+      for (Throwable t : ((RetriesExhaustedWithDetailsException) e).getCauses()) {
+        if (t instanceof DoNotRetryIOException) {
+          err.setCanRetry(false);
+          break;
+        }
+      }
+    }
     err.setMessage(e.getMessage());
     return err;
   }
