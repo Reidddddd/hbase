@@ -46,6 +46,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.Token;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -421,6 +422,7 @@ public class TokenUtil {
       newToken.setPassword(Bytes.toBytes(password));
       newToken.setService(new Text(HConstants.CLUSTER_ID_DEFAULT));
       user.addToken(newToken);
+      user.getUGI().setAuthenticationMethod(AuthenticationMethod.TOKEN);
     }
   }
 }
