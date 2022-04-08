@@ -23,7 +23,7 @@
     <parent>
         <artifactId>hbase-build-configuration</artifactId>
         <groupId>org.apache.hbase</groupId>
-        <version>1.4.12-sdi-1.1.0-SNAPSHOT</version>
+        <version>1.4.12-sdi-1.0.1</version>
         <relativePath>../hbase-build-configuration</relativePath>
     </parent>
     <artifactId>hbase-shaded</artifactId>
