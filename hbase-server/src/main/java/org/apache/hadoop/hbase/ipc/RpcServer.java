@@ -194,6 +194,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
   private static final String AUTH_FAILED_FOR = "Auth failed for ";
   private static final String AUTH_SUCCESSFUL_FOR = "Auth successful for ";
+  private static final String AUTH_FALLBACK_WARN = "Auth fallback for ";
   private static final Log AUDITLOG = LogFactory.getLog("SecurityLogger." +
     Server.class.getName());
   protected SecretManager<TokenIdentifier> secretManager;
@@ -1869,16 +1870,15 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
               isPersonAllowedFallback = false;
             } else {
               isPersonAllowedFallback = true;
+              if (LOG.isTraceEnabled()) {
+                LOG.trace(AUTH_FALLBACK_WARN + ugi);
+              }
             }
           } else {
             LOG.warn("Allowed fallback to SIMPLE auth for " + ugi
                 + " connecting from " + getHostAddress());
+            AUDITLOG.info(AUTH_SUCCESSFUL_FOR + ugi);
           }
-        }
-        if (isPersonAllowedFallback) {
-          AUDITLOG.info(AUTH_SUCCESSFUL_FOR + ugi);
-        } else {
-          AUDITLOG.info(AUTH_FAILED_FOR + ugi);
         }
       } else {
         // user is authenticated
@@ -1916,8 +1916,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         AUDITLOG.info("Connection from " + this.hostAddress + " port: " + this.remotePort
             + " with unknown version info");
       }
-
-
     }
 
     /**
