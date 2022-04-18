@@ -116,6 +116,10 @@ public class HBaseSaslRpcServer {
       if (pc != null) {
         TokenIdentifier tokenIdentifier = getIdentifier(nc.getDefaultName(), secretManager);
         char[] password = getPassword(tokenIdentifier);
+        if (password.length == 0) {
+          throw new InvalidToken("The client " + tokenIdentifier.getUser().getShortUserName()
+              + " is not a valid user. ");
+        }
         UserGroupInformation user = null;
         user = tokenIdentifier.getUser(); // may throw exception
         connection.attemptingUser = user;

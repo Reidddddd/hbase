@@ -1527,7 +1527,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
           Throwable cause = e;
           while (cause != null) {
             if (cause instanceof InvalidToken) {
-              sendToClient = (InvalidToken) cause;
+              sendToClient = new AuthenticationFailedException(cause.getMessage());
               break;
             }
             cause = cause.getCause();
