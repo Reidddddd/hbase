@@ -128,6 +128,8 @@ public class SimpleRegionObserver extends BaseRegionObserver {
   final AtomicInteger ctPostBulkLoadHFile = new AtomicInteger(0);
   final AtomicInteger ctPreBatchMutate = new AtomicInteger(0);
   final AtomicInteger ctPostBatchMutate = new AtomicInteger(0);
+  final AtomicInteger ctPreReplayWALs = new AtomicInteger(0);
+  final AtomicInteger ctPostReplayWALs = new AtomicInteger(0);
   final AtomicInteger ctPreWALRestore = new AtomicInteger(0);
   final AtomicInteger ctPostWALRestore = new AtomicInteger(0);
   final AtomicInteger ctPreWALRestoreDeprecated = new AtomicInteger(0);
@@ -671,6 +673,18 @@ public class SimpleRegionObserver extends BaseRegionObserver {
   }
 
   @Override
+  public void preReplayWALs(ObserverContext<? extends RegionCoprocessorEnvironment> env,
+      HRegionInfo info, Path edits) throws IOException {
+    ctPreReplayWALs.incrementAndGet();
+  }
+
+  @Override
+  public void postReplayWALs(ObserverContext<? extends RegionCoprocessorEnvironment> env,
+      HRegionInfo info, Path edits) throws IOException {
+    ctPostReplayWALs.incrementAndGet();
+  }
+
+  @Override
   public void preWALRestore(ObserverContext<? extends RegionCoprocessorEnvironment> env,
       HRegionInfo info, WALKey logKey, WALEdit logEdit) throws IOException {
     String tableName = logKey.getTablename().getNameAsString();
@@ -957,6 +971,14 @@ public class SimpleRegionObserver extends BaseRegionObserver {
 
   public int getCtPostIncrement() {
     return ctPostIncrement.get();
+  }
+
+  public int getCtPreReplayWALs() {
+    return ctPreReplayWALs.get();
+  }
+
+  public int getCtPostReplayWALs() {
+    return ctPostReplayWALs.get();
   }
 
   public int getCtPreWALRestore() {
