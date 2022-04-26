@@ -23,10 +23,12 @@ import java.security.NoSuchAlgorithmException;
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Abstract class for different decryption algorithms.
  */
+@InterfaceAudience.Private
 public abstract class AbstractSecretDescryption implements SecretDecryption {
 
   // Package javax.crypto.* is not thread safe.
