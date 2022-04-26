@@ -24,6 +24,7 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.regionserver.BloomType;
@@ -83,13 +84,17 @@ public final class SecretTableAccessor {
    */
   public static boolean allowFallback(String username, Table table)
       throws IOException {
-    sanityCheck(table);
     if (username == null || username.isEmpty()) {
       LOG.warn("There is user with no name to fallback to simple authentication.");
       return false;
     }
+    return allowFallback(Bytes.toBytes(username), table);
+  }
 
-    Result res = table.get(new Get(Bytes.toBytes(username)));
+  public static boolean allowFallback(byte[] username, Table table) throws IOException {
+    sanityCheck(table);
+
+    Result res = table.get(new Get(username));
     if (res.isEmpty()) {
       return true;
     }
@@ -129,5 +134,14 @@ public final class SecretTableAccessor {
     return new HColumnDescriptor(SECRET_FAMILY_KEY).setMaxVersions(1).setInMemory(true)
         .setBlockCacheEnabled(true).setBlocksize(8 * 1024).setBloomFilterType(BloomType.NONE)
         .setScope(HConstants.REPLICATION_SCOPE_LOCAL);
+  }
+
+  /**
+   * Util function only used for secret table initialization.
+   */
+  static void insertSecretKey(byte[] algoName, byte[] key, Table table) throws IOException {
+    Put put = new Put(algoName);
+    put.addColumn(Bytes.toBytes(SECRET_FAMILY_KEY), Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY), key);
+    table.put(put);
   }
 }

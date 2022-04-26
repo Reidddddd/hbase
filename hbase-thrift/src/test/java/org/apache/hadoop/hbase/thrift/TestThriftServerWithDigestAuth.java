@@ -46,7 +46,8 @@ public class TestThriftServerWithDigestAuth extends TestThriftServer {
     UTIL.getConfiguration().setBoolean(COALESCE_INC_KEY, false);
     UTIL.getConfiguration().setInt("hbase.client.retries.number", 3);
 
-    String credential = "U0hCYXMAAAAgNWQ5YzY4YzZjNTBlZDNkMDJhMmZjZjU0ZjYzOTkzYjYxMjM0NTY=";
+    String credential = "U0hCYXMAAABAYWU1ZGViODIyZTBkNzE5OTI5MDA0NzFhNzE5OWQw"
+        + "ZDk1YjhlN2M5ZDA1YzQwYTgyNDVhMjgxZmQyYzFkNjY4NDEyMzQ1Ng==";
     UserGroupInformation.setLoginUser(
         UserGroupInformation.createUserForTesting("testuser", new String[] {"testusergroup"}));
 

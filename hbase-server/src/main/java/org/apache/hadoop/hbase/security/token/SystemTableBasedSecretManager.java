@@ -25,12 +25,13 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.authentication.SecretDecryptor;
 import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
 import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.MD5Hash;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -49,13 +50,15 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
   private static final byte[] CREDENTIAL_MAGIC_WORD = {'S', 'H', 'B', 'a', 's'};
 
   private final Server server;
+  private final SecretDecryptor decryptor;
   private final ThreadLocal<Table> authTable = new ThreadLocal<>();
 
   private final transient Token<? extends TokenIdentifier> adminToken = new Token<>();
 
-  public SystemTableBasedSecretManager(Server server) {
+  public SystemTableBasedSecretManager(final Server server) {
     User adminUser;
     this.server = server;
+    this.decryptor = new SecretDecryptor();
     try {
       adminUser = UserProvider.instantiate(server.getConfiguration()).getCurrent();
     } catch (IOException e) {
@@ -68,6 +71,40 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     } catch (InvalidToken e) {
       server.abort("Invalid local credential detected. Regionserver abort. ", e);
     }
+    Thread decrytorInitThread = new Thread(new Runnable() {
+      @Override
+      public void run() {
+        String msg = "Secret decryptor initialization failed. ";
+        while (server.getConnection() == null) {
+          // Wait for the cluster connection available.
+          try {
+            Thread.sleep(1000);
+          } catch (InterruptedException e) {
+            server.abort(msg, new IllegalStateException(msg));
+          }
+        }
+        try {
+          // Wait for the secret table initialization.
+          ClusterConnection conn = server.getConnection();
+          while (!conn.isTableAvailable(SecretTableAccessor.getSecretTableName())) {
+            try {
+              Thread.sleep(1000);
+            } catch (InterruptedException e) {
+              // Do nothing.
+            }
+          }
+          Thread.sleep(1000);
+          decryptor.initDecryption(getAuthTable(), server);
+        } catch (IOException | InterruptedException e) {
+          server.abort(e.getMessage(), e);
+        }
+        if (!decryptor.isInitialized()) {
+          server.abort(msg, new IllegalStateException(msg));
+        }
+      }
+    });
+    decrytorInitThread.setDaemon(true);
+    decrytorInitThread.start();
   }
 
   /**
@@ -95,7 +132,9 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
 
     byte[] password = null;
     try {
-      password = SecretTableAccessor.getUserPassword(Bytes.toBytes(username), getAuthTable());
+      byte[] cipherPassword =
+          SecretTableAccessor.getUserPassword(getHashedUsername(username), getAuthTable());
+      password = decryptor.decryptSecret(cipherPassword);
       if (password == null) {
         LOG.warn("Password of given user " + username + " is null. ");
       }
@@ -124,8 +163,7 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     byte[] username = new byte[nameLen];
     buffer.get(username);
 
-    if (0 != Bytes.compareTo(
-        MD5Hash.getMD5AsBytes(Bytes.toBytes(user.getShortName())), username)) {
+    if (0 != Bytes.compareTo(getHashedUsername(user.getShortName()), username)) {
       throw new InvalidToken("The local credential for user :" + user.getShortName()
           + " is not valid. ");
     }
@@ -165,7 +203,7 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     }
 
     try {
-      return SecretTableAccessor.allowFallback(username, getAuthTable());
+      return SecretTableAccessor.allowFallback(getHashedUsername(username), getAuthTable());
     } catch (IOException e) {
       LOG.warn("Error occurs when check allowFallback for user " + username + " \n", e);
       return false;
@@ -183,6 +221,10 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
       authTable.set(connection.getTable(SecretTableAccessor.getSecretTableName()));
     }
     return authTable.get();
+  }
+
+  private byte[] getHashedUsername(String username) {
+    return Encryption.hash256Hex(username);
   }
 
   @Override

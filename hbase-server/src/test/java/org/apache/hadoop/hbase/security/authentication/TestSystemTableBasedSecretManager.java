@@ -36,6 +36,7 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenIdentifier;
 import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
@@ -61,7 +62,8 @@ public class TestSystemTableBasedSecretManager {
   private static final String VALID_GROUP = "testgroup";
   private static final String VALID_PASSWORD = "123456";
   private static final String VALID_CREDENTIAL =
-      "U0hCYXMAAAAgNWQ5YzY4YzZjNTBlZDNkMDJhMmZjZjU0ZjYzOTkzYjYxMjM0NTY=";
+      "U0hCYXMAAABAYWU1ZGViODIyZTBkNzE5OTI5MDA0NzFhNzE5OWQwZDk1Y"
+          + "jhlN2M5ZDA1YzQwYTgyNDVhMjgxZmQyYzFkNjY4NDEyMzQ1Ng==";
 
   @AfterClass
   public static void tearDown() throws Exception {
@@ -132,7 +134,7 @@ public class TestSystemTableBasedSecretManager {
 
     TableName tableName = SecretTableAccessor.getSecretTableName();
     Table authTable = TEST_UTIL.getConnection().getTable(tableName);
-    Put put = new Put(Bytes.toBytes(VALID_USERNAME));
+    Put put = new Put(encryptUsername(VALID_USERNAME));
     put.addColumn(Bytes.toBytes("i"), Bytes.toBytes("a"), Bytes.toBytes(false));
     authTable.put(put);
 
@@ -142,6 +144,10 @@ public class TestSystemTableBasedSecretManager {
     authTable.put(put);
 
     assertTrue(secretManager.isAllowedFallback(VALID_USERNAME));
+  }
+
+  private byte[] encryptUsername(String username) {
+    return Encryption.hash256Hex(username);
   }
 
   static class DummyServer implements Server {

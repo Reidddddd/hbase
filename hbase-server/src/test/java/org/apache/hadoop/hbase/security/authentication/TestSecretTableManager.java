@@ -28,6 +28,9 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Threads;
@@ -52,7 +55,9 @@ public class TestSecretTableManager {
     TableName secretTableName = SecretTableAccessor.getSecretTableName();
     // username: testuser
     // password: 123456
-    String credential = "U0hCYXMAAAAgNWQ5YzY4YzZjNTBlZDNkMDJhMmZjZjU0ZjYzOTkzYjYxMjM0NTY=";
+    String credential =
+        "U0hCYXMAAABAYWU1ZGViODIyZTBkNzE5OTI5MDA0NzFhNzE5OWQwZDk1YjhlN2M5ZDA1YzQwYTgyND"
+            + "VhMjgxZmQyYzFkNjY4NDEyMzQ1Ng==";
     UserGroupInformation.setLoginUser(
         UserGroupInformation.createUserForTesting("testuser", new String[] {"testusergroup"}));
 
@@ -76,6 +81,14 @@ public class TestSecretTableManager {
     HColumnDescriptor realFamily = SecretTableAccessor.getSecretTableColumn();
     assertEquals(realFamily, desc.getColumnFamilies()[0]);
 
+    Scan scan = new Scan();
+    ResultScanner res = TEST_UTIL.getConnection().getTable(SecretTableAccessor.
+        getSecretTableName()).getScanner(scan);
+    int num = 0;
+    for(Result r : res) {
+      num ++;
+    }
+    assertEquals(SecretEncryptionType.values().length, num);
     TEST_UTIL.shutdownMiniCluster();
   }
 }

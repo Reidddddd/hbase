@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.io.crypto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.DigestException;
 import java.security.Key;
 import java.security.MessageDigest;
@@ -27,23 +28,21 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.util.ReflectionUtils;
-
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 /**
  * A facade for encryption algorithms and related support.
  */
@@ -184,6 +183,13 @@ public final class Encryption {
     } catch (DigestException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Return the SHA-256 digest of the concatenation of the supplied arguments in hex string.
+   */
+  public static byte[] hash256Hex(String... args) {
+    return Hex.encodeHexString(hash256(args)).getBytes(StandardCharsets.UTF_8);
   }
 
   /**
