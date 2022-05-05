@@ -31,11 +31,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Abortable;
@@ -47,17 +44,19 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.HTableWrapper;
+import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CoprocessorClassLoader;
 import org.apache.hadoop.hbase.util.SortedList;
 import org.apache.hadoop.hbase.util.VersionInfo;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Provides the common setup framework and runtime services for coprocessor
  * invocation from HBase services.
- * @param <E> the specific environment extension that a concrete implementation
- * provides
+ * This class is separated from hbase-server module.
+ * @param <E> the specific environment extension that a concrete implementation provides.
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.COPROC)
 @InterfaceStability.Evolving
@@ -142,8 +141,9 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
 
     // load default coprocessors from configure file
     String[] defaultCPClasses = conf.getStrings(confKey);
-    if (defaultCPClasses == null || defaultCPClasses.length == 0)
+    if (defaultCPClasses == null || defaultCPClasses.length == 0) {
       return;
+    }
 
     int priority = Coprocessor.PRIORITY_SYSTEM;
     for (String className : defaultCPClasses) {
@@ -357,7 +357,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
     final ClassLoader systemClassLoader = this.getClass().getClassLoader();
     for (E env : coprocessors) {
       ClassLoader cl = env.getInstance().getClass().getClassLoader();
-      if (cl != systemClassLoader ){
+      if (cl != systemClassLoader) {
         //do not include system classloader
         externalClassLoaders.add(cl);
       }
@@ -391,10 +391,10 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
   /**
    * Encapsulation of the environment of each coprocessor
    */
-  public static class Environment implements CoprocessorEnvironment {
+  public static abstract class Environment implements CoprocessorEnvironment {
 
     /** The coprocessor */
-    public Coprocessor impl;
+    private final Coprocessor impl;
     /** Chaining priority */
     protected int priority = Coprocessor.PRIORITY_USER;
     /** Current coprocessor state */
@@ -405,6 +405,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
     private int seq;
     private Configuration conf;
     private ClassLoader classLoader;
+    private TableProvider tableProvider;
 
     /**
      * Constructor
@@ -419,7 +420,10 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
       this.state = Coprocessor.State.INSTALLED;
       this.seq = seq;
       this.conf = conf;
+      this.tableProvider = getTableProvider();
     }
+
+    protected abstract TableProvider getTableProvider();
 
     /** Initialize the environment */
     public void startup() throws IOException {
@@ -464,7 +468,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
         // clean up any table references
         for (HTableInterface table: openTables) {
           try {
-            ((HTableWrapper)table).internalClose();
+            tableProvider.internalClose(table);
           } catch (IOException e) {
             // nothing can be done here
             LOG.warn("Failed to close " +
@@ -530,7 +534,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
      */
     @Override
     public HTableInterface getTable(TableName tableName, ExecutorService pool) throws IOException {
-      return HTableWrapper.createWrapper(openTables, tableName, this, pool);
+      return tableProvider.createWrapper(openTables, tableName, this, pool);
     }
   }
 
@@ -578,14 +582,8 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
       // server is configured to abort.
       abortServer(env, e);
     } else {
-      // If available, pull a table name out of the environment
-      if(env instanceof RegionCoprocessorEnvironment) {
-        String tableName = ((RegionCoprocessorEnvironment)env).getRegionInfo().getTable().getNameAsString();
-        LOG.error("Removing coprocessor '" + env.toString() + "' from table '"+ tableName + "'", e);
-      } else {
-        LOG.error("Removing coprocessor '" + env.toString() + "' from " +
-                "environment",e);
-      }
+      LOG.error("Removing coprocessor '" + env.toString() + "' from " +
+              "environment",e);
 
       coprocessors.remove(env);
       try {
@@ -608,12 +606,6 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
    * to the deprecated API by using this method to determine if an instance implements the new API.
    * In the event that said support is partial, then in the face of a runtime issue that prevents
    * proper operation {@link #legacyWarning(Class, String)} should be used to let operators know.
-   *
-   * For examples of this in action, see the implementation of
-   * <ul>
-   *   <li>{@link org.apache.hadoop.hbase.regionserver.RegionCoprocessorHost}
-   *   <li>{@link org.apache.hadoop.hbase.regionserver.wal.WALCoprocessorHost}
-   * </ul>
    *
    * @param clazz Coprocessor you wish to evaluate
    * @param methodName the name of the non-deprecated method version
@@ -647,16 +639,16 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
    * Used to limit legacy handling to once per Coprocessor class per classloader.
    */
   private static final Set<Class<? extends Coprocessor>> legacyWarning =
-      new ConcurrentSkipListSet<Class<? extends Coprocessor>>(
-          new Comparator<Class<? extends Coprocessor>>() {
-            @Override
-            public int compare(Class<? extends Coprocessor> c1, Class<? extends Coprocessor> c2) {
-              if (c1.equals(c2)) {
-                return 0;
-              }
-              return c1.getName().compareTo(c2.getName());
-            }
-          });
+    new ConcurrentSkipListSet<Class<? extends Coprocessor>>(
+      new Comparator<Class<? extends Coprocessor>>() {
+        @Override
+        public int compare(Class<? extends Coprocessor> c1, Class<? extends Coprocessor> c2) {
+          if (c1.equals(c2)) {
+            return 0;
+          }
+          return c1.getName().compareTo(c2.getName());
+        }
+      });
 
   /**
    * limits the amount of logging to once per coprocessor class.

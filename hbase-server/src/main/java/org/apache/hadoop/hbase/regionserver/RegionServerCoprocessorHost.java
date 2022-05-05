@@ -31,6 +31,8 @@ import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.MetaMutationAnnotation;
+import org.apache.hadoop.hbase.client.RSTableProvider;
+import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.Mutation;
@@ -41,10 +43,8 @@ import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.RegionServerObserver;
 import org.apache.hadoop.hbase.coprocessor.SingletonCoprocessorService;
 
-import org.apache.hadoop.hbase.ipc.RpcServer;
 import org.apache.hadoop.hbase.metrics.MetricRegistry;
 import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
-import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.WALEntry;
 
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.COPROC)
@@ -379,6 +379,11 @@ public class RegionServerCoprocessorHost extends
     @Override
     public MetricRegistry getMetricRegistryForRegionServer() {
       return metricRegistry;
+    }
+
+    @Override
+    protected TableProvider getTableProvider() {
+      return new RSTableProvider();
     }
 
     @Override

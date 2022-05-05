@@ -36,8 +36,9 @@ import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.ProcedureInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.RSTableProvider;
+import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorService;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.procedure2.ProcedureExecutor;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.SnapshotDescription;
 import org.apache.hadoop.hbase.protobuf.generated.QuotaProtos.Quotas;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Provides the coprocessor framework and environment for master oriented
@@ -91,6 +93,11 @@ public class MasterCoprocessorHost
     @Override
     public MetricRegistry getMetricRegistryForMaster() {
       return metricRegistry;
+    }
+
+    @Override
+    protected TableProvider getTableProvider() {
+      return new RSTableProvider();
     }
 
     @Override

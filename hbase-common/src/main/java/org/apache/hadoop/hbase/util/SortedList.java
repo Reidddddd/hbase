@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.RandomAccess;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Simple sorted list implementation that uses {@link java.util.ArrayList} as
@@ -48,6 +49,7 @@ import java.util.RandomAccess;
  */
 @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="UG_SYNC_SET_UNSYNC_GET",
   justification="TODO: synchronization in here needs review!!!")
+@InterfaceAudience.Private
 public class SortedList<E> implements List<E>, RandomAccess {
   private volatile List<E> list;
   private final Comparator<? super E> comparator;

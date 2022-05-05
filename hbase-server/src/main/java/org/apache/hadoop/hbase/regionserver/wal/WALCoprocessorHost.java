@@ -26,7 +26,8 @@ import java.util.List;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.HRegionInfo;
-import org.apache.hadoop.hbase.coprocessor.*;
+import org.apache.hadoop.hbase.client.RSTableProvider;
+import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
@@ -91,6 +92,11 @@ public class WALCoprocessorHost
     @Override
     public MetricRegistry getMetricRegistryForRegionServer() {
       return metricRegistry;
+    }
+
+    @Override
+    protected TableProvider getTableProvider() {
+      return new RSTableProvider();
     }
 
     @Override

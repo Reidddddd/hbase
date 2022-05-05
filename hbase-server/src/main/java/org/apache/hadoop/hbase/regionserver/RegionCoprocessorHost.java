@@ -34,6 +34,8 @@ import org.apache.commons.collections.map.ReferenceMap;
 import org.apache.commons.lang.ClassUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.client.RSTableProvider;
+import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -72,7 +74,6 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.io.Reference;
 import org.apache.hadoop.hbase.io.hfile.CacheConfig;
 import org.apache.hadoop.hbase.metrics.MetricRegistry;
-import org.apache.hadoop.hbase.regionserver.DeleteTracker;
 import org.apache.hadoop.hbase.regionserver.Region.Operation;
 import org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
@@ -152,6 +153,11 @@ public class RegionCoprocessorHost
     @Override
     public RegionServerServices getRegionServerServices() {
       return rsServices;
+    }
+
+    @Override
+    protected TableProvider getTableProvider() {
+      return new RSTableProvider();
     }
 
     @Override
