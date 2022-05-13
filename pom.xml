@@ -2394,41 +2394,6 @@
         -->
         <surefire.Xmx>2200m</surefire.Xmx>
       </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-enforcer-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>hadoop3-profile-required</id>
-                <goals>
-                  <goal>enforce</goal>
-                </goals>
-                <configuration>
-                  <rules>
-                    <requireProperty>
-                      <!--
-                        $ JAVA_HOME=... mvn -Dhadoop.profile=3.0 -PrunSmallTests help:active-profiles enforcer:display-info clean test
-                        enforcer plugin does not see active profiles on sub-modules, so enforce based
-                        on the presence of the activation property and value.
-                      -->
-                      <property>hadoop.profile</property>
-                      <regex>.*3\.0$</regex>
-                      <message>
-                        HBase with JDK11 requires Hadoop3. Activate the profile with `-Dhadoop.profile=3.0`.
-                      </message>
-                      <regexMessage>
-                        HBase with JDK11 requires Hadoop3. Activate the profile with `-Dhadoop.profile=3.0`.
-                      </regexMessage>
-                    </requireProperty>
-                  </rules>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
     </profile>
     <!-- profile activated by the Jenkins patch testing job -->
     <profile>
