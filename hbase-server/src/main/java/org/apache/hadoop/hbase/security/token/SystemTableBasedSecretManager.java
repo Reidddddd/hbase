@@ -22,7 +22,9 @@ import java.nio.ByteBuffer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.Server;
+import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.crypto.Encryption;
@@ -33,6 +35,7 @@ import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
 import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -201,13 +204,23 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
       LOG.warn("No valid username is found when doing allowFallback check. ");
       return false;
     }
-
+    IOException ioe = null;
     try {
       return SecretTableAccessor.allowFallback(getHashedUsername(username), getAuthTable());
     } catch (IOException e) {
-      LOG.warn("Error occurs when check allowFallback for user " + username + " \n", e);
-      return false;
+      try {
+        if (e instanceof TableNotFoundException || e instanceof NotServingRegionException) {
+          // To guarantee the cluster internal RPCs works normally, we need to allow the processing
+          // user to fallback if the secret table is not available.
+          return UserGroupInformation.getLoginUser().getShortUserName().equals(username);
+        }
+        ioe = e;
+      } catch (IOException ex) {
+        ioe = ex;
+      }
     }
+    LOG.warn("Error occurs when check allowFallback for user " + username + " \n", ioe);
+    return false;
   }
 
   private Table getAuthTable() throws IOException {
