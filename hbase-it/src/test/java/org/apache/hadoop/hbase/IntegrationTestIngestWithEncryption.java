@@ -18,26 +18,24 @@
 package org.apache.hadoop.hbase;
 
 import java.io.IOException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Waiter.Predicate;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.io.crypto.EncryptionTest;
 import org.apache.hadoop.hbase.io.crypto.KeyProviderForTesting;
 import org.apache.hadoop.hbase.io.hfile.HFile;
 import org.apache.hadoop.hbase.io.hfile.HFileReaderV3;
 import org.apache.hadoop.hbase.io.hfile.HFileWriterV3;
+import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
+import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter;
 import org.apache.hadoop.hbase.testclassification.IntegrationTests;
 import org.apache.hadoop.hbase.wal.WAL.Reader;
 import org.apache.hadoop.hbase.wal.WALProvider.Writer;
-import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
-import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter;
-import org.apache.hadoop.hbase.util.EncryptionTest;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
 import org.junit.Before;
 import org.junit.experimental.categories.Category;
 

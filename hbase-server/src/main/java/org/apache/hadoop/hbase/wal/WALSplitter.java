@@ -1356,8 +1356,8 @@ public class WALSplitter {
     void deleteOneWithFewerEntries(WriterAndPath wap, Path dst)
         throws IOException {
       long dstMinLogSeqNum = -1L;
-      try (WAL.Reader reader = walFactory.createReader(walFS, dst)) {
-        WAL.Entry entry = reader.next();
+      try (Reader reader = walFactory.createReader(walFS, dst)) {
+        Entry entry = reader.next();
         if (entry != null) {
           dstMinLogSeqNum = entry.getKey().getLogSeqNum();
         }
@@ -2541,5 +2541,50 @@ public class WALSplitter {
     }
 
     return mutations;
+  }
+
+  public static void main(String[] args) {
+    if (args.length < 2) {
+      usage();
+      System.exit(-1);
+    }
+    if (args[0].compareTo("--split") == 0) {
+      Configuration conf = HBaseConfiguration.create();
+      for (int i = 1; i < args.length; i++) {
+        try {
+          Path logPath = new Path(args[i]);
+          FSUtils.setFsDefault(conf, logPath);
+          split(conf, logPath);
+        } catch (IOException t) {
+          t.printStackTrace(System.err);
+          System.exit(-1);
+        }
+      }
+    } else {
+      usage();
+      System.exit(-1);
+    }
+  }
+
+  private static void usage() {
+    System.err.println("Usage: WALSplitter <ARGS>");
+    System.err.println("Arguments:");
+    System.err.println(" --split Split the passed directory of WAL logs");
+    System.err.println("         For example: " +
+        "FSHLog --split hdfs://example.com:9000/hbase/.logs/DIR");
+  }
+
+  private static void split(final Configuration conf, final Path p) throws IOException {
+    FileSystem fs = FSUtils.getWALFileSystem(conf);
+    if (!fs.exists(p)) {
+      throw new FileNotFoundException(p.toString());
+    }
+    if (!fs.getFileStatus(p).isDirectory()) {
+      throw new IOException(p + " is not a directory");
+    }
+
+    final Path baseDir = FSUtils.getWALRootDir(conf);
+    final Path archiveDir = new Path(baseDir, HConstants.HREGION_OLDLOGDIR_NAME);
+    split(baseDir, p, archiveDir, fs, conf, WALFactory.getInstance(conf));
   }
 }

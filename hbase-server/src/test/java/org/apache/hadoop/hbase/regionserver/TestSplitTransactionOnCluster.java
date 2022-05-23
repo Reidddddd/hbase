@@ -96,6 +96,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HBaseFsck;
+import org.apache.hadoop.hbase.util.HBaseFsckUtil;
 import org.apache.hadoop.hbase.util.JVMClusterUtil.RegionServerThread;
 import org.apache.hadoop.hbase.util.PairOfSameType;
 import org.apache.hadoop.hbase.util.RetryCounter;
@@ -1103,7 +1104,7 @@ public class TestSplitTransactionOnCluster {
       Path rootDir = FSUtils.getRootDir(conf);
       FileSystem fs = TESTING_UTIL.getDFSCluster().getFileSystem();
       Map<String, Path> storefiles =
-          FSUtils.getTableStoreFilePathMap(null, fs, rootDir, tableName);
+          HBaseFsckUtil.getTableStoreFilePathMap(null, fs, rootDir, tableName);
       assertEquals("Expected nothing but found " + storefiles.toString(), storefiles.size(), 0);
 
       // find a splittable region.  Refresh the regions list
@@ -1128,7 +1129,7 @@ public class TestSplitTransactionOnCluster {
       // check dirs
       HBaseFsck.debugLsr(conf, new Path("/"));
       Map<String, Path> storefilesAfter =
-          FSUtils.getTableStoreFilePathMap(null, fs, rootDir, tableName);
+        HBaseFsckUtil.getTableStoreFilePathMap(null, fs, rootDir, tableName);
       assertEquals("Expected nothing but found " + storefilesAfter.toString(),
           storefilesAfter.size(), 0);
 

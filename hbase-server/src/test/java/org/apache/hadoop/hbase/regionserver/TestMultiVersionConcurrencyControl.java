@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.regionserver;
 
 import junit.framework.TestCase;
+import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.junit.experimental.categories.Category;
 

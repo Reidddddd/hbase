@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,9 +43,10 @@ import org.apache.hadoop.hbase.io.hfile.CorruptHFileException;
 import org.apache.hadoop.hbase.io.hfile.HFile;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.FSUtils.FamilyDirFilter;
-import org.apache.hadoop.hbase.util.FSUtils.HFileFilter;
 import org.apache.hadoop.hbase.util.FSUtils.RegionDirFilter;
 import org.apache.hadoop.hbase.util.HBaseFsck.ErrorReporter;
+import org.apache.hadoop.hbase.util.HBaseFsckUtil.HFileFilter;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This class marches through all of the region's hfiles and verifies that

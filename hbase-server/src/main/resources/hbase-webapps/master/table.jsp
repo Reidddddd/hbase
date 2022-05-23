@@ -41,10 +41,10 @@
   import="org.apache.hadoop.hbase.RegionLoad"
   import="org.apache.hadoop.hbase.HConstants"
   import="org.apache.hadoop.hbase.io.ImmutableBytesWritable"
-  import="org.apache.hadoop.hbase.master.HMaster" 
+  import="org.apache.hadoop.hbase.master.HMaster"
+  import="org.apache.hadoop.hbase.master.util.MasterUtils"
   import="org.apache.hadoop.hbase.zookeeper.MetaTableLocator"
   import="org.apache.hadoop.hbase.util.Bytes"
-  import="org.apache.hadoop.hbase.util.FSUtils"
   import="org.apache.hadoop.hbase.regionserver.compactions.CompactionRequest"
   import="org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetRegionInfoResponse.CompactionState"
   import="org.apache.hadoop.hbase.protobuf.generated.ClusterStatusProtos"
@@ -69,7 +69,7 @@
                         HConstants.DEFAULT_META_REPLICA_NUM);
   Map<String, Integer> frags = null;
   if (showFragmentation) {
-      frags = FSUtils.getTableFragmentation(master);
+      frags = MasterUtils.getTableFragmentation(master);
   }
   String action = request.getParameter("action");
   String key = request.getParameter("key");

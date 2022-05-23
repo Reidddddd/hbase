@@ -21,7 +21,6 @@ package org.apache.hadoop.hbase.regionserver;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
-
 import org.apache.commons.lang.ClassUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -31,21 +30,20 @@ import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.MetaMutationAnnotation;
-import org.apache.hadoop.hbase.client.RSTableProvider;
+import org.apache.hadoop.hbase.client.RSCoprocessorTableProvider;
 import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
-import org.apache.hadoop.hbase.coprocessor.MetricsCoprocessor;
+import org.apache.hadoop.hbase.metrics.MetricRegistry;
+import org.apache.hadoop.hbase.metrics.MetricsCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.RegionServerObserver;
 import org.apache.hadoop.hbase.coprocessor.SingletonCoprocessorService;
-
-import org.apache.hadoop.hbase.metrics.MetricRegistry;
-import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.WALEntry;
+import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.COPROC)
 @InterfaceStability.Evolving
@@ -383,7 +381,7 @@ public class RegionServerCoprocessorHost extends
 
     @Override
     protected TableProvider getTableProvider() {
-      return new RSTableProvider();
+      return new RSCoprocessorTableProvider();
     }
 
     @Override

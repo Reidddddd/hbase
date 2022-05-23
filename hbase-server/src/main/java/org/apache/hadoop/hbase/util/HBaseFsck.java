@@ -17,6 +17,15 @@
  */
 package org.apache.hadoop.hbase.util;
 
+import static org.apache.hadoop.hbase.util.HBaseFsckUtil.getReferenceFilePaths;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Ordering;
+import com.google.common.collect.TreeMultimap;
+import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -55,7 +64,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -128,7 +136,6 @@ import org.apache.hadoop.hbase.util.hbck.TableIntegrityErrorHandler;
 import org.apache.hadoop.hbase.util.hbck.TableIntegrityErrorHandlerImpl;
 import org.apache.hadoop.hbase.util.hbck.TableLockChecker;
 import org.apache.hadoop.hbase.wal.WALSplitter;
-import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZKTableStateClientSideReader;
 import org.apache.hadoop.hbase.zookeeper.ZKTableStateManager;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -140,15 +147,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.zookeeper.KeeperException;
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Ordering;
-import com.google.common.collect.TreeMultimap;
-import com.google.protobuf.ServiceException;
 
 /**
  * HBaseFsck (hbck) is a tool for checking and repairing region consistency and
@@ -1095,8 +1093,8 @@ public class HBaseFsck extends Configured implements Closeable {
     Path hbaseRoot = FSUtils.getRootDir(conf);
     FileSystem fs = hbaseRoot.getFileSystem(conf);
     LOG.info("Computing mapping of all store files");
-    Map<String, Path> allFiles = FSUtils.getTableStoreFilePathMap(fs, hbaseRoot,
-      new FSUtils.ReferenceFileFilter(fs), executor, errors);
+    Map<String, Path> allFiles = HBaseFsckUtil.getTableStoreFilePathMap(fs, hbaseRoot,
+      new HBaseFsckUtil.ReferenceFileFilter(fs), executor, errors);
     errors.print("");
     LOG.info("Validating mapping using HDFS state");
     for (Path path: allFiles.values()) {
@@ -1148,8 +1146,8 @@ public class HBaseFsck extends Configured implements Closeable {
     Path hbaseRoot = FSUtils.getRootDir(conf);
     FileSystem fs = hbaseRoot.getFileSystem(conf);
     LOG.info("Computing mapping of all link files");
-    Map<String, Path> allFiles = FSUtils
-        .getTableStoreFilePathMap(fs, hbaseRoot, new FSUtils.HFileLinkFilter(), executor, errors);
+    Map<String, Path> allFiles = HBaseFsckUtil.getTableStoreFilePathMap(fs, hbaseRoot,
+        new HBaseFsckUtil.HFileLinkFilter(), executor, errors);
     errors.print("");
 
     LOG.info("Validating mapping using HDFS state");
@@ -2379,7 +2377,7 @@ public class HBaseFsck extends Configured implements Closeable {
             FileSystem fs = regionDir.getFileSystem(getConf());
             List<Path> familyDirs = FSUtils.getFamilyDirs(fs, regionDir);
             for (Path familyDir : familyDirs) {
-              List<Path> referenceFilePaths = FSUtils.getReferenceFilePaths(fs, familyDir);
+              List<Path> referenceFilePaths = getReferenceFilePaths(fs, familyDir);
               for (Path referenceFilePath : referenceFilePaths) {
                 Path parentRegionDir =
                     StoreFileInfo.getReferredToFile(referenceFilePath).getParent().getParent();

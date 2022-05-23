@@ -85,6 +85,7 @@
     <module>hbase-metrics</module>
     <module>hbase-hbtop</module>
     <module>hbase-build-configuration</module>
+    <module>hbase-storage</module>
   </modules>
   <!--Add apache snapshots in case we want to use unreleased versions of plugins:
       e.g. surefire 2.18-SNAPSHOT-->

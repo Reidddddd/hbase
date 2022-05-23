@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.util.HBaseFsckUtil;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.ConfigUtil;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HasThread;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.PairOfSameType;
@@ -451,8 +451,8 @@ public class SplitTransactionImpl implements SplitTransaction {
   void assertReferenceFileCount(int expectedReferenceFileCount, Path dir)
       throws IOException {
     if (expectedReferenceFileCount != 0 &&
-        expectedReferenceFileCount != FSUtils.getRegionReferenceFileCount(parent.getFilesystem(),
-          dir)) {
+        expectedReferenceFileCount != HBaseFsckUtil.getRegionReferenceFileCount(
+          parent.getFilesystem(), dir)) {
       throw new IOException("Failing split. Expected reference file count isn't equal.");
     }
   }

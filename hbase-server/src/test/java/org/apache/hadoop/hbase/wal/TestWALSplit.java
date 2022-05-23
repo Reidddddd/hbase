@@ -66,8 +66,6 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
-import org.apache.hadoop.hbase.regionserver.wal.FaultySequenceFileLogReader;
-import org.apache.hadoop.hbase.regionserver.wal.InstrumentedLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.security.User;
@@ -81,7 +79,6 @@ import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.hadoop.hbase.wal.WAL.Reader;
 import org.apache.hadoop.hbase.wal.WALProvider.Writer;
-import org.apache.hadoop.hbase.wal.WALSplitter.CorruptedLogFileException;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
 import org.apache.hadoop.ipc.RemoteException;
@@ -136,6 +133,7 @@ public class TestWALSplit {
   private static final String WAL_FILE_PREFIX = "wal.dat.";
   private static List<String> REGIONS = new ArrayList<String>();
   private static final String HBASE_SKIP_ERRORS = "hbase.hlog.split.skip.errors";
+  protected static Path hbaseWALDir;
   private static String ROBBER;
   private static String ZOMBIE;
   private static String [] GROUP = new String [] {"supergroup"};
@@ -165,6 +163,7 @@ public class TestWALSplit {
     DFSTestUtil.updateConfWithFakeGroupMapping(conf, u2g_map);
     conf.setInt("dfs.heartbeat.interval", 1);
     TEST_UTIL.startMiniDFSCluster(2);
+    hbaseWALDir = TEST_UTIL.createWALRootDir();
   }
 
   @AfterClass
@@ -216,8 +215,6 @@ public class TestWALSplit {
   /**
    * Simulates splitting a WAL out from under a regionserver that is still trying to write it.
    * Ensures we do not lose edits.
-   * @throws IOException
-   * @throws InterruptedException
    */
   @Test (timeout=300000)
   public void testLogCannotBeWrittenOnceParsed() throws IOException, InterruptedException {
@@ -903,7 +900,7 @@ public class TestWALSplit {
   }
 
   @Test (timeout=300000)
-  public void testTerminationAskedByReporter() throws IOException, CorruptedLogFileException {
+  public void testTerminationAskedByReporter() throws IOException {
     generateWALs(1, 10, -1);
     FileStatus logfile = fs.listStatus(WALDIR)[0];
     useDifferentDFSClient();
@@ -1148,7 +1145,7 @@ public class TestWALSplit {
         // After creating writer, simulate region's
         // replayRecoveredEditsIfAny() which gets SplitEditFiles of this
         // region and delete them, excluding files with '.temp' suffix.
-        NavigableSet<Path> files = WALSplitter.getSplitEditFilesSorted(fs, regiondir);
+        NavigableSet<Path> files = getSplitEditFilesSorted(fs, regiondir);
         if (files != null && !files.isEmpty()) {
           for (Path file : files) {
             if (!this.walFS.delete(file, false)) {

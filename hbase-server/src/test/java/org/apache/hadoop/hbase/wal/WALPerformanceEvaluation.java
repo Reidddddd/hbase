@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.hbase.wal;
 
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.Meter;
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.reporting.ConsoleReporter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,10 +30,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
@@ -48,7 +50,11 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.crypto.KeyProviderForTesting;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.LogRoller;
-import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
+import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter;
+import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.trace.HBaseHTraceConfiguration;
 import org.apache.hadoop.hbase.trace.SpanReceiverHost;
 import org.apache.hadoop.hbase.wal.WALProvider.Writer;
@@ -61,17 +67,7 @@ import org.apache.htrace.Sampler;
 import org.apache.htrace.Trace;
 import org.apache.htrace.TraceScope;
 import org.apache.htrace.impl.ProbabilitySampler;
-
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.ConsoleReporter;
-
-// imports for things that haven't moved from regionserver.wal yet.
-import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
-import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter;
-import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
-import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This class runs performance benchmarks for {@link WAL}.
@@ -576,7 +572,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
    * @return errCode
    * @throws Exception
    */
-  static int innerMain(final Configuration c, final String [] args) throws Exception {
+  public static int innerMain(final Configuration c, final String[] args) throws Exception {
     return ToolRunner.run(c, new WALPerformanceEvaluation(), args);
   }
 

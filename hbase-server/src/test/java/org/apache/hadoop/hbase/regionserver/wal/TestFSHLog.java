@@ -24,7 +24,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -37,7 +36,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -62,7 +60,7 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.coprocessor.SampleRegionWALObserver;
 import org.apache.hadoop.hbase.regionserver.HRegion;
-import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.regionserver.Region;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -72,6 +70,7 @@ import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALPerformanceEvaluation;
 import org.apache.hadoop.hbase.wal.WALProvider;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -270,8 +269,6 @@ public class TestFSHLog {
 
   /**
    * helper method to simulate region flush for a WAL.
-   * @param wal
-   * @param regionEncodedName
    */
   protected void flushRegion(WAL wal, byte[] regionEncodedName, Set<byte[]> flushedFamilyNames) {
     wal.startCacheFlush(regionEncodedName, flushedFamilyNames);
@@ -281,7 +278,6 @@ public class TestFSHLog {
   /**
    * tests the log comparator. Ensure that we are not mixing meta logs with non-meta logs (throws
    * exception if we do). Comparison is based on the timestamp present in the wal name.
-   * @throws Exception
    */
   @Test 
   public void testWALComparator() throws Exception {
@@ -339,7 +335,6 @@ public class TestFSHLog {
    * This method tests this behavior by inserting edits and rolling the wal enough times to reach
    * the max number of logs threshold. It checks whether we get the "right regions" for flush on
    * rolling the wal.
-   * @throws Exception
    */
   @Test 
   public void testFindMemStoresEligibleForFlush() throws Exception {
@@ -442,7 +437,6 @@ public class TestFSHLog {
    * flush.  The addition of the sync over HRegion in flush should fix an issue where flush was
    * returning before all of its appends had made it out to the WAL (HBASE-11109).
    * see HBASE-11109
-   * @throws IOException
    */
   @Test
   public void testFlushSequenceIdIsGreaterThanAllEditsInHFile() throws IOException {
@@ -546,6 +540,19 @@ public class TestFSHLog {
     } finally {
       log.close();
     }
+  }
+
+  /**
+   * Write to a log file with three concurrent threads and verifying all data is written.
+   */
+  @Test
+  public void testConcurrentWrites() throws Exception {
+    // Run the WPE tool with three threads writing 3000 edits each concurrently.
+    // When done, verify that all edits were written.
+    int errCode = WALPerformanceEvaluation.
+      innerMain(new Configuration(TEST_UTIL.getConfiguration()),
+        new String [] {"-threads", "3", "-verify", "-noclosefs", "-iterations", "3000"});
+    assertEquals(0, errCode);
   }
 
   /**

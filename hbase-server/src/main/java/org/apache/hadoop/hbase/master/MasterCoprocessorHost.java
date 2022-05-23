@@ -22,7 +22,6 @@ package org.apache.hadoop.hbase.master;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-
 import org.apache.commons.lang.ClassUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,14 +36,14 @@ import org.apache.hadoop.hbase.ProcedureInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.client.RSTableProvider;
+import org.apache.hadoop.hbase.client.RSCoprocessorTableProvider;
 import org.apache.hadoop.hbase.client.coprocessor.TableProvider;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorService;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.MasterObserver;
-import org.apache.hadoop.hbase.coprocessor.MetricsCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
+import org.apache.hadoop.hbase.metrics.MetricsCoprocessor;
 import org.apache.hadoop.hbase.master.procedure.MasterProcedureEnv;
 import org.apache.hadoop.hbase.metrics.MetricRegistry;
 import org.apache.hadoop.hbase.net.Address;
@@ -97,7 +96,7 @@ public class MasterCoprocessorHost
 
     @Override
     protected TableProvider getTableProvider() {
-      return new RSTableProvider();
+      return new RSCoprocessorTableProvider();
     }
 
     @Override

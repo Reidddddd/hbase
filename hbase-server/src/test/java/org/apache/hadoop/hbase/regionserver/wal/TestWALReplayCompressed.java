@@ -32,7 +32,7 @@ public class TestWALReplayCompressed extends TestWALReplay {
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
     TestWALReplay.setUpBeforeClass();
-    Configuration conf = TestWALReplay.TEST_UTIL.getConfiguration();
+    Configuration conf = TEST_UTIL.getConfiguration();
     conf.setBoolean(HConstants.ENABLE_WAL_COMPRESSION, true);
   }
 
