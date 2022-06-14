@@ -100,6 +100,7 @@ import org.apache.hadoop.hbase.util.JVMClusterUtil.MasterThread;
 import org.apache.hadoop.hbase.util.JVMClusterUtil.RegionServerThread;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALSplitter;
@@ -1646,7 +1647,7 @@ public class TestDistributedLogSplitting {
     int count = 0;
     WAL.Reader in = WALFactory.createReader(fs, log, conf);
     try {
-      WAL.Entry e;
+      Entry e;
       while ((e = in.next()) != null) {
         if (!WALEdit.isMetaEditFamily(e.getEdit().getCells().get(0))) {
           count++;

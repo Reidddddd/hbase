@@ -112,7 +112,7 @@ public class TestSecureWAL {
     // Confirm the WAL can be read back
     WAL.Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
     int count = 0;
-    WAL.Entry entry = new WAL.Entry();
+    Entry entry = new Entry();
     while (reader.next(entry) != null) {
       count++;
       List<Cell> cells = entry.getEdit().getCells();

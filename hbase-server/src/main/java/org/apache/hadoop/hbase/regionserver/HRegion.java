@@ -52,7 +52,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.RandomAccess;
@@ -195,6 +194,7 @@ import org.apache.hadoop.hbase.util.HashedBytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
 import org.apache.hadoop.hbase.util.Threads;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -4468,7 +4468,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       long skippedEdits = 0;
       long editsCount = 0;
       long intervalEdits = 0;
-      WAL.Entry entry;
+      Entry entry;
       Store store = null;
       boolean reported_once = false;
       ServerNonceManager ng = this.rsServices == null ? null : this.rsServices.getNonceManager();
@@ -5313,7 +5313,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     if (writestate.flushing) {
       boolean canDrop = true;
       if (prepareFlushResult.storeFlushCtxs != null) {
-        for (Entry<byte[], StoreFlushContext> entry
+        for (Map.Entry<byte[], StoreFlushContext> entry
             : prepareFlushResult.storeFlushCtxs.entrySet()) {
           Store store = getStore(entry.getKey());
           if (store == null) {

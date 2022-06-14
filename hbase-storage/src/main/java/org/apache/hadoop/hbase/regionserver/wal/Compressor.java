@@ -29,6 +29,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.io.util.Dictionary;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALProvider;
@@ -85,7 +86,7 @@ final public class Compressor {
       conf.setBoolean(HConstants.ENABLE_WAL_COMPRESSION, !compress);
       out = WALFactory.createWALWriter(outFS, output, conf);
 
-      WAL.Entry e = null;
+      Entry e = null;
       while ((e = in.next()) != null) {
         out.append(e);
       }

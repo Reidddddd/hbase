@@ -40,6 +40,7 @@ import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -236,7 +237,7 @@ public class TestDurability {
     Path walPath = DefaultWALProvider.getCurrentFileName(log);
     WAL.Reader reader = wals.createReader(FS, walPath);
     int count = 0;
-    WAL.Entry entry = new WAL.Entry();
+    Entry entry = new Entry();
     while (reader.next(entry) != null) count++;
     reader.close();
     assertEquals(expected, count);

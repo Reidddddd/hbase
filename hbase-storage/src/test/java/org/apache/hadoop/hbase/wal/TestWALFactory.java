@@ -207,7 +207,7 @@ public class TestWALFactory {
       Path walPath = DefaultWALProvider.getCurrentFileName(wal);
       reader = wals.createReader(fs, walPath);
       int count = 0;
-      WAL.Entry entry = new WAL.Entry();
+      Entry entry = new Entry();
       while ((entry = reader.next(entry)) != null) {
         count++;
       }
@@ -387,7 +387,7 @@ public class TestWALFactory {
     // Make sure you can read all the content
     WAL.Reader reader = wals.createReader(fs, walPath);
     int count = 0;
-    WAL.Entry entry = new WAL.Entry();
+    Entry entry = new Entry();
     while (reader.next(entry) != null) {
       count++;
       assertTrue("Should be one KeyValue per WALEdit",
@@ -441,7 +441,7 @@ public class TestWALFactory {
       // Above we added all columns on a single row so we only read one
       // entry in the below... thats why we have '1'.
       for (int i = 0; i < 1; i++) {
-        WAL.Entry entry = reader.next(null);
+        Entry entry = reader.next(null);
         if (entry == null) {
           break;
         }
@@ -494,7 +494,7 @@ public class TestWALFactory {
       Path filename = DefaultWALProvider.getCurrentFileName(log);
       // Now open a reader on the log and assert append worked.
       reader = wals.createReader(fs, filename);
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       assertEquals(COL_COUNT, entry.getEdit().size());
       int idx = 0;
       for (Cell val : entry.getEdit().getCells()) {
@@ -594,7 +594,7 @@ public class TestWALFactory {
           String value = i + "" + j;
           edit.add(new KeyValue(row, row, row, timestamp, Bytes.toBytes(value)));
         }
-        sflw.append(new WAL.Entry(key, edit));
+        sflw.append(new Entry(key, edit));
       }
       sflw.sync();
       sflw.close();
@@ -603,7 +603,7 @@ public class TestWALFactory {
       reader = wals.createReader(fs, path);
       assertTrue(reader instanceof SequenceFileLogReader);
       for (int i = 0; i < recordCount; ++i) {
-        WAL.Entry entry = reader.next();
+        Entry entry = reader.next();
         assertNotNull(entry);
         assertEquals(columnCount, entry.getEdit().size());
         assertArrayEquals(hri.getEncodedNameAsBytes(), entry.getKey().getEncodedRegionName());
@@ -616,7 +616,7 @@ public class TestWALFactory {
           idx++;
         }
       }
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       assertNull(entry);
     } finally {
       if (sflw != null) {

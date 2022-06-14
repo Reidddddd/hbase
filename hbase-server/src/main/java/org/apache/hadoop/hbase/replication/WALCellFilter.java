@@ -19,8 +19,8 @@ package org.apache.hadoop.hbase.replication;
 
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
 
 /**
  * A filter for WAL entry cells before being sent over to replication.

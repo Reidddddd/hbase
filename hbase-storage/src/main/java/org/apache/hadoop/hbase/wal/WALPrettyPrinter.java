@@ -280,7 +280,7 @@ public class WALPrettyPrinter {
     }
 
     try {
-      WAL.Entry entry;
+      Entry entry;
       while ((entry = log.next()) != null) {
         WALKey key = entry.getKey();
         WALEdit edit = entry.getEdit();

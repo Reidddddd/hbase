@@ -18,16 +18,14 @@
 
 package org.apache.hadoop.hbase.replication;
 
+import com.google.common.base.Predicate;
 import java.util.NavigableMap;
-
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
-
-import com.google.common.base.Predicate;
 
 /**
  * Keeps KVs that are scoped other than local

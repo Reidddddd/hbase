@@ -25,7 +25,6 @@ import java.util.Queue;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.SequenceFileLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
 
 public class FaultySequenceFileLogReader extends SequenceFileLogReader {
 

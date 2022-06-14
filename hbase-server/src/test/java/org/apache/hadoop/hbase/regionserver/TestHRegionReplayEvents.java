@@ -79,6 +79,7 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManagerTestHelper;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -259,7 +260,7 @@ public class TestHRegionReplayEvents {
 
     LOG.info("-- Replaying edits and flush events in secondary");
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -285,7 +286,7 @@ public class TestHRegionReplayEvents {
     assertEquals(0, rss.getRegionServerAccounting().getGlobalMemstoreSize());
   }
 
-  static int replayEdit(HRegion region, WAL.Entry entry) throws IOException {
+  static int replayEdit(HRegion region, Entry entry) throws IOException {
     if (WALEdit.isMetaEditFamily(entry.getEdit().getCells().get(0))) {
       return 0; // handled elsewhere
     }
@@ -323,7 +324,7 @@ public class TestHRegionReplayEvents {
     int lastReplayed = 0;
     int expectedStoreFileCount = 0;
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -425,7 +426,7 @@ public class TestHRegionReplayEvents {
 
     int lastReplayed = 0;
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -531,7 +532,7 @@ public class TestHRegionReplayEvents {
     int lastReplayed = 0;
     while (true) {
       System.out.println(lastReplayed);
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -621,7 +622,7 @@ public class TestHRegionReplayEvents {
 
     int lastReplayed = 0;
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -733,7 +734,7 @@ public class TestHRegionReplayEvents {
 
     int lastReplayed = 0;
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -827,7 +828,7 @@ public class TestHRegionReplayEvents {
 
     LOG.info("-- Replaying edits and region events in secondary");
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -907,7 +908,7 @@ public class TestHRegionReplayEvents {
 
     LOG.info("-- Replaying edits and region events in secondary");
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -983,11 +984,11 @@ public class TestHRegionReplayEvents {
     // now replay the edits and the flush marker
     reader =  createWALReaderForPrimary();
     List<RegionEventDescriptor> regionEvents = Lists.newArrayList();
-    List<WAL.Entry> edits = Lists.newArrayList();
+    List<Entry> edits = Lists.newArrayList();
 
     LOG.info("-- Replaying edits and region events in secondary");
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1014,7 +1015,7 @@ public class TestHRegionReplayEvents {
 
     // replay edits from the before region close. If replay does not
     // skip these the following verification will NOT fail.
-    for (WAL.Entry entry: edits) {
+    for (Entry entry: edits) {
       replayEdit(secondaryRegion, entry);
     }
 
@@ -1044,7 +1045,7 @@ public class TestHRegionReplayEvents {
     long flushSeqId = -1;
     LOG.info("-- Replaying flush events in secondary");
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1193,7 +1194,7 @@ public class TestHRegionReplayEvents {
     List<FlushDescriptor> flushes = Lists.newArrayList();
     reader = createWALReaderForPrimary();
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1223,7 +1224,7 @@ public class TestHRegionReplayEvents {
     primaryRegion.flushcache(true, true);
     reader = createWALReaderForPrimary();
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1255,7 +1256,7 @@ public class TestHRegionReplayEvents {
 
     reader = createWALReaderForPrimary();
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1289,7 +1290,7 @@ public class TestHRegionReplayEvents {
 
     reader = createWALReaderForPrimary();
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1319,7 +1320,7 @@ public class TestHRegionReplayEvents {
 
     reader = createWALReaderForPrimary();
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1400,7 +1401,7 @@ public class TestHRegionReplayEvents {
 
     reader =  createWALReaderForPrimary();
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }
@@ -1488,7 +1489,7 @@ public class TestHRegionReplayEvents {
     LOG.info("-- Replaying edits and region events in secondary");
     BulkLoadDescriptor bulkloadEvent = null;
     while (true) {
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       if (entry == null) {
         break;
       }

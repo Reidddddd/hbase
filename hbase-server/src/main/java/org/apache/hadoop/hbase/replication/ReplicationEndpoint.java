@@ -23,12 +23,12 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.hbase.Abortable;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.TableDescriptors;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.hadoop.hbase.replication.regionserver.MetricsSource;
 
 import com.google.common.util.concurrent.Service;

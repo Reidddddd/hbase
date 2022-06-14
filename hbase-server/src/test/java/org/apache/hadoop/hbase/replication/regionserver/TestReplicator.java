@@ -39,8 +39,8 @@ import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.TestReplicationBase;
 import org.apache.hadoop.hbase.replication.regionserver.HBaseInterClusterReplicationEndpoint;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
 
+import org.apache.hadoop.hbase.wal.Entry;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;

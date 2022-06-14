@@ -31,7 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.WAL;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WALProvider;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
@@ -169,7 +169,7 @@ public class SequenceFileLogWriter extends WriterBase {
   }
 
   @Override
-  public void append(WAL.Entry entry) throws IOException {
+  public void append(Entry entry) throws IOException {
     entry.setCompressionContext(compressionContext);
     try {
       this.writer.append(entry.getKey(), entry.getEdit());

@@ -21,11 +21,10 @@ package org.apache.hadoop.hbase.replication;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
+import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A {@link WALEntryFilter} which contains multiple filters and applies them

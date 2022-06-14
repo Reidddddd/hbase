@@ -37,6 +37,7 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -98,18 +99,18 @@ public class TestReadOldRootAndMetaEdits {
     Path path = new Path(dir, "t");
     try {
       tRegionInfo = new HRegionInfo(t, HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);
-      WAL.Entry tEntry = createAEntry(
+      Entry tEntry = createAEntry(
         new HLogKey(tRegionInfo.getEncodedNameAsBytes(), t, ++logCount, timestamp,
           HConstants.DEFAULT_CLUSTER_ID), kvs);
 
       // create a old root edit (-ROOT-).
-      WAL.Entry rootEntry = createAEntry(
+      Entry rootEntry = createAEntry(
         new HLogKey(Bytes.toBytes(TableName.OLD_ROOT_STR),
           TableName.OLD_ROOT_TABLE_NAME, ++logCount, timestamp,
           HConstants.DEFAULT_CLUSTER_ID), kvs);
 
       // create a old meta edit (hbase:meta).
-      WAL.Entry oldMetaEntry = createAEntry(
+      Entry oldMetaEntry = createAEntry(
         new HLogKey(Bytes.toBytes(TableName.OLD_META_STR),
           TableName.OLD_META_TABLE_NAME, ++logCount, timestamp,
           HConstants.DEFAULT_CLUSTER_ID), kvs);
@@ -126,7 +127,7 @@ public class TestReadOldRootAndMetaEdits {
 
       // read the log and see things are okay.
       reader = WALFactory.createReader(fs, path, conf);
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       assertNotNull(entry);
       assertTrue(entry.getKey().getTablename().equals(t));
       assertEquals(Bytes.toString(entry.getKey().getEncodedRegionName()),
@@ -150,14 +151,14 @@ public class TestReadOldRootAndMetaEdits {
   /**
    * Creates a WALEdit for the passed KeyValues and returns a WALProvider.Entry instance composed of
    * the WALEdit and passed WALKey.
-   * @return WAL.Entry instance for the passed WALKey and KeyValues
+   * @return Entry instance for the passed WALKey and KeyValues
    */
-  private WAL.Entry createAEntry(WALKey walKey, List<KeyValue> kvs) {
+  private Entry createAEntry(WALKey walKey, List<KeyValue> kvs) {
     WALEdit edit = new WALEdit();
     for (KeyValue kv: kvs) {
       edit.add(kv);
     }
-    return new WAL.Entry(walKey, edit);
+    return new Entry(walKey, edit);
   }
 
 }

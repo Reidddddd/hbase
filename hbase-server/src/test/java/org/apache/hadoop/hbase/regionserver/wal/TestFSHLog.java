@@ -68,6 +68,7 @@ import org.apache.hadoop.hbase.util.EnvironmentEdge;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALPerformanceEvaluation;
@@ -179,7 +180,7 @@ public class TestFSHLog {
         throw new IOException("Injected failure..");
       }
 
-      @Override public void append(WAL.Entry entry) throws IOException {
+      @Override public void append(Entry entry) throws IOException {
       }
 
       @Override public long getLength() throws IOException {

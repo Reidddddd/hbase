@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.hbase.replication;
 
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
+import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A Filter for WAL entries before being sent over to replication. Multiple

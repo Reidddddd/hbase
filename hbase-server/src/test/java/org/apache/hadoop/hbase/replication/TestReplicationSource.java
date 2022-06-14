@@ -75,6 +75,7 @@ import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.ManualEnvironmentEdge;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -168,13 +169,13 @@ public class TestReplicationSource {
       edit.add(kv);
       WALKey key = new WALKey(b, TableName.valueOf(b), 0, 0,
           HConstants.DEFAULT_CLUSTER_ID);
-      writer.append(new WAL.Entry(key, edit));
+      writer.append(new Entry(key, edit));
       writer.sync();
     }
     writer.close();
 
     WAL.Reader reader = WALFactory.createReader(FS, logPath, TEST_UTIL.getConfiguration());
-    WAL.Entry entry = reader.next();
+    Entry entry = reader.next();
     assertNotNull(entry);
 
     Path oldLogPath = new Path(oldLogDir, "log");
@@ -244,7 +245,7 @@ public class TestReplicationSource {
       NavigableMap<byte[], Integer> scopes = new TreeMap<byte[], Integer>(Bytes.BYTES_COMPARATOR);
       scopes.put(b, HConstants.REPLICATION_SCOPE_GLOBAL);
       key.setScopes(scopes);
-      writer.append(new WAL.Entry(key, edit));
+      writer.append(new Entry(key, edit));
       writer.sync();
     }
     writer.close();

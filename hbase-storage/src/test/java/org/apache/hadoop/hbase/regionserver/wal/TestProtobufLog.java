@@ -39,7 +39,7 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.wal.WAL;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALProvider;
@@ -160,7 +160,7 @@ public class TestProtobufLog {
           String value = i + "" + j;
           edit.add(new KeyValue(row, row, row, timestamp, Bytes.toBytes(value)));
         }
-        writer.append(new WAL.Entry(key, edit));
+        writer.append(new Entry(key, edit));
       }
       writer.sync();
       if (withTrailer) {
@@ -175,7 +175,7 @@ public class TestProtobufLog {
         assertNull(reader.trailer);
       }
       for (int i = 0; i < recordCount; ++i) {
-        WAL.Entry entry = reader.next();
+        Entry entry = reader.next();
         assertNotNull(entry);
         assertEquals(columnCount, entry.getEdit().size());
         assertArrayEquals(hri.getEncodedNameAsBytes(), entry.getKey().getEncodedRegionName());
@@ -188,7 +188,7 @@ public class TestProtobufLog {
           idx++;
         }
       }
-      WAL.Entry entry = reader.next();
+      Entry entry = reader.next();
       assertNull(entry);
     } finally {
       if (writer != null) {

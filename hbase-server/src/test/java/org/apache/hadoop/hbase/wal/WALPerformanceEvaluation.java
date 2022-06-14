@@ -403,7 +403,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
     Map<String, Long> sequenceIds = new HashMap<String, Long>();
     try {
       while (true) {
-        WAL.Entry e = reader.next();
+        Entry e = reader.next();
         if (e == null) {
           LOG.debug("Read count=" + count + " from " + wal);
           break;

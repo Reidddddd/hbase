@@ -160,6 +160,7 @@ import org.apache.hadoop.hbase.util.ManualEnvironmentEdge;
 import org.apache.hadoop.hbase.util.PairOfSameType;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.FaultyFSLog;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
@@ -689,7 +690,7 @@ public class TestHRegion {
         WALEdit edit = new WALEdit();
         edit.add(new KeyValue(row, family, Bytes.toBytes(i), time, KeyValue.Type.Put, Bytes
             .toBytes(i)));
-        writer.append(new WAL.Entry(new HLogKey(regionName, tableName, i, time,
+        writer.append(new Entry(new HLogKey(regionName, tableName, i, time,
             HConstants.DEFAULT_CLUSTER_ID), edit));
 
         writer.close();
@@ -742,7 +743,7 @@ public class TestHRegion {
         WALEdit edit = new WALEdit();
         edit.add(new KeyValue(row, family, Bytes.toBytes(i), time, KeyValue.Type.Put, Bytes
             .toBytes(i)));
-        writer.append(new WAL.Entry(new HLogKey(regionName, tableName, i, time,
+        writer.append(new Entry(new HLogKey(regionName, tableName, i, time,
             HConstants.DEFAULT_CLUSTER_ID), edit));
 
         writer.close();
@@ -842,7 +843,7 @@ public class TestHRegion {
           edit.add(new KeyValue(row, family, Bytes.toBytes(i), time, KeyValue.Type.Put, Bytes
             .toBytes(i)));
         }
-        writer.append(new WAL.Entry(new HLogKey(regionName, tableName, i, time,
+        writer.append(new Entry(new HLogKey(regionName, tableName, i, time,
             HConstants.DEFAULT_CLUSTER_ID), edit));
         writer.close();
       }
@@ -940,7 +941,7 @@ public class TestHRegion {
 
       long time = System.nanoTime();
 
-      writer.append(new WAL.Entry(new HLogKey(regionName, tableName, 10, time,
+      writer.append(new Entry(new HLogKey(regionName, tableName, 10, time,
           HConstants.DEFAULT_CLUSTER_ID), WALEdit.createCompaction(region.getRegionInfo(),
           compactionDescriptor)));
       writer.close();
@@ -1020,10 +1021,10 @@ public class TestHRegion {
       WAL.Reader reader = WALFactory.createReader(fs, DefaultWALProvider.getCurrentFileName(wal),
         TEST_UTIL.getConfiguration());
       try {
-        List<WAL.Entry> flushDescriptors = new ArrayList<WAL.Entry>();
+        List<Entry> flushDescriptors = new ArrayList<Entry>();
         long lastFlushSeqId = -1;
         while (true) {
-          WAL.Entry entry = reader.next();
+          Entry entry = reader.next();
           if (entry == null) {
             break;
           }
@@ -1064,7 +1065,7 @@ public class TestHRegion {
         fs.create(recoveredEdits);
         WALProvider.Writer writer = wals.createRecoveredEditsWriter(fs, recoveredEdits);
 
-        for (WAL.Entry entry : flushDescriptors) {
+        for (Entry entry : flushDescriptors) {
           writer.append(entry);
         }
         writer.close();

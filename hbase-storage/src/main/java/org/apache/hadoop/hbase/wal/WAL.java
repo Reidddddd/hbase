@@ -26,9 +26,7 @@ import java.util.Set;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.regionserver.wal.CompressionContext;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
-import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.regionserver.wal.WALCoprocessorHost;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
@@ -208,66 +206,4 @@ public interface WAL extends Closeable {
     long getPosition() throws IOException;
     void reset() throws IOException;
   }
-
-  /**
-   * Utility class that lets us keep track of the edit with it's key.
-   */
-  class Entry {
-    private WALEdit edit;
-    private WALKey key;
-
-    public Entry() {
-      edit = new WALEdit();
-      // we use HLogKey here instead of WALKey directly to support legacy coprocessors.
-      key = new HLogKey();
-    }
-
-    /**
-     * Constructor for both params
-     *
-     * @param edit log's edit
-     * @param key log's key
-     */
-    public Entry(WALKey key, WALEdit edit) {
-      super();
-      this.key = key;
-      this.edit = edit;
-    }
-
-    /**
-     * Gets the edit
-     *
-     * @return edit
-     */
-    public WALEdit getEdit() {
-      return edit;
-    }
-
-    /**
-     * Gets the key
-     *
-     * @return key
-     */
-    public WALKey getKey() {
-      return key;
-    }
-
-    /**
-     * Set compression context for this entry.
-     *
-     * @param compressionContext
-     *          Compression context
-     */
-    public void setCompressionContext(CompressionContext compressionContext) {
-      edit.setCompressionContext(compressionContext);
-      key.setCompressionContext(compressionContext);
-    }
-
-    @Override
-    public String toString() {
-      return this.key + "=" + this.edit;
-    }
-
-  }
-
 }

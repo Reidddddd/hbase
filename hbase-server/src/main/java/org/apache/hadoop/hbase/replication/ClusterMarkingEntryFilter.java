@@ -21,12 +21,11 @@ package org.apache.hadoop.hbase.replication;
 import java.util.UUID;
 
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
-
 
 /**
  * Filters out entries with our peerClusterId (i.e. already replicated)

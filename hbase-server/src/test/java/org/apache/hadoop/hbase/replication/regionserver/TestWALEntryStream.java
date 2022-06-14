@@ -30,7 +30,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,7 +46,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -75,8 +73,8 @@ import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.testclassification.ReplicationTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
-import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALProvider;
@@ -181,7 +179,7 @@ public class TestWALEntryStream {
           try (WALEntryStream entryStream =
               new WALEntryStream(logQueue, fs, conf, new MetricsSource("1"), fakeWalGroupId)) {
             int i = 0;
-            for (WAL.Entry e : entryStream) {
+            for (Entry e : entryStream) {
               assertNotNull(e);
               i++;
             }
@@ -210,7 +208,7 @@ public class TestWALEntryStream {
         new WALEntryStream(logQueue, fs, conf, new MetricsSource("1"), fakeWalGroupId)) {
       // There's one edit in the log, read it. Reading past it needs to throw exception
       assertTrue(entryStream.hasNext());
-      WAL.Entry entry = entryStream.next();
+      Entry entry = entryStream.next();
       assertNotNull(entry);
       assertFalse(entryStream.hasNext());
       try {
@@ -227,7 +225,7 @@ public class TestWALEntryStream {
     try (WALEntryStream entryStream =
         new WALEntryStream(logQueue, fs, conf, oldPos, new MetricsSource("1"), fakeWalGroupId)) {
       // Read the newly added entry, make sure we made progress
-      WAL.Entry entry = entryStream.next();
+      Entry entry = entryStream.next();
       assertNotEquals(oldPos, entryStream.getPosition());
       assertNotNull(entry);
       oldPos = entryStream.getPosition();
@@ -240,7 +238,7 @@ public class TestWALEntryStream {
 
     try (WALEntryStream entryStream =
         new WALEntryStream(logQueue, fs, conf, oldPos, new MetricsSource("1"), fakeWalGroupId)) {
-      WAL.Entry entry = entryStream.next();
+      Entry entry = entryStream.next();
       assertNotEquals(oldPos, entryStream.getPosition());
       assertNotNull(entry);
 
@@ -535,7 +533,7 @@ public class TestWALEntryStream {
     return entryStream.getPosition();
   }
 
-  private String getRow(WAL.Entry entry) {
+  private String getRow(Entry entry) {
     Cell cell = entry.getEdit().getCells().get(0);
     return Bytes.toString(cell.getRowArray(), cell.getRowOffset(), cell.getRowLength());
   }
@@ -778,7 +776,7 @@ public class TestWALEntryStream {
       NavigableMap<byte[], Integer> scopes = new TreeMap<byte[], Integer>(Bytes.BYTES_COMPARATOR);
       scopes.put(b, HConstants.REPLICATION_SCOPE_GLOBAL);
       key.setScopes(scopes);
-      writer.append(new WAL.Entry(key, edit));
+      writer.append(new Entry(key, edit));
       writer.sync();
     }
     writer.close();
@@ -800,7 +798,7 @@ public class TestWALEntryStream {
            new WALEntryStream(logQueue, fs, conf, logQueue.getMetrics(), fakeWalGroupId)) {
       // There's one edit in the log, read it.
       assertTrue(entryStream.hasNext());
-      WAL.Entry entry = entryStream.next();
+      Entry entry = entryStream.next();
       assertNotNull(entry);
       assertFalse(entryStream.hasNext());
     }

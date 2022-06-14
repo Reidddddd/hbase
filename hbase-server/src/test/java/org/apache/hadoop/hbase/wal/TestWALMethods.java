@@ -146,7 +146,7 @@ public class TestWALMethods {
 
     EntryBuffers sink = new EntryBuffers(new PipelineController(), 1*1024*1024);
     for (int i = 0; i < 1000; i++) {
-      WAL.Entry entry = createTestLogEntry(i);
+      Entry entry = createTestLogEntry(i);
       sink.appendEntry(entry);
     }
 
@@ -161,7 +161,7 @@ public class TestWALMethods {
 
     // Insert some more entries
     for (int i = 0; i < 500; i++) {
-      WAL.Entry entry = createTestLogEntry(i);
+      Entry entry = createTestLogEntry(i);
       sink.appendEntry(entry);
     }
     // Asking for another chunk shouldn't work since the first one
@@ -183,7 +183,7 @@ public class TestWALMethods {
     assertEquals(0, sink.totalBuffered);
   }
 
-  private WAL.Entry createTestLogEntry(int i) {
+  private Entry createTestLogEntry(int i) {
     long seq = i;
     long now = i * 1000;
 
@@ -191,7 +191,7 @@ public class TestWALMethods {
     edit.add(KeyValueTestUtil.create("row", "fam", "qual", 1234, "val"));
     WALKey key = new WALKey(TEST_REGION, TEST_TABLE, seq, now,
         HConstants.DEFAULT_CLUSTER_ID);
-    WAL.Entry entry = new WAL.Entry(key, edit);
+    Entry entry = new Entry(key, edit);
     return entry;
   }
 

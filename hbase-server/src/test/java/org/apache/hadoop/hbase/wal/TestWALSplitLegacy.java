@@ -190,7 +190,7 @@ public class TestWALSplitLegacy {
         int count = 0;
         String previousRegion = null;
         long seqno = -1;
-        WAL.Entry entry = new WAL.Entry();
+        Entry entry = new Entry();
         while((entry = reader.next(entry)) != null) {
           WALKey key = entry.getKey();
           String region = Bytes.toString(key.getEncodedRegionName());
