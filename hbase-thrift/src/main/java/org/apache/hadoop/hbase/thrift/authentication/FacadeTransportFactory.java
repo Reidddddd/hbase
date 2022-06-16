@@ -24,6 +24,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.thrift.HBaseServiceHandler;
 import org.apache.thrift.transport.TSaslServerTransport;
+import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -51,7 +52,15 @@ public class FacadeTransportFactory extends TSaslServerTransport.Factory {
       try {
         transport.open();
       } catch (TTransportException e) {
-        LOG.warn(e);
+        if (LOG.isTraceEnabled()) {
+          // This exception should not impact our server side.
+          // Only set the address to trace the client here.
+          if (base instanceof TSocket) {
+            TSocket tSocket = (TSocket) base;
+            LOG.trace("Failed to open sasl transport for " + tSocket.getSocket().getInetAddress()
+              + "\n", e);
+          }
+        }
       }
     }
     return ret.get();
