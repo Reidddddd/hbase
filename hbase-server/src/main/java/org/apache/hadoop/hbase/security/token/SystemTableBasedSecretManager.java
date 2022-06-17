@@ -17,25 +17,20 @@
  */
 package org.apache.hadoop.hbase.security.token;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.Server;
-import org.apache.hadoop.hbase.TableNotFoundException;
-import org.apache.hadoop.hbase.client.ClusterConnection;
-import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
-import org.apache.hadoop.hbase.security.authentication.SecretDecryptor;
-import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
+import org.apache.hadoop.hbase.security.authentication.CredentialCache;
 import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -52,16 +47,10 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
   private static final Log LOG = LogFactory.getLog(SystemTableBasedSecretManager.class);
   private static final byte[] CREDENTIAL_MAGIC_WORD = {'S', 'H', 'B', 'a', 's'};
 
-  private final Server server;
-  private final SecretDecryptor decryptor;
-  private final ThreadLocal<Table> authTable = new ThreadLocal<>();
-
-  private final transient Token<? extends TokenIdentifier> adminToken = new Token<>();
+  private CredentialCache credentialCache;
 
   public SystemTableBasedSecretManager(final Server server) {
     User adminUser;
-    this.server = server;
-    this.decryptor = new SecretDecryptor();
     try {
       adminUser = UserProvider.instantiate(server.getConfiguration()).getCurrent();
     } catch (IOException e) {
@@ -70,44 +59,11 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     }
     try {
       String localCredential = server.getConfiguration().get(User.DIGEST_PASSWORD_KEY);
+      credentialCache = new CredentialCache(server, adminUser.getShortName());
       setLocalCredential(adminUser, localCredential);
     } catch (InvalidToken e) {
       server.abort("Invalid local credential detected. Regionserver abort. ", e);
     }
-    Thread decrytorInitThread = new Thread(new Runnable() {
-      @Override
-      public void run() {
-        String msg = "Secret decryptor initialization failed. ";
-        while (server.getConnection() == null) {
-          // Wait for the cluster connection available.
-          try {
-            Thread.sleep(1000);
-          } catch (InterruptedException e) {
-            server.abort(msg, new IllegalStateException(msg));
-          }
-        }
-        try {
-          // Wait for the secret table initialization.
-          ClusterConnection conn = server.getConnection();
-          while (!conn.isTableAvailable(SecretTableAccessor.getSecretTableName())) {
-            try {
-              Thread.sleep(1000);
-            } catch (InterruptedException e) {
-              // Do nothing.
-            }
-          }
-          Thread.sleep(1000);
-          decryptor.initDecryption(getAuthTable(), server);
-        } catch (IOException | InterruptedException e) {
-          server.abort(e.getMessage(), e);
-        }
-        if (!decryptor.isInitialized()) {
-          server.abort(msg, new IllegalStateException(msg));
-        }
-      }
-    });
-    decrytorInitThread.setDaemon(true);
-    decrytorInitThread.start();
   }
 
   /**
@@ -121,6 +77,7 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
   /**
    * Returns a password of a given user in bytes.
    */
+  @VisibleForTesting
   @Override
   public byte[] retrievePassword(AuthenticationTokenIdentifier authenticationTokenIdentifier)
       throws InvalidToken {
@@ -128,23 +85,7 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     if (username == null || username.isEmpty()) {
       throw new InvalidToken("Username was not given when do authentication.");
     }
-    if (Bytes.compareTo(authenticationTokenIdentifier.getBytes(),
-        adminToken.getIdentifier()) == 0) {
-      return adminToken.getPassword();
-    }
-
-    byte[] password = null;
-    try {
-      byte[] cipherPassword =
-          SecretTableAccessor.getUserPassword(getHashedUsername(username), getAuthTable());
-      password = decryptor.decryptSecret(cipherPassword);
-      if (password == null) {
-        LOG.warn("Password of given user " + username + " is null. ");
-      }
-    } catch (IOException e) {
-      LOG.error("Failed retrieving password for user " + username + "\n", e);
-    }
-    return password == null ? new byte[0] : password;
+    return credentialCache.getPassword(username);
   }
 
   private void setLocalCredential(User user, String code) throws InvalidToken {
@@ -166,7 +107,7 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
     byte[] username = new byte[nameLen];
     buffer.get(username);
 
-    if (0 != Bytes.compareTo(getHashedUsername(user.getShortName()), username)) {
+    if (0 != Bytes.compareTo(Encryption.hash256Hex(user.getShortName()), username)) {
       throw new InvalidToken("The local credential for user :" + user.getShortName()
           + " is not valid. ");
     }
@@ -176,12 +117,14 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
 
     AuthenticationTokenIdentifier identifier =
         new AuthenticationTokenIdentifier(user.getShortName());
+    Token<? extends TokenIdentifier> adminToken = new Token<>();
     adminToken.setID(identifier.getBytes());
     adminToken.setPassword(password);
     adminToken.setService(new Text(HConstants.CLUSTER_ID_DEFAULT));
     adminToken.setKind(identifier.getKind());
 
     user.addToken(adminToken);
+    credentialCache.insertLocalCredential(user.getShortName(), password, true);
   }
 
   private boolean isValidCredential(byte[] code) {
@@ -204,40 +147,8 @@ public class SystemTableBasedSecretManager extends AbstractAuthenticationSecretM
       LOG.warn("No valid username is found when doing allowFallback check. ");
       return false;
     }
-    IOException ioe = null;
-    try {
-      return SecretTableAccessor.allowFallback(getHashedUsername(username), getAuthTable());
-    } catch (IOException e) {
-      try {
-        if (e instanceof TableNotFoundException || e instanceof NotServingRegionException) {
-          // To guarantee the cluster internal RPCs works normally, we need to allow the processing
-          // user to fallback if the secret table is not available.
-          return UserGroupInformation.getLoginUser().getShortUserName().equals(username);
-        }
-        ioe = e;
-      } catch (IOException ex) {
-        ioe = ex;
-      }
-    }
-    LOG.warn("Error occurs when check allowFallback for user " + username + " \n", ioe);
-    return false;
-  }
 
-  private Table getAuthTable() throws IOException {
-    if (authTable.get() == null) {
-      ClusterConnection connection = server.getConnection();
-      if (connection == null) {
-        // We should never go here.
-        throw new IllegalStateException("The ClusterConnection in region server "
-            + "is not initialized.");
-      }
-      authTable.set(connection.getTable(SecretTableAccessor.getSecretTableName()));
-    }
-    return authTable.get();
-  }
-
-  private byte[] getHashedUsername(String username) {
-    return Encryption.hash256Hex(username);
+    return credentialCache.getAllowFallback(username);
   }
 
   @Override

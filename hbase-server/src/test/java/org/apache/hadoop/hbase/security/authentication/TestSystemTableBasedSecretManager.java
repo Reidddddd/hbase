@@ -122,6 +122,7 @@ public class TestSystemTableBasedSecretManager {
 
     TEST_UTIL.getConfiguration().set(User.HBASE_SECURITY_CONF_KEY, "digest");
     TEST_UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, VALID_CREDENTIAL);
+    TEST_UTIL.getConfiguration().setLong("hbase.secret.refresh.period", 1000);
 
     TEST_UTIL.startMiniCluster();
     SystemTableBasedSecretManager secretManager =
@@ -138,11 +139,15 @@ public class TestSystemTableBasedSecretManager {
     put.addColumn(Bytes.toBytes("i"), Bytes.toBytes("a"), Bytes.toBytes(false));
     authTable.put(put);
 
+    // Wait the cache periodical refresh.
+    Threads.sleep(2000);
     assertFalse(secretManager.isAllowedFallback(VALID_USERNAME));
 
     put.addColumn(Bytes.toBytes("i"), Bytes.toBytes("a"), Bytes.toBytes(true));
     authTable.put(put);
 
+    // Wait the cache periodical refresh.
+    Threads.sleep(2000);
     assertTrue(secretManager.isAllowedFallback(VALID_USERNAME));
   }
 
@@ -212,7 +217,7 @@ public class TestSystemTableBasedSecretManager {
 
     @Override
     public ChoreService getChoreService() {
-      return null;
+      return new ChoreService("DummyChore");
     }
 
     public Throwable getAbortCause() {

@@ -107,6 +107,27 @@ public final class SecretTableAccessor {
     return Bytes.toBoolean(resValue);
   }
 
+  /**
+   * Method to get the whole credential information of a specific account.
+   * @return a {@link CredentialEntry} object.
+   */
+  public static CredentialEntry getAccountCredential(String account, Table table)
+    throws IOException {
+    sanityCheck(table);
+
+    Result res = table.get(new Get(Bytes.toBytes(account)));
+    CredentialEntry entry = new CredentialEntry();
+
+    entry.setPassword(res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
+      Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY)));
+
+    byte[] allowFallback = res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
+      Bytes.toBytes(SECRET_COLUMN_ALLOW_FALLBACK_KEY));
+    entry.setAllowFallback(allowFallback == null || allowFallback.length == 0 ? true :
+      Bytes.toBoolean(allowFallback));
+    return entry;
+  }
+
   private static void sanityCheck(Table table) {
     if (table == null) {
       throw new IllegalArgumentException("The global system table is not initialized. "

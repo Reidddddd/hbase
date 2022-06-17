@@ -633,10 +633,11 @@ public class HRegionServer extends HasThread implements
     }
     this.configurationManager = new ConfigurationManager();
 
+    // We need to create chore service first. Otherwise, the CredentialCache will have NPE.
+    this.choreService = new ChoreService(getServerName().toString(), true);
     rpcServices.start();
     putUpWebUI();
     this.walRoller = new LogRoller(this, this);
-    this.choreService = new ChoreService(getServerName().toString(), true);
     this.flushThroughputController = FlushThroughputControllerFactory.create(this, conf);
 
     if (!SystemUtils.IS_OS_WINDOWS) {
