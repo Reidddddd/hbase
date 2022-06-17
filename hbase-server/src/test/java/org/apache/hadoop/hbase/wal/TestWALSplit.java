@@ -76,7 +76,6 @@ import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Threads;
-import org.apache.hadoop.hbase.wal.WAL.Reader;
 import org.apache.hadoop.hbase.wal.WALProvider.Writer;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException;
@@ -597,7 +596,7 @@ public class TestWALSplit {
   private Set<String> splitCorruptWALs(final FaultySequenceFileLogReader.FailureType failureType)
       throws IOException {
     Class<?> backupClass = conf.getClass("hbase.regionserver.hlog.reader.impl",
-        Reader.class);
+      Reader.class);
     InstrumentedLogWriter.activateFailure = false;
 
     try {
@@ -632,7 +631,7 @@ public class TestWALSplit {
       return walDirContents;
     } finally {
       conf.setClass("hbase.regionserver.hlog.reader.impl", backupClass,
-          Reader.class);
+        Reader.class);
     }
   }
 

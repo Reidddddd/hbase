@@ -124,7 +124,7 @@ public class TestWALReaderOnSecureWAL {
   public void testWALReaderOnSecureWAL() throws Exception {
     Configuration conf = TEST_UTIL.getConfiguration();
     conf.setClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
-      WAL.Reader.class);
+      Reader.class);
     conf.setClass("hbase.regionserver.hlog.writer.impl", SecureProtobufLogWriter.class,
       WALProvider.Writer.class);
     conf.setBoolean(WAL_ENCRYPTION, true);
@@ -169,7 +169,7 @@ public class TestWALReaderOnSecureWAL {
   public void testSecureWALReaderOnWAL() throws Exception {
     Configuration conf = TEST_UTIL.getConfiguration();
     conf.setClass("hbase.regionserver.hlog.reader.impl", SecureProtobufLogReader.class,
-      WAL.Reader.class);
+      Reader.class);
     conf.setClass("hbase.regionserver.hlog.writer.impl", ProtobufLogWriter.class,
       WALProvider.Writer.class);
     conf.setBoolean(WAL_ENCRYPTION, false);
@@ -187,7 +187,7 @@ public class TestWALReaderOnSecureWAL {
 
     // Confirm the WAL can be read back by SecureProtobufLogReader
     try {
-      WAL.Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
+      Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
       reader.close();
     } catch (IOException ioe) {
       assertFalse(true);

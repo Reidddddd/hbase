@@ -91,6 +91,8 @@ import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HFileTestUtil;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
+import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -967,11 +969,13 @@ public class TestWALReplay {
     Path editFile = WALSplitter.getSplitEditFilesSorted(this.fs, regionDir).first();
     FSDataInputStream stream = fs.open(editFile);
     stream.seek(ProtobufLogReader.PB_WAL_MAGIC.length);
-    Class<? extends DefaultWALProvider.Reader> logReaderClass =
+    Class<? extends Reader> logReaderClass =
         conf.getClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
-          DefaultWALProvider.Reader.class);
-    DefaultWALProvider.Reader reader = logReaderClass.newInstance();
-    reader.init(this.fs, editFile, conf, stream);
+          Reader.class);
+    Reader reader = logReaderClass.newInstance();
+    if (reader instanceof FileSystemBasedReader) {
+      ((FileSystemBasedReader) reader).init(this.fs, editFile, conf, stream);
+    }
     final long headerLength = stream.getPos();
     reader.close();
     FileSystem spyFs = spy(this.fs);

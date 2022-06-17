@@ -39,7 +39,7 @@ import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.LeaseNotRecoveredException;
 import org.apache.hadoop.hbase.wal.Entry;
-import org.apache.hadoop.hbase.wal.WAL.Reader;
+import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.ipc.RemoteException;
 

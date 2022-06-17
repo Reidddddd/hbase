@@ -39,7 +39,6 @@ import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.LeaseNotRecoveredException;
-import org.apache.hadoop.hbase.wal.WAL.Reader;
 import org.apache.hadoop.hbase.wal.WALProvider.Writer;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -97,7 +96,7 @@ public class WALFactory {
   /**
    * Configuration-specified WAL Reader used when a custom reader is requested
    */
-  private final Class<? extends DefaultWALProvider.Reader> logReaderClass;
+  private final Class<? extends Reader> logReaderClass;
 
   /**
    * How long to attempt opening in-recovery wals
@@ -114,7 +113,7 @@ public class WALFactory {
     timeoutMillis = conf.getInt("hbase.hlog.open.timeout", 300000);
     /* TODO Both of these are probably specific to the fs wal provider */
     logReaderClass = conf.getClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
-        DefaultWALProvider.Reader.class);
+        Reader.class);
     this.conf = conf;
     // end required early initialization
 
@@ -172,7 +171,7 @@ public class WALFactory {
     timeoutMillis = conf.getInt("hbase.hlog.open.timeout", 300000);
     /* TODO Both of these are probably specific to the fs wal provider */
     logReaderClass = conf.getClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
-        DefaultWALProvider.Reader.class);
+        Reader.class);
     this.conf = conf;
     this.factoryId = factoryId;
     // end required early initialization
@@ -262,7 +261,7 @@ public class WALFactory {
 
   /**
    * Create a reader for the WAL. If you are reading from a file that's being written to and need
-   * to reopen it multiple times, use {@link WAL.Reader#reset()} instead of this method
+   * to reopen it multiple times, use {@link Reader#reset()} instead of this method
    * then just seek back to the last known good position.
    * @return A WAL reader.  Close when done with it.
    */
@@ -274,7 +273,7 @@ public class WALFactory {
   public Reader createReader(final FileSystem fs, final Path path,
       CancelableProgressable reporter, boolean allowCustom)
       throws IOException {
-    Class<? extends DefaultWALProvider.Reader> lrClass =
+    Class<? extends Reader> lrClass =
         allowCustom ? logReaderClass : ProtobufLogReader.class;
 
     try {
@@ -285,13 +284,15 @@ public class WALFactory {
       long openTimeout = timeoutMillis + startWaiting;
       int nbAttempt = 0;
       FSDataInputStream stream = null;
-      DefaultWALProvider.Reader reader = null;
+      Reader reader = null;
       while (true) {
         try {
           if (lrClass != ProtobufLogReader.class) {
             // User is overriding the WAL reader, let them.
             reader = lrClass.getDeclaredConstructor().newInstance();
-            reader.init(fs, path, conf, null);
+            if (reader instanceof FileSystemBasedReader) {
+              ((FileSystemBasedReader) reader).init(fs, path, conf, null);
+            }
             return reader;
           } else {
             stream = fs.open(path);
@@ -304,7 +305,9 @@ public class WALFactory {
                 && Arrays.equals(magic, ProtobufLogReader.PB_WAL_MAGIC);
             reader =
                 isPbWal ? new ProtobufLogReader() : new SequenceFileLogReader();
-            reader.init(fs, path, conf, stream);
+            if (reader instanceof FileSystemBasedReader) {
+              ((FileSystemBasedReader) reader).init(fs, path, conf, stream);
+            }
             return reader;
           }
         } catch (IOException e) {

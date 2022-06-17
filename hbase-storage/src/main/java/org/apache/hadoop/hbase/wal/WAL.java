@@ -194,16 +194,4 @@ public interface WAL extends Closeable {
    */
   @Override
   String toString();
-
-  /**
-   * When outside clients need to consume persisted WALs, they rely on a provided
-   * Reader.
-   */
-  interface Reader extends Closeable {
-    Entry next() throws IOException;
-    Entry next(Entry reuse) throws IOException;
-    void seek(long pos) throws IOException;
-    long getPosition() throws IOException;
-    void reset() throws IOException;
-  }
 }

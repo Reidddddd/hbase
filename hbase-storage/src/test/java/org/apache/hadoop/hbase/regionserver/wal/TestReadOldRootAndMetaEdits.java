@@ -38,7 +38,7 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.Entry;
-import org.apache.hadoop.hbase.wal.WAL;
+import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALProvider;
@@ -90,7 +90,7 @@ public class TestReadOldRootAndMetaEdits {
     kvs.add(kv);
 
     WALProvider.Writer writer = null;
-    WAL.Reader reader = null;
+    Reader reader = null;
     // a regular table
     TableName t = TableName.valueOf("t");
     HRegionInfo tRegionInfo = null;

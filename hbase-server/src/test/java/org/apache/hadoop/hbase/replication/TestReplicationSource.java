@@ -76,7 +76,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.ManualEnvironmentEdge;
 import org.apache.hadoop.hbase.wal.Entry;
-import org.apache.hadoop.hbase.wal.WAL;
+import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALProvider;
@@ -87,7 +87,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 @Category(MediumTests.class)
 public class TestReplicationSource {
@@ -174,7 +173,7 @@ public class TestReplicationSource {
     }
     writer.close();
 
-    WAL.Reader reader = WALFactory.createReader(FS, logPath, TEST_UTIL.getConfiguration());
+    Reader reader = WALFactory.createReader(FS, logPath, TEST_UTIL.getConfiguration());
     Entry entry = reader.next();
     assertNotNull(entry);
 
@@ -252,7 +251,7 @@ public class TestReplicationSource {
   }
 
   private long getPosition(WALFactory wals, Path log2, int numEntries) throws IOException {
-    WAL.Reader reader = wals.createReader(FS, log2);
+    Reader reader = wals.createReader(FS, log2);
     for (int i = 0; i < numEntries; i++) {
       reader.next();
     }

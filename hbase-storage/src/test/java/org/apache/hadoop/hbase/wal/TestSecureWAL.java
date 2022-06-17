@@ -65,7 +65,7 @@ public class TestSecureWAL {
     conf.set(HConstants.CRYPTO_KEYPROVIDER_CONF_KEY, KeyProviderForTesting.class.getName());
     conf.set(HConstants.CRYPTO_MASTERKEY_NAME_CONF_KEY, "hbase");
     conf.setClass("hbase.regionserver.hlog.reader.impl", SecureProtobufLogReader.class,
-      WAL.Reader.class);
+      Reader.class);
     conf.setClass("hbase.regionserver.hlog.writer.impl", SecureProtobufLogWriter.class,
       WALProvider.Writer.class);
     conf.setBoolean(HConstants.ENABLE_WAL_ENCRYPTION, true);
@@ -110,7 +110,7 @@ public class TestSecureWAL {
     assertFalse("Cells appear to be plaintext", Bytes.contains(fileData, value));
 
     // Confirm the WAL can be read back
-    WAL.Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
+    Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
     int count = 0;
     Entry entry = new Entry();
     while (reader.next(entry) != null) {

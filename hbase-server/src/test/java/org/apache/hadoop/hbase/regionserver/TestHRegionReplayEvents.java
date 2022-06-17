@@ -80,6 +80,7 @@ import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -130,7 +131,7 @@ public class TestHRegionReplayEvents {
   private HRegion primaryRegion, secondaryRegion;
   private WALFactory wals;
   private WAL walPrimary, walSecondary;
-  private WAL.Reader reader;
+  private Reader reader;
 
   @Before
   public void setup() throws IOException {
@@ -299,7 +300,7 @@ public class TestHRegionReplayEvents {
     return Integer.parseInt(Bytes.toString(put.getRow()));
   }
 
-  WAL.Reader createWALReaderForPrimary() throws FileNotFoundException, IOException {
+  Reader createWALReaderForPrimary() throws FileNotFoundException, IOException {
     return wals.createReader(TEST_UTIL.getTestFileSystem(),
       DefaultWALProvider.getCurrentFileName(walPrimary),
       TEST_UTIL.getConfiguration());

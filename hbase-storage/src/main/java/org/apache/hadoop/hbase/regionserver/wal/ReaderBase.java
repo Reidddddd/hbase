@@ -30,12 +30,12 @@ import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.io.util.LRUDictionary;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX})
-public abstract class ReaderBase implements DefaultWALProvider.Reader {
+public abstract class ReaderBase implements FileSystemBasedReader {
   private static final Log LOG = LogFactory.getLog(ReaderBase.class);
   protected Configuration conf;
   protected FileSystem fs;

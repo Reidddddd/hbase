@@ -185,7 +185,7 @@ public class TestWALFactory {
     in.close();
 
     final int total = 20;
-    WAL.Reader reader = null;
+    Reader reader = null;
 
     try {
       HRegionInfo info = new HRegionInfo(tableName,
@@ -385,7 +385,7 @@ public class TestWALFactory {
     }
 
     // Make sure you can read all the content
-    WAL.Reader reader = wals.createReader(fs, walPath);
+    Reader reader = wals.createReader(fs, walPath);
     int count = 0;
     Entry entry = new Entry();
     while (reader.next(entry) != null) {
@@ -410,7 +410,7 @@ public class TestWALFactory {
         new HTableDescriptor(TableName.valueOf("tablename")).addFamily(new HColumnDescriptor(
             "column"));
     final byte [] row = Bytes.toBytes("row");
-    WAL.Reader reader = null;
+    Reader reader = null;
     try {
       final MultiVersionConcurrencyControl mvcc = new MultiVersionConcurrencyControl(1);
 
@@ -468,7 +468,7 @@ public class TestWALFactory {
         new HTableDescriptor(TableName.valueOf("tablename")).addFamily(new HColumnDescriptor(
             "column"));
     final byte [] row = Bytes.toBytes("row");
-    WAL.Reader reader = null;
+    Reader reader = null;
     final MultiVersionConcurrencyControl mvcc = new MultiVersionConcurrencyControl(1);
     try {
       // Write columns named 1, 2, 3, etc. and then values of single byte
@@ -574,7 +574,7 @@ public class TestWALFactory {
     long timestamp = System.currentTimeMillis();
     Path path = new Path(dir, "tempwal");
     SequenceFileLogWriter sflw = null;
-    WAL.Reader reader = null;
+    Reader reader = null;
     try {
       HRegionInfo hri = new HRegionInfo(tableName,
           HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);

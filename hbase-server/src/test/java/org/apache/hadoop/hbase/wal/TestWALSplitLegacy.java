@@ -185,7 +185,7 @@ public class TestWALSplitLegacy {
     assertEquals(howmany * howmany, splits.size());
     for (int i = 0; i < splits.size(); i++) {
       LOG.info("Verifying=" + splits.get(i));
-      WAL.Reader reader = wals.createReader(fs, splits.get(i));
+      Reader reader = wals.createReader(fs, splits.get(i));
       try {
         int count = 0;
         String previousRegion = null;

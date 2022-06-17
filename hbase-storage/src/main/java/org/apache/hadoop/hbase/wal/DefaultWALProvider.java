@@ -28,7 +28,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
@@ -55,17 +54,6 @@ import org.apache.yetus.audience.InterfaceStability;
 @InterfaceStability.Evolving
 public class DefaultWALProvider implements WALProvider {
   private static final Log LOG = LogFactory.getLog(DefaultWALProvider.class);
-
-  // Only public so classes back in regionserver.wal can access
-  public interface Reader extends WAL.Reader {
-    /**
-     * @param fs File system.
-     * @param path Path.
-     * @param c Configuration.
-     * @param s Input stream that may have been pre-opened by the caller; may be null.
-     */
-    void init(FileSystem fs, Path path, Configuration c, FSDataInputStream s) throws IOException;
-  }
 
   // Only public so classes back in regionserver.wal can access
   public interface Writer extends WALProvider.Writer {

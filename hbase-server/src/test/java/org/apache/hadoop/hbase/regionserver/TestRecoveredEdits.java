@@ -45,7 +45,7 @@ import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.Entry;
-import org.apache.hadoop.hbase.wal.WAL;
+import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
@@ -149,7 +149,7 @@ public class TestRecoveredEdits {
   throws IOException {
     int count = 0;
     // Based on HRegion#replayRecoveredEdits
-    WAL.Reader reader = null;
+    Reader reader = null;
     try {
       reader = WALFactory.createReader(fs, edits, conf);
       Entry entry;
