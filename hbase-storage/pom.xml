@@ -25,6 +25,7 @@
         <artifactId>hbase</artifactId>
         <groupId>org.apache.hbase</groupId>
         <version>1.4.12-sdi-1.1.1</version>
+        <relativePath>../hbase-build-configuration</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <name>Apache HBase - Storage</name>

@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hbase.wal;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
@@ -72,14 +71,6 @@ public interface WALProvider {
    * this provider. After this call completes, the underlying resources should have been reclaimed.
    */
   void close() throws IOException;
-
-  // Writers are used internally. Users outside of the WAL should be relying on the
-  // interface provided by WAL.
-  interface Writer extends Closeable {
-    void sync() throws IOException;
-    void append(Entry entry) throws IOException;
-    long getLength() throws IOException;
-  }
 
   /**
    * Get number of the log files this provider is managing

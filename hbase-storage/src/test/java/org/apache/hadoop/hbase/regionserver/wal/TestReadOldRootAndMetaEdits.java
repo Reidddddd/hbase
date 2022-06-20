@@ -41,7 +41,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALProvider;
+import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -64,7 +64,7 @@ public class TestReadOldRootAndMetaEdits {
   public static void setupBeforeClass() throws Exception {
     conf = TEST_UTIL.getConfiguration();
     conf.setClass("hbase.regionserver.hlog.writer.impl",
-      SequenceFileLogWriter.class, WALProvider.Writer.class);
+      SequenceFileLogWriter.class, Writer.class);
     fs = TEST_UTIL.getTestFileSystem();
     dir = new Path(TEST_UTIL.createRootDir(), "testReadOldRootAndMetaEdits");
     fs.mkdirs(dir);
@@ -89,8 +89,9 @@ public class TestReadOldRootAndMetaEdits {
     List<KeyValue> kvs = new ArrayList<KeyValue>();
     kvs.add(kv);
 
-    WALProvider.Writer writer = null;
     Reader reader = null;
+    Writer writer = null;
+    
     // a regular table
     TableName t = TableName.valueOf("t");
     HRegionInfo tRegionInfo = null;

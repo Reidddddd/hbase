@@ -72,7 +72,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALPerformanceEvaluation;
-import org.apache.hadoop.hbase.wal.WALProvider;
+import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -175,7 +175,7 @@ public class TestFSHLog {
   public void testDeadlockWithSyncOverwrites() throws Exception {
     final CountDownLatch blockBeforeSafePoint = new CountDownLatch(1);
 
-    class FailingWriter implements WALProvider.Writer {
+    class FailingWriter implements Writer {
       @Override public void sync() throws IOException {
         throw new IOException("Injected failure..");
       }

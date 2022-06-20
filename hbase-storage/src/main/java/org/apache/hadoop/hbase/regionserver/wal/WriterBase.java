@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.io.util.LRUDictionary;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.FileSystemBasedWriter;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -33,7 +33,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  * custom dictionary compression.
  */
 @InterfaceAudience.Private
-public abstract class WriterBase implements DefaultWALProvider.Writer {
+public abstract class WriterBase implements FileSystemBasedWriter {
 
   protected CompressionContext compressionContext;
   protected Configuration conf;

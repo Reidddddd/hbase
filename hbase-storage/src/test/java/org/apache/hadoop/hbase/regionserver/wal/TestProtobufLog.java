@@ -42,7 +42,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALProvider;
+import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -140,7 +140,7 @@ public class TestProtobufLog {
     Path path = new Path(dir, "tempwal");
     // delete the log if already exists, for test only
     fs.delete(path, true);
-    WALProvider.Writer writer = null;
+    Writer writer = null;
     ProtobufLogReader reader = null;
     try {
       HRegionInfo hri = new HRegionInfo(tableName,

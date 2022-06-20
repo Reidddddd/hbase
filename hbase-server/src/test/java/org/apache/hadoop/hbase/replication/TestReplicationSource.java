@@ -79,7 +79,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALProvider;
+import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -159,7 +159,7 @@ public class TestReplicationSource {
   @Test
   public void testLogMoving() throws Exception{
     Path logPath = new Path(logDir, "log");
-    WALProvider.Writer writer = WALFactory.createWALWriter(FS, logPath,
+    Writer writer = WALFactory.createWALWriter(FS, logPath,
         TEST_UTIL.getConfiguration());
     for(int i = 0; i < 3; i++) {
       byte[] b = Bytes.toBytes(Integer.toString(i));
@@ -233,7 +233,7 @@ public class TestReplicationSource {
     });
   }
 
-  private void appendEntries(WALProvider.Writer writer, int numEntries) throws IOException {
+  private void appendEntries(Writer writer, int numEntries) throws IOException {
     for (int i = 0; i < numEntries; i++) {
       byte[] b = Bytes.toBytes(Integer.toString(i));
       KeyValue kv = new KeyValue(b,b,b);
@@ -312,9 +312,9 @@ public class TestReplicationSource {
       final Path log1 = new Path(logDir, "log.1");
       final Path log2 = new Path(logDir, "log.2");
 
-      WALProvider.Writer writer1
+      Writer writer1
               = WALFactory.createWALWriter(FS, log1, TEST_UTIL.getConfiguration());
-      WALProvider.Writer writer2
+      Writer writer2
               = WALFactory.createWALWriter(FS, log2, TEST_UTIL.getConfiguration());
 
       appendEntries(writer1, 3);
@@ -397,9 +397,9 @@ public class TestReplicationSource {
     final Path log1 = new Path(logDir, "log.1");
     final Path log2 = new Path(logDir, "log.2");
 
-    WALProvider.Writer writer1
+    Writer writer1
       = WALFactory.createWALWriter(FS, log1, TEST_UTIL.getConfiguration());
-    WALProvider.Writer writer2
+    Writer writer2
       = WALFactory.createWALWriter(FS, log2, TEST_UTIL.getConfiguration());
 
     appendEntries(writer1, 3);
@@ -441,7 +441,7 @@ public class TestReplicationSource {
 
     // Append 3 entries in a log
     final Path log1 = new Path(logDir, logPrefix + ".1");
-    WALProvider.Writer writer1 = WALFactory.createWALWriter(FS, log1, TEST_UTIL.getConfiguration());
+    Writer writer1 = WALFactory.createWALWriter(FS, log1, TEST_UTIL.getConfiguration());
     appendEntries(writer1, 3);
 
     // Create a 0 length log.
@@ -540,7 +540,7 @@ public class TestReplicationSource {
 
     // Append 3 entries in a log
     final Path log1 = new Path(logDir, logPrefix + ".11");
-    WALProvider.Writer writer1 = WALFactory.createWALWriter(FS, log1, TEST_UTIL.getConfiguration());
+    Writer writer1 = WALFactory.createWALWriter(FS, log1, TEST_UTIL.getConfiguration());
     appendEntries(writer1, 3);
 
     // Create a 0 length log.
@@ -551,12 +551,12 @@ public class TestReplicationSource {
 
     // Append 5 entries in a log
     final Path log3 = new Path(logDir, logPrefix + ".13");
-    WALProvider.Writer writer3 = WALFactory.createWALWriter(FS, log3, TEST_UTIL.getConfiguration());
+    Writer writer3 = WALFactory.createWALWriter(FS, log3, TEST_UTIL.getConfiguration());
     appendEntries(writer3, 5);
 
     // Append 10 entries in a log
     final Path log4 = new Path(logDir, logPrefix + ".14");
-    WALProvider.Writer writer4 = WALFactory.createWALWriter(FS, log4, TEST_UTIL.getConfiguration());
+    Writer writer4 = WALFactory.createWALWriter(FS, log4, TEST_UTIL.getConfiguration());
     appendEntries(writer4, 10);
 
     // Replication end point with no filter

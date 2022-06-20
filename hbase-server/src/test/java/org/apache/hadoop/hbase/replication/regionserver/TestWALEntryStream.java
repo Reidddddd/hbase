@@ -77,7 +77,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALProvider;
+import org.apache.hadoop.hbase.wal.Writer;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -726,7 +726,7 @@ public class TestWALEntryStream {
     localLogQueue.enqueueLog(emptyLog, fakeWalGroupId);
 
     final Path log1 = new Path("log.1");
-    WALProvider.Writer writer1 = WALFactory.createWALWriter(fs, log1, TEST_UTIL.getConfiguration());
+    Writer writer1 = WALFactory.createWALWriter(fs, log1, TEST_UTIL.getConfiguration());
     appendEntries(writer1, 3);
     localLogQueue.enqueueLog(log1, fakeWalGroupId);
 
@@ -765,7 +765,7 @@ public class TestWALEntryStream {
     return source;
   }
 
-  private void appendEntries(WALProvider.Writer writer, int numEntries) throws IOException {
+  private void appendEntries(Writer writer, int numEntries) throws IOException {
     for (int i = 0; i < numEntries; i++) {
       byte[] b = Bytes.toBytes(Integer.toString(i));
       KeyValue kv = new KeyValue(b,b,b);

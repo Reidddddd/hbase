@@ -55,11 +55,6 @@ import org.apache.yetus.audience.InterfaceStability;
 public class DefaultWALProvider implements WALProvider {
   private static final Log LOG = LogFactory.getLog(DefaultWALProvider.class);
 
-  // Only public so classes back in regionserver.wal can access
-  public interface Writer extends WALProvider.Writer {
-    void init(FileSystem fs, Path path, Configuration c, boolean overwritable) throws IOException;
-  }
-
   protected volatile FSHLog log = null;
   private WALFactory factory = null;
   private Configuration conf = null;
@@ -371,7 +366,9 @@ public class DefaultWALProvider implements WALProvider {
     try {
       writer = logWriterClass.getDeclaredConstructor().newInstance();
       FileSystem rootFs = FileSystem.get(path.toUri(), conf);
-      writer.init(rootFs, path, conf, overwritable);
+      if (writer instanceof FileSystemBasedWriter) {
+        ((FileSystemBasedWriter) writer).init(rootFs, path, conf, overwritable);
+      }
       return writer;
     } catch (Exception e) {
       LOG.debug("Error instantiating log writer.", e);

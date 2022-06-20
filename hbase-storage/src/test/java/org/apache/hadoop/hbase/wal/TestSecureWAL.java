@@ -67,7 +67,7 @@ public class TestSecureWAL {
     conf.setClass("hbase.regionserver.hlog.reader.impl", SecureProtobufLogReader.class,
       Reader.class);
     conf.setClass("hbase.regionserver.hlog.writer.impl", SecureProtobufLogWriter.class,
-      WALProvider.Writer.class);
+      Writer.class);
     conf.setBoolean(HConstants.ENABLE_WAL_ENCRYPTION, true);
     FSUtils.setRootDir(conf, TEST_UTIL.getDataTestDir());
   }

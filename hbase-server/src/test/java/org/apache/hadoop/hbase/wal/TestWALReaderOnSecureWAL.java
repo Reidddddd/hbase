@@ -126,7 +126,7 @@ public class TestWALReaderOnSecureWAL {
     conf.setClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
       Reader.class);
     conf.setClass("hbase.regionserver.hlog.writer.impl", SecureProtobufLogWriter.class,
-      WALProvider.Writer.class);
+      Writer.class);
     conf.setBoolean(WAL_ENCRYPTION, true);
     FileSystem fs = TEST_UTIL.getTestFileSystem();
     final WALFactory wals = new WALFactory(conf, null, currentTest.getMethodName());
@@ -171,7 +171,7 @@ public class TestWALReaderOnSecureWAL {
     conf.setClass("hbase.regionserver.hlog.reader.impl", SecureProtobufLogReader.class,
       Reader.class);
     conf.setClass("hbase.regionserver.hlog.writer.impl", ProtobufLogWriter.class,
-      WALProvider.Writer.class);
+      Writer.class);
     conf.setBoolean(WAL_ENCRYPTION, false);
     FileSystem fs = TEST_UTIL.getTestFileSystem();
     final WALFactory wals = new WALFactory(conf, null, currentTest.getMethodName());
