@@ -84,14 +84,17 @@ public class TestRegionServerHostname {
       NetworkInterface ni = netInterfaceList.nextElement();
       Enumeration<InetAddress> addrList = ni.getInetAddresses();
       // iterate through host addresses and use each as hostname
-      while (addrList.hasMoreElements()) {
+      // if there're too much hostnames, this test will timeout
+      // so we set an upperbound(5) here
+      int iteration = 5;
+      while (addrList.hasMoreElements() && iteration-- > 0) {
         InetAddress addr = addrList.nextElement();
         if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isMulticastAddress()) {
           continue;
         }
         String hostName = addr.getHostName();
         LOG.info("Found " + hostName + " on " + ni);
-        
+
         TEST_UTIL.getConfiguration().set(HRegionServer.RS_HOSTNAME_KEY, hostName);
         TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
         try {
