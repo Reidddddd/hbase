@@ -41,6 +41,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -117,7 +118,7 @@ public class TestReadOldRootAndMetaEdits {
           HConstants.DEFAULT_CLUSTER_ID), kvs);
 
       // write above entries
-      writer = WALFactory.createWALWriter(fs, path, conf);
+      writer = WALUtils.createWALWriter(fs, path, conf);
       writer.append(tEntry);
       writer.append(rootEntry);
       writer.append(oldMetaEntry);
@@ -127,7 +128,7 @@ public class TestReadOldRootAndMetaEdits {
       writer.close();
 
       // read the log and see things are okay.
-      reader = WALFactory.createReader(fs, path, conf);
+      reader = WALUtils.createReader(fs, path, conf);
       Entry entry = reader.next();
       assertNotNull(entry);
       assertTrue(entry.getKey().getTablename().equals(t));

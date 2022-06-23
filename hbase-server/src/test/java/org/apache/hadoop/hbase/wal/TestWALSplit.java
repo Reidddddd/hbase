@@ -411,7 +411,7 @@ public class TestWALSplit {
         FILENAME_BEING_SPLIT, TMPDIRNAME, conf);
     String parentOfParent = p.getParent().getParent().getName();
     assertEquals(parentOfParent, HRegionInfo.FIRST_META_REGIONINFO.getEncodedName());
-    WALFactory.createRecoveredEditsWriter(fs, p, conf).close();
+    WALUtils.createRecoveredEditsWriter(fs, p, conf).close();
   }
 
   private void useDifferentDFSClient() throws IOException {
@@ -673,7 +673,7 @@ public class TestWALSplit {
     assertEquals(1, splitLog.length);
 
     int actualCount = 0;
-    Reader in = wals.createReader(fs, splitLog[0]);
+    Reader in = WALUtils.createReader(fs, splitLog[0], conf);
     @SuppressWarnings("unused")
     Entry entry;
     while ((entry = in.next()) != null) ++actualCount;
@@ -1138,7 +1138,7 @@ public class TestWALSplit {
       @Override
       protected Writer createWriter(Path logfile)
           throws IOException {
-        Writer writer = wals.createRecoveredEditsWriter(this.walFS, logfile);
+        Writer writer = WALUtils.createRecoveredEditsWriter(this.walFS, logfile, conf);
         // After creating writer, simulate region's
         // replayRecoveredEditsIfAny() which gets SplitEditFiles of this
         // region and delete them, excluding files with '.temp' suffix.
@@ -1221,7 +1221,7 @@ public class TestWALSplit {
     int seq = 0;
     int numRegionEventsAdded = 0;
     for (int i = 0; i < writers; i++) {
-      ws[i] = wals.createWALWriter(fs, new Path(WALDIR, WAL_FILE_PREFIX + i));
+      ws[i] = WALUtils.createWALWriter(fs, new Path(WALDIR, WAL_FILE_PREFIX + i), conf);
       for (int j = 0; j < entries; j++) {
         int prefix = 0;
         for (String region : REGIONS) {
@@ -1350,7 +1350,7 @@ public class TestWALSplit {
 
   private int countWAL(Path log) throws IOException {
     int count = 0;
-    Reader in = wals.createReader(fs, log);
+    Reader in = WALUtils.createReader(fs, log, conf);
     while (in.next() != null) {
       count++;
     }
@@ -1421,15 +1421,15 @@ public class TestWALSplit {
 
   private void injectEmptyFile(String suffix, boolean closeFile)
       throws IOException {
-    Writer writer = wals.createWALWriter(fs, new Path(WALDIR, WAL_FILE_PREFIX + suffix),
+    Writer writer = WALUtils.createWALWriter(fs, new Path(WALDIR, WAL_FILE_PREFIX + suffix),
         conf);
     if (closeFile) writer.close();
   }
 
   private boolean logsAreEqual(Path p1, Path p2) throws IOException {
     Reader in1, in2;
-    in1 = wals.createReader(fs, p1);
-    in2 = wals.createReader(fs, p2);
+    in1 = WALUtils.createReader(fs, p1, conf);
+    in2 = WALUtils.createReader(fs, p2, conf);
     Entry entry1;
     Entry entry2;
     while ((entry1 = in1.next()) != null) {

@@ -49,6 +49,7 @@ import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -151,7 +152,7 @@ public class TestRecoveredEdits {
     // Based on HRegion#replayRecoveredEdits
     Reader reader = null;
     try {
-      reader = WALFactory.createReader(fs, edits, conf);
+      reader = WALUtils.createReader(fs, edits, conf);
       Entry entry;
       while ((entry = reader.next()) != null) {
         WALKey key = entry.getKey();

@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -148,7 +149,7 @@ public class TestProtobufLog {
       HTableDescriptor htd = new HTableDescriptor(tableName);
       fs.mkdirs(dir);
       // Write log in pb format.
-      writer = wals.createWALWriter(fs, path);
+      writer = WALUtils.createWALWriter(fs, path, TEST_UTIL.getConfiguration());
       for (int i = 0; i < recordCount; ++i) {
         WALKey key = new WALKey(
             hri.getEncodedNameAsBytes(), tableName, i, timestamp, HConstants.DEFAULT_CLUSTER_ID);
@@ -168,7 +169,7 @@ public class TestProtobufLog {
       }
 
       // Now read the log using standard means.
-      reader = (ProtobufLogReader) wals.createReader(fs, path);
+      reader = (ProtobufLogReader) WALUtils.createReader(fs, path, TEST_UTIL.getConfiguration());
       if (withTrailer) {
         assertNotNull(reader.trailer);
       } else {

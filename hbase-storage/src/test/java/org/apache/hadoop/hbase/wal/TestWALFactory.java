@@ -205,7 +205,7 @@ public class TestWALFactory {
       wal.sync();
       // Open a Reader.
       Path walPath = DefaultWALProvider.getCurrentFileName(wal);
-      reader = wals.createReader(fs, walPath);
+      reader = WALUtils.createReader(fs, walPath, conf);
       int count = 0;
       Entry entry = new Entry();
       while ((entry = reader.next(entry)) != null) {
@@ -222,7 +222,7 @@ public class TestWALFactory {
             System.currentTimeMillis(), mvcc), kvs, true);
       }
       wal.sync();
-      reader = wals.createReader(fs, walPath);
+      reader = WALUtils.createReader(fs, walPath, conf);
       count = 0;
       while((entry = reader.next(entry)) != null) {
         count++;
@@ -231,7 +231,7 @@ public class TestWALFactory {
       reader.close();
       // If I sync, should see double the edits.
       wal.sync();
-      reader = wals.createReader(fs, walPath);
+      reader = WALUtils.createReader(fs, walPath, conf);
       count = 0;
       while((entry = reader.next(entry)) != null) {
         count++;
@@ -249,7 +249,7 @@ public class TestWALFactory {
       }
       // Now I should have written out lots of blocks.  Sync then read.
       wal.sync();
-      reader = wals.createReader(fs, walPath);
+      reader = WALUtils.createReader(fs, walPath, conf);
       count = 0;
       while((entry = reader.next(entry)) != null) {
         count++;
@@ -258,7 +258,7 @@ public class TestWALFactory {
       reader.close();
       // shutdown and ensure that Reader gets right length also.
       wal.shutdown();
-      reader = wals.createReader(fs, walPath);
+      reader = WALUtils.createReader(fs, walPath, conf);
       count = 0;
       while((entry = reader.next(entry)) != null) {
         count++;
@@ -385,7 +385,7 @@ public class TestWALFactory {
     }
 
     // Make sure you can read all the content
-    Reader reader = wals.createReader(fs, walPath);
+    Reader reader = WALUtils.createReader(fs, walPath, conf);
     int count = 0;
     Entry entry = new Entry();
     while (reader.next(entry) != null) {
@@ -437,7 +437,7 @@ public class TestWALFactory {
       log.shutdown();
       Path filename = DefaultWALProvider.getCurrentFileName(log);
       // Now open a reader on the log and assert append worked.
-      reader = wals.createReader(fs, filename);
+      reader = WALUtils.createReader(fs, filename, conf);
       // Above we added all columns on a single row so we only read one
       // entry in the below... thats why we have '1'.
       for (int i = 0; i < 1; i++) {
@@ -493,7 +493,7 @@ public class TestWALFactory {
       log.shutdown();
       Path filename = DefaultWALProvider.getCurrentFileName(log);
       // Now open a reader on the log and assert append worked.
-      reader = wals.createReader(fs, filename);
+      reader = WALUtils.createReader(fs, filename, conf);
       Entry entry = reader.next();
       assertEquals(COL_COUNT, entry.getEdit().size());
       int idx = 0;
@@ -600,7 +600,7 @@ public class TestWALFactory {
       sflw.close();
 
       // Now read the log using standard means.
-      reader = wals.createReader(fs, path);
+      reader = WALUtils.createReader(fs, path, conf);
       assertTrue(reader instanceof SequenceFileLogReader);
       for (int i = 0; i < recordCount; ++i) {
         Entry entry = reader.next();

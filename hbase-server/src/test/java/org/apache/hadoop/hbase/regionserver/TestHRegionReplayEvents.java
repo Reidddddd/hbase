@@ -85,6 +85,7 @@ import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter.MutationReplay;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -301,7 +302,7 @@ public class TestHRegionReplayEvents {
   }
 
   Reader createWALReaderForPrimary() throws FileNotFoundException, IOException {
-    return wals.createReader(TEST_UTIL.getTestFileSystem(),
+    return WALUtils.createReader(TEST_UTIL.getTestFileSystem(),
       DefaultWALProvider.getCurrentFileName(walPrimary),
       TEST_UTIL.getConfiguration());
   }

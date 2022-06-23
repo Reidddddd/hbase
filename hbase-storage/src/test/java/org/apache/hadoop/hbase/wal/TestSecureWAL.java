@@ -110,7 +110,8 @@ public class TestSecureWAL {
     assertFalse("Cells appear to be plaintext", Bytes.contains(fileData, value));
 
     // Confirm the WAL can be read back
-    Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
+    Reader reader = WALUtils.createReader(TEST_UTIL.getTestFileSystem(), walPath,
+      TEST_UTIL.getConfiguration());
     int count = 0;
     Entry entry = new Entry();
     while (reader.next(entry) != null) {

@@ -78,7 +78,7 @@ public class TestWALOpenAfterDNRollingStart {
     }
 
     //if the log is not rolled, then we can never open this wal forever.
-    Reader reader = WALFactory
+    Reader reader = WALUtils
         .createReader(TEST_UTIL.getTestFileSystem(), currentFile, TEST_UTIL.getConfiguration());
   }
 

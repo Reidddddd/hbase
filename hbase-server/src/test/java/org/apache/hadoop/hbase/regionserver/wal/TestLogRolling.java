@@ -67,6 +67,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -510,7 +511,7 @@ public class TestLogRolling  {
         LOG.debug("Reading WAL "+FSUtils.getPath(p));
         Reader reader = null;
         try {
-          reader = WALFactory.createReader(fs, p, TEST_UTIL.getConfiguration());
+          reader = WALUtils.createReader(fs, p, TEST_UTIL.getConfiguration());
           Entry entry;
           while ((entry = reader.next()) != null) {
             LOG.debug("#"+entry.getKey().getLogSeqNum()+": "+entry.getEdit().getCells());

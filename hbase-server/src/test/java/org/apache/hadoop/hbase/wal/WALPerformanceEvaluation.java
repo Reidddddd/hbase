@@ -397,7 +397,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
    */
   private long verify(final WALFactory wals, final Path wal, final boolean verbose)
       throws IOException {
-    Reader reader = wals.createReader(wal.getFileSystem(getConf()), wal);
+    Reader reader = WALUtils.createReader(wal.getFileSystem(getConf()), wal, getConf());
     long count = 0;
     Map<String, Long> sequenceIds = new HashMap<String, Long>();
     try {

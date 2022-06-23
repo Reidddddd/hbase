@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -234,7 +235,7 @@ public class TestDurability {
 
   private void verifyWALCount(WALFactory wals, WAL log, int expected) throws Exception {
     Path walPath = DefaultWALProvider.getCurrentFileName(log);
-    Reader reader = wals.createReader(FS, walPath);
+    Reader reader = WALUtils.createReader(FS, walPath, CONF);
     int count = 0;
     Entry entry = new Entry();
     while (reader.next(entry) != null) count++;

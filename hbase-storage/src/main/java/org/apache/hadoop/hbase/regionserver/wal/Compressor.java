@@ -31,7 +31,7 @@ import org.apache.hadoop.hbase.io.util.Dictionary;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
-import org.apache.hadoop.hbase.wal.WALFactory;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -74,7 +74,7 @@ final public class Compressor {
     FileSystem inFS = input.getFileSystem(conf);
     FileSystem outFS = output.getFileSystem(conf);
 
-    Reader in = WALFactory.createReaderIgnoreCustomClass(inFS, input, conf);
+    Reader in = WALUtils.createReaderIgnoreCustomClass(inFS, input, conf);
     Writer out = null;
 
     try {
@@ -84,7 +84,7 @@ final public class Compressor {
       }
       boolean compress = ((ReaderBase)in).hasCompression();
       conf.setBoolean(HConstants.ENABLE_WAL_COMPRESSION, !compress);
-      out = WALFactory.createWALWriter(outFS, output, conf);
+      out = WALUtils.createWALWriter(outFS, output, conf);
 
       Entry e = null;
       while ((e = in.next()) != null) {

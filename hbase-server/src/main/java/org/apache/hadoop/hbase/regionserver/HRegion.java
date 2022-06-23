@@ -201,6 +201,7 @@ import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.wal.WALSplitter.MutationReplay;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.htrace.Trace;
@@ -4462,7 +4463,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     status.setStatus("Opening recovered edits");
     Reader reader = null;
     try {
-      reader = WALFactory.createReader(fs, edits, conf);
+      reader = WALUtils.createReader(fs, edits, conf);
       long currentEditSeqId = -1;
       long currentReplaySeqId = -1;
       long firstSeqIdInLog = -1;

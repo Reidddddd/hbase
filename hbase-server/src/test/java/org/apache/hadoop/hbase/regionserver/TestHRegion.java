@@ -167,6 +167,7 @@ import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
 import org.junit.Assert;
@@ -684,7 +685,7 @@ public class TestHRegion {
       for (long i = minSeqId; i <= maxSeqId; i += 10) {
         Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", i));
         fs.create(recoveredEdits);
-        Writer writer = wals.createRecoveredEditsWriter(fs, recoveredEdits);
+        Writer writer = WALUtils.createRecoveredEditsWriter(fs, recoveredEdits, CONF);
 
         long time = System.nanoTime();
         WALEdit edit = new WALEdit();
@@ -737,7 +738,7 @@ public class TestHRegion {
       for (long i = minSeqId; i <= maxSeqId; i += 10) {
         Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", i));
         fs.create(recoveredEdits);
-        Writer writer = wals.createRecoveredEditsWriter(fs, recoveredEdits);
+        Writer writer = WALUtils.createRecoveredEditsWriter(fs, recoveredEdits, CONF);
 
         long time = System.nanoTime();
         WALEdit edit = new WALEdit();
@@ -825,7 +826,7 @@ public class TestHRegion {
       for (long i = minSeqId; i <= maxSeqId; i += 10) {
         Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", i));
         fs.create(recoveredEdits);
-        Writer writer = wals.createRecoveredEditsWriter(fs, recoveredEdits);
+        Writer writer = WALUtils.createRecoveredEditsWriter(fs, recoveredEdits, CONF);
 
         long time = System.nanoTime();
         WALEdit edit = null;
@@ -937,7 +938,7 @@ public class TestHRegion {
 
       Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", 1000));
       fs.create(recoveredEdits);
-      Writer writer = wals.createRecoveredEditsWriter(fs, recoveredEdits);
+      Writer writer = WALUtils.createRecoveredEditsWriter(fs, recoveredEdits, CONF);
 
       long time = System.nanoTime();
 
@@ -1018,7 +1019,7 @@ public class TestHRegion {
 
       // now verify that the flush markers are written
       wal.shutdown();
-      Reader reader = WALFactory.createReader(fs, DefaultWALProvider.getCurrentFileName(wal),
+      Reader reader = WALUtils.createReader(fs, DefaultWALProvider.getCurrentFileName(wal),
         TEST_UTIL.getConfiguration());
       try {
         List<Entry> flushDescriptors = new ArrayList<Entry>();
@@ -1063,7 +1064,7 @@ public class TestHRegion {
 
         Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", 1000));
         fs.create(recoveredEdits);
-        Writer writer = wals.createRecoveredEditsWriter(fs, recoveredEdits);
+        Writer writer = WALUtils.createRecoveredEditsWriter(fs, recoveredEdits, CONF);
 
         for (Entry entry : flushDescriptors) {
           writer.append(entry);

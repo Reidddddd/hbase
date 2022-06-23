@@ -354,36 +354,6 @@ public class DefaultWALProvider implements WALProvider {
   }
 
   /**
-   * public because of FSHLog. Should be package-private
-   */
-  public static Writer createWriter(final Configuration conf, final FileSystem fs, final Path path,
-      final boolean overwritable)
-      throws IOException {
-    // Configuration already does caching for the Class lookup.
-    Class<? extends Writer> logWriterClass = conf.getClass("hbase.regionserver.hlog.writer.impl",
-        ProtobufLogWriter.class, Writer.class);
-    Writer writer = null;
-    try {
-      writer = logWriterClass.getDeclaredConstructor().newInstance();
-      FileSystem rootFs = FileSystem.get(path.toUri(), conf);
-      if (writer instanceof FileSystemBasedWriter) {
-        ((FileSystemBasedWriter) writer).init(rootFs, path, conf, overwritable);
-      }
-      return writer;
-    } catch (Exception e) {
-      LOG.debug("Error instantiating log writer.", e);
-      if (writer != null) {
-        try{
-          writer.close();
-        } catch(IOException ee){
-          LOG.error("cannot close log writer", ee);
-        }
-      }
-      throw new IOException("cannot get log writer", e);
-    }
-  }
-
-  /**
    * Get prefix of the log from its name, assuming WAL name in format of
    * log_prefix.filenumber.log_suffix @see {@link FSHLog#getCurrentFileName()}
    * @param name Name of the WAL to parse
@@ -401,6 +371,4 @@ public class DefaultWALProvider implements WALProvider {
   public static Path getWALArchivePath(Path archiveDir, Path p) {
     return new Path(archiveDir, p.getName());
   }
-
-
 }

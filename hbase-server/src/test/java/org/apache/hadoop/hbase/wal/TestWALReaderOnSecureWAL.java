@@ -142,7 +142,7 @@ public class TestWALReaderOnSecureWAL {
 
     // Confirm the WAL cannot be read back by ProtobufLogReader
     try {
-      wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
+      WALUtils.createReader(TEST_UTIL.getTestFileSystem(), walPath, conf);
       assertFalse(true);
     } catch (IOException ioe) {
       // expected IOE
@@ -187,7 +187,7 @@ public class TestWALReaderOnSecureWAL {
 
     // Confirm the WAL can be read back by SecureProtobufLogReader
     try {
-      Reader reader = wals.createReader(TEST_UTIL.getTestFileSystem(), walPath);
+      Reader reader = WALUtils.createReader(TEST_UTIL.getTestFileSystem(), walPath, conf);
       reader.close();
     } catch (IOException ioe) {
       assertFalse(true);

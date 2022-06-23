@@ -859,7 +859,7 @@ public class WALSplitter {
    */
   protected Writer createWriter(Path logfile)
       throws IOException {
-    return walFactory.createRecoveredEditsWriter(walFS, logfile);
+    return WALUtils.createRecoveredEditsWriter(walFS, logfile, conf);
   }
 
   /**
@@ -867,7 +867,7 @@ public class WALSplitter {
    * @return new Reader instance, caller should close
    */
   protected Reader getReader(Path curLogFile, CancelableProgressable reporter) throws IOException {
-    return walFactory.createReader(walFS, curLogFile, reporter);
+    return WALUtils.createReader(walFS, curLogFile, reporter, conf);
   }
 
   /**
@@ -1353,7 +1353,7 @@ public class WALSplitter {
     void deleteOneWithFewerEntries(WriterAndPath wap, Path dst)
         throws IOException {
       long dstMinLogSeqNum = -1L;
-      try (Reader reader = walFactory.createReader(walFS, dst)) {
+      try (Reader reader = WALUtils.createReader(walFS, dst, conf)) {
         Entry entry = reader.next();
         if (entry != null) {
           dstMinLogSeqNum = entry.getKey().getLogSeqNum();

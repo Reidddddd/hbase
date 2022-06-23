@@ -103,6 +103,7 @@ import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.MiniZooKeeperCluster;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -1644,7 +1645,7 @@ public class TestDistributedLogSplitting {
   private int countWAL(Path log, FileSystem fs, Configuration conf)
       throws IOException {
     int count = 0;
-    Reader in = WALFactory.createReader(fs, log, conf);
+    Reader in = WALUtils.createReader(fs, log, conf);
     try {
       Entry e;
       while ((e = in.next()) != null) {

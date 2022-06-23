@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
@@ -342,7 +343,7 @@ public class WALEntryStream implements Iterator<Entry>, Closeable, Iterable<Entr
       // reset the current reader so that we see the new data
       if (reader == null || !getCurrentPath().equals(path) || forceCreateReader) {
         closeReader();
-        reader = WALFactory.createReader(fs, path, conf);
+        reader = WALUtils.createReader(fs, path, conf);
         seek();
         setCurrentPath(path);
       } else {

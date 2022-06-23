@@ -82,6 +82,7 @@ import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALPrettyPrinter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
@@ -730,7 +731,7 @@ public class FSHLog implements WAL {
    * @return Writer instance
    */
   protected Writer createWriterInstance(final Path path) throws IOException {
-    return DefaultWALProvider.createWriter(conf, fs, path, false);
+    return WALUtils.createWriter(conf, fs, path, false);
   }
 
   /**

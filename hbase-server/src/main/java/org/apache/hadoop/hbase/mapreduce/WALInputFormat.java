@@ -37,6 +37,7 @@ import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -148,7 +149,7 @@ public class WALInputFormat extends InputFormat<WALKey, WALEdit> {
       Configuration conf = context.getConfiguration();
       LOG.info("Opening reader for "+split);
       try {
-        this.reader = WALFactory.createReader(logFile.getFileSystem(conf), logFile, conf);
+        this.reader = WALUtils.createReader(logFile.getFileSystem(conf), logFile, conf);
       } catch (EOFException x) {
         LOG.info("Ignoring corrupted WAL file: " + logFile
             + " (This is normal when a RegionServer crashed.)");
