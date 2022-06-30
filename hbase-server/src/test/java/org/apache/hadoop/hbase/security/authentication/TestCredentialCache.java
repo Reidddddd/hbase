@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.security.authentication;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -74,14 +75,22 @@ public class TestCredentialCache {
   public void testRefresh() throws IOException, InterruptedException {
     HRegionServer rs = TEST_UTIL.getMiniHBaseCluster().getRegionServer(0);
     CredentialCache cc = new CredentialCache(rs, SUPER_USERNAME);
-    cc.setDecryptor(new DummyDecryptor());
+    DummyDecryptor decryptor = new DummyDecryptor();
+    decryptor.setInitialized(false);
+    cc.setDecryptor(decryptor);
 
     Table secretTable = rs.getConnection().getTable(SecretTableAccessor.getSecretTableName());
     Put firstPut = new Put(getHashedUsername(VALID_USERNAME));
     firstPut.addColumn(Bytes.toBytes("i"), Bytes.toBytes("p"), Bytes.toBytes(FIRST_PASSWORD));
     secretTable.put(firstPut);
 
+    // If the decryptor is not initialized, the first time checked password should be byte[0]
     byte[] fp1 = cc.getPassword(VALID_USERNAME);
+    assertEquals(0, fp1.length);
+
+    decryptor.setInitialized(true);
+    fp1 = cc.getPassword(VALID_USERNAME);
+
     LOG.info("Fp1 is " + Bytes.toString(fp1));
     assertEquals(0, Bytes.compareTo(fp1, Bytes.toBytes(FIRST_PASSWORD)));
 
@@ -110,14 +119,30 @@ public class TestCredentialCache {
     assertEquals(0, Bytes.compareTo(superPassword, Bytes.toBytes(SUPER_PASSWORD)));
   }
 
+  @Test
+  public void testUninitializedDecryptor() {
+
+  }
+
   private byte[] getHashedUsername(String username) {
     return Encryption.hash256Hex(username);
   }
 
   static class DummyDecryptor extends SecretDecryptor {
+    private boolean initialized = false;
+
     @Override
     public byte[] decryptSecret(byte[] secret) throws IOException {
       return secret;
+    }
+
+    @Override
+    public boolean isInitialized() {
+      return initialized;
+    }
+
+    public void setInitialized(boolean value) {
+      initialized = value;
     }
   }
 }

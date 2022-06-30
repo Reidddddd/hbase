@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -149,6 +150,32 @@ public class TestSystemTableBasedSecretManager {
     // Wait the cache periodical refresh.
     Threads.sleep(2000);
     assertTrue(secretManager.isAllowedFallback(VALID_USERNAME));
+    TEST_UTIL.shutdownMiniCluster();
+  }
+
+  @Test
+  public void testSecretTableNotAvailable() throws Exception {
+    UserGroupInformation.setLoginUser(
+      UserGroupInformation.createUserForTesting(VALID_USERNAME, new String[] {VALID_GROUP}));
+
+    TEST_UTIL.getConfiguration().set(User.HBASE_SECURITY_CONF_KEY, "digest");
+    TEST_UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, VALID_CREDENTIAL);
+    TEST_UTIL.getConfiguration().setLong("hbase.secret.refresh.period", 1000);
+    TEST_UTIL.startMiniCluster();
+
+    // We disable secret table here to simulate secret table not online.
+    TEST_UTIL.getHBaseAdmin().disableTable(SecretTableAccessor.getSecretTableName());
+    SystemTableBasedSecretManager secretManager =
+      new SystemTableBasedSecretManager(TEST_UTIL.getHBaseCluster().getRegionServer(0));
+    // Wait 5s to let the rs has requests to secret table.
+    Thread.sleep(5000);
+
+    try {
+      TEST_UTIL.getHBaseAdmin().enableTable(SecretTableAccessor.getSecretTableName());
+    } catch (IOException e) {
+      fail("We should be able to do requests with super user even if secret table is unavailable.");
+    }
+    TEST_UTIL.shutdownMiniCluster();
   }
 
   private byte[] encryptUsername(String username) {

@@ -87,33 +87,24 @@ public class CredentialCache {
     Thread decrytorInitThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        String msg = "Secret decryptor initialization failed. ";
-        while (server.getConnection() == null) {
-          // Wait for the cluster connection available.
+        while (!decryptor.isInitialized()) {
+          String msg = "Secret decryptor initialization failed with exception:\n ";
           try {
-            // 5 seconds is only for pass UT.
-            Thread.sleep(5000);
-          } catch (InterruptedException e) {
-            server.abort(msg, new IllegalStateException(msg));
-          }
-        }
-        try {
-          // Wait for the secret table initialization.
-          ClusterConnection conn = server.getConnection();
-          while (!conn.isTableAvailable(SecretTableAccessor.getSecretTableName())) {
-            try {
-              Thread.sleep(1000);
-            } catch (InterruptedException e) {
-              // Do nothing.
+            while (server.getConnection() == null) {
+              // Wait for the cluster connection available.
+              // 5 seconds is only for pass UT.
+              Thread.sleep(5000);
             }
+            // Wait for the secret table initialization.
+            ClusterConnection conn = server.getConnection();
+            while (!conn.isTableAvailable(SecretTableAccessor.getSecretTableName())) {
+              Thread.sleep(1000);
+            }
+            Thread.sleep(1000);
+            decryptor.initDecryption(getAuthTable());
+          } catch (Throwable t) {
+            LOG.warn(msg, t);
           }
-          Thread.sleep(1000);
-          decryptor.initDecryption(getAuthTable(), server);
-        } catch (IOException | InterruptedException e) {
-          server.abort(e.getMessage(), e);
-        }
-        if (!decryptor.isInitialized()) {
-          server.abort(msg, new IllegalStateException(msg));
         }
       }
     });
@@ -135,7 +126,9 @@ public class CredentialCache {
   }
 
   private void refreshCredential() throws IOException {
-    LOG.info("Start refresh credential. ");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Start refresh credential. ");
+    }
     ClusterConnection conn = this.server.getConnection();
     if (conn == null || conn.isAborted() || conn.isClosed()) {
       throw new IllegalStateException("The internal cluster connection is not open. ");
@@ -157,6 +150,12 @@ public class CredentialCache {
 
   private void updateAccountCredential(String account, Map<String, CredentialEntry> map)
     throws IOException {
+    if (!decryptor.isInitialized()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Decryptor is not initialized. Skip update credential for account " + account);
+      }
+      return;
+    }
     CredentialEntry entry;
     if (LOG.isDebugEnabled()) {
       LOG.debug("Start update credential of " + account);

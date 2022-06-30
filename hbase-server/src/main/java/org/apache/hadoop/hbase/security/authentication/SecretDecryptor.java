@@ -66,7 +66,7 @@ public class SecretDecryptor {
     }
   }
 
-  public void initDecryption(Table table, Server server) {
+  public void initDecryption(Table table) throws IOException {
     synchronized (this) {
       if (isInitialized()) {
         return;
@@ -84,7 +84,8 @@ public class SecretDecryptor {
         } catch (Throwable t) {
           String msg = "Invalid secret key: " + Arrays.toString(key) +
               " detected for algo " + type.getName() + '\n';
-          server.abort(msg, t);
+          LOG.warn(msg, t);
+          throw t;
         }
       }
       initialized = true;
