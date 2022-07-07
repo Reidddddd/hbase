@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.io.crypto.KeyProviderForTesting;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
 // imports for things that haven't moved from regionserver.wal yet.
+import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
@@ -110,7 +111,7 @@ public class TestWALReaderOnSecureWAL {
             System.currentTimeMillis(), mvcc), kvs, true);
       }
       wal.sync();
-      final Path walPath = DefaultWALProvider.getCurrentFileName(wal);
+      final Path walPath = ((FSHLog)wal).getCurrentFileName();
       wal.shutdown();
       
       return walPath;

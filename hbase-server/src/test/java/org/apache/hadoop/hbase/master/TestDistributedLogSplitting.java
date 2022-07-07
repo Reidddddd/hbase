@@ -240,7 +240,7 @@ public class TestDistributedLogSplitting {
         }
         if (foundRs) break;
       }
-      final Path logDir = new Path(rootdir, DefaultWALProvider.getWALDirectoryName(hrs
+      final Path logDir = new Path(rootdir, WALUtils.getWALDirectoryName(hrs
           .getServerName().toString()));
 
       LOG.info("#regions = " + regions.size());
@@ -1021,7 +1021,7 @@ public class TestDistributedLogSplitting {
     HRegionServer hrs = findRSToKill(false, "table");
     Path rootdir = FSUtils.getRootDir(conf);
     final Path logDir = new Path(rootdir,
-        DefaultWALProvider.getWALDirectoryName(hrs.getServerName().toString()));
+        WALUtils.getWALDirectoryName(hrs.getServerName().toString()));
 
     Table t = installTable(new ZooKeeperWatcher(conf, "table-creation", null),
         "table", "family", 40);

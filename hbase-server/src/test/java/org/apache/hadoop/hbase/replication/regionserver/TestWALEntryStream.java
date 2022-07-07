@@ -526,7 +526,7 @@ public class TestWALEntryStream {
   private long getPosition(Path walPath) throws IOException {
     ReplicationSourceLogQueue tempQueue =
       new ReplicationSourceLogQueue(conf, getMockMetrics());
-    String walPrefix = DefaultWALProvider.getWALPrefixFromWALName(walPath.getName());
+    String walPrefix = WALUtils.getWALPrefixFromWALName(walPath.getName());
     tempQueue.enqueueLog(walPath, walPrefix);
     WALEntryStream entryStream =
       new WALEntryStream(tempQueue, fs, conf, getMockMetrics(), walPrefix);

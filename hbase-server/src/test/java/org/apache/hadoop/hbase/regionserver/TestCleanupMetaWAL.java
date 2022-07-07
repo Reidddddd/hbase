@@ -29,7 +29,7 @@ import org.apache.hadoop.hbase.master.MasterFileSystem;
 import org.apache.hadoop.hbase.protobuf.generated.ProcedureProtos;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -82,7 +82,7 @@ public class TestCleanupMetaWAL {
     MasterFileSystem fs = TEST_UTIL.getMiniHBaseCluster().getMaster().getMasterFileSystem();
     Path walPath = new Path(fs.getWALRootDir(), HConstants.HREGION_LOGDIR_NAME);
     for (FileStatus status : FSUtils.listStatus(fs.getFileSystem(), walPath)) {
-      if (status.getPath().toString().contains(DefaultWALProvider.SPLITTING_EXT)) {
+      if (status.getPath().toString().contains(WALUtils.SPLITTING_EXT)) {
         fail("Should not have splitting wal dir here:" + status);
       }
     }

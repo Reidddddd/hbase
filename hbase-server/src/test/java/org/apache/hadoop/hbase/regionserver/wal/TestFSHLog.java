@@ -67,11 +67,11 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdge;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.Threads;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALPerformanceEvaluation;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -297,7 +297,7 @@ public class TestFSHLog {
       assertTrue(comp.compare(p1, p2) < 0);
       walMeta = new FSHLog(fs, walRootDir, dir.toString(),
           HConstants.HREGION_OLDLOGDIR_NAME, conf, null, true, null,
-          DefaultWALProvider.META_WAL_PROVIDER_ID);
+          WALUtils.META_WAL_PROVIDER_ID);
       Comparator<Path> compMeta = walMeta.LOG_NAME_COMPARATOR;
 
       Path p1WithMeta = walMeta.computeFilename(11);

@@ -31,13 +31,13 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This Chore, every time it runs, will attempt to delete the WALs in the old logs folder. The WAL
@@ -89,7 +89,7 @@ public class LogCleaner extends CleanerChore<BaseLogCleanerDelegate>
 
   @Override
   protected boolean validate(Path file) {
-    return DefaultWALProvider.validateWALFilename(file.getName());
+    return WALUtils.validateWALFilename(file.getName());
   }
 
   @Override

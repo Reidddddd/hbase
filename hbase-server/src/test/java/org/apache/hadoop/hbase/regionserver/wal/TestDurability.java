@@ -234,7 +234,7 @@ public class TestDurability {
   }
 
   private void verifyWALCount(WALFactory wals, WAL log, int expected) throws Exception {
-    Path walPath = DefaultWALProvider.getCurrentFileName(log);
+    Path walPath = ((FSHLog)log).getCurrentFileName();
     Reader reader = WALUtils.createReader(FS, walPath, CONF);
     int count = 0;
     Entry entry = new Entry();

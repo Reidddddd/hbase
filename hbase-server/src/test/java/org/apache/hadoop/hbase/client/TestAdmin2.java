@@ -38,6 +38,7 @@ import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.regionserver.Store;
+import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.MiniHBaseCluster;
@@ -58,7 +59,7 @@ import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.Region;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -496,15 +497,15 @@ public class TestAdmin2 extends TestAdminBase {
     }
     byte[] value = Bytes.toBytes(v.toString());
     HRegionServer regionServer = startAndWriteData(TableName.valueOf("TestLogRolling"), value);
-    LOG.info("after writing there are "
-        + DefaultWALProvider.getNumRolledLogFiles(regionServer.getWAL(null)) + " log files");
+    LOG.info("after writing there are " + ((FSHLog)regionServer.getWAL(null)).getNumRolledLogFiles()
+        + " log files");
 
     // flush all regions
     for (Region r : regionServer.getOnlineRegionsLocalContext()) {
       r.flush(true);
     }
     admin.rollWALWriter(regionServer.getServerName());
-    int count = DefaultWALProvider.getNumRolledLogFiles(regionServer.getWAL(null));
+    int count = ((FSHLog)regionServer.getWAL(null)).getNumRolledLogFiles();
     LOG.info("after flushing all regions and rolling logs there are " +
         count + " log files");
     assertTrue(("actual count: " + count), count <= 2);

@@ -18,9 +18,9 @@
  */
 package org.apache.hadoop.hbase.wal;
 
-import static org.apache.hadoop.hbase.wal.DefaultWALProvider.DEFAULT_PROVIDER_ID;
-import static org.apache.hadoop.hbase.wal.DefaultWALProvider.META_WAL_PROVIDER_ID;
-import static org.apache.hadoop.hbase.wal.DefaultWALProvider.WAL_FILE_NAME_DELIMITER;
+import static org.apache.hadoop.hbase.wal.WALUtils.DEFAULT_PROVIDER_ID;
+import static org.apache.hadoop.hbase.wal.WALUtils.META_WAL_PROVIDER_ID;
+import static org.apache.hadoop.hbase.wal.WALUtils.WAL_FILE_NAME_DELIMITER;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -97,7 +97,7 @@ public class IOTestProvider implements WALProvider {
     }
     final String logPrefix = factory.factoryId + WAL_FILE_NAME_DELIMITER + providerId;
     log = new IOTestWAL(FSUtils.getWALFileSystem(conf), FSUtils.getWALRootDir(conf),
-        DefaultWALProvider.getWALDirectoryName(factory.factoryId),
+        WALUtils.getWALDirectoryName(factory.factoryId),
         HConstants.HREGION_OLDLOGDIR_NAME, conf, listeners,
         true, logPrefix, META_WAL_PROVIDER_ID.equals(providerId) ? META_WAL_PROVIDER_ID : null);
   }
@@ -152,7 +152,7 @@ public class IOTestProvider implements WALProvider {
      *               it will be URL encoded before being used.
      *               If prefix is null, "wal" will be used
      * @param suffix will be url encoded. null is treated as empty. non-empty must start with
-     *        {@link DefaultWALProvider#WAL_FILE_NAME_DELIMITER}
+     *        {@link WALUtils#WAL_FILE_NAME_DELIMITER}
      */
     public IOTestWAL(final FileSystem fs, final Path rootDir, final String logDir,
         final String archiveDir, final Configuration conf,

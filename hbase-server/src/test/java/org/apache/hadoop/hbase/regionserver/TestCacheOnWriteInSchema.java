@@ -50,10 +50,10 @@ import org.apache.hadoop.hbase.io.hfile.HFileBlock;
 import org.apache.hadoop.hbase.io.hfile.HFileReaderV2;
 import org.apache.hadoop.hbase.io.hfile.HFileScanner;
 import org.apache.hadoop.hbase.io.hfile.TestHFileWriterV2;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -167,7 +167,7 @@ public class TestCacheOnWriteInSchema {
     // Create a store based on the schema
     final String id = TestCacheOnWriteInSchema.class.getName();
     final Path logdir = new Path(FSUtils.getRootDir(conf),
-        DefaultWALProvider.getWALDirectoryName(id));
+        WALUtils.getWALDirectoryName(id));
     fs.delete(logdir, true);
 
     HRegionInfo info = new HRegionInfo(htd.getTableName(), null, null, false);

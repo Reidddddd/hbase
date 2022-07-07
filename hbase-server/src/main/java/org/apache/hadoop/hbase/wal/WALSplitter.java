@@ -337,7 +337,7 @@ public class WALSplitter {
       outputSinkStarted = true;
       Entry entry;
       Long lastFlushedSequenceId = -1L;
-      ServerName serverName = DefaultWALProvider.getServerNameFromWALDirectoryName(logPath);
+      ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(logPath);
       failedServerName = (serverName == null) ? "" : serverName.getServerName();
       while ((entry = getNextLogLine(in, logPath, skipErrors)) != null) {
         byte[] region = entry.getKey().getEncodedRegionName();

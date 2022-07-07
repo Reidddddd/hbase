@@ -41,7 +41,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.ReflectionUtils;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
@@ -355,7 +355,7 @@ public class HFileSystem extends FilterFileSystem {
     public void reorderBlocks(Configuration conf, LocatedBlocks lbs, String src)
         throws IOException {
 
-      ServerName sn = DefaultWALProvider.getServerNameFromWALDirectoryName(conf, src);
+      ServerName sn = WALUtils.getServerNameFromWALDirectoryName(conf, src);
       if (sn == null) {
         // It's not an WAL
         return;

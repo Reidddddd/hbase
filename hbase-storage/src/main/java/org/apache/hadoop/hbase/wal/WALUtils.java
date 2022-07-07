@@ -21,6 +21,7 @@ package org.apache.hadoop.hbase.wal;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Arrays;
+import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,15 +29,30 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.SequenceFileLogReader;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.LeaseNotRecoveredException;
 
 public class WALUtils {
   private static final Log LOG = LogFactory.getLog(WALUtils.class);
+
+  // should be package private; more visible for use in FSHLog
+  public static final String WAL_FILE_NAME_DELIMITER = ".";
+  /** The hbase:meta region's WAL filename extension */
+  @VisibleForTesting
+  public static final String META_WAL_PROVIDER_ID = ".meta";
+  static final String DEFAULT_PROVIDER_ID = "default";
+
+  // Implementation details that currently leak in tests or elsewhere follow
+  /** File Extension used while splitting an WAL into regions (HBASE-2312) */
+  public static final String SPLITTING_EXT = "-splitting";
 
   /**
    * Create a writer for the WAL.
@@ -225,5 +241,183 @@ public class WALUtils {
     } catch (Exception e) {
       throw new IOException("Cannot get log reader", e);
     }
+  }
+
+  /**
+   * It returns the file create timestamp from the file name.
+   * For name format see {@link #validateWALFilename(String)}
+   * public until remaining tests move to o.a.h.h.wal
+   * @param wal must not be null
+   * @return the file number that is part of the WAL file name
+   */
+  @VisibleForTesting
+  public static long extractFileNumFromWAL(final WAL wal) {
+    final Path walName = ((FSHLog)wal).getCurrentFileName();
+    if (walName == null) {
+      throw new IllegalArgumentException("The WAL path couldn't be null");
+    }
+    final String[] walPathStrs = walName.toString().split("\\" + WAL_FILE_NAME_DELIMITER);
+    return Long.parseLong(walPathStrs[walPathStrs.length - (isMetaFile(walName) ? 2:1)]);
+  }
+
+  /**
+   * Pattern used to validate a WAL file name
+   * see {@link #validateWALFilename(String)} for description.
+   */
+  private static final Pattern pattern = Pattern.compile(".*\\.\\d*("+META_WAL_PROVIDER_ID+")*");
+
+  /**
+   * A WAL file name is of the format:
+   * &lt;wal-name&gt;{@link #WAL_FILE_NAME_DELIMITER}&lt;file-creation-timestamp&gt;[.meta].
+   *
+   * provider-name is usually made up of a server-name and a provider-id
+   *
+   * @param filename name of the file to validate
+   * @return <tt>true</tt> if the filename matches an WAL, <tt>false</tt>
+   *         otherwise
+   */
+  public static boolean validateWALFilename(String filename) {
+    return pattern.matcher(filename).matches();
+  }
+
+  /**
+   * Construct the directory name for all WALs on a given server.
+   *
+   * @param serverName
+   *          Server name formatted as described in {@link ServerName}
+   * @return the relative WAL directory name, e.g.
+   *         <code>.logs/1.example.org,60030,12345</code> if
+   *         <code>serverName</code> passed is
+   *         <code>1.example.org,60030,12345</code>
+   */
+  public static String getWALDirectoryName(final String serverName) {
+    StringBuilder dirName = new StringBuilder(HConstants.HREGION_LOGDIR_NAME);
+    dirName.append("/");
+    dirName.append(serverName);
+    return dirName.toString();
+  }
+
+  /**
+   * Pulls a ServerName out of a Path generated according to our layout rules.
+   *
+   * In the below layouts, this method ignores the format of the logfile component.
+   *
+   * Current format:
+   *
+   * [base directory for hbase]/hbase/.logs/ServerName/logfile
+   *      or
+   * [base directory for hbase]/hbase/.logs/ServerName-splitting/logfile
+   *
+   * Expected to work for individual log files and server-specific directories.
+   *
+   * @return null if it's not a log file. Returns the ServerName of the region
+   *         server that created this log file otherwise.
+   */
+  public static ServerName getServerNameFromWALDirectoryName(Configuration conf, String path)
+    throws IOException {
+    if (path == null
+      || path.length() <= HConstants.HREGION_LOGDIR_NAME.length()) {
+      return null;
+    }
+
+    if (conf == null) {
+      throw new IllegalArgumentException("parameter conf must be set");
+    }
+
+    final String walDir = FSUtils.getWALRootDir(conf).toString();
+
+    final StringBuilder startPathSB = new StringBuilder(walDir);
+    if (!walDir.endsWith("/")) {
+      startPathSB.append('/');
+    }
+    startPathSB.append(HConstants.HREGION_LOGDIR_NAME);
+    if (!HConstants.HREGION_LOGDIR_NAME.endsWith("/")) {
+      startPathSB.append('/');
+    }
+    final String startPath = startPathSB.toString();
+
+    String fullPath;
+    try {
+      fullPath = FileSystem.get(conf).makeQualified(new Path(path)).toString();
+    } catch (IllegalArgumentException e) {
+      LOG.info("Call to makeQualified failed on " + path + " " + e.getMessage());
+      return null;
+    }
+
+    if (!fullPath.startsWith(startPath)) {
+      return null;
+    }
+
+    final String serverNameAndFile = fullPath.substring(startPath.length());
+
+    if (serverNameAndFile.indexOf('/') < "a,0,0".length()) {
+      // Either it's a file (not a directory) or it's not a ServerName format
+      return null;
+    }
+
+    Path p = new Path(path);
+    return getServerNameFromWALDirectoryName(p);
+  }
+
+  /**
+   * This function returns region server name from a log file name which is in one of the following
+   * formats:
+   * <ul>
+   *   <li>hdfs://&lt;name node&gt;/hbase/.logs/&lt;server name&gt;-splitting/...</li>
+   *   <li>hdfs://&lt;name node&gt;/hbase/.logs/&lt;server name&gt;/...</li>
+   * </ul>
+   * @return null if the passed in logFile isn't a valid WAL file path
+   */
+  public static ServerName getServerNameFromWALDirectoryName(Path logFile) {
+    String logDirName = logFile.getParent().getName();
+    // We were passed the directory and not a file in it.
+    if (logDirName.equals(HConstants.HREGION_LOGDIR_NAME)) {
+      logDirName = logFile.getName();
+    }
+    ServerName serverName = null;
+    if (logDirName.endsWith(SPLITTING_EXT)) {
+      logDirName = logDirName.substring(0, logDirName.length() - SPLITTING_EXT.length());
+    }
+    try {
+      serverName = ServerName.parseServerName(logDirName);
+    } catch (IllegalArgumentException ex) {
+      serverName = null;
+      LOG.warn("Cannot parse a server name from path=" + logFile + "; " + ex.getMessage());
+    }
+    if (serverName != null && serverName.getStartcode() < 0) {
+      LOG.warn("Invalid log file path=" + logFile);
+      serverName = null;
+    }
+    return serverName;
+  }
+
+  public static boolean isMetaFile(Path p) {
+    return isMetaFile(p.getName());
+  }
+
+  public static boolean isMetaFile(String p) {
+    if (p != null && p.endsWith(META_WAL_PROVIDER_ID)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get prefix of the log from its name, assuming WAL name in format of
+   * log_prefix.filenumber.log_suffix @see {@link FSHLog#getCurrentFileName()}
+   * @param name Name of the WAL to parse
+   * @return prefix of the log
+   */
+  public static String getWALPrefixFromWALName(String name) {
+    int endIndex = name.replaceAll(META_WAL_PROVIDER_ID, "").lastIndexOf(".");
+    return name.substring(0, endIndex);
+  }
+
+  /*
+   * only public so WALSplitter can use.
+   * @return archived location of a WAL file with the given path p
+   */
+  public static Path getWALArchivePath(Path archiveDir, Path p) {
+    return new Path(archiveDir, p.getName());
   }
 }

@@ -63,14 +63,14 @@ public class TestWALMethods {
   @Test
   public void testServerNameFromWAL() throws Exception {
     Path walPath = new Path("/hbase/WALs/regionserver-2.example.com,22101,1487767381290", "regionserver-2.example.com%2C22101%2C1487767381290.null0.1487785392316");
-    ServerName name = DefaultWALProvider.getServerNameFromWALDirectoryName(walPath);
+    ServerName name = WALUtils.getServerNameFromWALDirectoryName(walPath);
     assertEquals(ServerName.valueOf("regionserver-2.example.com", 22101, 1487767381290L), name);
   }
 
   @Test
   public void testServerNameFromTestWAL() throws Exception {
     Path walPath = new Path("/user/example/test-data/12ff1404-68c6-4715-a4b9-775e763842bc/WALs/TestWALRecordReader", "TestWALRecordReader.default.1487787939118");
-    ServerName name = DefaultWALProvider.getServerNameFromWALDirectoryName(walPath);
+    ServerName name = WALUtils.getServerNameFromWALDirectoryName(walPath);
     assertNull(name);
   }
 

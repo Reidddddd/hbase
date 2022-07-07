@@ -189,7 +189,7 @@ public class TestWALSplit {
     this.mode = (conf.getBoolean(HConstants.DISTRIBUTED_LOG_REPLAY_KEY, false) ?
         RecoveryMode.LOG_REPLAY : RecoveryMode.LOG_SPLITTING);
     wals = new WALFactory(conf, null, name.getMethodName());
-    WALDIR = new Path(HBASELOGDIR, DefaultWALProvider.getWALDirectoryName(name.getMethodName()));
+    WALDIR = new Path(HBASELOGDIR, WALUtils.getWALDirectoryName(name.getMethodName()));
     //fs.mkdirs(WALDIR);
   }
 

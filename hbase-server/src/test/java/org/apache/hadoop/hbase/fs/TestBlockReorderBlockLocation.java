@@ -27,7 +27,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.MiniHBaseCluster;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.testclassification.MiscTests;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -138,7 +138,7 @@ public class TestBlockReorderBlockLocation {
 
       // Check that it will be possible to extract a ServerName from our construction
       Assert.assertNotNull("log= " + pseudoLogFile,
-          DefaultWALProvider.getServerNameFromWALDirectoryName(dfs.getConf(), pseudoLogFile));
+          WALUtils.getServerNameFromWALDirectoryName(dfs.getConf(), pseudoLogFile));
 
       // And check we're doing the right reorder.
       lrb.reorderBlocks(conf, l, pseudoLogFile);

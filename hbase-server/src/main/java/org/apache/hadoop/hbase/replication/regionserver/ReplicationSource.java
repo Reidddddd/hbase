@@ -48,7 +48,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.BulkLoadDescriptor;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.StoreDescriptor;
 import org.apache.hadoop.hbase.regionserver.RSRpcServices;
@@ -69,8 +68,9 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Threads;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.WALUtils;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Class that handles the source of a replication stream.
@@ -198,7 +198,7 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
 
   @Override
   public void enqueueLog(Path log) {
-    String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(log.getName());
+    String logPrefix = WALUtils.getWALPrefixFromWALName(log.getName());
     boolean queueExists = logQueue.enqueueLog(log, logPrefix);
     if (!queueExists) {
       if (this.sourceRunning) {
@@ -826,9 +826,9 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
           final Path walDir = FSUtils.getWALRootDir(conf);
           for (String curDeadServerName : deadRegionServers) {
             final Path deadRsDirectory =
-                new Path(walDir, DefaultWALProvider.getWALDirectoryName(curDeadServerName));
+                new Path(walDir, WALUtils.getWALDirectoryName(curDeadServerName));
             Path[] locs = new Path[] { new Path(deadRsDirectory, path.getName()), new Path(
-                deadRsDirectory.suffix(DefaultWALProvider.SPLITTING_EXT), path.getName()) };
+                deadRsDirectory.suffix(WALUtils.SPLITTING_EXT), path.getName()) };
             for (Path possibleLogLocation : locs) {
               LOG.info("Possible location " + possibleLogLocation.toUri().toString());
               if (manager.getFs().exists(possibleLogLocation)) {

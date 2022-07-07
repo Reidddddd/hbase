@@ -52,7 +52,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerCoprocessorHost;
 import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
@@ -66,7 +65,8 @@ import org.apache.hadoop.hbase.replication.ReplicationQueueInfo;
 import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.replication.ReplicationTracker;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This class is responsible to manage all the replication
@@ -204,7 +204,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    * @param queueRecovered Whether this is a recovered queue
    */
   public void cleanOldLogs(String key, String id, boolean queueRecovered) {
-    String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(key);
+    String logPrefix = WALUtils.getWALPrefixFromWALName(key);
     if (queueRecovered) {
       Map<String, SortedSet<String>> walsForPeer = walsByIdRecoveredQueues.get(id);
       if(walsForPeer != null) {
@@ -284,7 +284,7 @@ public class ReplicationSourceManager implements ReplicationListener {
         if (this.latestPaths.size() > 0) {
           for (Path logPath : latestPaths) {
             String name = logPath.getName();
-            String walPrefix = DefaultWALProvider.getWALPrefixFromWALName(name);
+            String walPrefix = WALUtils.getWALPrefixFromWALName(name);
             SortedSet<String> logs = new TreeSet<String>();
             logs.add(name);
             walsByGroup.put(walPrefix, logs);
@@ -384,7 +384,7 @@ public class ReplicationSourceManager implements ReplicationListener {
   void preLogRoll(Path newLog) throws IOException {
     recordLog(newLog);
     String logName = newLog.getName();
-    String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(logName);
+    String logPrefix = WALUtils.getWALPrefixFromWALName(logName);
     synchronized (latestPaths) {
       Iterator<Path> iterator = latestPaths.iterator();
       while (iterator.hasNext()) {
@@ -406,7 +406,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   private void recordLog(Path logPath) throws IOException {
     String logName = logPath.getName();
-    String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(logName);
+    String logPrefix = WALUtils.getWALPrefixFromWALName(logName);
     // update replication queues on ZK
     // synchronize on replicationPeers to avoid adding source for the to-be-removed peer
     synchronized (replicationPeers) {
@@ -753,7 +753,7 @@ public class ReplicationSourceManager implements ReplicationListener {
           Map<String, SortedSet<String>> walsByGroup = new HashMap<String, SortedSet<String>>();
           walsByIdRecoveredQueues.put(peerId, walsByGroup);
           for (String wal : walsSet) {
-            String walPrefix = DefaultWALProvider.getWALPrefixFromWALName(wal);
+            String walPrefix = WALUtils.getWALPrefixFromWALName(wal);
             SortedSet<String> wals = walsByGroup.get(walPrefix);
             if (wals == null) {
               wals = new TreeSet<String>();

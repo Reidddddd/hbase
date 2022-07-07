@@ -207,7 +207,7 @@ public class WALFactory {
     if (null == metaProvider) {
       final WALProvider temp = getProvider(META_WAL_PROVIDER, DEFAULT_META_WAL_PROVIDER,
           Collections.<WALActionsListener>singletonList(new MetricsWAL()),
-          DefaultWALProvider.META_WAL_PROVIDER_ID);
+          WALUtils.META_WAL_PROVIDER_ID);
       if (this.metaProvider.compareAndSet(null, temp)) {
         metaProvider = temp;
       } else {

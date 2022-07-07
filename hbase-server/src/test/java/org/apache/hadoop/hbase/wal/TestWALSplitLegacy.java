@@ -137,7 +137,7 @@ public class TestWALSplitLegacy {
     final byte [] rowName = tableName.getName();
     final MultiVersionConcurrencyControl mvcc = new MultiVersionConcurrencyControl(1);
     final Path logdir = new Path(hbaseWALDir,
-      DefaultWALProvider.getWALDirectoryName(currentTest.getMethodName()));
+      WALUtils.getWALDirectoryName(currentTest.getMethodName()));
     Path oldLogDir = new Path(hbaseWALDir, HConstants.HREGION_OLDLOGDIR_NAME);
     final int howmany = 3;
     HRegionInfo[] infos = new HRegionInfo[3];

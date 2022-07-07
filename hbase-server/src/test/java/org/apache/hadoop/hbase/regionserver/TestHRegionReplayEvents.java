@@ -71,6 +71,7 @@ import org.apache.hadoop.hbase.protobuf.generated.WALProtos.StoreDescriptor;
 import org.apache.hadoop.hbase.regionserver.HRegion.FlushResultImpl;
 import org.apache.hadoop.hbase.regionserver.HRegion.PrepareFlushResult;
 import org.apache.hadoop.hbase.regionserver.throttle.NoLimitThroughputController;
+import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -303,7 +304,7 @@ public class TestHRegionReplayEvents {
 
   Reader createWALReaderForPrimary() throws FileNotFoundException, IOException {
     return WALUtils.createReader(TEST_UTIL.getTestFileSystem(),
-      DefaultWALProvider.getCurrentFileName(walPrimary),
+      ((FSHLog)walPrimary).getCurrentFileName(),
       TEST_UTIL.getConfiguration());
   }
 

@@ -52,6 +52,7 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.SplitLogCounters;
 import org.apache.hadoop.hbase.Stoppable;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.coordination.BaseCoordinatedStateManager;
 import org.apache.hadoop.hbase.coordination.SplitLogManagerCoordination;
@@ -169,7 +170,7 @@ public class SplitLogManager {
    * Get a list of paths that need to be split given a set of server-specific directories and
    * optionally  a filter.
    *
-   * See {@link DefaultWALProvider#getServerNameFromWALDirectoryName} for more info on directory
+   * See {@link WALUtils#getServerNameFromWALDirectoryName} for more info on directory
    * layout.
    *
    * Should be package-private, but is needed by
@@ -225,7 +226,7 @@ public class SplitLogManager {
     Set<ServerName> serverNames = new HashSet<ServerName>();
     for (Path logDir : logDirs) {
       try {
-        ServerName serverName = DefaultWALProvider.getServerNameFromWALDirectoryName(logDir);
+        ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(logDir);
         if (serverName != null) {
           serverNames.add(serverName);
         }

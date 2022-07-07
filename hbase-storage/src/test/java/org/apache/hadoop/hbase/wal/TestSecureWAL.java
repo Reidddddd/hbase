@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.io.crypto.KeyProviderForTesting;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
@@ -98,7 +99,7 @@ public class TestSecureWAL {
           System.currentTimeMillis(), mvcc), kvs, true);
     }
     wal.sync();
-    final Path walPath = DefaultWALProvider.getCurrentFileName(wal);
+    final Path walPath = ((FSHLog)wal).getCurrentFileName();
     wals.shutdown();
 
     // Insure edits are not plaintext

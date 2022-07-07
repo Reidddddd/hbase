@@ -90,7 +90,7 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HFileTestUtil;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
@@ -161,7 +161,7 @@ public class TestWALReplay {
     this.hbaseRootDir = FSUtils.getRootDir(this.conf);
     this.hbaseWALRootDir = FSUtils.getWALRootDir(this.conf);
     this.oldLogDir = new Path(this.hbaseWALRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
-    this.logName = DefaultWALProvider.getWALDirectoryName(currentTest.getMethodName() + "-manual");
+    this.logName = WALUtils.getWALDirectoryName(currentTest.getMethodName() + "-manual");
     this.logDir = new Path(this.hbaseWALRootDir, logName);
     if (TEST_UTIL.getDFSCluster().getFileSystem().exists(this.hbaseRootDir)) {
       TEST_UTIL.getDFSCluster().getFileSystem().delete(this.hbaseRootDir, true);

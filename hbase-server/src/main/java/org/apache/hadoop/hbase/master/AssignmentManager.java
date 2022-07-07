@@ -65,6 +65,7 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.TableStateManager;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Admin.MasterSwitchType;
@@ -107,7 +108,7 @@ import org.apache.hadoop.hbase.util.RetryCounter;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.util.Triple;
 import org.apache.hadoop.hbase.util.VersionInfo;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZKAssign;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -622,8 +623,8 @@ public class AssignmentManager extends ZooKeeperListener {
           // In the case of a clean exit, the shutdown handler would have presplit any WALs and
           // removed empty directories.
           Path walDir = new Path(walRootDir,
-              DefaultWALProvider.getWALDirectoryName(serverName.toString()));
-          Path splitDir = walDir.suffix(DefaultWALProvider.SPLITTING_EXT);
+            WALUtils.getWALDirectoryName(serverName.toString()));
+          Path splitDir = walDir.suffix(WALUtils.SPLITTING_EXT);
           if (walFs.exists(walDir) || walFs.exists(splitDir)) {
             LOG.debug("Found queued dead server " + serverName);
             failover = true;

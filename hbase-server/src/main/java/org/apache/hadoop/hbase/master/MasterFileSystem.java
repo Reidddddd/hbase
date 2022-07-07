@@ -29,6 +29,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -50,7 +51,6 @@ import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.fs.HFileSystem;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
 import org.apache.hadoop.hbase.regionserver.HRegion;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
@@ -104,14 +104,14 @@ public class MasterFileSystem {
   final static PathFilter META_FILTER = new PathFilter() {
     @Override
     public boolean accept(Path p) {
-      return DefaultWALProvider.isMetaFile(p);
+      return WALUtils.isMetaFile(p);
     }
   };
 
   final static PathFilter NON_META_FILTER = new PathFilter() {
     @Override
     public boolean accept(Path p) {
-      return !DefaultWALProvider.isMetaFile(p);
+      return !WALUtils.isMetaFile(p);
     }
   };
 
@@ -280,7 +280,7 @@ public class MasterFileSystem {
             // Empty log folder. No recovery needed
             continue;
           }
-          final ServerName serverName = DefaultWALProvider.getServerNameFromWALDirectoryName(
+          final ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(
               status.getPath());
           if (null == serverName) {
             LOG.warn("Log folder " + status.getPath() + " doesn't look like its name includes a " +
@@ -357,8 +357,8 @@ public class MasterFileSystem {
     try {
       for (ServerName serverName : serverNames) {
         Path logDir = new Path(this.walRootDir,
-            DefaultWALProvider.getWALDirectoryName(serverName.toString()));
-        Path splitDir = logDir.suffix(DefaultWALProvider.SPLITTING_EXT);
+          WALUtils.getWALDirectoryName(serverName.toString()));
+        Path splitDir = logDir.suffix(WALUtils.SPLITTING_EXT);
         // Rename the directory so a rogue RS doesn't create more WALs
         if (walFs.exists(logDir)) {
           if (!this.walFs.rename(logDir, splitDir)) {
@@ -664,14 +664,14 @@ public class MasterFileSystem {
   public void archiveMetaLog(final ServerName serverName) {
     try {
       Path logDir = new Path(this.rootdir,
-          DefaultWALProvider.getWALDirectoryName(serverName.toString()));
-      Path splitDir = logDir.suffix(DefaultWALProvider.SPLITTING_EXT);
+        WALUtils.getWALDirectoryName(serverName.toString()));
+      Path splitDir = logDir.suffix(WALUtils.SPLITTING_EXT);
       if (fs.exists(splitDir)) {
         FileStatus[] logfiles = FSUtils.listStatus(fs, splitDir, META_FILTER);
         if (logfiles != null) {
           for (FileStatus status : logfiles) {
             if (!status.isDir()) {
-              Path newPath = DefaultWALProvider.getWALArchivePath(this.oldLogDir,
+              Path newPath = WALUtils.getWALArchivePath(this.oldLogDir,
                   status.getPath());
               if (!FSUtils.renameAndSetModifyTime(fs, status.getPath(), newPath)) {
                 LOG.warn("Unable to move  " + status.getPath() + " to " + newPath);

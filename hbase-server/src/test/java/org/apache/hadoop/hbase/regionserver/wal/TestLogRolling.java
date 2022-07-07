@@ -223,7 +223,7 @@ public class TestLogRolling  {
     HRegionInfo region =
         server.getOnlineRegions(TableName.valueOf(tableName)).get(0).getRegionInfo();
     final WAL log = server.getWAL(region);
-    LOG.info("after writing there are " + DefaultWALProvider.getNumRolledLogFiles(log) +
+    LOG.info("after writing there are " + ((FSHLog)log).getNumRolledLogFiles() +
         " log files");
 
       // flush all regions
@@ -234,7 +234,7 @@ public class TestLogRolling  {
       // Now roll the log
       log.rollWriter();
 
-    int count = DefaultWALProvider.getNumRolledLogFiles(log);
+    int count = ((FSHLog)log).getNumRolledLogFiles();
     LOG.info("after flushing all regions and rolling logs there are " + count + " log files");
       assertTrue(("actual count: " + count), count <= 2);
   }
@@ -358,12 +358,12 @@ public class TestLogRolling  {
 
     long curTime = System.currentTimeMillis();
     LOG.info("log.getCurrentFileName(): " + log.getCurrentFileName());
-    long oldFilenum = DefaultWALProvider.extractFileNumFromWAL(log);
+    long oldFilenum = WALUtils.extractFileNumFromWAL(log);
     assertTrue("Log should have a timestamp older than now",
         curTime > oldFilenum && oldFilenum != -1);
 
     assertTrue("The log shouldn't have rolled yet",
-        oldFilenum == DefaultWALProvider.extractFileNumFromWAL(log));
+        oldFilenum == WALUtils.extractFileNumFromWAL(log));
     final DatanodeInfo[] pipeline = log.getPipeLine();
     assertTrue(pipeline.length ==
         fs.getDefaultReplication(TEST_UTIL.getDataTestDirOnTestFS()));
@@ -374,7 +374,7 @@ public class TestLogRolling  {
 
     // this write should succeed, but trigger a log roll
     writeData(table, 2);
-    long newFilenum = DefaultWALProvider.extractFileNumFromWAL(log);
+    long newFilenum = WALUtils.extractFileNumFromWAL(log);
 
     assertTrue("Missing datanode should've triggered a log roll",
         newFilenum > oldFilenum && newFilenum > curTime);
@@ -385,7 +385,7 @@ public class TestLogRolling  {
     // write some more log data (this should use a new hdfs_out)
     writeData(table, 3);
     assertTrue("The log should not roll again.",
-        DefaultWALProvider.extractFileNumFromWAL(log) == newFilenum);
+        WALUtils.extractFileNumFromWAL(log) == newFilenum);
     // kill another datanode in the pipeline, so the replicas will be lower than
     // the configured value 2.
     assertTrue(dfsCluster.stopDataNode(pipeline[1].getName()) != null);
@@ -439,7 +439,7 @@ public class TestLogRolling  {
       final List<Path> paths = new ArrayList<Path>();
       final List<Integer> preLogRolledCalled = new ArrayList<Integer>();
 
-      paths.add(DefaultWALProvider.getCurrentFileName(log));
+      paths.add(((FSHLog)log).getCurrentFileName());
       log.registerWALActionsListener(new WALActionsListener.Base() {
 
         @Override
@@ -460,13 +460,13 @@ public class TestLogRolling  {
       writeData(table, 1002);
 
       long curTime = System.currentTimeMillis();
-      LOG.info("log.getCurrentFileName()): " + DefaultWALProvider.getCurrentFileName(log));
-      long oldFilenum = DefaultWALProvider.extractFileNumFromWAL(log);
+      LOG.info("log.getCurrentFileName()): " + ((FSHLog)log).getCurrentFileName());
+      long oldFilenum = WALUtils.extractFileNumFromWAL(log);
       assertTrue("Log should have a timestamp older than now",
           curTime > oldFilenum && oldFilenum != -1);
 
       assertTrue("The log shouldn't have rolled yet", oldFilenum ==
-          DefaultWALProvider.extractFileNumFromWAL(log));
+          WALUtils.extractFileNumFromWAL(log));
 
       // roll all datanodes in the pipeline
       dfsCluster.restartDataNodes();
@@ -477,7 +477,7 @@ public class TestLogRolling  {
 
       // this write should succeed, but trigger a log roll
       writeData(table, 1003);
-      long newFilenum = DefaultWALProvider.extractFileNumFromWAL(log);
+      long newFilenum = WALUtils.extractFileNumFromWAL(log);
 
       assertTrue("Missing datanode should've triggered a log roll",
           newFilenum > oldFilenum && newFilenum > curTime);
@@ -596,13 +596,13 @@ public class TestLogRolling  {
       }
       doPut(table, 3); // don't flush yet, or compaction might trigger before we roll WAL
       assertEquals("Should have no WAL after initial writes", 0,
-          DefaultWALProvider.getNumRolledLogFiles(log));
+        ((FSHLog)log).getNumRolledLogFiles());
       assertEquals(2, s.getStorefilesCount());
 
       // Roll the log and compact table, to have compaction record in the 2nd WAL.
       log.rollWriter();
       assertEquals("Should have WAL; one table is not flushed", 1,
-          DefaultWALProvider.getNumRolledLogFiles(log));
+        ((FSHLog)log).getNumRolledLogFiles());
       admin.flush(table.getName());
       region.compact(false);
       // Wait for compaction in case if flush triggered it before us.
@@ -616,14 +616,14 @@ public class TestLogRolling  {
       doPut(table, 0); // Now 2nd WAL will have both compaction and put record for table.
       log.rollWriter(); // 1st WAL deleted, 2nd not deleted yet.
       assertEquals("Should have WAL; one table is not flushed", 1,
-          DefaultWALProvider.getNumRolledLogFiles(log));
+        ((FSHLog)log).getNumRolledLogFiles());
 
       // Flush table to make latest WAL obsolete; write another record, and roll again.
       admin.flush(table.getName());
       doPut(table, 1);
       log.rollWriter(); // Now 2nd WAL is deleted and 3rd is added.
       assertEquals("Should have 1 WALs at the end", 1,
-          DefaultWALProvider.getNumRolledLogFiles(log));
+        ((FSHLog)log).getNumRolledLogFiles());
     } finally {
       if (t != null) t.close();
       if (table != null) table.close();

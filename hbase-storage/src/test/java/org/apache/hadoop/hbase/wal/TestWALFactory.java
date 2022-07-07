@@ -47,6 +47,7 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.SequenceFileLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.SequenceFileLogWriter;
@@ -204,7 +205,7 @@ public class TestWALFactory {
       // gives you EOFE.
       wal.sync();
       // Open a Reader.
-      Path walPath = DefaultWALProvider.getCurrentFileName(wal);
+      Path walPath = ((FSHLog)wal).getCurrentFileName();
       reader = WALUtils.createReader(fs, walPath, conf);
       int count = 0;
       Entry entry = new Entry();
@@ -304,7 +305,7 @@ public class TestWALFactory {
     // Now call sync to send the data to HDFS datanodes
     wal.sync();
     int namenodePort = cluster.getNameNodePort();
-    final Path walPath = DefaultWALProvider.getCurrentFileName(wal);
+    final Path walPath = ((FSHLog)wal).getCurrentFileName();
 
 
     // Stop the cluster.  (ensure restart since we're sharing MiniDFSCluster)
@@ -435,7 +436,7 @@ public class TestWALFactory {
       log.startCacheFlush(info.getEncodedNameAsBytes(), htd.getFamiliesKeys());
       log.completeCacheFlush(info.getEncodedNameAsBytes());
       log.shutdown();
-      Path filename = DefaultWALProvider.getCurrentFileName(log);
+      Path filename = ((FSHLog)log).getCurrentFileName();
       // Now open a reader on the log and assert append worked.
       reader = WALUtils.createReader(fs, filename, conf);
       // Above we added all columns on a single row so we only read one
@@ -491,7 +492,7 @@ public class TestWALFactory {
       log.startCacheFlush(hri.getEncodedNameAsBytes(), htd.getFamiliesKeys());
       log.completeCacheFlush(hri.getEncodedNameAsBytes());
       log.shutdown();
-      Path filename = DefaultWALProvider.getCurrentFileName(log);
+      Path filename = ((FSHLog)log).getCurrentFileName();
       // Now open a reader on the log and assert append worked.
       reader = WALUtils.createReader(fs, filename, conf);
       Entry entry = reader.next();

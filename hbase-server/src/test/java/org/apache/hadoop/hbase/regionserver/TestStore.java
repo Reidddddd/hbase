@@ -90,13 +90,11 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManagerTestHelper;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.IncrementingEnvironmentEdge;
 import org.apache.hadoop.hbase.util.ManualEnvironmentEdge;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WALFactory;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.util.Progressable;
 import org.junit.After;
 import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -186,7 +184,7 @@ public class TestStore {
     //Setting up a Store
     Path basedir = new Path(DIR+methodName);
     Path tableDir = FSUtils.getTableDir(basedir, htd.getTableName());
-    final Path logdir = new Path(basedir, DefaultWALProvider.getWALDirectoryName(methodName));
+    final Path logdir = new Path(basedir, WALUtils.getWALDirectoryName(methodName));
 
     FileSystem fs = FileSystem.get(conf);
 

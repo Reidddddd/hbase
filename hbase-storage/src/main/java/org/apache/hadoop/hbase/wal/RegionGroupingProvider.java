@@ -18,8 +18,8 @@
  */
 package org.apache.hadoop.hbase.wal;
 
-import static org.apache.hadoop.hbase.wal.DefaultWALProvider.META_WAL_PROVIDER_ID;
-import static org.apache.hadoop.hbase.wal.DefaultWALProvider.WAL_FILE_NAME_DELIMITER;
+import static org.apache.hadoop.hbase.wal.WALUtils.META_WAL_PROVIDER_ID;
+import static org.apache.hadoop.hbase.wal.WALUtils.WAL_FILE_NAME_DELIMITER;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;

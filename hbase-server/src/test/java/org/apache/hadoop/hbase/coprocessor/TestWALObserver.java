@@ -55,11 +55,11 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdge;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -137,7 +137,7 @@ public class TestWALObserver {
     this.oldLogDir = new Path(this.hbaseWALRootDir,
         HConstants.HREGION_OLDLOGDIR_NAME);
     this.logDir = new Path(this.hbaseWALRootDir,
-        DefaultWALProvider.getWALDirectoryName(currentTest.getMethodName()));
+        WALUtils.getWALDirectoryName(currentTest.getMethodName()));
     this.logName = HConstants.HREGION_LOGDIR_NAME;
 
     if (TEST_UTIL.getDFSCluster().getFileSystem().exists(this.hbaseRootDir)) {

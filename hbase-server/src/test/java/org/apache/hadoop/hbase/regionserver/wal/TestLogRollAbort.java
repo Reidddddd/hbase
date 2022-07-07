@@ -44,11 +44,11 @@ import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.junit.After;
 import org.junit.Assert;
@@ -185,7 +185,7 @@ public class TestLogRollAbort {
   public void testLogRollAfterSplitStart() throws IOException {
     LOG.info("Verify wal roll after split starts will fail.");
     String logName = "testLogRollAfterSplitStart";
-    Path thisTestsDir = new Path(HBASELOGDIR, DefaultWALProvider.getWALDirectoryName(logName));
+    Path thisTestsDir = new Path(HBASELOGDIR, WALUtils.getWALDirectoryName(logName));
     final WALFactory wals = new WALFactory(conf, null, logName);
 
     try {
@@ -215,7 +215,7 @@ public class TestLogRollAbort {
        * handles RS shutdowns (as observed by the splitting process)
        */
       // rename the directory so a rogue RS doesn't create more WALs
-      Path rsSplitDir = thisTestsDir.suffix(DefaultWALProvider.SPLITTING_EXT);
+      Path rsSplitDir = thisTestsDir.suffix(WALUtils.SPLITTING_EXT);
       if (!fs.rename(thisTestsDir, rsSplitDir)) {
         throw new IOException("Failed fs.rename for log split: " + thisTestsDir);
       }

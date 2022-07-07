@@ -1019,7 +1019,7 @@ public class TestHRegion {
 
       // now verify that the flush markers are written
       wal.shutdown();
-      Reader reader = WALUtils.createReader(fs, DefaultWALProvider.getCurrentFileName(wal),
+      Reader reader = WALUtils.createReader(fs, ((FSHLog)wal).getCurrentFileName(),
         TEST_UTIL.getConfiguration());
       try {
         List<Entry> flushDescriptors = new ArrayList<Entry>();

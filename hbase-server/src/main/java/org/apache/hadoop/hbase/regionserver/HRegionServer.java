@@ -92,6 +92,7 @@ import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.YouAreDeadException;
 import org.apache.hadoop.hbase.ZNodeClearer;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
@@ -1712,7 +1713,7 @@ public class HRegionServer extends HasThread implements
   private WALFactory setupWALAndReplication() throws IOException {
     // TODO Replication make assumptions here based on the default filesystem impl
     final Path oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
-    final String logName = DefaultWALProvider.getWALDirectoryName(this.serverName.toString());
+    final String logName = WALUtils.getWALDirectoryName(this.serverName.toString());
 
     Path logDir = new Path(walRootDir, logName);
     if (LOG.isDebugEnabled()) LOG.debug("logDir=" + logDir);
