@@ -101,5 +101,12 @@ public abstract class OffPeakHours {
       }
       return targetHour < endHour || startHour <= targetHour;
     }
+
+    @Override
+    public String toString() {
+      return "{" + "startHour=" + startHour + ", endHour="
+          + endHour + '}';
+    }
+
   }
 }

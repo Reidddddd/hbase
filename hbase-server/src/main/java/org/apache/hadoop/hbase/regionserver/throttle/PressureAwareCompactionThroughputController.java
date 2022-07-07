@@ -48,13 +48,13 @@ public class PressureAwareCompactionThroughputController extends PressureAwareTh
   public static final String HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_HIGHER_BOUND =
       "hbase.hstore.compaction.throughput.higher.bound";
 
-  private static final long DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_HIGHER_BOUND =
+  public static final long DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_HIGHER_BOUND =
       20L * 1024 * 1024;
 
   public static final String HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_LOWER_BOUND =
       "hbase.hstore.compaction.throughput.lower.bound";
 
-  private static final long DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_LOWER_BOUND =
+  public static final long DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_LOWER_BOUND =
       10L * 1024 * 1024;
 
   public static final String HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_OFFPEAK =
@@ -83,6 +83,28 @@ public class PressureAwareCompactionThroughputController extends PressureAwareTh
           tune(server.getCompactionPressure());
         }
       });
+  }
+
+  @Override
+  public void updateConfig(Configuration newConf) {
+    this.maxThroughputUpperBound =
+        newConf.getLong(HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_HIGHER_BOUND,
+            DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_HIGHER_BOUND);
+    this.maxThroughputLowerBound =
+        newConf.getLong(HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_LOWER_BOUND,
+            DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_LOWER_BOUND);
+    this.maxThroughputOffpeak =
+        newConf.getLong(HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_OFFPEAK,
+            DEFAULT_HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_OFFPEAK);
+    this.offPeakHours = OffPeakHours.getInstance(newConf);
+    this.controlPerSize = this.maxThroughputLowerBound;
+
+    LOG.info("updateParam Compaction throughput configurations, higher bound: "
+        + throughputDesc(maxThroughputUpperBound) + ", lower bound "
+        + throughputDesc(maxThroughputLowerBound) + ", off peak: "
+        + throughputDesc(maxThroughputOffpeak) + ", tuning period: "
+        + tuningPeriod + " ms, offPeakHours:"+offPeakHours);
+
   }
 
   private void tune(double compactionPressure) {
@@ -140,5 +162,21 @@ public class PressureAwareCompactionThroughputController extends PressureAwareTh
     return "DefaultCompactionThroughputController [maxThroughput="
         + throughputDesc(getMaxThroughput()) + ", activeCompactions=" + activeOperations.size()
         + "]";
+  }
+
+  public long getMaxThroughputUpperBound() {
+    return maxThroughputUpperBound;
+  }
+
+  public long getMaxThroughputLowerBound() {
+    return maxThroughputLowerBound;
+  }
+
+  public long getMaxThroughputOffpeak() {
+    return maxThroughputOffpeak;
+  }
+
+  public OffPeakHours getOffPeakHours() {
+    return offPeakHours;
   }
 }

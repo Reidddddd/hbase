@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -49,9 +51,6 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.StealJobQueue;
 import org.apache.hadoop.util.StringUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 
 /**
  * Compact region on request and then run split if appropriate
@@ -684,12 +683,27 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
       }
     }
 
-    ThroughputController old = this.compactionThroughputController;
-    if (old != null) {
-      old.stop("configuration change");
+    String newCompactClass = newConf.get(
+        CompactionThroughputControllerFactory.HBASE_THROUGHPUT_CONTROLLER_KEY);
+    String oldCompactClass = conf.get(
+        CompactionThroughputControllerFactory.HBASE_THROUGHPUT_CONTROLLER_KEY,
+        CompactionThroughputControllerFactory.DEFAULT_THROUGHPUT_CONTROLLER_CLASS
+            .getName());
+    if (oldCompactClass.equals(newCompactClass)) {
+      compactionThroughputController.updateConfig(newConf);
+    } else {
+      LOG.info(
+          CompactionThroughputControllerFactory.HBASE_THROUGHPUT_CONTROLLER_KEY
+              + " is changed from " + oldCompactClass + " to "
+              + newCompactClass);
+      ThroughputController old = this.compactionThroughputController;
+      if (old != null) {
+        old.stop("configuration change");
+      }
+
+      this.compactionThroughputController =
+          CompactionThroughputControllerFactory.create(server, newConf);
     }
-    this.compactionThroughputController =
-        CompactionThroughputControllerFactory.create(server, newConf);
 
     // We change this atomically here instead of reloading the config in order that upstream
     // would be the only one with the flexibility to reload the config.

@@ -36,7 +36,7 @@ public final class CompactionThroughputControllerFactory {
   private CompactionThroughputControllerFactory() {
   }
 
-  private static final Class<? extends ThroughputController>
+  public static final Class<? extends ThroughputController>
       DEFAULT_THROUGHPUT_CONTROLLER_CLASS = NoLimitThroughputController.class;
 
   // for backward compatibility and may not be supported in the future

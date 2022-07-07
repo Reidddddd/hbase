@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.regionserver.throttle;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -49,4 +50,6 @@ public interface ThroughputController extends Stoppable {
    * Finish the controller. Should call this method in a finally block.
    */
   void finish(String name);
+
+  void updateConfig(Configuration conf);
 }

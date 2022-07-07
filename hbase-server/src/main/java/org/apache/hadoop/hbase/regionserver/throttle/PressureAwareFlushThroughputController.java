@@ -78,6 +78,13 @@ public class PressureAwareFlushThroughputController extends PressureAwareThrough
       });
   }
 
+  @Override
+  public void updateConfig(Configuration newConf) {
+
+
+
+  }
+
   private void tune(double flushPressure) {
     double maxThroughputToSet;
     if (flushPressure >= 1.0) {
