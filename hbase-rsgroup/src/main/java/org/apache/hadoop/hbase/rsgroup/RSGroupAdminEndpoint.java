@@ -135,7 +135,7 @@ public class RSGroupAdminEndpoint extends RSGroupAdminService
       );
     }
 
-    String getRSGroup(String namespace, String tablename) {
+    synchronized String getRSGroup(String namespace, String tablename) {
       if (rsgroupMappingScript == null) {
         return RSGroupInfo.DEFAULT_GROUP;
       }
