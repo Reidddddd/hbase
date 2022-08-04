@@ -80,6 +80,7 @@ import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownRegionException;
 import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.MetaScanner;
@@ -167,6 +168,7 @@ import org.apache.hadoop.hbase.util.ModifyRegionUtils;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.util.VersionInfo;
+import org.apache.zookeeper.KeeperException;
 import org.apache.hadoop.hbase.zookeeper.DrainingServerTracker;
 import org.apache.hadoop.hbase.zookeeper.LoadBalancerTracker;
 import org.apache.hadoop.hbase.zookeeper.MasterAddressTracker;
@@ -175,10 +177,10 @@ import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.RegionNormalizerTracker;
 import org.apache.hadoop.hbase.zookeeper.RegionServerTracker;
 import org.apache.hadoop.hbase.zookeeper.SplitOrMergeTracker;
+import org.apache.hadoop.hbase.zookeeper.ZKChildrenCountMXBeanImpl;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
-import org.apache.zookeeper.KeeperException;
 import org.mortbay.jetty.Connector;
 import org.mortbay.jetty.nio.SelectChannelConnector;
 import org.mortbay.jetty.servlet.Context;
@@ -707,6 +709,15 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     this.mpmHost.register(new MasterFlushTableProcedureManager());
     this.mpmHost.loadProcedures(conf);
     this.mpmHost.initialize(this, this.metricsMaster);
+
+    registerZKInfoMXBean();
+  }
+
+  private void registerZKInfoMXBean() {
+    ZKChildrenCountMXBeanImpl mxBeanInfo =
+            ZKChildrenCountMXBeanImpl.init(this);
+    MBeans.register("HBase", "Master,sub=ZooKeeperInfo", mxBeanInfo);
+    LOG.info("Registered ZKInfo MXBean");
   }
 
   /**

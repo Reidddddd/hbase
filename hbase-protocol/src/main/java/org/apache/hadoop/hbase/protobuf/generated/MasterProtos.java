@@ -62073,6 +62073,1244 @@ public final class MasterProtos {
     // @@protoc_insertion_point(class_scope:hbase.pb.ClearDeadServersResponse)
   }
 
+  public interface GetZNodeCountRequestOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // required string path = 1;
+    /**
+     * <code>required string path = 1;</code>
+     */
+    boolean hasPath();
+    /**
+     * <code>required string path = 1;</code>
+     */
+    java.lang.String getPath();
+    /**
+     * <code>required string path = 1;</code>
+     */
+    com.google.protobuf.ByteString
+        getPathBytes();
+  }
+  /**
+   * Protobuf type {@code hbase.pb.GetZNodeCountRequest}
+   */
+  public static final class GetZNodeCountRequest extends
+      com.google.protobuf.GeneratedMessage
+      implements GetZNodeCountRequestOrBuilder {
+    // Use GetZNodeCountRequest.newBuilder() to construct.
+    private GetZNodeCountRequest(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private GetZNodeCountRequest(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final GetZNodeCountRequest defaultInstance;
+    public static GetZNodeCountRequest getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public GetZNodeCountRequest getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private GetZNodeCountRequest(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              bitField0_ |= 0x00000001;
+              path_ = input.readBytes();
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountRequest_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountRequest_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.class, org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<GetZNodeCountRequest> PARSER =
+        new com.google.protobuf.AbstractParser<GetZNodeCountRequest>() {
+      public GetZNodeCountRequest parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new GetZNodeCountRequest(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<GetZNodeCountRequest> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
+    // required string path = 1;
+    public static final int PATH_FIELD_NUMBER = 1;
+    private java.lang.Object path_;
+    /**
+     * <code>required string path = 1;</code>
+     */
+    public boolean hasPath() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>required string path = 1;</code>
+     */
+    public java.lang.String getPath() {
+      java.lang.Object ref = path_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        if (bs.isValidUtf8()) {
+          path_ = s;
+        }
+        return s;
+      }
+    }
+    /**
+     * <code>required string path = 1;</code>
+     */
+    public com.google.protobuf.ByteString
+        getPathBytes() {
+      java.lang.Object ref = path_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        path_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    private void initFields() {
+      path_ = "";
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      if (!hasPath()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeBytes(1, getPathBytes());
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(1, getPathBytes());
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest)) {
+        return super.equals(obj);
+      }
+      org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest other = (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest) obj;
+
+      boolean result = true;
+      result = result && (hasPath() == other.hasPath());
+      if (hasPath()) {
+        result = result && getPath()
+            .equals(other.getPath());
+      }
+      result = result &&
+          getUnknownFields().equals(other.getUnknownFields());
+      return result;
+    }
+
+    private int memoizedHashCode = 0;
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptorForType().hashCode();
+      if (hasPath()) {
+        hash = (37 * hash) + PATH_FIELD_NUMBER;
+        hash = (53 * hash) + getPath().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code hbase.pb.GetZNodeCountRequest}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequestOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountRequest_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountRequest_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.class, org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.Builder.class);
+      }
+
+      // Construct using org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        path_ = "";
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountRequest_descriptor;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest getDefaultInstanceForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.getDefaultInstance();
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest build() {
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest buildPartial() {
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest result = new org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
+        }
+        result.path_ = path_;
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest) {
+          return mergeFrom((org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest other) {
+        if (other == org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.getDefaultInstance()) return this;
+        if (other.hasPath()) {
+          bitField0_ |= 0x00000001;
+          path_ = other.path_;
+          onChanged();
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        if (!hasPath()) {
+          
+          return false;
+        }
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // required string path = 1;
+      private java.lang.Object path_ = "";
+      /**
+       * <code>required string path = 1;</code>
+       */
+      public boolean hasPath() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      /**
+       * <code>required string path = 1;</code>
+       */
+      public java.lang.String getPath() {
+        java.lang.Object ref = path_;
+        if (!(ref instanceof java.lang.String)) {
+          java.lang.String s = ((com.google.protobuf.ByteString) ref)
+              .toStringUtf8();
+          path_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>required string path = 1;</code>
+       */
+      public com.google.protobuf.ByteString
+          getPathBytes() {
+        java.lang.Object ref = path_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          path_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>required string path = 1;</code>
+       */
+      public Builder setPath(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000001;
+        path_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>required string path = 1;</code>
+       */
+      public Builder clearPath() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        path_ = getDefaultInstance().getPath();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>required string path = 1;</code>
+       */
+      public Builder setPathBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000001;
+        path_ = value;
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:hbase.pb.GetZNodeCountRequest)
+    }
+
+    static {
+      defaultInstance = new GetZNodeCountRequest(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:hbase.pb.GetZNodeCountRequest)
+  }
+
+  public interface GetZNodeCountResponseOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // repeated .hbase.pb.ZNodeInfo znode_infos = 1;
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    java.util.List<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo> 
+        getZnodeInfosList();
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo getZnodeInfos(int index);
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    int getZnodeInfosCount();
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    java.util.List<? extends org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder> 
+        getZnodeInfosOrBuilderList();
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder getZnodeInfosOrBuilder(
+        int index);
+  }
+  /**
+   * Protobuf type {@code hbase.pb.GetZNodeCountResponse}
+   */
+  public static final class GetZNodeCountResponse extends
+      com.google.protobuf.GeneratedMessage
+      implements GetZNodeCountResponseOrBuilder {
+    // Use GetZNodeCountResponse.newBuilder() to construct.
+    private GetZNodeCountResponse(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private GetZNodeCountResponse(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final GetZNodeCountResponse defaultInstance;
+    public static GetZNodeCountResponse getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public GetZNodeCountResponse getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private GetZNodeCountResponse(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
+                znodeInfos_ = new java.util.ArrayList<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo>();
+                mutable_bitField0_ |= 0x00000001;
+              }
+              znodeInfos_.add(input.readMessage(org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.PARSER, extensionRegistry));
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
+          znodeInfos_ = java.util.Collections.unmodifiableList(znodeInfos_);
+        }
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountResponse_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountResponse_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.class, org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<GetZNodeCountResponse> PARSER =
+        new com.google.protobuf.AbstractParser<GetZNodeCountResponse>() {
+      public GetZNodeCountResponse parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new GetZNodeCountResponse(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<GetZNodeCountResponse> getParserForType() {
+      return PARSER;
+    }
+
+    // repeated .hbase.pb.ZNodeInfo znode_infos = 1;
+    public static final int ZNODE_INFOS_FIELD_NUMBER = 1;
+    private java.util.List<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo> znodeInfos_;
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    public java.util.List<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo> getZnodeInfosList() {
+      return znodeInfos_;
+    }
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    public java.util.List<? extends org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder> 
+        getZnodeInfosOrBuilderList() {
+      return znodeInfos_;
+    }
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    public int getZnodeInfosCount() {
+      return znodeInfos_.size();
+    }
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo getZnodeInfos(int index) {
+      return znodeInfos_.get(index);
+    }
+    /**
+     * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+     */
+    public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder getZnodeInfosOrBuilder(
+        int index) {
+      return znodeInfos_.get(index);
+    }
+
+    private void initFields() {
+      znodeInfos_ = java.util.Collections.emptyList();
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      for (int i = 0; i < getZnodeInfosCount(); i++) {
+        if (!getZnodeInfos(i).isInitialized()) {
+          memoizedIsInitialized = 0;
+          return false;
+        }
+      }
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      for (int i = 0; i < znodeInfos_.size(); i++) {
+        output.writeMessage(1, znodeInfos_.get(i));
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      for (int i = 0; i < znodeInfos_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, znodeInfos_.get(i));
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse)) {
+        return super.equals(obj);
+      }
+      org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse other = (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse) obj;
+
+      boolean result = true;
+      result = result && getZnodeInfosList()
+          .equals(other.getZnodeInfosList());
+      result = result &&
+          getUnknownFields().equals(other.getUnknownFields());
+      return result;
+    }
+
+    private int memoizedHashCode = 0;
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptorForType().hashCode();
+      if (getZnodeInfosCount() > 0) {
+        hash = (37 * hash) + ZNODE_INFOS_FIELD_NUMBER;
+        hash = (53 * hash) + getZnodeInfosList().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code hbase.pb.GetZNodeCountResponse}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponseOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountResponse_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountResponse_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.class, org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.Builder.class);
+      }
+
+      // Construct using org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getZnodeInfosFieldBuilder();
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        if (znodeInfosBuilder_ == null) {
+          znodeInfos_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+        } else {
+          znodeInfosBuilder_.clear();
+        }
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.internal_static_hbase_pb_GetZNodeCountResponse_descriptor;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse getDefaultInstanceForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance();
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse build() {
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse buildPartial() {
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse result = new org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse(this);
+        int from_bitField0_ = bitField0_;
+        if (znodeInfosBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) == 0x00000001)) {
+            znodeInfos_ = java.util.Collections.unmodifiableList(znodeInfos_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.znodeInfos_ = znodeInfos_;
+        } else {
+          result.znodeInfos_ = znodeInfosBuilder_.build();
+        }
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse) {
+          return mergeFrom((org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse other) {
+        if (other == org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance()) return this;
+        if (znodeInfosBuilder_ == null) {
+          if (!other.znodeInfos_.isEmpty()) {
+            if (znodeInfos_.isEmpty()) {
+              znodeInfos_ = other.znodeInfos_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureZnodeInfosIsMutable();
+              znodeInfos_.addAll(other.znodeInfos_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.znodeInfos_.isEmpty()) {
+            if (znodeInfosBuilder_.isEmpty()) {
+              znodeInfosBuilder_.dispose();
+              znodeInfosBuilder_ = null;
+              znodeInfos_ = other.znodeInfos_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              znodeInfosBuilder_ = 
+                com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
+                   getZnodeInfosFieldBuilder() : null;
+            } else {
+              znodeInfosBuilder_.addAllMessages(other.znodeInfos_);
+            }
+          }
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        for (int i = 0; i < getZnodeInfosCount(); i++) {
+          if (!getZnodeInfos(i).isInitialized()) {
+            
+            return false;
+          }
+        }
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // repeated .hbase.pb.ZNodeInfo znode_infos = 1;
+      private java.util.List<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo> znodeInfos_ =
+        java.util.Collections.emptyList();
+      private void ensureZnodeInfosIsMutable() {
+        if (!((bitField0_ & 0x00000001) == 0x00000001)) {
+          znodeInfos_ = new java.util.ArrayList<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo>(znodeInfos_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilder<
+          org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder> znodeInfosBuilder_;
+
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public java.util.List<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo> getZnodeInfosList() {
+        if (znodeInfosBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(znodeInfos_);
+        } else {
+          return znodeInfosBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public int getZnodeInfosCount() {
+        if (znodeInfosBuilder_ == null) {
+          return znodeInfos_.size();
+        } else {
+          return znodeInfosBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo getZnodeInfos(int index) {
+        if (znodeInfosBuilder_ == null) {
+          return znodeInfos_.get(index);
+        } else {
+          return znodeInfosBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder setZnodeInfos(
+          int index, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo value) {
+        if (znodeInfosBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.set(index, value);
+          onChanged();
+        } else {
+          znodeInfosBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder setZnodeInfos(
+          int index, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder builderForValue) {
+        if (znodeInfosBuilder_ == null) {
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          znodeInfosBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder addZnodeInfos(org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo value) {
+        if (znodeInfosBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.add(value);
+          onChanged();
+        } else {
+          znodeInfosBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder addZnodeInfos(
+          int index, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo value) {
+        if (znodeInfosBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.add(index, value);
+          onChanged();
+        } else {
+          znodeInfosBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder addZnodeInfos(
+          org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder builderForValue) {
+        if (znodeInfosBuilder_ == null) {
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.add(builderForValue.build());
+          onChanged();
+        } else {
+          znodeInfosBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder addZnodeInfos(
+          int index, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder builderForValue) {
+        if (znodeInfosBuilder_ == null) {
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          znodeInfosBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder addAllZnodeInfos(
+          java.lang.Iterable<? extends org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo> values) {
+        if (znodeInfosBuilder_ == null) {
+          ensureZnodeInfosIsMutable();
+          super.addAll(values, znodeInfos_);
+          onChanged();
+        } else {
+          znodeInfosBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder clearZnodeInfos() {
+        if (znodeInfosBuilder_ == null) {
+          znodeInfos_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          znodeInfosBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public Builder removeZnodeInfos(int index) {
+        if (znodeInfosBuilder_ == null) {
+          ensureZnodeInfosIsMutable();
+          znodeInfos_.remove(index);
+          onChanged();
+        } else {
+          znodeInfosBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder getZnodeInfosBuilder(
+          int index) {
+        return getZnodeInfosFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder getZnodeInfosOrBuilder(
+          int index) {
+        if (znodeInfosBuilder_ == null) {
+          return znodeInfos_.get(index);  } else {
+          return znodeInfosBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public java.util.List<? extends org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder> 
+           getZnodeInfosOrBuilderList() {
+        if (znodeInfosBuilder_ != null) {
+          return znodeInfosBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(znodeInfos_);
+        }
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder addZnodeInfosBuilder() {
+        return getZnodeInfosFieldBuilder().addBuilder(
+            org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder addZnodeInfosBuilder(
+          int index) {
+        return getZnodeInfosFieldBuilder().addBuilder(
+            index, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .hbase.pb.ZNodeInfo znode_infos = 1;</code>
+       */
+      public java.util.List<org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder> 
+           getZnodeInfosBuilderList() {
+        return getZnodeInfosFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilder<
+          org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder> 
+          getZnodeInfosFieldBuilder() {
+        if (znodeInfosBuilder_ == null) {
+          znodeInfosBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+              org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfo.Builder, org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ZNodeInfoOrBuilder>(
+                  znodeInfos_,
+                  ((bitField0_ & 0x00000001) == 0x00000001),
+                  getParentForChildren(),
+                  isClean());
+          znodeInfos_ = null;
+        }
+        return znodeInfosBuilder_;
+      }
+
+      // @@protoc_insertion_point(builder_scope:hbase.pb.GetZNodeCountResponse)
+    }
+
+    static {
+      defaultInstance = new GetZNodeCountResponse(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:hbase.pb.GetZNodeCountResponse)
+  }
+
   /**
    * Protobuf service {@code hbase.pb.MasterService}
    */
@@ -62845,6 +64083,18 @@ public final class MasterProtos {
           org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersRequest request,
           com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse> done);
 
+      /**
+       * <code>rpc GetZNodeCount(.hbase.pb.GetZNodeCountRequest) returns (.hbase.pb.GetZNodeCountResponse);</code>
+       *
+       * <pre>
+       ** get total count of the znode, include itself and children 
+       * </pre>
+       */
+      public abstract void getZNodeCount(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest request,
+          com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse> done);
+
     }
 
     public static com.google.protobuf.Service newReflectiveService(
@@ -63338,6 +64588,14 @@ public final class MasterProtos {
           impl.clearDeadServers(controller, request, done);
         }
 
+        @java.lang.Override
+        public  void getZNodeCount(
+            com.google.protobuf.RpcController controller,
+            org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest request,
+            com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse> done) {
+          impl.getZNodeCount(controller, request, done);
+        }
+
       };
     }
 
@@ -63482,6 +64740,8 @@ public final class MasterProtos {
               return impl.listProcedures(controller, (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ListProceduresRequest)request);
             case 60:
               return impl.clearDeadServers(controller, (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersRequest)request);
+            case 61:
+              return impl.getZNodeCount(controller, (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest)request);
             default:
               throw new java.lang.AssertionError("Can't get here.");
           }
@@ -63618,6 +64878,8 @@ public final class MasterProtos {
               return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ListProceduresRequest.getDefaultInstance();
             case 60:
               return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersRequest.getDefaultInstance();
+            case 61:
+              return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.getDefaultInstance();
             default:
               throw new java.lang.AssertionError("Can't get here.");
           }
@@ -63754,6 +65016,8 @@ public final class MasterProtos {
               return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ListProceduresResponse.getDefaultInstance();
             case 60:
               return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse.getDefaultInstance();
+            case 61:
+              return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance();
             default:
               throw new java.lang.AssertionError("Can't get here.");
           }
@@ -64526,6 +65790,18 @@ public final class MasterProtos {
         org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersRequest request,
         com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse> done);
 
+    /**
+     * <code>rpc GetZNodeCount(.hbase.pb.GetZNodeCountRequest) returns (.hbase.pb.GetZNodeCountResponse);</code>
+     *
+     * <pre>
+     ** get total count of the znode, include itself and children 
+     * </pre>
+     */
+    public abstract void getZNodeCount(
+        com.google.protobuf.RpcController controller,
+        org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest request,
+        com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse> done);
+
     public static final
         com.google.protobuf.Descriptors.ServiceDescriptor
         getDescriptor() {
@@ -64853,6 +66129,11 @@ public final class MasterProtos {
             com.google.protobuf.RpcUtil.<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse>specializeCallback(
               done));
           return;
+        case 61:
+          this.getZNodeCount(controller, (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest)request,
+            com.google.protobuf.RpcUtil.<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse>specializeCallback(
+              done));
+          return;
         default:
           throw new java.lang.AssertionError("Can't get here.");
       }
@@ -64989,6 +66270,8 @@ public final class MasterProtos {
           return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ListProceduresRequest.getDefaultInstance();
         case 60:
           return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersRequest.getDefaultInstance();
+        case 61:
+          return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest.getDefaultInstance();
         default:
           throw new java.lang.AssertionError("Can't get here.");
       }
@@ -65125,6 +66408,8 @@ public final class MasterProtos {
           return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ListProceduresResponse.getDefaultInstance();
         case 60:
           return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse.getDefaultInstance();
+        case 61:
+          return org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance();
         default:
           throw new java.lang.AssertionError("Can't get here.");
       }
@@ -66060,6 +67345,21 @@ public final class MasterProtos {
             org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse.class,
             org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse.getDefaultInstance()));
       }
+
+      public  void getZNodeCount(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest request,
+          com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse> done) {
+        channel.callMethod(
+          getDescriptor().getMethods().get(61),
+          controller,
+          request,
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance(),
+          com.google.protobuf.RpcUtil.generalizeCallback(
+            done,
+            org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.class,
+            org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance()));
+      }
     }
 
     public static BlockingInterface newBlockingStub(
@@ -66371,6 +67671,11 @@ public final class MasterProtos {
       public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse clearDeadServers(
           com.google.protobuf.RpcController controller,
           org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersRequest request)
+          throws com.google.protobuf.ServiceException;
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse getZNodeCount(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest request)
           throws com.google.protobuf.ServiceException;
     }
 
@@ -67112,6 +68417,18 @@ public final class MasterProtos {
           org.apache.hadoop.hbase.protobuf.generated.MasterProtos.ClearDeadServersResponse.getDefaultInstance());
       }
 
+
+      public org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse getZNodeCount(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest request)
+          throws com.google.protobuf.ServiceException {
+        return (org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse) channel.callBlockingMethod(
+          getDescriptor().getMethods().get(61),
+          controller,
+          request,
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountResponse.getDefaultInstance());
+      }
+
     }
 
     // @@protoc_insertion_point(class_scope:hbase.pb.MasterService)
@@ -67702,6 +69019,16 @@ public final class MasterProtos {
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_hbase_pb_ClearDeadServersResponse_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_hbase_pb_GetZNodeCountRequest_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_hbase_pb_GetZNodeCountRequest_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_hbase_pb_GetZNodeCountResponse_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_hbase_pb_GetZNodeCountResponse_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -67909,150 +69236,155 @@ public final class MasterProtos {
       "ServersRequest\022)\n\013server_name\030\001 \003(\0132\024.hb" +
       "ase.pb.ServerName\"E\n\030ClearDeadServersRes" +
       "ponse\022)\n\013server_name\030\001 \003(\0132\024.hbase.pb.Se" +
-      "rverName*(\n\020MasterSwitchType\022\t\n\005SPLIT\020\000\022" +
-      "\t\n\005MERGE\020\0012\365+\n\rMasterService\022e\n\024GetSchem",
-      "aAlterStatus\022%.hbase.pb.GetSchemaAlterSt" +
-      "atusRequest\032&.hbase.pb.GetSchemaAlterSta" +
-      "tusResponse\022b\n\023GetTableDescriptors\022$.hba" +
-      "se.pb.GetTableDescriptorsRequest\032%.hbase" +
-      ".pb.GetTableDescriptorsResponse\022P\n\rGetTa" +
-      "bleNames\022\036.hbase.pb.GetTableNamesRequest" +
-      "\032\037.hbase.pb.GetTableNamesResponse\022Y\n\020Get" +
-      "ClusterStatus\022!.hbase.pb.GetClusterStatu" +
-      "sRequest\032\".hbase.pb.GetClusterStatusResp" +
-      "onse\022V\n\017IsMasterRunning\022 .hbase.pb.IsMas",
-      "terRunningRequest\032!.hbase.pb.IsMasterRun" +
-      "ningResponse\022D\n\tAddColumn\022\032.hbase.pb.Add" +
-      "ColumnRequest\032\033.hbase.pb.AddColumnRespon" +
-      "se\022M\n\014DeleteColumn\022\035.hbase.pb.DeleteColu" +
-      "mnRequest\032\036.hbase.pb.DeleteColumnRespons" +
-      "e\022M\n\014ModifyColumn\022\035.hbase.pb.ModifyColum" +
-      "nRequest\032\036.hbase.pb.ModifyColumnResponse" +
-      "\022G\n\nMoveRegion\022\033.hbase.pb.MoveRegionRequ" +
-      "est\032\034.hbase.pb.MoveRegionResponse\022k\n\026Dis" +
-      "patchMergingRegions\022\'.hbase.pb.DispatchM",
-      "ergingRegionsRequest\032(.hbase.pb.Dispatch" +
-      "MergingRegionsResponse\022M\n\014AssignRegion\022\035" +
-      ".hbase.pb.AssignRegionRequest\032\036.hbase.pb" +
-      ".AssignRegionResponse\022S\n\016UnassignRegion\022" +
-      "\037.hbase.pb.UnassignRegionRequest\032 .hbase" +
-      ".pb.UnassignRegionResponse\022P\n\rOfflineReg" +
-      "ion\022\036.hbase.pb.OfflineRegionRequest\032\037.hb" +
-      "ase.pb.OfflineRegionResponse\022J\n\013DeleteTa" +
-      "ble\022\034.hbase.pb.DeleteTableRequest\032\035.hbas" +
-      "e.pb.DeleteTableResponse\022P\n\rtruncateTabl",
-      "e\022\036.hbase.pb.TruncateTableRequest\032\037.hbas" +
-      "e.pb.TruncateTableResponse\022J\n\013EnableTabl" +
-      "e\022\034.hbase.pb.EnableTableRequest\032\035.hbase." +
-      "pb.EnableTableResponse\022M\n\014DisableTable\022\035" +
-      ".hbase.pb.DisableTableRequest\032\036.hbase.pb" +
-      ".DisableTableResponse\022J\n\013ModifyTable\022\034.h" +
-      "base.pb.ModifyTableRequest\032\035.hbase.pb.Mo" +
-      "difyTableResponse\022J\n\013CreateTable\022\034.hbase" +
-      ".pb.CreateTableRequest\032\035.hbase.pb.Create" +
-      "TableResponse\022A\n\010Shutdown\022\031.hbase.pb.Shu",
-      "tdownRequest\032\032.hbase.pb.ShutdownResponse" +
-      "\022G\n\nStopMaster\022\033.hbase.pb.StopMasterRequ" +
-      "est\032\034.hbase.pb.StopMasterResponse\022h\n\031IsM" +
-      "asterInMaintenanceMode\022$.hbase.pb.IsInMa" +
-      "intenanceModeRequest\032%.hbase.pb.IsInMain" +
-      "tenanceModeResponse\022>\n\007Balance\022\030.hbase.p" +
-      "b.BalanceRequest\032\031.hbase.pb.BalanceRespo" +
-      "nse\022_\n\022SetBalancerRunning\022#.hbase.pb.Set" +
-      "BalancerRunningRequest\032$.hbase.pb.SetBal" +
-      "ancerRunningResponse\022\\\n\021IsBalancerEnable",
-      "d\022\".hbase.pb.IsBalancerEnabledRequest\032#." +
-      "hbase.pb.IsBalancerEnabledResponse\022k\n\026Se" +
-      "tSplitOrMergeEnabled\022\'.hbase.pb.SetSplit" +
-      "OrMergeEnabledRequest\032(.hbase.pb.SetSpli" +
-      "tOrMergeEnabledResponse\022h\n\025IsSplitOrMerg" +
-      "eEnabled\022&.hbase.pb.IsSplitOrMergeEnable" +
-      "dRequest\032\'.hbase.pb.IsSplitOrMergeEnable" +
-      "dResponse\022D\n\tNormalize\022\032.hbase.pb.Normal" +
-      "izeRequest\032\033.hbase.pb.NormalizeResponse\022" +
-      "e\n\024SetNormalizerRunning\022%.hbase.pb.SetNo",
-      "rmalizerRunningRequest\032&.hbase.pb.SetNor" +
-      "malizerRunningResponse\022b\n\023IsNormalizerEn" +
-      "abled\022$.hbase.pb.IsNormalizerEnabledRequ" +
-      "est\032%.hbase.pb.IsNormalizerEnabledRespon" +
-      "se\022S\n\016RunCatalogScan\022\037.hbase.pb.RunCatal" +
-      "ogScanRequest\032 .hbase.pb.RunCatalogScanR" +
-      "esponse\022e\n\024EnableCatalogJanitor\022%.hbase." +
-      "pb.EnableCatalogJanitorRequest\032&.hbase.p" +
-      "b.EnableCatalogJanitorResponse\022n\n\027IsCata" +
-      "logJanitorEnabled\022(.hbase.pb.IsCatalogJa",
-      "nitorEnabledRequest\032).hbase.pb.IsCatalog" +
-      "JanitorEnabledResponse\022V\n\017RunCleanerChor" +
-      "e\022 .hbase.pb.RunCleanerChoreRequest\032!.hb" +
-      "ase.pb.RunCleanerChoreResponse\022k\n\026SetCle" +
-      "anerChoreRunning\022\'.hbase.pb.SetCleanerCh" +
-      "oreRunningRequest\032(.hbase.pb.SetCleanerC" +
-      "horeRunningResponse\022h\n\025IsCleanerChoreEna" +
-      "bled\022&.hbase.pb.IsCleanerChoreEnabledReq" +
-      "uest\032\'.hbase.pb.IsCleanerChoreEnabledRes" +
-      "ponse\022^\n\021ExecMasterService\022#.hbase.pb.Co",
-      "processorServiceRequest\032$.hbase.pb.Copro" +
-      "cessorServiceResponse\022A\n\010Snapshot\022\031.hbas" +
-      "e.pb.SnapshotRequest\032\032.hbase.pb.Snapshot" +
-      "Response\022h\n\025GetCompletedSnapshots\022&.hbas" +
-      "e.pb.GetCompletedSnapshotsRequest\032\'.hbas" +
-      "e.pb.GetCompletedSnapshotsResponse\022S\n\016De" +
-      "leteSnapshot\022\037.hbase.pb.DeleteSnapshotRe" +
-      "quest\032 .hbase.pb.DeleteSnapshotResponse\022" +
-      "S\n\016IsSnapshotDone\022\037.hbase.pb.IsSnapshotD" +
-      "oneRequest\032 .hbase.pb.IsSnapshotDoneResp",
-      "onse\022V\n\017RestoreSnapshot\022 .hbase.pb.Resto" +
-      "reSnapshotRequest\032!.hbase.pb.RestoreSnap" +
-      "shotResponse\022h\n\025IsRestoreSnapshotDone\022&." +
-      "hbase.pb.IsRestoreSnapshotDoneRequest\032\'." +
-      "hbase.pb.IsRestoreSnapshotDoneResponse\022P" +
-      "\n\rExecProcedure\022\036.hbase.pb.ExecProcedure" +
-      "Request\032\037.hbase.pb.ExecProcedureResponse" +
-      "\022W\n\024ExecProcedureWithRet\022\036.hbase.pb.Exec" +
-      "ProcedureRequest\032\037.hbase.pb.ExecProcedur" +
-      "eResponse\022V\n\017IsProcedureDone\022 .hbase.pb.",
-      "IsProcedureDoneRequest\032!.hbase.pb.IsProc" +
-      "edureDoneResponse\022V\n\017ModifyNamespace\022 .h" +
-      "base.pb.ModifyNamespaceRequest\032!.hbase.p" +
-      "b.ModifyNamespaceResponse\022V\n\017CreateNames" +
-      "pace\022 .hbase.pb.CreateNamespaceRequest\032!" +
-      ".hbase.pb.CreateNamespaceResponse\022V\n\017Del" +
-      "eteNamespace\022 .hbase.pb.DeleteNamespaceR" +
-      "equest\032!.hbase.pb.DeleteNamespaceRespons" +
-      "e\022k\n\026GetNamespaceDescriptor\022\'.hbase.pb.G" +
-      "etNamespaceDescriptorRequest\032(.hbase.pb.",
-      "GetNamespaceDescriptorResponse\022q\n\030ListNa" +
-      "mespaceDescriptors\022).hbase.pb.ListNamesp" +
-      "aceDescriptorsRequest\032*.hbase.pb.ListNam" +
-      "espaceDescriptorsResponse\022\206\001\n\037ListTableD" +
-      "escriptorsByNamespace\0220.hbase.pb.ListTab" +
-      "leDescriptorsByNamespaceRequest\0321.hbase." +
-      "pb.ListTableDescriptorsByNamespaceRespon" +
-      "se\022t\n\031ListTableNamesByNamespace\022*.hbase." +
-      "pb.ListTableNamesByNamespaceRequest\032+.hb" +
-      "ase.pb.ListTableNamesByNamespaceResponse",
-      "\022A\n\010SetQuota\022\031.hbase.pb.SetQuotaRequest\032" +
-      "\032.hbase.pb.SetQuotaResponse\022x\n\037getLastMa" +
-      "jorCompactionTimestamp\022).hbase.pb.MajorC" +
-      "ompactionTimestampRequest\032*.hbase.pb.Maj" +
-      "orCompactionTimestampResponse\022\212\001\n(getLas" +
-      "tMajorCompactionTimestampForRegion\0222.hba" +
-      "se.pb.MajorCompactionTimestampForRegionR" +
-      "equest\032*.hbase.pb.MajorCompactionTimesta" +
-      "mpResponse\022_\n\022getProcedureResult\022#.hbase" +
-      ".pb.GetProcedureResultRequest\032$.hbase.pb",
-      ".GetProcedureResultResponse\022h\n\027getSecuri" +
-      "tyCapabilities\022%.hbase.pb.SecurityCapabi" +
-      "litiesRequest\032&.hbase.pb.SecurityCapabil" +
-      "itiesResponse\022S\n\016AbortProcedure\022\037.hbase." +
-      "pb.AbortProcedureRequest\032 .hbase.pb.Abor" +
-      "tProcedureResponse\022S\n\016ListProcedures\022\037.h" +
-      "base.pb.ListProceduresRequest\032 .hbase.pb" +
-      ".ListProceduresResponse\022Y\n\020ClearDeadServ" +
-      "ers\022!.hbase.pb.ClearDeadServersRequest\032\"" +
-      ".hbase.pb.ClearDeadServersResponseBB\n*or",
-      "g.apache.hadoop.hbase.protobuf.generated" +
-      "B\014MasterProtosH\001\210\001\001\240\001\001"
+      "rverName\"$\n\024GetZNodeCountRequest\022\014\n\004path" +
+      "\030\001 \002(\t\"A\n\025GetZNodeCountResponse\022(\n\013znode",
+      "_infos\030\001 \003(\0132\023.hbase.pb.ZNodeInfo*(\n\020Mas" +
+      "terSwitchType\022\t\n\005SPLIT\020\000\022\t\n\005MERGE\020\0012\307,\n\r" +
+      "MasterService\022e\n\024GetSchemaAlterStatus\022%." +
+      "hbase.pb.GetSchemaAlterStatusRequest\032&.h" +
+      "base.pb.GetSchemaAlterStatusResponse\022b\n\023" +
+      "GetTableDescriptors\022$.hbase.pb.GetTableD" +
+      "escriptorsRequest\032%.hbase.pb.GetTableDes" +
+      "criptorsResponse\022P\n\rGetTableNames\022\036.hbas" +
+      "e.pb.GetTableNamesRequest\032\037.hbase.pb.Get" +
+      "TableNamesResponse\022Y\n\020GetClusterStatus\022!",
+      ".hbase.pb.GetClusterStatusRequest\032\".hbas" +
+      "e.pb.GetClusterStatusResponse\022V\n\017IsMaste" +
+      "rRunning\022 .hbase.pb.IsMasterRunningReque" +
+      "st\032!.hbase.pb.IsMasterRunningResponse\022D\n" +
+      "\tAddColumn\022\032.hbase.pb.AddColumnRequest\032\033" +
+      ".hbase.pb.AddColumnResponse\022M\n\014DeleteCol" +
+      "umn\022\035.hbase.pb.DeleteColumnRequest\032\036.hba" +
+      "se.pb.DeleteColumnResponse\022M\n\014ModifyColu" +
+      "mn\022\035.hbase.pb.ModifyColumnRequest\032\036.hbas" +
+      "e.pb.ModifyColumnResponse\022G\n\nMoveRegion\022",
+      "\033.hbase.pb.MoveRegionRequest\032\034.hbase.pb." +
+      "MoveRegionResponse\022k\n\026DispatchMergingReg" +
+      "ions\022\'.hbase.pb.DispatchMergingRegionsRe" +
+      "quest\032(.hbase.pb.DispatchMergingRegionsR" +
+      "esponse\022M\n\014AssignRegion\022\035.hbase.pb.Assig" +
+      "nRegionRequest\032\036.hbase.pb.AssignRegionRe" +
+      "sponse\022S\n\016UnassignRegion\022\037.hbase.pb.Unas" +
+      "signRegionRequest\032 .hbase.pb.UnassignReg" +
+      "ionResponse\022P\n\rOfflineRegion\022\036.hbase.pb." +
+      "OfflineRegionRequest\032\037.hbase.pb.OfflineR",
+      "egionResponse\022J\n\013DeleteTable\022\034.hbase.pb." +
+      "DeleteTableRequest\032\035.hbase.pb.DeleteTabl" +
+      "eResponse\022P\n\rtruncateTable\022\036.hbase.pb.Tr" +
+      "uncateTableRequest\032\037.hbase.pb.TruncateTa" +
+      "bleResponse\022J\n\013EnableTable\022\034.hbase.pb.En" +
+      "ableTableRequest\032\035.hbase.pb.EnableTableR" +
+      "esponse\022M\n\014DisableTable\022\035.hbase.pb.Disab" +
+      "leTableRequest\032\036.hbase.pb.DisableTableRe" +
+      "sponse\022J\n\013ModifyTable\022\034.hbase.pb.ModifyT" +
+      "ableRequest\032\035.hbase.pb.ModifyTableRespon",
+      "se\022J\n\013CreateTable\022\034.hbase.pb.CreateTable" +
+      "Request\032\035.hbase.pb.CreateTableResponse\022A" +
+      "\n\010Shutdown\022\031.hbase.pb.ShutdownRequest\032\032." +
+      "hbase.pb.ShutdownResponse\022G\n\nStopMaster\022" +
+      "\033.hbase.pb.StopMasterRequest\032\034.hbase.pb." +
+      "StopMasterResponse\022h\n\031IsMasterInMaintena" +
+      "nceMode\022$.hbase.pb.IsInMaintenanceModeRe" +
+      "quest\032%.hbase.pb.IsInMaintenanceModeResp" +
+      "onse\022>\n\007Balance\022\030.hbase.pb.BalanceReques" +
+      "t\032\031.hbase.pb.BalanceResponse\022_\n\022SetBalan",
+      "cerRunning\022#.hbase.pb.SetBalancerRunning" +
+      "Request\032$.hbase.pb.SetBalancerRunningRes" +
+      "ponse\022\\\n\021IsBalancerEnabled\022\".hbase.pb.Is" +
+      "BalancerEnabledRequest\032#.hbase.pb.IsBala" +
+      "ncerEnabledResponse\022k\n\026SetSplitOrMergeEn" +
+      "abled\022\'.hbase.pb.SetSplitOrMergeEnabledR" +
+      "equest\032(.hbase.pb.SetSplitOrMergeEnabled" +
+      "Response\022h\n\025IsSplitOrMergeEnabled\022&.hbas" +
+      "e.pb.IsSplitOrMergeEnabledRequest\032\'.hbas" +
+      "e.pb.IsSplitOrMergeEnabledResponse\022D\n\tNo",
+      "rmalize\022\032.hbase.pb.NormalizeRequest\032\033.hb" +
+      "ase.pb.NormalizeResponse\022e\n\024SetNormalize" +
+      "rRunning\022%.hbase.pb.SetNormalizerRunning" +
+      "Request\032&.hbase.pb.SetNormalizerRunningR" +
+      "esponse\022b\n\023IsNormalizerEnabled\022$.hbase.p" +
+      "b.IsNormalizerEnabledRequest\032%.hbase.pb." +
+      "IsNormalizerEnabledResponse\022S\n\016RunCatalo" +
+      "gScan\022\037.hbase.pb.RunCatalogScanRequest\032 " +
+      ".hbase.pb.RunCatalogScanResponse\022e\n\024Enab" +
+      "leCatalogJanitor\022%.hbase.pb.EnableCatalo",
+      "gJanitorRequest\032&.hbase.pb.EnableCatalog" +
+      "JanitorResponse\022n\n\027IsCatalogJanitorEnabl" +
+      "ed\022(.hbase.pb.IsCatalogJanitorEnabledReq" +
+      "uest\032).hbase.pb.IsCatalogJanitorEnabledR" +
+      "esponse\022V\n\017RunCleanerChore\022 .hbase.pb.Ru" +
+      "nCleanerChoreRequest\032!.hbase.pb.RunClean" +
+      "erChoreResponse\022k\n\026SetCleanerChoreRunnin" +
+      "g\022\'.hbase.pb.SetCleanerChoreRunningReque" +
+      "st\032(.hbase.pb.SetCleanerChoreRunningResp" +
+      "onse\022h\n\025IsCleanerChoreEnabled\022&.hbase.pb",
+      ".IsCleanerChoreEnabledRequest\032\'.hbase.pb" +
+      ".IsCleanerChoreEnabledResponse\022^\n\021ExecMa" +
+      "sterService\022#.hbase.pb.CoprocessorServic" +
+      "eRequest\032$.hbase.pb.CoprocessorServiceRe" +
+      "sponse\022A\n\010Snapshot\022\031.hbase.pb.SnapshotRe" +
+      "quest\032\032.hbase.pb.SnapshotResponse\022h\n\025Get" +
+      "CompletedSnapshots\022&.hbase.pb.GetComplet" +
+      "edSnapshotsRequest\032\'.hbase.pb.GetComplet" +
+      "edSnapshotsResponse\022S\n\016DeleteSnapshot\022\037." +
+      "hbase.pb.DeleteSnapshotRequest\032 .hbase.p",
+      "b.DeleteSnapshotResponse\022S\n\016IsSnapshotDo" +
+      "ne\022\037.hbase.pb.IsSnapshotDoneRequest\032 .hb" +
+      "ase.pb.IsSnapshotDoneResponse\022V\n\017Restore" +
+      "Snapshot\022 .hbase.pb.RestoreSnapshotReque" +
+      "st\032!.hbase.pb.RestoreSnapshotResponse\022h\n" +
+      "\025IsRestoreSnapshotDone\022&.hbase.pb.IsRest" +
+      "oreSnapshotDoneRequest\032\'.hbase.pb.IsRest" +
+      "oreSnapshotDoneResponse\022P\n\rExecProcedure" +
+      "\022\036.hbase.pb.ExecProcedureRequest\032\037.hbase" +
+      ".pb.ExecProcedureResponse\022W\n\024ExecProcedu",
+      "reWithRet\022\036.hbase.pb.ExecProcedureReques" +
+      "t\032\037.hbase.pb.ExecProcedureResponse\022V\n\017Is" +
+      "ProcedureDone\022 .hbase.pb.IsProcedureDone" +
+      "Request\032!.hbase.pb.IsProcedureDoneRespon" +
+      "se\022V\n\017ModifyNamespace\022 .hbase.pb.ModifyN" +
+      "amespaceRequest\032!.hbase.pb.ModifyNamespa" +
+      "ceResponse\022V\n\017CreateNamespace\022 .hbase.pb" +
+      ".CreateNamespaceRequest\032!.hbase.pb.Creat" +
+      "eNamespaceResponse\022V\n\017DeleteNamespace\022 ." +
+      "hbase.pb.DeleteNamespaceRequest\032!.hbase.",
+      "pb.DeleteNamespaceResponse\022k\n\026GetNamespa" +
+      "ceDescriptor\022\'.hbase.pb.GetNamespaceDesc" +
+      "riptorRequest\032(.hbase.pb.GetNamespaceDes" +
+      "criptorResponse\022q\n\030ListNamespaceDescript" +
+      "ors\022).hbase.pb.ListNamespaceDescriptorsR" +
+      "equest\032*.hbase.pb.ListNamespaceDescripto" +
+      "rsResponse\022\206\001\n\037ListTableDescriptorsByNam" +
+      "espace\0220.hbase.pb.ListTableDescriptorsBy" +
+      "NamespaceRequest\0321.hbase.pb.ListTableDes" +
+      "criptorsByNamespaceResponse\022t\n\031ListTable",
+      "NamesByNamespace\022*.hbase.pb.ListTableNam" +
+      "esByNamespaceRequest\032+.hbase.pb.ListTabl" +
+      "eNamesByNamespaceResponse\022A\n\010SetQuota\022\031." +
+      "hbase.pb.SetQuotaRequest\032\032.hbase.pb.SetQ" +
+      "uotaResponse\022x\n\037getLastMajorCompactionTi" +
+      "mestamp\022).hbase.pb.MajorCompactionTimest" +
+      "ampRequest\032*.hbase.pb.MajorCompactionTim" +
+      "estampResponse\022\212\001\n(getLastMajorCompactio" +
+      "nTimestampForRegion\0222.hbase.pb.MajorComp" +
+      "actionTimestampForRegionRequest\032*.hbase.",
+      "pb.MajorCompactionTimestampResponse\022_\n\022g" +
+      "etProcedureResult\022#.hbase.pb.GetProcedur" +
+      "eResultRequest\032$.hbase.pb.GetProcedureRe" +
+      "sultResponse\022h\n\027getSecurityCapabilities\022" +
+      "%.hbase.pb.SecurityCapabilitiesRequest\032&" +
+      ".hbase.pb.SecurityCapabilitiesResponse\022S" +
+      "\n\016AbortProcedure\022\037.hbase.pb.AbortProcedu" +
+      "reRequest\032 .hbase.pb.AbortProcedureRespo" +
+      "nse\022S\n\016ListProcedures\022\037.hbase.pb.ListPro" +
+      "ceduresRequest\032 .hbase.pb.ListProcedures",
+      "Response\022Y\n\020ClearDeadServers\022!.hbase.pb." +
+      "ClearDeadServersRequest\032\".hbase.pb.Clear" +
+      "DeadServersResponse\022P\n\rGetZNodeCount\022\036.h" +
+      "base.pb.GetZNodeCountRequest\032\037.hbase.pb." +
+      "GetZNodeCountResponseBB\n*org.apache.hado" +
+      "op.hbase.protobuf.generatedB\014MasterProto" +
+      "sH\001\210\001\001\240\001\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -68761,6 +70093,18 @@ public final class MasterProtos {
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_hbase_pb_ClearDeadServersResponse_descriptor,
               new java.lang.String[] { "ServerName", });
+          internal_static_hbase_pb_GetZNodeCountRequest_descriptor =
+            getDescriptor().getMessageTypes().get(117);
+          internal_static_hbase_pb_GetZNodeCountRequest_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_hbase_pb_GetZNodeCountRequest_descriptor,
+              new java.lang.String[] { "Path", });
+          internal_static_hbase_pb_GetZNodeCountResponse_descriptor =
+            getDescriptor().getMessageTypes().get(118);
+          internal_static_hbase_pb_GetZNodeCountResponse_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_hbase_pb_GetZNodeCountResponse_descriptor,
+              new java.lang.String[] { "ZnodeInfos", });
           return null;
         }
       };

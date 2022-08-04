@@ -24,7 +24,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZKTableStateClientSideReader;
+import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -358,5 +361,14 @@ public class TestAdmin3 extends TestAdminBase {
       admin.disableTable(tableName);
       admin.deleteTable(tableName);
     }
+  }
+
+  @Test(timeout = 300000)
+  public void testGetZNodeCount() throws IOException {
+    List<ZNodeInfo> zNodeInfoList = admin.getZNodeCount("/hbase");
+    assertNotNull(zNodeInfoList);
+    Map<String, Integer> collect = zNodeInfoList.stream().collect(
+            Collectors.toMap(node -> node.getPath(), node -> node.getCount()));
+    assertEquals(Integer.valueOf(1), collect.get("/hbase/master"));
   }
 }

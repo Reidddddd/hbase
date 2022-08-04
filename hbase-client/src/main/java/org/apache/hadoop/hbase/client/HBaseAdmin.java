@@ -65,6 +65,7 @@ import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownRegionException;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.MetaScanner.MetaScannerVisitor;
@@ -128,6 +129,7 @@ import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetSchemaAlterSta
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetTableDescriptorsRequest;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetTableDescriptorsResponse;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetTableNamesRequest;
+import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.GetZNodeCountRequest;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.IsInMaintenanceModeRequest;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.IsInMaintenanceModeResponse;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.IsProcedureDoneRequest;
@@ -4927,6 +4929,20 @@ public class HBaseAdmin implements Admin {
         ClearDeadServersRequest req = RequestConverter.buildClearDeadServersRequest(servers);
         return ProtobufUtil.toServerNameList(
                 master.clearDeadServers(null, req).getServerNameList());
+      }
+    });
+  }
+
+  @Override
+  public List<ZNodeInfo> getZNodeCount(String path) throws IOException {
+    return executeCallable(new MasterCallable<List<ZNodeInfo>>(getConnection()) {
+      @Override
+      public List<ZNodeInfo> call(int callTimeout) throws ServiceException {
+        HBaseRpcController controller = rpcControllerFactory.newController();
+        GetZNodeCountRequest req = GetZNodeCountRequest.newBuilder().setPath(path).build();
+        controller.setCallTimeout(callTimeout);
+        return ProtobufUtil.toZNodeInfoList(
+                master.getZNodeCount(controller, req).getZnodeInfosList());
       }
     });
   }

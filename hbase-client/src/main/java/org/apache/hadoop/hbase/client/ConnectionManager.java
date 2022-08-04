@@ -1825,6 +1825,13 @@ class ConnectionManager {
         }
 
         @Override
+        public MasterProtos.GetZNodeCountResponse getZNodeCount(
+                RpcController controller,
+                MasterProtos.GetZNodeCountRequest request) throws ServiceException {
+          return stub.getZNodeCount(controller, request);
+        }
+
+        @Override
         public AddColumnResponse addColumn(RpcController controller, AddColumnRequest request)
         throws ServiceException {
           return stub.addColumn(controller, request);

@@ -614,6 +614,50 @@ public class ZKUtil {
     return 0;
   }
 
+  /**
+   * Recursively count all children of the specified node, and itself.
+   *
+   * If the node does not exist, returns 0.
+   * If the node has no children, returns 1.
+   *
+   * Sets no watches at all.
+   *
+   * @param zkw zk reference
+   * @param znode path of node to count children of
+   * @return number of children of specified node, 0 if none or parent does not
+   *         exist
+   * @throws KeeperException if unexpected zookeeper exception
+   */
+  public static Map<String, Integer> getAllNodeNumber(ZooKeeperWatcher zkw, String znode)
+          throws KeeperException {
+    Map<String, Integer> node2NumberMap = new HashMap<>();
+    String totalKey = "total";
+    int totalValue = 0;
+    try {
+      RecoverableZooKeeper zooKeeper = zkw.getRecoverableZooKeeper();
+      if (null == zooKeeper.exists(znode, null)) {
+        node2NumberMap.put(totalKey, totalValue);
+        return node2NumberMap;
+      }
+      List<String> childrenList = zooKeeper.getChildren(znode, null);
+      for (String child: childrenList) {
+        String childNode = joinZNode(znode, child);
+        Map<String, Integer> childMap = getAllNodeNumber(zkw, childNode);
+        int childTotal = childMap.get(totalKey);
+        totalValue += childTotal;
+        node2NumberMap.put(childNode, childTotal);
+      }
+      totalValue += 1;
+      node2NumberMap.put(totalKey, totalValue);
+    } catch(KeeperException e) {
+      LOG.warn(zkw.prefix("Unable to get all children of node " + znode));
+      zkw.keeperException(e);
+    } catch(InterruptedException e) {
+      zkw.interruptedException(e);
+    }
+    return node2NumberMap;
+  }
+
   //
   // Data retrieval
   //

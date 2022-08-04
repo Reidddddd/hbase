@@ -1206,5 +1206,15 @@ module Hbase
       end
       @admin.clearDeadServers(servers).to_a
     end
+
+    #----------------------------------------------------------------------------------------------
+    # Returns a list of snapshots
+    def get_znode_count(path)
+      list = @admin.getZNodeCount(path)
+      unless list.nil?
+        return list
+      end
+      raise(ArgumentError, "Failed to find znode for path: #{path}")
+    end
   end
 end

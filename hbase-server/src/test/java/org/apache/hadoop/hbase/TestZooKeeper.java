@@ -578,6 +578,34 @@ public class TestZooKeeper {
     }
   }
 
+  /**
+   * Test recursively count all nodes of the root node.
+   * @throws Exception
+   */
+  @Test
+  public void testGetAllNodeNumber() throws Exception {
+    ZooKeeperWatcher zkw = new ZooKeeperWatcher(
+            new Configuration(TEST_UTIL.getConfiguration()),
+            TestZooKeeper.class.getName(), null);
+    Map<String, Integer> map0 = ZKUtil.getAllNodeNumber(zkw, "/hbase");
+    assertEquals(Integer.valueOf(3), map0.get("/hbase/rs"));
+    assertEquals(Integer.valueOf(1), map0.get("/hbase/meta-region-server"));
+    Map<String, Integer> map1 = ZKUtil.getAllNodeNumber(zkw, "/hbase/table");
+    assertEquals(Integer.valueOf(1), map1.get("/hbase/table/hbase:meta"));
+    int tableCount = map1.get("total") - 1;
+    assertEquals(null, map1.get("/hbase/table/12345"));
+    Map<String, Integer> map2 = ZKUtil.getAllNodeNumber(zkw, "/hbase/table/hbase:meta");
+    assertEquals(Integer.valueOf(1), map2.get("total"));
+    Map<String, Integer> map3 = ZKUtil.getAllNodeNumber(zkw, "/12345");
+    assertEquals(Integer.valueOf(0), map3.get("total"));
+
+    TEST_UTIL.createTable(Bytes.toBytes("testTable"), Bytes.toBytes("cf"));
+    Map<String, Integer> map4 = ZKUtil.getAllNodeNumber(zkw, "/hbase/table");
+    assertEquals(Integer.valueOf(tableCount) + 1, map4.get("total") - 1);
+
+    TEST_UTIL.deleteTable(Bytes.toBytes("testTable"));
+  }
+
   static class MockLoadBalancer extends SimpleLoadBalancer {
     static boolean retainAssignCalled = false;
 

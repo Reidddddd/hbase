@@ -23,11 +23,14 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.CoordinatedStateException;
+import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
@@ -1172,6 +1175,30 @@ public class MasterRpcServices extends RSRpcServices
       throw new ServiceException(io);
     }
     return response.build();
+  }
+
+  @Override
+  public MasterProtos.GetZNodeCountResponse getZNodeCount(RpcController controller,
+    MasterProtos.GetZNodeCountRequest request) throws ServiceException {
+    String path = request.getPath();
+    try {
+      Map<String, Integer> node2CountMap =
+              ZKUtil.getAllNodeNumber(master.getZooKeeper(), path);
+      MasterProtos.GetZNodeCountResponse.Builder response =
+              MasterProtos.GetZNodeCountResponse.newBuilder();
+      List<HBaseProtos.ZNodeInfo> collect = node2CountMap.entrySet().stream().map(entry -> {
+        HBaseProtos.ZNodeInfo.Builder znodeInfo =
+                HBaseProtos.ZNodeInfo.newBuilder();
+        znodeInfo.setPath(entry.getKey());
+        znodeInfo.setNodeCount(entry.getValue());
+        HBaseProtos.ZNodeInfo build = znodeInfo.build();
+        return build;
+      }).collect(Collectors.toList());
+      response.addAllZnodeInfos(collect);
+      return response.build();
+    } catch (KeeperException e) {
+      throw new ServiceException(e);
+    }
   }
 
 

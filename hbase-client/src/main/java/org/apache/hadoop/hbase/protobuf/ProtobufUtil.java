@@ -74,6 +74,7 @@ import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.Tag;
+import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.ClientUtil;
@@ -3644,5 +3645,24 @@ public final class ProtobufUtil {
       }
     }
     return Collections.emptySet();
+  }
+
+  public static List<ZNodeInfo> toZNodeInfoList(
+          List<HBaseProtos.ZNodeInfo> proto) {
+    List<ZNodeInfo> nodeInfos = new ArrayList<ZNodeInfo>();
+    for (HBaseProtos.ZNodeInfo znodeInfo : proto) {
+      nodeInfos.add(toZNodeInfo(znodeInfo));
+    }
+    return nodeInfos;
+  }
+
+  private static ZNodeInfo toZNodeInfo(HBaseProtos.ZNodeInfo proto) {
+    if (proto == null) return null;
+    String path = proto.getPath();
+    int nodeCount = -1;
+    if (proto.hasNodeCount()) {
+      nodeCount = proto.getNodeCount();
+    }
+    return new ZNodeInfo(path, nodeCount);
   }
 }

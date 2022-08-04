@@ -38,6 +38,8 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
+import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
+import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.security.SecurityCapability;
@@ -1597,4 +1599,10 @@ public interface Admin extends Abortable, Closeable {
    * @return List of servers that not cleared
    */
   List<ServerName> clearDeadServers(final List<ServerName> servers) throws IOException;
+
+  /**
+   * List node count of the path.
+   * @return List.
+   */
+  List<ZNodeInfo> getZNodeCount(String path) throws IOException;
 }

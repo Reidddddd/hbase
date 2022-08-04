@@ -233,3 +233,11 @@ message SnapshotDescription {
   optional string owner = 6;
   optional UsersAndPermissions users_and_permissions = 7;
 }
+
+/**
+ * Description of the znode info
+ */
+message ZNodeInfo {
+  required string path = 1;
+  optional int32 node_count = 2;
+}
