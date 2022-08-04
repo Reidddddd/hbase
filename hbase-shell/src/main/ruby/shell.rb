@@ -354,6 +354,7 @@ Shell.load_command_group(
     list_deadservers
     clear_deadservers
     get_znode_count
+    clear_compaction_queues
   ],
   # TODO remove older hlog_roll command
   :aliases => {

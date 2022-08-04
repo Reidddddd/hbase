@@ -1216,5 +1216,31 @@ module Hbase
       end
       raise(ArgumentError, "Failed to find znode for path: #{path}")
     end
+
+    #----------------------------------------------------------------------------------------------
+    # clear compaction queues
+    def clear_compaction_queues(server_name, queue_name = nil)
+      names = ['long', 'short']
+      queues = java.util.HashSet.new
+      if queue_name.nil?
+        queues.add('long')
+        queues.add('short')
+      elsif queue_name.kind_of?(String)
+        queues.add(queue_name)
+        if !(names.include?(queue_name))
+          raise(ArgumentError, "Unknown queue name #{queue_name}")
+        end
+      elsif queue_name.kind_of?(Array)
+        queue_name.each do |s|
+          queues.add(s)
+          if !(names.include?(s))
+            raise(ArgumentError, "Unknown queue name #{s}")
+          end
+        end
+      else
+        raise(ArgumentError, "Unknown queue name #{queue_name}")
+      end
+      @admin.clearCompactionQueues(ServerName.valueOf(server_name), queues)
+    end
   end
 end

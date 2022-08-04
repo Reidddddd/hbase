@@ -47,6 +47,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.mutable.MutableObject;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.UnknownScannerException;
+import org.apache.hadoop.hbase.protobuf.generated.AdminProtos;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
@@ -281,6 +283,8 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
    * The minimum allowable delta to use for the scan limit
    */
   private final long minimumScanTimeLimitDelta;
+
+  final AtomicBoolean clearCompactionQueues = new AtomicBoolean(false);
 
   /**
    * Row size threshold for multi requests above which a warning is logged
@@ -1570,6 +1574,45 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     } catch (IOException ie) {
       throw new ServiceException(ie);
     }
+  }
+
+  @Override
+  @QosPriority(priority = HConstants.ADMIN_QOS)
+  public AdminProtos.ClearCompactionQueuesResponse clearCompactionQueues(RpcController controller,
+      AdminProtos.ClearCompactionQueuesRequest request) throws ServiceException {
+    LOG.debug("Client=" + RpcServer.getRequestUserName() + "/" + RpcServer.getRemoteAddress()
+        + " clear compactions queue");
+    AdminProtos.ClearCompactionQueuesResponse.Builder respBuilder =
+            AdminProtos.ClearCompactionQueuesResponse.newBuilder();
+    requestCount.increment();
+    if (clearCompactionQueues.compareAndSet(false, true)) {
+      try {
+        checkOpen();
+        regionServer.getRegionServerCoprocessorHost().preClearCompactionQueues();
+        for (String queueName : request.getQueueNameList()) {
+          LOG.debug("clear " + queueName + " compaction queue");
+          switch (queueName) {
+          case "long":
+            regionServer.compactSplitThread.clearLongCompactionsQueue();
+            break;
+          case "short":
+            regionServer.compactSplitThread.clearShortCompactionsQueue();
+            break;
+          default:
+            LOG.warn("Unknown queue name " + queueName);
+            throw new IOException("Unknown queue name " + queueName);
+          }
+        }
+        regionServer.getRegionServerCoprocessorHost().postClearCompactionQueues();
+      } catch (IOException ie) {
+        throw new ServiceException(ie);
+      } finally {
+        clearCompactionQueues.set(false);
+      }
+    } else {
+      LOG.warn("Clear compactions queue is executing by other admin.");
+    }
+    return respBuilder.build();
   }
 
   /**

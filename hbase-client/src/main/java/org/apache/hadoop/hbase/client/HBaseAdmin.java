@@ -31,6 +31,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -81,6 +83,7 @@ import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.AdminService;
+import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CompactRegionRequest;
@@ -4950,5 +4953,30 @@ public class HBaseAdmin implements Admin {
 
   private RpcControllerFactory getRpcControllerFactory() {
     return rpcControllerFactory;
+  }
+
+  @Override
+  public void clearCompactionQueues(final ServerName sn, final Set<String> queues)
+          throws IOException, InterruptedException {
+    if (queues == null || queues.size() == 0) {
+      throw new IllegalArgumentException("queues cannot be null or empty");
+    }
+    final AdminService.BlockingInterface admin = this.connection.getAdmin(sn);
+    Callable<Void> callable = new Callable<Void>() {
+      @Override
+      public Void call() throws Exception {
+        // TODO: There is no timeout on this controller. Set one!
+        HBaseRpcController controller = rpcControllerFactory.newController();
+        ClearCompactionQueuesRequest request =
+                RequestConverter.buildClearCompactionQueuesRequest(queues);
+        admin.clearCompactionQueues(controller, request);
+        return null;
+      }
+    };
+    try {
+      callable.call();
+    } catch (Exception e) {
+      throw ProtobufUtil.handleRemoteException(e);
+    }
   }
 }

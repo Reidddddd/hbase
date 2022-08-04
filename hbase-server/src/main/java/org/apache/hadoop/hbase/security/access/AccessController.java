@@ -2497,6 +2497,12 @@ public class AccessController extends BaseMasterAndRegionObserver
   }
 
   @Override
+  public void  preClearCompactionQueues(ObserverContext<RegionServerCoprocessorEnvironment> ctx)
+          throws IOException {
+    requirePermission("preClearCompactionQueues", Permission.Action.ADMIN);
+  }
+
+  @Override
   public void preSetUserQuota(final ObserverContext<MasterCoprocessorEnvironment> ctx,
       final String userName, final Quotas quotas) throws IOException {
     requirePermission("setUserQuota", Action.ADMIN);

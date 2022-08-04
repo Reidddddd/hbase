@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.protobuf;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.apache.yetus.audience.InterfaceAudience;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
+import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CompactRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.FlushRegionRequest;
@@ -1850,5 +1852,13 @@ public final class RequestConverter {
         break;
     }
     throw new UnsupportedOperationException("Unsupport switch type:" + switchType);
+  }
+
+  public static ClearCompactionQueuesRequest buildClearCompactionQueuesRequest(Set<String> queues) {
+    ClearCompactionQueuesRequest.Builder builder = ClearCompactionQueuesRequest.newBuilder();
+    for(String name: queues) {
+      builder.addQueueName(name);
+    }
+    return builder.build();
   }
 }

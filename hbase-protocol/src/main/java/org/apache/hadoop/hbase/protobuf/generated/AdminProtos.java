@@ -22420,6 +22420,876 @@ public final class AdminProtos {
     // @@protoc_insertion_point(class_scope:hbase.pb.UpdateConfigurationResponse)
   }
 
+  public interface ClearCompactionQueuesRequestOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // repeated string queue_name = 1;
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    java.util.List<java.lang.String>
+    getQueueNameList();
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    int getQueueNameCount();
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    java.lang.String getQueueName(int index);
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    com.google.protobuf.ByteString
+        getQueueNameBytes(int index);
+  }
+  /**
+   * Protobuf type {@code hbase.pb.ClearCompactionQueuesRequest}
+   */
+  public static final class ClearCompactionQueuesRequest extends
+      com.google.protobuf.GeneratedMessage
+      implements ClearCompactionQueuesRequestOrBuilder {
+    // Use ClearCompactionQueuesRequest.newBuilder() to construct.
+    private ClearCompactionQueuesRequest(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private ClearCompactionQueuesRequest(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final ClearCompactionQueuesRequest defaultInstance;
+    public static ClearCompactionQueuesRequest getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public ClearCompactionQueuesRequest getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private ClearCompactionQueuesRequest(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
+                queueName_ = new com.google.protobuf.LazyStringArrayList();
+                mutable_bitField0_ |= 0x00000001;
+              }
+              queueName_.add(input.readBytes());
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
+          queueName_ = new com.google.protobuf.UnmodifiableLazyStringList(queueName_);
+        }
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesRequest_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesRequest_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.class, org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<ClearCompactionQueuesRequest> PARSER =
+        new com.google.protobuf.AbstractParser<ClearCompactionQueuesRequest>() {
+      public ClearCompactionQueuesRequest parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new ClearCompactionQueuesRequest(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ClearCompactionQueuesRequest> getParserForType() {
+      return PARSER;
+    }
+
+    // repeated string queue_name = 1;
+    public static final int QUEUE_NAME_FIELD_NUMBER = 1;
+    private com.google.protobuf.LazyStringList queueName_;
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    public java.util.List<java.lang.String>
+        getQueueNameList() {
+      return queueName_;
+    }
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    public int getQueueNameCount() {
+      return queueName_.size();
+    }
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    public java.lang.String getQueueName(int index) {
+      return queueName_.get(index);
+    }
+    /**
+     * <code>repeated string queue_name = 1;</code>
+     */
+    public com.google.protobuf.ByteString
+        getQueueNameBytes(int index) {
+      return queueName_.getByteString(index);
+    }
+
+    private void initFields() {
+      queueName_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      for (int i = 0; i < queueName_.size(); i++) {
+        output.writeBytes(1, queueName_.getByteString(i));
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      {
+        int dataSize = 0;
+        for (int i = 0; i < queueName_.size(); i++) {
+          dataSize += com.google.protobuf.CodedOutputStream
+            .computeBytesSizeNoTag(queueName_.getByteString(i));
+        }
+        size += dataSize;
+        size += 1 * getQueueNameList().size();
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest)) {
+        return super.equals(obj);
+      }
+      org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest other = (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest) obj;
+
+      boolean result = true;
+      result = result && getQueueNameList()
+          .equals(other.getQueueNameList());
+      result = result &&
+          getUnknownFields().equals(other.getUnknownFields());
+      return result;
+    }
+
+    private int memoizedHashCode = 0;
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptorForType().hashCode();
+      if (getQueueNameCount() > 0) {
+        hash = (37 * hash) + QUEUE_NAME_FIELD_NUMBER;
+        hash = (53 * hash) + getQueueNameList().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code hbase.pb.ClearCompactionQueuesRequest}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequestOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesRequest_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesRequest_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.class, org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.Builder.class);
+      }
+
+      // Construct using org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        queueName_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesRequest_descriptor;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest getDefaultInstanceForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.getDefaultInstance();
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest build() {
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest buildPartial() {
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest result = new org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest(this);
+        int from_bitField0_ = bitField0_;
+        if (((bitField0_ & 0x00000001) == 0x00000001)) {
+          queueName_ = new com.google.protobuf.UnmodifiableLazyStringList(
+              queueName_);
+          bitField0_ = (bitField0_ & ~0x00000001);
+        }
+        result.queueName_ = queueName_;
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest) {
+          return mergeFrom((org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest other) {
+        if (other == org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.getDefaultInstance()) return this;
+        if (!other.queueName_.isEmpty()) {
+          if (queueName_.isEmpty()) {
+            queueName_ = other.queueName_;
+            bitField0_ = (bitField0_ & ~0x00000001);
+          } else {
+            ensureQueueNameIsMutable();
+            queueName_.addAll(other.queueName_);
+          }
+          onChanged();
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // repeated string queue_name = 1;
+      private com.google.protobuf.LazyStringList queueName_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+      private void ensureQueueNameIsMutable() {
+        if (!((bitField0_ & 0x00000001) == 0x00000001)) {
+          queueName_ = new com.google.protobuf.LazyStringArrayList(queueName_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public java.util.List<java.lang.String>
+          getQueueNameList() {
+        return java.util.Collections.unmodifiableList(queueName_);
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public int getQueueNameCount() {
+        return queueName_.size();
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public java.lang.String getQueueName(int index) {
+        return queueName_.get(index);
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public com.google.protobuf.ByteString
+          getQueueNameBytes(int index) {
+        return queueName_.getByteString(index);
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public Builder setQueueName(
+          int index, java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  ensureQueueNameIsMutable();
+        queueName_.set(index, value);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public Builder addQueueName(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  ensureQueueNameIsMutable();
+        queueName_.add(value);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public Builder addAllQueueName(
+          java.lang.Iterable<java.lang.String> values) {
+        ensureQueueNameIsMutable();
+        super.addAll(values, queueName_);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public Builder clearQueueName() {
+        queueName_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+        bitField0_ = (bitField0_ & ~0x00000001);
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>repeated string queue_name = 1;</code>
+       */
+      public Builder addQueueNameBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  ensureQueueNameIsMutable();
+        queueName_.add(value);
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:hbase.pb.ClearCompactionQueuesRequest)
+    }
+
+    static {
+      defaultInstance = new ClearCompactionQueuesRequest(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:hbase.pb.ClearCompactionQueuesRequest)
+  }
+
+  public interface ClearCompactionQueuesResponseOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+  }
+  /**
+   * Protobuf type {@code hbase.pb.ClearCompactionQueuesResponse}
+   */
+  public static final class ClearCompactionQueuesResponse extends
+      com.google.protobuf.GeneratedMessage
+      implements ClearCompactionQueuesResponseOrBuilder {
+    // Use ClearCompactionQueuesResponse.newBuilder() to construct.
+    private ClearCompactionQueuesResponse(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private ClearCompactionQueuesResponse(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final ClearCompactionQueuesResponse defaultInstance;
+    public static ClearCompactionQueuesResponse getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public ClearCompactionQueuesResponse getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private ClearCompactionQueuesResponse(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesResponse_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesResponse_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.class, org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<ClearCompactionQueuesResponse> PARSER =
+        new com.google.protobuf.AbstractParser<ClearCompactionQueuesResponse>() {
+      public ClearCompactionQueuesResponse parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new ClearCompactionQueuesResponse(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ClearCompactionQueuesResponse> getParserForType() {
+      return PARSER;
+    }
+
+    private void initFields() {
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse)) {
+        return super.equals(obj);
+      }
+      org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse other = (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse) obj;
+
+      boolean result = true;
+      result = result &&
+          getUnknownFields().equals(other.getUnknownFields());
+      return result;
+    }
+
+    private int memoizedHashCode = 0;
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptorForType().hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code hbase.pb.ClearCompactionQueuesResponse}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponseOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesResponse_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesResponse_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.class, org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.Builder.class);
+      }
+
+      // Construct using org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.internal_static_hbase_pb_ClearCompactionQueuesResponse_descriptor;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse getDefaultInstanceForType() {
+        return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance();
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse build() {
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse buildPartial() {
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse result = new org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse(this);
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse) {
+          return mergeFrom((org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse other) {
+        if (other == org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance()) return this;
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:hbase.pb.ClearCompactionQueuesResponse)
+    }
+
+    static {
+      defaultInstance = new ClearCompactionQueuesResponse(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:hbase.pb.ClearCompactionQueuesResponse)
+  }
+
   /**
    * Protobuf service {@code hbase.pb.AdminService}
    */
@@ -22564,6 +23434,14 @@ public final class AdminProtos {
           org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationRequest request,
           com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse> done);
 
+      /**
+       * <code>rpc ClearCompactionQueues(.hbase.pb.ClearCompactionQueuesRequest) returns (.hbase.pb.ClearCompactionQueuesResponse);</code>
+       */
+      public abstract void clearCompactionQueues(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest request,
+          com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse> done);
+
     }
 
     public static com.google.protobuf.Service newReflectiveService(
@@ -22705,6 +23583,14 @@ public final class AdminProtos {
           impl.updateConfiguration(controller, request, done);
         }
 
+        @java.lang.Override
+        public  void clearCompactionQueues(
+            com.google.protobuf.RpcController controller,
+            org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest request,
+            com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse> done) {
+          impl.clearCompactionQueues(controller, request, done);
+        }
+
       };
     }
 
@@ -22761,6 +23647,8 @@ public final class AdminProtos {
               return impl.updateFavoredNodes(controller, (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateFavoredNodesRequest)request);
             case 16:
               return impl.updateConfiguration(controller, (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationRequest)request);
+            case 17:
+              return impl.clearCompactionQueues(controller, (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest)request);
             default:
               throw new java.lang.AssertionError("Can't get here.");
           }
@@ -22809,6 +23697,8 @@ public final class AdminProtos {
               return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateFavoredNodesRequest.getDefaultInstance();
             case 16:
               return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationRequest.getDefaultInstance();
+            case 17:
+              return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.getDefaultInstance();
             default:
               throw new java.lang.AssertionError("Can't get here.");
           }
@@ -22857,6 +23747,8 @@ public final class AdminProtos {
               return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateFavoredNodesResponse.getDefaultInstance();
             case 16:
               return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse.getDefaultInstance();
+            case 17:
+              return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance();
             default:
               throw new java.lang.AssertionError("Can't get here.");
           }
@@ -23001,6 +23893,14 @@ public final class AdminProtos {
         org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationRequest request,
         com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse> done);
 
+    /**
+     * <code>rpc ClearCompactionQueues(.hbase.pb.ClearCompactionQueuesRequest) returns (.hbase.pb.ClearCompactionQueuesResponse);</code>
+     */
+    public abstract void clearCompactionQueues(
+        com.google.protobuf.RpcController controller,
+        org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest request,
+        com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse> done);
+
     public static final
         com.google.protobuf.Descriptors.ServiceDescriptor
         getDescriptor() {
@@ -23108,6 +24008,11 @@ public final class AdminProtos {
             com.google.protobuf.RpcUtil.<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse>specializeCallback(
               done));
           return;
+        case 17:
+          this.clearCompactionQueues(controller, (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest)request,
+            com.google.protobuf.RpcUtil.<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse>specializeCallback(
+              done));
+          return;
         default:
           throw new java.lang.AssertionError("Can't get here.");
       }
@@ -23156,6 +24061,8 @@ public final class AdminProtos {
           return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateFavoredNodesRequest.getDefaultInstance();
         case 16:
           return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationRequest.getDefaultInstance();
+        case 17:
+          return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest.getDefaultInstance();
         default:
           throw new java.lang.AssertionError("Can't get here.");
       }
@@ -23204,6 +24111,8 @@ public final class AdminProtos {
           return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateFavoredNodesResponse.getDefaultInstance();
         case 16:
           return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse.getDefaultInstance();
+        case 17:
+          return org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance();
         default:
           throw new java.lang.AssertionError("Can't get here.");
       }
@@ -23479,6 +24388,21 @@ public final class AdminProtos {
             org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse.class,
             org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse.getDefaultInstance()));
       }
+
+      public  void clearCompactionQueues(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest request,
+          com.google.protobuf.RpcCallback<org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse> done) {
+        channel.callMethod(
+          getDescriptor().getMethods().get(17),
+          controller,
+          request,
+          org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance(),
+          com.google.protobuf.RpcUtil.generalizeCallback(
+            done,
+            org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.class,
+            org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance()));
+      }
     }
 
     public static BlockingInterface newBlockingStub(
@@ -23570,6 +24494,11 @@ public final class AdminProtos {
       public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse updateConfiguration(
           com.google.protobuf.RpcController controller,
           org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationRequest request)
+          throws com.google.protobuf.ServiceException;
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse clearCompactionQueues(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest request)
           throws com.google.protobuf.ServiceException;
     }
 
@@ -23783,6 +24712,18 @@ public final class AdminProtos {
           org.apache.hadoop.hbase.protobuf.generated.AdminProtos.UpdateConfigurationResponse.getDefaultInstance());
       }
 
+
+      public org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse clearCompactionQueues(
+          com.google.protobuf.RpcController controller,
+          org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesRequest request)
+          throws com.google.protobuf.ServiceException {
+        return (org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse) channel.callBlockingMethod(
+          getDescriptor().getMethods().get(17),
+          controller,
+          request,
+          org.apache.hadoop.hbase.protobuf.generated.AdminProtos.ClearCompactionQueuesResponse.getDefaultInstance());
+      }
+
     }
 
     // @@protoc_insertion_point(class_scope:hbase.pb.AdminService)
@@ -23968,6 +24909,16 @@ public final class AdminProtos {
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_hbase_pb_UpdateConfigurationResponse_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_hbase_pb_ClearCompactionQueuesRequest_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_hbase_pb_ClearCompactionQueuesRequest_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_hbase_pb_ClearCompactionQueuesResponse_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_hbase_pb_ClearCompactionQueuesResponse_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -24051,44 +25002,49 @@ public final class AdminProtos {
       "ui_port\030\002 \001(\r\"B\n\025GetServerInfoResponse\022)" +
       "\n\013server_info\030\001 \002(\0132\024.hbase.pb.ServerInf" +
       "o\"\034\n\032UpdateConfigurationRequest\"\035\n\033Updat" +
-      "eConfigurationResponse2\207\013\n\014AdminService\022" +
-      "P\n\rGetRegionInfo\022\036.hbase.pb.GetRegionInf" +
-      "oRequest\032\037.hbase.pb.GetRegionInfoRespons" +
-      "e\022M\n\014GetStoreFile\022\035.hbase.pb.GetStoreFil" +
-      "eRequest\032\036.hbase.pb.GetStoreFileResponse" +
-      "\022V\n\017GetOnlineRegion\022 .hbase.pb.GetOnline",
-      "RegionRequest\032!.hbase.pb.GetOnlineRegion" +
-      "Response\022G\n\nOpenRegion\022\033.hbase.pb.OpenRe" +
-      "gionRequest\032\034.hbase.pb.OpenRegionRespons" +
-      "e\022M\n\014WarmupRegion\022\035.hbase.pb.WarmupRegio" +
-      "nRequest\032\036.hbase.pb.WarmupRegionResponse" +
-      "\022J\n\013CloseRegion\022\034.hbase.pb.CloseRegionRe" +
-      "quest\032\035.hbase.pb.CloseRegionResponse\022J\n\013" +
-      "FlushRegion\022\034.hbase.pb.FlushRegionReques" +
-      "t\032\035.hbase.pb.FlushRegionResponse\022J\n\013Spli" +
-      "tRegion\022\034.hbase.pb.SplitRegionRequest\032\035.",
-      "hbase.pb.SplitRegionResponse\022P\n\rCompactR" +
-      "egion\022\036.hbase.pb.CompactRegionRequest\032\037." +
-      "hbase.pb.CompactRegionResponse\022M\n\014MergeR" +
-      "egions\022\035.hbase.pb.MergeRegionsRequest\032\036." +
-      "hbase.pb.MergeRegionsResponse\022\\\n\021Replica" +
-      "teWALEntry\022\".hbase.pb.ReplicateWALEntryR" +
-      "equest\032#.hbase.pb.ReplicateWALEntryRespo" +
-      "nse\022Q\n\006Replay\022\".hbase.pb.ReplicateWALEnt" +
-      "ryRequest\032#.hbase.pb.ReplicateWALEntryRe" +
-      "sponse\022P\n\rRollWALWriter\022\036.hbase.pb.RollW",
-      "ALWriterRequest\032\037.hbase.pb.RollWALWriter" +
-      "Response\022P\n\rGetServerInfo\022\036.hbase.pb.Get" +
-      "ServerInfoRequest\032\037.hbase.pb.GetServerIn" +
-      "foResponse\022G\n\nStopServer\022\033.hbase.pb.Stop" +
-      "ServerRequest\032\034.hbase.pb.StopServerRespo" +
-      "nse\022_\n\022UpdateFavoredNodes\022#.hbase.pb.Upd" +
-      "ateFavoredNodesRequest\032$.hbase.pb.Update" +
-      "FavoredNodesResponse\022b\n\023UpdateConfigurat" +
-      "ion\022$.hbase.pb.UpdateConfigurationReques" +
-      "t\032%.hbase.pb.UpdateConfigurationResponse",
-      "BA\n*org.apache.hadoop.hbase.protobuf.gen" +
-      "eratedB\013AdminProtosH\001\210\001\001\240\001\001"
+      "eConfigurationResponse\"2\n\034ClearCompactio" +
+      "nQueuesRequest\022\022\n\nqueue_name\030\001 \003(\t\"\037\n\035Cl" +
+      "earCompactionQueuesResponse2\361\013\n\014AdminSer" +
+      "vice\022P\n\rGetRegionInfo\022\036.hbase.pb.GetRegi" +
+      "onInfoRequest\032\037.hbase.pb.GetRegionInfoRe" +
+      "sponse\022M\n\014GetStoreFile\022\035.hbase.pb.GetSto",
+      "reFileRequest\032\036.hbase.pb.GetStoreFileRes" +
+      "ponse\022V\n\017GetOnlineRegion\022 .hbase.pb.GetO" +
+      "nlineRegionRequest\032!.hbase.pb.GetOnlineR" +
+      "egionResponse\022G\n\nOpenRegion\022\033.hbase.pb.O" +
+      "penRegionRequest\032\034.hbase.pb.OpenRegionRe" +
+      "sponse\022M\n\014WarmupRegion\022\035.hbase.pb.Warmup" +
+      "RegionRequest\032\036.hbase.pb.WarmupRegionRes" +
+      "ponse\022J\n\013CloseRegion\022\034.hbase.pb.CloseReg" +
+      "ionRequest\032\035.hbase.pb.CloseRegionRespons" +
+      "e\022J\n\013FlushRegion\022\034.hbase.pb.FlushRegionR",
+      "equest\032\035.hbase.pb.FlushRegionResponse\022J\n" +
+      "\013SplitRegion\022\034.hbase.pb.SplitRegionReque" +
+      "st\032\035.hbase.pb.SplitRegionResponse\022P\n\rCom" +
+      "pactRegion\022\036.hbase.pb.CompactRegionReque" +
+      "st\032\037.hbase.pb.CompactRegionResponse\022M\n\014M" +
+      "ergeRegions\022\035.hbase.pb.MergeRegionsReque" +
+      "st\032\036.hbase.pb.MergeRegionsResponse\022\\\n\021Re" +
+      "plicateWALEntry\022\".hbase.pb.ReplicateWALE" +
+      "ntryRequest\032#.hbase.pb.ReplicateWALEntry" +
+      "Response\022Q\n\006Replay\022\".hbase.pb.ReplicateW",
+      "ALEntryRequest\032#.hbase.pb.ReplicateWALEn" +
+      "tryResponse\022P\n\rRollWALWriter\022\036.hbase.pb." +
+      "RollWALWriterRequest\032\037.hbase.pb.RollWALW" +
+      "riterResponse\022P\n\rGetServerInfo\022\036.hbase.p" +
+      "b.GetServerInfoRequest\032\037.hbase.pb.GetSer" +
+      "verInfoResponse\022G\n\nStopServer\022\033.hbase.pb" +
+      ".StopServerRequest\032\034.hbase.pb.StopServer" +
+      "Response\022_\n\022UpdateFavoredNodes\022#.hbase.p" +
+      "b.UpdateFavoredNodesRequest\032$.hbase.pb.U" +
+      "pdateFavoredNodesResponse\022b\n\023UpdateConfi",
+      "guration\022$.hbase.pb.UpdateConfigurationR" +
+      "equest\032%.hbase.pb.UpdateConfigurationRes" +
+      "ponse\022h\n\025ClearCompactionQueues\022&.hbase.p" +
+      "b.ClearCompactionQueuesRequest\032\'.hbase.p" +
+      "b.ClearCompactionQueuesResponseBA\n*org.a" +
+      "pache.hadoop.hbase.protobuf.generatedB\013A" +
+      "dminProtosH\001\210\001\001\240\001\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -24310,6 +25266,18 @@ public final class AdminProtos {
           internal_static_hbase_pb_UpdateConfigurationResponse_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_hbase_pb_UpdateConfigurationResponse_descriptor,
+              new java.lang.String[] { });
+          internal_static_hbase_pb_ClearCompactionQueuesRequest_descriptor =
+            getDescriptor().getMessageTypes().get(34);
+          internal_static_hbase_pb_ClearCompactionQueuesRequest_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_hbase_pb_ClearCompactionQueuesRequest_descriptor,
+              new java.lang.String[] { "QueueName", });
+          internal_static_hbase_pb_ClearCompactionQueuesResponse_descriptor =
+            getDescriptor().getMessageTypes().get(35);
+          internal_static_hbase_pb_ClearCompactionQueuesResponse_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_hbase_pb_ClearCompactionQueuesResponse_descriptor,
               new java.lang.String[] { });
           return null;
         }

@@ -27,7 +27,7 @@ option optimize_for = SPEED;
 import "Table.proto";
 import "HBase.proto";
 import "RSGroup.proto";
-
+import "Master.proto";
 /** Group level protobufs */
 
 message ListTablesOfRSGroupRequest {

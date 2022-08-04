@@ -389,6 +389,12 @@ public class TestReplicator extends TestReplicationBase {
           UpdateConfigurationRequest request) throws ServiceException {
         return delegate.updateConfiguration(controller, request);
       }
+
+      @Override
+      public ClearCompactionQueuesResponse clearCompactionQueues(RpcController controller,
+          ClearCompactionQueuesRequest request) throws ServiceException {
+        return null;
+      }
     }
 
     public class FailureInjectingReplicatorForTest extends ReplicatorForTest {
