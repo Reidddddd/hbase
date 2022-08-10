@@ -214,12 +214,12 @@ public class TestFSHLog {
       HConstants.HREGION_OLDLOGDIR_NAME, conf, null, true, null, null)) {
       log.setWriter(new FailingWriter());
       Field ringBufferEventHandlerField =
-        FSHLog.class.getDeclaredField("ringBufferEventHandler");
+        AbstractLog.class.getDeclaredField("ringBufferEventHandler");
       ringBufferEventHandlerField.setAccessible(true);
-      FSHLog.RingBufferEventHandler ringBufferEventHandler =
-        (FSHLog.RingBufferEventHandler) ringBufferEventHandlerField.get(log);
+      AbstractLog.RingBufferEventHandler ringBufferEventHandler =
+        (AbstractLog.RingBufferEventHandler) ringBufferEventHandlerField.get(log);
       // Force a safe point
-      final FSHLog.SafePointZigZagLatch latch = ringBufferEventHandler.attainSafePoint();
+      final AbstractLog.SafePointZigZagLatch latch = ringBufferEventHandler.attainSafePoint();
       try {
         final SyncFuture future0 = log.publishSyncOnRingBuffer(null);
         // Wait for the sync to be done.
@@ -522,12 +522,12 @@ public class TestFSHLog {
         new FSHLog(fs, walRootDir, name, HConstants.HREGION_OLDLOGDIR_NAME, conf,
             null, true, null, null);
     try {
-      Field ringBufferEventHandlerField = FSHLog.class.getDeclaredField("ringBufferEventHandler");
+      Field ringBufferEventHandlerField = AbstractLog.class.getDeclaredField("ringBufferEventHandler");
       ringBufferEventHandlerField.setAccessible(true);
       FSHLog.RingBufferEventHandler ringBufferEventHandler =
           (FSHLog.RingBufferEventHandler) ringBufferEventHandlerField.get(log);
       Field syncRunnerIndexField =
-          FSHLog.RingBufferEventHandler.class.getDeclaredField("syncRunnerIndex");
+          AbstractLog.RingBufferEventHandler.class.getDeclaredField("syncRunnerIndex");
       syncRunnerIndexField.setAccessible(true);
       syncRunnerIndexField.set(ringBufferEventHandler, Integer.MAX_VALUE - 1);
       HTableDescriptor htd =
