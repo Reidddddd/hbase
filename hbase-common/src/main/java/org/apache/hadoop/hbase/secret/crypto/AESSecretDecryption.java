@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.security.authentication;
+package org.apache.hadoop.hbase.secret.crypto;
 
 import java.security.GeneralSecurityException;
 import javax.crypto.Cipher;
@@ -23,13 +23,13 @@ import javax.crypto.spec.IvParameterSpec;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * IDEA decryption.
+ * AES_CBC decryption.
  */
 @InterfaceAudience.Private
-public class DES3SecretDescryption extends AbstractSecretDescryption {
-  private static final int IV_LENGTH = 64 / 8;
+public class AESSecretDecryption extends AbstractSecretDescryption {
+  private static final int IV_LENGTH = 128 / 8;
 
-  public DES3SecretDescryption(SecretEncryptionType type, byte[] key)
+  public AESSecretDecryption(SecretEncryptionType type, byte[] key)
       throws IllegalArgumentException {
     super(type, key);
   }

@@ -15,21 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.security.authentication;
+package org.apache.hadoop.hbase.secret.crypto;
 
 import java.security.GeneralSecurityException;
 import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
+
+import org.apache.hadoop.hbase.secret.crypto.AbstractSecretDescryption;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * AES_CBC decryption.
+ * RC4 decryption.
  */
 @InterfaceAudience.Private
-public class AESSecretDecryption extends AbstractSecretDescryption {
-  private static final int IV_LENGTH = 128 / 8;
+public class RC4SecretDecryption extends AbstractSecretDescryption {
 
-  public AESSecretDecryption(SecretEncryptionType type, byte[] key)
+  public RC4SecretDecryption(SecretEncryptionType type, byte[] key)
       throws IllegalArgumentException {
     super(type, key);
   }
@@ -38,9 +38,7 @@ public class AESSecretDecryption extends AbstractSecretDescryption {
   public byte[] decryptSecret(byte[] secret, int offset, int len)
       throws GeneralSecurityException {
     Cipher cipher = getCipher();
-    IvParameterSpec vector =
-        new IvParameterSpec(secret, offset, IV_LENGTH);
-    cipher.init(Cipher.DECRYPT_MODE, key, vector);
-    return cipher.doFinal(secret, offset + IV_LENGTH, len - IV_LENGTH);
+    cipher.init(Cipher.DECRYPT_MODE, key);
+    return cipher.doFinal(secret, offset, len);
   }
 }

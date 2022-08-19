@@ -26,7 +26,12 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.apache.hadoop.hbase.io.crypto.aes.AESDecryptor;
+import org.apache.hadoop.hbase.secret.crypto.AESSecretDecryption;
+import org.apache.hadoop.hbase.secret.crypto.BFSecretDecryption;
+import org.apache.hadoop.hbase.secret.crypto.DES3SecretDescryption;
+import org.apache.hadoop.hbase.secret.crypto.RC4SecretDecryption;
+import org.apache.hadoop.hbase.secret.crypto.SecretDecryption;
+import org.apache.hadoop.hbase.secret.crypto.SecretEncryptionType;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;

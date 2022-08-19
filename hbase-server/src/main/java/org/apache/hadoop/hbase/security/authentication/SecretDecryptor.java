@@ -25,8 +25,10 @@ import java.util.Arrays;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.codec.binary.Base64;
-import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.secret.crypto.SecretDecryption;
+import org.apache.hadoop.hbase.secret.crypto.SecretDecryptionSet;
+import org.apache.hadoop.hbase.secret.crypto.SecretEncryptionType;
 import org.apache.hadoop.hbase.security.AuthenticationFailedException;
 import org.apache.yetus.audience.InterfaceAudience;
 

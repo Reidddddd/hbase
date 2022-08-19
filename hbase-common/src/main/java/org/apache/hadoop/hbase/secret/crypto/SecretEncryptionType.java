@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.security.authentication;
+package org.apache.hadoop.hbase.secret.crypto;
 
 import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -41,27 +41,27 @@ public enum SecretEncryptionType {
     this.keyLength = keyLength;
   }
 
-  String getName() {
+  public String getName() {
     return name;
   }
 
-  String getCipherName() {
+  public String getCipherName() {
     return cipherName;
   }
 
-  String getAlgoName() {
+  public String getAlgoName() {
     return algoName;
   }
 
-  byte[] getHashedName() {
+  public byte[] getHashedName() {
     return Encryption.hash256Hex(this.name);
   }
 
-  int getKeyLength() {
+  public int getKeyLength() {
     return keyLength;
   }
 
-  static SecretEncryptionType getType(int n) {
+  public static SecretEncryptionType getType(int n) {
     for (SecretEncryptionType t : SecretEncryptionType.values()) {
       if (t.num == n) {
         return t;

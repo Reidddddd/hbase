@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.security.authentication;
+package org.apache.hadoop.hbase.secret.crypto;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,11 +30,11 @@ public class SecretDecryptionSet {
   private final Map<SecretEncryptionType, SecretDecryption> decryptionMap =
       new ConcurrentHashMap<>(SecretEncryptionType.values().length);
 
-  SecretDecryption getDecryptionFromType(SecretEncryptionType type) {
+  public SecretDecryption getDecryptionFromType(SecretEncryptionType type) {
     return decryptionMap.get(type);
   }
 
-  void initOneDecryption(SecretEncryptionType type, byte[] key)
+  public void initOneDecryption(SecretEncryptionType type, byte[] key)
       throws IllegalArgumentException {
     SecretDecryption res = decryptionMap.get(type);
     if (res == null) {
