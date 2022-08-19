@@ -66,6 +66,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Waiter.ExplainingPredicate;
 import org.apache.hadoop.hbase.Waiter.Predicate;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hbase.util.ReflectionUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -2771,6 +2772,14 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
     conf.setBoolean("mapreduce.map.speculative", false);
     conf.setBoolean("mapreduce.reduce.speculative", false);
     ////
+
+    // Yarn container runs in independent JVM. We need to pass the argument manually here if the
+    // JDK version >= 17. Otherwise, the MiniMRCluster will fail.
+    if (JVM.getJVMSpecVersion() >= 17) {
+      String jvmOpts = conf.get("yarn.app.mapreduce.am.command-opts", "");
+      conf.set("yarn.app.mapreduce.am.command-opts",
+        jvmOpts + " --add-opens java.base/java.lang=ALL-UNNAMED");
+    }
 
     // Allow the user to override FS URI for this map-reduce cluster to use.
     mrCluster = new MiniMRCluster(servers,
