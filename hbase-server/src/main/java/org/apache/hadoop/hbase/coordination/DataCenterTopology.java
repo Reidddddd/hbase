@@ -35,21 +35,17 @@ public class DataCenterTopology {
   private static final Log LOG = LogFactory.getLog(DataCenterTopology.class);
   protected static final String UNRESOLVABLE = "UNRESOLVABLE";
 
-  private Shell.ShellCommandExecutor topoScript;
   protected String localDataCenter;
+  private final String script;
 
   public DataCenterTopology(Configuration conf, String localhostname) {
     // At here, means `hbase.regionserver.splitlog.check.topology` is true
-    String script = conf.get("hbase.regionserver.splitlog.topology.resolver.script");
+    script = conf.get("hbase.regionserver.splitlog.topology.resolver.script");
     if (script == null || script.isEmpty()) {
       throw new IllegalArgumentException("hbase.regionserver.splitlog.check.topology set true, " +
           "but hbase.regionserver.splitlog.topology.resolver.script is unset.");
     }
 
-    topoScript = new Shell.ShellCommandExecutor(
-        new String[] { script, "" }, null, null,
-        conf.getLong("hbase.regionserver.splitlog.topology.resolver.script.timeout", 500) // 0.5 seconds
-    );
     localDataCenter = getDataCenter(localhostname);
     if (localDataCenter.equals(UNRESOLVABLE)) {
       throw new IllegalArgumentException("SplitLog check topology is enable, but " + localhostname
@@ -67,16 +63,16 @@ public class DataCenterTopology {
     if (hostname == null || hostname.isEmpty()) {
       return UNRESOLVABLE;
     }
-    String[] exec = topoScript.getExecString();
-    exec[1] = hostname;
+
+    Shell.ShellCommandExecutor exe = new Shell.ShellCommandExecutor(new String[] { script, hostname });
     try {
-      topoScript.execute();
+      exe.execute();
     } catch (IOException e) {
       LOG.error(e.getMessage());
       return UNRESOLVABLE;
     }
 
-    String topo = topoScript.getOutput().trim();
+    String topo = exe.getOutput().trim();
     if (topo.isEmpty()) {
       return UNRESOLVABLE;
     }
