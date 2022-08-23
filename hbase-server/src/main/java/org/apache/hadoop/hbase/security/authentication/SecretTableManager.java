@@ -22,7 +22,7 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.master.MasterServices;
-import org.apache.hadoop.hbase.secret.crypto.SecretEncryptionType;
+import org.apache.hadoop.hbase.secret.crypto.SecretCryptoType;
 import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -81,7 +81,7 @@ public class SecretTableManager {
   private void initializeSecretKeys() throws IOException {
     Table table = masterServices.getConnection().getTable(SECRET_TABLE_NAME);
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
-    Arrays.stream(SecretEncryptionType.values()).forEach((SecretEncryptionType type) -> {
+    Arrays.stream(SecretCryptoType.values()).forEach((SecretCryptoType type) -> {
       try {
         // If there is no secret key for this algo, generate a new one.
         if (table.get(new Get(type.getHashedName())).isEmpty()) {

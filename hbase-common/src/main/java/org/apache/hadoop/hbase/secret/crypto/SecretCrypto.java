@@ -17,30 +17,14 @@
  */
 package org.apache.hadoop.hbase.secret.crypto;
 
+import java.io.IOException;
 import java.security.GeneralSecurityException;
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
 import org.apache.yetus.audience.InterfaceAudience;
 
-/**
- * AES_CBC decryption.
- */
 @InterfaceAudience.Private
-public class AESSecretDecryption extends AbstractSecretDescryption {
-  private static final int IV_LENGTH = 128 / 8;
+public interface SecretCrypto {
 
-  public AESSecretDecryption(SecretEncryptionType type, byte[] key)
-      throws IllegalArgumentException {
-    super(type, key);
-  }
+  byte[] encryptSecret(byte[] secret) throws GeneralSecurityException, IOException;
 
-  @Override
-  public byte[] decryptSecret(byte[] secret, int offset, int len)
-      throws GeneralSecurityException {
-    Cipher cipher = getCipher();
-    IvParameterSpec vector =
-        new IvParameterSpec(secret, offset, IV_LENGTH);
-    cipher.init(Cipher.DECRYPT_MODE, key, vector);
-    return cipher.doFinal(secret, offset + IV_LENGTH, len - IV_LENGTH);
-  }
+  byte[] decryptSecret(byte[] cipherText, int offset, int len) throws GeneralSecurityException;
 }

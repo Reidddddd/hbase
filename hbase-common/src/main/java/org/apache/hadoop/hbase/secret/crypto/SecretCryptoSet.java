@@ -25,31 +25,31 @@ import org.apache.yetus.audience.InterfaceAudience;
  * Return a global unique decryption object.
  */
 @InterfaceAudience.Private
-public class SecretDecryptionSet {
+public class SecretCryptoSet {
 
-  private final Map<SecretEncryptionType, SecretDecryption> decryptionMap =
-      new ConcurrentHashMap<>(SecretEncryptionType.values().length);
+  private final Map<SecretCryptoType, SecretCrypto> decryptionMap =
+      new ConcurrentHashMap<>(SecretCryptoType.values().length);
 
-  public SecretDecryption getDecryptionFromType(SecretEncryptionType type) {
+  public SecretCrypto getDecryptionFromType(SecretCryptoType type) {
     return decryptionMap.get(type);
   }
 
-  public void initOneDecryption(SecretEncryptionType type, byte[] key)
+  public void initOneDecryption(SecretCryptoType type, byte[] key)
       throws IllegalArgumentException {
-    SecretDecryption res = decryptionMap.get(type);
+    SecretCrypto res = decryptionMap.get(type);
     if (res == null) {
       switch (type) {
         case AES:
-          res = new AESSecretDecryption(type, key);
+          res = new AESSecretCrypto(type, key);
           break;
         case RC4:
-          res = new RC4SecretDecryption(type, key);
+          res = new RC4SecretCrypto(type, key);
           break;
         case BLOW_FISH:
-          res = new BFSecretDecryption(type, key);
+          res = new BFSecretCrypto(type, key);
           break;
         case DES3:
-          res = new DES3SecretDescryption(type, key);
+          res = new DES3SecretCrypto(type, key);
           break;
         default:
           throw new IllegalArgumentException("Invalid encryption type "

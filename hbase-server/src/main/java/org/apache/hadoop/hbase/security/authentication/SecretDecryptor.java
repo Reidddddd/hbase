@@ -18,18 +18,14 @@
 package org.apache.hadoop.hbase.security.authentication;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.security.GeneralSecurityException;
 import java.util.Arrays;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.secret.crypto.SecretDecryption;
-import org.apache.hadoop.hbase.secret.crypto.SecretDecryptionSet;
-import org.apache.hadoop.hbase.secret.crypto.SecretEncryptionType;
-import org.apache.hadoop.hbase.security.AuthenticationFailedException;
+import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
+import org.apache.hadoop.hbase.secret.crypto.AbstractSecretCryptor;
+import org.apache.hadoop.hbase.secret.crypto.SecretCryptoType;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -38,43 +34,26 @@ import org.apache.yetus.audience.InterfaceAudience;
  * So that this class cannot be static.
  */
 @InterfaceAudience.Private
-public class SecretDecryptor {
+public class SecretDecryptor extends AbstractSecretCryptor {
   private static final Log LOG = LogFactory.getLog(SecretDecryptor.class);
 
-  private final SecretDecryptionSet secretDecryptionSet;
-
-  private volatile boolean initialized = false;
-
   public SecretDecryptor() {
-    this.secretDecryptionSet = new SecretDecryptionSet();
+    super();
   }
 
-  public byte[] decryptSecret(byte[] secret) throws IOException {
-    // Secret should be Base64 encoded.
-    ByteBuffer buff = ByteBuffer.wrap(Base64.decodeBase64(secret));
-    // Get the type number, we only use the last half byte to figure the algo out.
-    int typeNum = buff.getInt() & 0x0F;
-    SecretEncryptionType type = SecretEncryptionType.getType(typeNum);
-    if (type == null) {
-      // We should never go here.
-      throw new AuthenticationFailedException("The internal credential is invalid. ");
+  @Override
+  public void initDecryption(Object obj) throws IOException {
+    if (!(obj instanceof Table)) {
+      throw new IllegalArgumentIOException("There should be a Table object to initialize server "
+        + "side decryptor, but got: " + obj.getClass().getName());
     }
-    SecretDecryption decryption = secretDecryptionSet.getDecryptionFromType(type);
-    LOG.info("Select decryption " + decryption.getClass() + " from type: " + type.getName());
-    try {
-      return decryption.decryptSecret(buff.array(), buff.position(), buff.remaining());
-    } catch (GeneralSecurityException e) {
-      throw new IOException(e.getMessage());
-    }
-  }
-
-  public void initDecryption(Table table) throws IOException {
+    Table table = (Table) obj;
     synchronized (this) {
       if (isInitialized()) {
         return;
       }
       byte[] key = null;
-      for (SecretEncryptionType type : SecretEncryptionType.values()) {
+      for (SecretCryptoType type : SecretCryptoType.values()) {
         try {
           byte[] keyBytes = SecretTableAccessor.getUserPassword(type.getHashedName(), table);
           key = Base64.decodeBase64(keyBytes);
@@ -82,7 +61,7 @@ public class SecretDecryptor {
             throw new IllegalArgumentException("Failed to get valid secret key for algo: "
                 + type.getName() + " from secret table. ");
           }
-          secretDecryptionSet.initOneDecryption(type, key);
+          secretCryptoSet.initOneDecryption(type, key);
         } catch (Throwable t) {
           String msg = "Invalid secret key: " + Arrays.toString(key) +
               " detected for algo " + type.getName() + '\n';
@@ -92,9 +71,5 @@ public class SecretDecryptor {
       }
       initialized = true;
     }
-  }
-
-  public boolean isInitialized() {
-    return initialized;
   }
 }

@@ -18,43 +18,23 @@
 package org.apache.hadoop.hbase.secret.crypto;
 
 import java.security.GeneralSecurityException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.SecretKeySpec;
+
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * Abstract class for different decryption algorithms.
+ * RC4 decryption.
  */
 @InterfaceAudience.Private
-public abstract class AbstractSecretDescryption implements SecretDecryption {
+public class RC4SecretCrypto extends AbstractSecretCrypto {
 
-  // Package javax.crypto.* is not thread safe.
-  private final ThreadLocal<Cipher> cipher;
-  private final SecretEncryptionType type;
-
-  protected final Key key;
-
-  public AbstractSecretDescryption(SecretEncryptionType type, byte[] key)
+  public RC4SecretCrypto(SecretCryptoType type, byte[] key)
       throws IllegalArgumentException {
-    this.type = type;
-    this.cipher = new ThreadLocal<>();
-    this.key = new SecretKeySpec(key, type.getAlgoName());
+    super(type, key);
   }
 
   @Override
-  public abstract byte[] decryptSecret(byte[] secret, int offset, int len)
-      throws GeneralSecurityException;
-
-  protected Cipher getCipher()
-      throws NoSuchPaddingException, NoSuchAlgorithmException {
-    Cipher c = cipher.get();
-    if (c == null) {
-      c = Cipher.getInstance(type.getCipherName());
-      cipher.set(c);
-    }
-    return c;
+  protected int getIvLength() {
+    return 0;
   }
 }

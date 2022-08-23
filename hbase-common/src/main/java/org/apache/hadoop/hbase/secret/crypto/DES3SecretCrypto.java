@@ -19,24 +19,24 @@ package org.apache.hadoop.hbase.secret.crypto;
 
 import java.security.GeneralSecurityException;
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * Blow Fish decryption.
+ * IDEA decryption.
  */
 @InterfaceAudience.Private
-public class BFSecretDecryption extends AbstractSecretDescryption {
+public class DES3SecretCrypto extends AbstractSecretCrypto {
+  private static final int IV_LENGTH = 64 / 8;
 
-  public BFSecretDecryption(SecretEncryptionType type, byte[] key)
+  public DES3SecretCrypto(SecretCryptoType type, byte[] key)
       throws IllegalArgumentException {
     super(type, key);
   }
 
   @Override
-  public byte[] decryptSecret(byte[] secret, int offset, int len)
-      throws GeneralSecurityException {
-    Cipher cipher = getCipher();
-    cipher.init(Cipher.DECRYPT_MODE, key);
-    return cipher.doFinal(secret, offset, len);
+  protected int getIvLength() {
+    return IV_LENGTH;
   }
 }

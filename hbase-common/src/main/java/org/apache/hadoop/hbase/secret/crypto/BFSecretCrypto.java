@@ -19,26 +19,21 @@ package org.apache.hadoop.hbase.secret.crypto;
 
 import java.security.GeneralSecurityException;
 import javax.crypto.Cipher;
-
-import org.apache.hadoop.hbase.secret.crypto.AbstractSecretDescryption;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * RC4 decryption.
+ * Blow Fish decryption.
  */
 @InterfaceAudience.Private
-public class RC4SecretDecryption extends AbstractSecretDescryption {
+public class BFSecretCrypto extends AbstractSecretCrypto {
 
-  public RC4SecretDecryption(SecretEncryptionType type, byte[] key)
+  public BFSecretCrypto(SecretCryptoType type, byte[] key)
       throws IllegalArgumentException {
     super(type, key);
   }
 
   @Override
-  public byte[] decryptSecret(byte[] secret, int offset, int len)
-      throws GeneralSecurityException {
-    Cipher cipher = getCipher();
-    cipher.init(Cipher.DECRYPT_MODE, key);
-    return cipher.doFinal(secret, offset, len);
+  protected int getIvLength() {
+    return 0;
   }
 }

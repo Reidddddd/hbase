@@ -20,29 +20,22 @@ package org.apache.hadoop.hbase.secret.crypto;
 import java.security.GeneralSecurityException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
-
-import org.apache.hadoop.hbase.secret.crypto.AbstractSecretDescryption;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * IDEA decryption.
+ * AES_CBC decryption.
  */
 @InterfaceAudience.Private
-public class DES3SecretDescryption extends AbstractSecretDescryption {
-  private static final int IV_LENGTH = 64 / 8;
+public class AESSecretCrypto extends AbstractSecretCrypto {
+  private static final int IV_LENGTH = 128 / 8;
 
-  public DES3SecretDescryption(SecretEncryptionType type, byte[] key)
+  public AESSecretCrypto(SecretCryptoType type, byte[] key)
       throws IllegalArgumentException {
     super(type, key);
   }
 
   @Override
-  public byte[] decryptSecret(byte[] secret, int offset, int len)
-      throws GeneralSecurityException {
-    Cipher cipher = getCipher();
-    IvParameterSpec vector =
-        new IvParameterSpec(secret, offset, IV_LENGTH);
-    cipher.init(Cipher.DECRYPT_MODE, key, vector);
-    return cipher.doFinal(secret, offset + IV_LENGTH, len - IV_LENGTH);
+  protected int getIvLength() {
+    return IV_LENGTH;
   }
 }

@@ -21,7 +21,7 @@ import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
-public enum SecretEncryptionType {
+public enum SecretCryptoType {
   AES("AES", 1, "AES/CBC/PKCS5PADDING", "AES", 256 / 8),
   RC4("RC4", 2, "RC4", "RC4", 256 / 8),
   BLOW_FISH("BLOW_FISH", 3, "Blowfish", "Blowfish", 256 / 8),
@@ -33,7 +33,7 @@ public enum SecretEncryptionType {
   final String algoName;
   final int keyLength;
 
-  SecretEncryptionType(String name, int num, String cipherName, String algoName, int keyLength) {
+  SecretCryptoType(String name, int num, String cipherName, String algoName, int keyLength) {
     this.name = name;
     this.num = num;
     this.cipherName = cipherName;
@@ -61,8 +61,12 @@ public enum SecretEncryptionType {
     return keyLength;
   }
 
-  public static SecretEncryptionType getType(int n) {
-    for (SecretEncryptionType t : SecretEncryptionType.values()) {
+  public int getNum() {
+    return this.num;
+  }
+
+  public static SecretCryptoType getType(int n) {
+    for (SecretCryptoType t : SecretCryptoType.values()) {
       if (t.num == n) {
         return t;
       }

@@ -26,12 +26,12 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.apache.hadoop.hbase.secret.crypto.AESSecretDecryption;
-import org.apache.hadoop.hbase.secret.crypto.BFSecretDecryption;
-import org.apache.hadoop.hbase.secret.crypto.DES3SecretDescryption;
-import org.apache.hadoop.hbase.secret.crypto.RC4SecretDecryption;
-import org.apache.hadoop.hbase.secret.crypto.SecretDecryption;
-import org.apache.hadoop.hbase.secret.crypto.SecretEncryptionType;
+import org.apache.hadoop.hbase.secret.crypto.AESSecretCrypto;
+import org.apache.hadoop.hbase.secret.crypto.BFSecretCrypto;
+import org.apache.hadoop.hbase.secret.crypto.DES3SecretCrypto;
+import org.apache.hadoop.hbase.secret.crypto.RC4SecretCrypto;
+import org.apache.hadoop.hbase.secret.crypto.SecretCrypto;
+import org.apache.hadoop.hbase.secret.crypto.SecretCryptoType;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -39,14 +39,14 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 @Category(SmallTests.class)
-public class TestSecretDecryption {
+public class TestSecretCrypto {
   private static final String VALID_USER_NAME = "testuser";
   private static final String VALID_USER_PASSWORD = "password0";
 
   @Test
   public void testAESDecryption() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
-    SecretEncryptionType type = SecretEncryptionType.AES;
+    SecretCryptoType type = SecretCryptoType.AES;
     byte[] key = new byte[type.getKeyLength()];
     rand.nextBytes(key);
 
@@ -66,7 +66,7 @@ public class TestSecretDecryption {
     buffer.put(cipherText);
     byte[] secret = buffer.array();
 
-    SecretDecryption aes = new AESSecretDecryption(type, key);
+    SecretCrypto aes = new AESSecretCrypto(type, key);
     byte[] original = aes.decryptSecret(secret, 0, secret.length);
     assertEquals(0, Bytes.compareTo(original, plainText));
   }
@@ -74,7 +74,7 @@ public class TestSecretDecryption {
   @Test
   public void TestRC4SecretDecryption() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
-    SecretEncryptionType type = SecretEncryptionType.RC4;
+    SecretCryptoType type = SecretCryptoType.RC4;
     byte[] key = new byte[type.getKeyLength()];
     rand.nextBytes(key);
 
@@ -85,7 +85,7 @@ public class TestSecretDecryption {
     byte[] plainText = Bytes.toBytes(VALID_USER_PASSWORD);
     byte[] cipherText = cipher.doFinal(plainText);
 
-    SecretDecryption rc4 = new RC4SecretDecryption(type, key);
+    SecretCrypto rc4 = new RC4SecretCrypto(type, key);
     byte[] original = rc4.decryptSecret(cipherText, 0, cipherText.length);
     assertEquals(0, Bytes.compareTo(original, plainText));
   }
@@ -93,7 +93,7 @@ public class TestSecretDecryption {
   @Test
   public void TestBFSecretDecryption() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
-    SecretEncryptionType type = SecretEncryptionType.BLOW_FISH;
+    SecretCryptoType type = SecretCryptoType.BLOW_FISH;
     byte[] key = new byte[type.getKeyLength()];
     rand.nextBytes(key);
 
@@ -104,7 +104,7 @@ public class TestSecretDecryption {
     byte[] plainText = Bytes.toBytes(VALID_USER_PASSWORD);
     byte[] cipherText = cipher.doFinal(plainText);
 
-    SecretDecryption bf = new BFSecretDecryption(type, key);
+    SecretCrypto bf = new BFSecretCrypto(type, key);
     byte[] original = bf.decryptSecret(cipherText, 0, cipherText.length);
     assertEquals(0, Bytes.compareTo(original, plainText));
   }
@@ -112,7 +112,7 @@ public class TestSecretDecryption {
   @Test
   public void testDES3Decryption() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
-    SecretEncryptionType type = SecretEncryptionType.DES3;
+    SecretCryptoType type = SecretCryptoType.DES3;
     byte[] key = new byte[type.getKeyLength()];
     rand.nextBytes(key);
 
@@ -132,7 +132,7 @@ public class TestSecretDecryption {
     buffer.put(cipherText);
     byte[] secret = buffer.array();
 
-    SecretDecryption idea = new DES3SecretDescryption(type, key);
+    SecretCrypto idea = new DES3SecretCrypto(type, key);
     byte[] original = idea.decryptSecret(secret, 0, secret.length);
     assertEquals(0, Bytes.compareTo(original, plainText));
   }
@@ -143,7 +143,7 @@ public class TestSecretDecryption {
     String key = "YOIcO7ntndlBtPVssvufgBQssS5M0/biccD4835aQkM=";
     byte[] data = Base64.decode(input);
     byte[] secretKey = Base64.decode(key);
-    AESSecretDecryption decryption = new AESSecretDecryption(SecretEncryptionType.AES, secretKey);
+    AESSecretCrypto decryption = new AESSecretCrypto(SecretCryptoType.AES, secretKey);
     byte[] plain = decryption.decryptSecret(data, 4, data.length - 4);
     assertEquals(0, Bytes.compareTo(plain, Bytes.toBytes("123456")));
   }
