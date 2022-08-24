@@ -644,6 +644,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     try {
       if (assignmentManager != null) {
         assignmentManager.updateRegionsInTransitionMetrics();
+        assignmentManager.updateRegionsCountMetrics();
       }
     } catch (Throwable e) {
       LOG.error("Couldn't update metrics: " + e.getMessage());

@@ -3539,6 +3539,25 @@ public class AssignmentManager extends ZooKeeperListener {
   }
 
   /**
+   * Set a metrics to count the number of online, offline, failed, splitting, other status regions.
+   * This method get an HBase admin by using the clusterConnection in master. Will do nothing if
+   * get exceptions.
+   */
+  public void updateRegionsCountMetrics() {
+    long otherRegionCount = regionStates.getTotalRegions();
+
+    long onlineRegionsCount = regionStates.getOnlineRegionCount();
+    long offlineRegionsCount = regionStates.getOfflineRegionCount();
+    long failedRegionsCount = regionStates.getFailedRegionCount();
+    long splitRegionsCount = regionStates.getSplitRegionCount();
+    long otherRegionsCount = otherRegionCount - onlineRegionsCount - failedRegionsCount
+      - offlineRegionsCount - splitRegionsCount;
+
+    metricsAssignmentManager.updateRegionCount(onlineRegionsCount, offlineRegionsCount,
+      failedRegionsCount, splitRegionsCount, otherRegionsCount);
+  }
+
+  /**
    * @param region Region whose plan we are to clear.
    */
   void clearRegionPlan(final HRegionInfo region) {

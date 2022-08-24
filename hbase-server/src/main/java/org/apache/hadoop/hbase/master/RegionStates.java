@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -70,6 +71,11 @@ public class RegionStates {
 
   public final static RegionStateStampComparator REGION_STATE_COMPARATOR =
     new RegionStateStampComparator();
+
+  private final AtomicLong offlineRegions = new AtomicLong(0);
+  private final AtomicLong onlineRegions = new AtomicLong(0);
+  private final AtomicLong failedRegions = new AtomicLong(0);
+  private final AtomicLong splitRegions = new AtomicLong(0);
 
   // This comparator sorts the RegionStates by time stamp then Region name.
   // Comparing by timestamp alone can lead us to discard different RegionStates that happen
@@ -406,6 +412,7 @@ public class RegionStates {
         }
       }
     }
+    updateMetrics(regionState.getState(), false);
     return regionState;
   }
 
@@ -1252,6 +1259,10 @@ public class RegionStates {
       regionStateStore.updateRegionState(openSeqNum, regionState, oldState);
     }
 
+    if (oldState != null) {
+      updateMetrics(oldState.getState(), true);
+    }
+
     synchronized (this) {
       RegionState oldRegionState = regionsInTransition.put(encodedName, regionState);
       // When region transform old region state to new region state,
@@ -1286,10 +1297,51 @@ public class RegionStates {
           }
         }
       }
-
+      updateMetrics(state, false);
       // notify the change
       this.notifyAll();
     }
     return regionState;
+  }
+
+  /**
+   * Update metrics with state.
+   */
+  public long updateMetrics(State state, boolean isOld) {
+    switch (state) {
+      case OPEN:
+        return isOld ? onlineRegions.decrementAndGet() : onlineRegions.incrementAndGet();
+      case OFFLINE:
+        return isOld ? offlineRegions.decrementAndGet() : offlineRegions.incrementAndGet();
+      case SPLIT:
+        return isOld ? splitRegions.decrementAndGet() : splitRegions.incrementAndGet();
+      case FAILED_OPEN:
+      case FAILED_CLOSE:
+        return isOld ? failedRegions.decrementAndGet() : this.failedRegions.incrementAndGet();
+    }
+    return 0;
+  }
+
+  /**
+   * Get regions count for metrics.
+   */
+  public long getOnlineRegionCount() {
+    return this.onlineRegions.get();
+  }
+
+  public long getOfflineRegionCount() {
+    return this.offlineRegions.get();
+  }
+
+  public long getFailedRegionCount() {
+    return this.failedRegions.get();
+  }
+
+  public long getSplitRegionCount() {
+    return this.splitRegions.get();
+  }
+
+  public long getTotalRegions() {
+    return regionStates.size();
   }
 }

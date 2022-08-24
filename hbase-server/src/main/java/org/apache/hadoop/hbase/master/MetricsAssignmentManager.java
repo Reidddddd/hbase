@@ -72,4 +72,15 @@ public class MetricsAssignmentManager {
   public void updateRitDuration(long duration) {
     assignmentManagerSource.updateRitDuration(duration);
   }
+
+  /**
+   * update the number of online, offline, failed, split, others regions.
+   */
+  public void updateRegionCount(long online, long offline, long failed, long split, long other) {
+    assignmentManagerSource.setOnlineRegionCount(online);
+    assignmentManagerSource.setOfflineRegionCount(offline);
+    assignmentManagerSource.setFailedRegionCount(failed);
+    assignmentManagerSource.setSplitRegionCount(split);
+    assignmentManagerSource.setOtherRegionCount(other);
+  }
 }

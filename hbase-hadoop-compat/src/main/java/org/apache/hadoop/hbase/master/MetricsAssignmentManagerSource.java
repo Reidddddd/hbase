@@ -48,6 +48,11 @@ public interface MetricsAssignmentManagerSource extends BaseSource {
   String RIT_DURATION_NAME = "ritDuration";
   String ASSIGN_TIME_NAME = "assign";
   String BULK_ASSIGN_TIME_NAME = "bulkAssign";
+  String ONLINE_REGION_COUNT_NAME = "onlineRegionCount";
+  String OFFLINE_REGION_COUNT_NAME = "offlineRegionCount";
+  String FAILED_REGION_COUNT_NAME = "failedRegionCount";
+  String SPLIT_REGION_COUNT_NAME = "splitRegionCount";
+  String OTHER_REGION_COUNT_NAME = "otherRegionCount";
 
   void updateAssignmentTime(long time);
 
@@ -75,4 +80,30 @@ public interface MetricsAssignmentManagerSource extends BaseSource {
   void setRITOldestAge(long age);
 
   void updateRitDuration(long duration);
+
+  /**
+   * Set the number of online regions.
+   */
+  void setOnlineRegionCount(long onlineRegionCount);
+
+  /**
+   * Set the number of offline regions.
+   */
+  void setOfflineRegionCount(long offlineRegionCount);
+
+  /**
+   * Set the number of failed regions.
+   */
+  void setFailedRegionCount(long failedRegionCount);
+
+  /**
+   * Set the number of splitting regions.
+   */
+  void setSplitRegionCount(long splitRegionCount);
+
+  /**
+   * Set the number of other regions.
+   */
+  void setOtherRegionCount(long otherRegionCount);
+
 }

@@ -34,6 +34,11 @@ public class MetricsAssignmentManagerSourceImpl
   private MetricHistogram ritDurationHisto;
   private MetricHistogram assignTimeHisto;
   private MetricHistogram bulkAssignTimeHisto;
+  private MutableGaugeLong onlineRegionGauge;
+  private MutableGaugeLong offlineRegionGauge;
+  private MutableGaugeLong failedRegionGauge;
+  private MutableGaugeLong splitRegionGauge;
+  private MutableGaugeLong otherRegionGauge;
 
   public MetricsAssignmentManagerSourceImpl() {
     this(METRICS_NAME, METRICS_DESCRIPTION, METRICS_CONTEXT, METRICS_JMX_CONTEXT);
@@ -52,6 +57,11 @@ public class MetricsAssignmentManagerSourceImpl
     assignTimeHisto = metricsRegistry.newTimeHistogram(ASSIGN_TIME_NAME);
     bulkAssignTimeHisto = metricsRegistry.newTimeHistogram(BULK_ASSIGN_TIME_NAME);
     ritDurationHisto = metricsRegistry.newTimeHistogram(RIT_DURATION_NAME);
+    onlineRegionGauge = metricsRegistry.newGauge(ONLINE_REGION_COUNT_NAME, "", 0l);
+    offlineRegionGauge = metricsRegistry.newGauge(OFFLINE_REGION_COUNT_NAME, "", 0l);
+    failedRegionGauge = metricsRegistry.newGauge(FAILED_REGION_COUNT_NAME, "", 0l);
+    splitRegionGauge = metricsRegistry.newGauge(SPLIT_REGION_COUNT_NAME, "", 0l);
+    otherRegionGauge = metricsRegistry.newGauge(OTHER_REGION_COUNT_NAME, "", 0l);
   }
 
   @Override
@@ -79,5 +89,30 @@ public class MetricsAssignmentManagerSourceImpl
   @Override
   public void updateRitDuration(long duration) {
     ritDurationHisto.add(duration);
+  }
+
+  @Override
+  public void setOnlineRegionCount(long onlineRegionCount) {
+    onlineRegionGauge.set(onlineRegionCount);
+  }
+
+  @Override
+  public void setOfflineRegionCount(long offlineRegionCount) {
+    offlineRegionGauge.set(offlineRegionCount);
+  }
+
+  @Override
+  public void setFailedRegionCount(long failedRegionCount) {
+    failedRegionGauge.set(failedRegionCount);
+  }
+
+  @Override
+  public void setSplitRegionCount(long splitRegionCount) {
+    splitRegionGauge.set(splitRegionCount);
+  }
+
+  @Override
+  public void setOtherRegionCount(long otherRegionCount) {
+    otherRegionGauge.set(otherRegionCount);
   }
 }
