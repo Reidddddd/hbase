@@ -1446,7 +1446,7 @@
     <maven.min.version>3.0.4</maven.min.version>
     <java.min.version>${compileSource}</java.min.version>
     <!-- Dependencies -->
-    <hadoop-two.version>2.10.0</hadoop-two.version>
+    <hadoop-two.version>2.10.sdi-057</hadoop-two.version>
     <hadoop-three.version>3.1.2</hadoop-three.version>
     <!-- These must be defined here for downstream build tools that don't look at profiles.
          They ought to match the values found in our default hadoop profile, which is
@@ -2385,7 +2385,16 @@
       </activation>
       <properties>
         <!-- TODO: replicate logic for windows support -->
-        <argLine>--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED ${hbase-surefire.argLine}</argLine>
+        <argLine>-Dio.netty.tryReflectionSetAccessible=true
+          --illegal-access=permit
+          --add-modules jdk.unsupported
+          --add-opens java.base/java.nio=ALL-UNNAMED
+          --add-opens java.base/sun.nio.ch=ALL-UNNAMED
+          --add-opens java.base/java.lang=ALL-UNNAMED
+          --add-opens java.base/jdk.internal.ref=ALL-UNNAMED
+          --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+          --add-exports java.base/jdk.internal.misc=ALL-UNNAMED
+          ${hbase-surefire.argLine}</argLine>
         <!-- We need a minimum HDFS version of 3.2.0 for HADOOP-12760 -->
         <hadoop-three.version>3.2.0</hadoop-three.version>
         <!--
@@ -2769,6 +2778,10 @@
             <version>${hadoop-two.version}</version>
             <exclusions>
               <exclusion>
+                <groupId>org.json</groupId>
+                <artifactId>json</artifactId>
+              </exclusion>
+              <exclusion>
                 <groupId>com.sun.jersey</groupId>
                 <artifactId>jersey-core</artifactId>
               </exclusion>
@@ -2972,6 +2985,10 @@
             <type>test-jar</type>
             <scope>test</scope>
             <exclusions>
+              <exclusion>
+                <groupId>org.json</groupId>
+                <artifactId>json</artifactId>
+              </exclusion>
               <exclusion>
                 <groupId>javax.servlet.jsp</groupId>
                 <artifactId>jsp-api</artifactId>
