@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.FileSystemBasedWriter;
 import org.apache.hadoop.hbase.wal.WALProvider;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
@@ -51,7 +52,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  * Hadoop serialization).
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class SequenceFileLogWriter extends WriterBase {
+public class SequenceFileLogWriter extends WriterBase implements FileSystemBasedWriter {
   private static final Log LOG = LogFactory.getLog(SequenceFileLogWriter.class);
   // The sequence file we delegate to.
   private SequenceFile.Writer writer;
@@ -89,8 +90,9 @@ public class SequenceFileLogWriter extends WriterBase {
   @Override
   public void init(FileSystem fs, Path path, Configuration conf, boolean overwritable)
     throws IOException {
-    super.init(fs, path, conf, overwritable);
-    boolean compress = initializeCompressionContext(conf, path);
+    super.init(conf);
+    isRecoveredEdits = FSUtils.isRecoveredEdits(path);
+    boolean compress = initializeCompressionContext(conf);
     // Create a SF.Writer instance.
     try {
       // reflection for a version of SequenceFile.createWriter that doesn't

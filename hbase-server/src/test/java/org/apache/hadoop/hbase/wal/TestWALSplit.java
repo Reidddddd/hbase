@@ -1310,7 +1310,7 @@ public class TestWALSplit {
       fs.delete(path, false);
       out = fs.create(path);
       out.write(corrupted_bytes, 0, fileSize
-          - (32 + ProtobufLogReader.PB_WAL_COMPLETE_MAGIC.length + Bytes.SIZEOF_INT));
+          - (32 + WALUtils.PB_WAL_COMPLETE_MAGIC.length + Bytes.SIZEOF_INT));
       closeOrFlush(close, out);
       break;
 

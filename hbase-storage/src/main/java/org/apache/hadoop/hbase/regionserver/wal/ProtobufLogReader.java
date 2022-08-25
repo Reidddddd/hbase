@@ -19,6 +19,10 @@
 
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.apache.hadoop.hbase.wal.WALUtils.DEFAULT_WAL_TRAILER_WARN_SIZE;
+import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_COMPLETE_MAGIC;
+import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
+import static org.apache.hadoop.hbase.wal.WALUtils.WAL_TRAILER_WARN_SIZE;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.EOFException;
@@ -60,18 +64,6 @@ import org.apache.yetus.audience.InterfaceAudience;
   HBaseInterfaceAudience.CONFIG})
 public class ProtobufLogReader extends ReaderBase {
   private static final Log LOG = LogFactory.getLog(ProtobufLogReader.class);
-  // public for WALFactory until we move everything to o.a.h.h.wal
-  @InterfaceAudience.Private
-  public static final byte[] PB_WAL_MAGIC = Bytes.toBytes("PWAL");
-  // public for TestWALSplit
-  @InterfaceAudience.Private
-  public static final byte[] PB_WAL_COMPLETE_MAGIC = Bytes.toBytes("LAWP");
-  /**
-   * Configuration name of WAL Trailer's warning size. If a waltrailer's size is greater than the
-   * configured size, providers should log a warning. e.g. this is used with Protobuf reader/writer.
-   */
-  static final String WAL_TRAILER_WARN_SIZE = "hbase.regionserver.waltrailer.warn.size";
-  static final int DEFAULT_WAL_TRAILER_WARN_SIZE = 1024 * 1024; // 1MB
 
   protected FSDataInputStream inputStream;
   protected Codec.Decoder cellDecoder;
@@ -272,7 +264,7 @@ public class ProtobufLogReader extends ReaderBase {
       this.seekOnFs(trailerSizeOffset);
       // read the int as trailer size.
       int trailerSize = this.inputStream.readInt();
-      ByteBuffer buf = ByteBuffer.allocate(ProtobufLogReader.PB_WAL_COMPLETE_MAGIC.length);
+      ByteBuffer buf = ByteBuffer.allocate(PB_WAL_COMPLETE_MAGIC.length);
       this.inputStream.readFully(buf.array(), buf.arrayOffset(), buf.capacity());
       if (!Arrays.equals(buf.array(), PB_WAL_COMPLETE_MAGIC)) {
         LOG.trace("No trailer found.");

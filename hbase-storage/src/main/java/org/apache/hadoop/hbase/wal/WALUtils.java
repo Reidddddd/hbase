@@ -32,17 +32,20 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
-import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
+import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.SequenceFileLogReader;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.LeaseNotRecoveredException;
+import org.apache.yetus.audience.InterfaceAudience;
 
 public class WALUtils {
   private static final Log LOG = LogFactory.getLog(WALUtils.class);
 
+  public static final String WAL_DIR_NAME_DELIMITER = ",";
   // should be package private; more visible for use in FSHLog
   public static final String WAL_FILE_NAME_DELIMITER = ".";
   /** The hbase:meta region's WAL filename extension */
@@ -53,6 +56,19 @@ public class WALUtils {
   // Implementation details that currently leak in tests or elsewhere follow
   /** File Extension used while splitting an WAL into regions (HBASE-2312) */
   public static final String SPLITTING_EXT = "-splitting";
+
+  // public for WALFactory until we move everything to o.a.h.h.wal
+  @InterfaceAudience.Private
+  public static final byte[] PB_WAL_MAGIC = Bytes.toBytes("PWAL");
+  // public for TestWALSplit
+  @InterfaceAudience.Private
+  public static final byte[] PB_WAL_COMPLETE_MAGIC = Bytes.toBytes("LAWP");
+  /**
+   * Configuration name of WAL Trailer's warning size. If a waltrailer's size is greater than the
+   * configured size, providers should log a warning. e.g. this is used with Protobuf reader/writer.
+   */
+  public static final String WAL_TRAILER_WARN_SIZE = "hbase.regionserver.waltrailer.warn.size";
+  public static final int DEFAULT_WAL_TRAILER_WARN_SIZE = 1024 * 1024; // 1MB
 
   /**
    * Create a writer for the WAL.
@@ -90,6 +106,8 @@ public class WALUtils {
       FileSystem rootFs = FileSystem.get(path.toUri(), conf);
       if (writer instanceof FileSystemBasedWriter) {
         ((FileSystemBasedWriter) writer).init(rootFs, path, conf, overwritable);
+      } else if (writer instanceof ServiceBasedWriter) {
+        ((ServiceBasedWriter) writer).init(conf, path.getName());
       }
       return writer;
     } catch (Exception e) {
@@ -180,9 +198,9 @@ public class WALUtils {
             // a non-PB reader and fail the same way existing code expects it to. If we get
             // rid of the old reader entirely, we need to handle 0-size files differently from
             // merely non-PB files.
-            byte[] magic = new byte[ProtobufLogReader.PB_WAL_MAGIC.length];
+            byte[] magic = new byte[PB_WAL_MAGIC.length];
             boolean isPbWal = (stream.read(magic) == magic.length)
-              && Arrays.equals(magic, ProtobufLogReader.PB_WAL_MAGIC);
+              && Arrays.equals(magic, PB_WAL_MAGIC);
             reader =
               isPbWal ? new ProtobufLogReader() : new SequenceFileLogReader();
             if (reader instanceof FileSystemBasedReader) {

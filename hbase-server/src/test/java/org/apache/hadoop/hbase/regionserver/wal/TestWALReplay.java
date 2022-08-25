@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -968,7 +969,7 @@ public class TestWALReplay {
     // here we let the DFSInputStream throw an IOException just after the WALHeader.
     Path editFile = WALSplitter.getSplitEditFilesSorted(this.fs, regionDir).first();
     FSDataInputStream stream = fs.open(editFile);
-    stream.seek(ProtobufLogReader.PB_WAL_MAGIC.length);
+    stream.seek(PB_WAL_MAGIC.length);
     Class<? extends Reader> logReaderClass =
         conf.getClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
           Reader.class);

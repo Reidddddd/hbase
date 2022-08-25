@@ -53,7 +53,7 @@ public class TestLogRollingNoCluster {
   private static final int NUM_ENTRIES = 100; // How many entries to write
 
   /** ProtobufLogWriter that simulates higher latencies in sync() call */
-  public static class HighLatencySyncWriter extends  ProtobufLogWriter {
+  public static class HighLatencySyncWriter extends ProtobufLogWriter {
     @Override
     public void sync() throws IOException {
       Threads.sleep(ThreadLocalRandom.current().nextInt(10));

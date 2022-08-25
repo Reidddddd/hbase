@@ -20,12 +20,9 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.io.util.LRUDictionary;
-import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.FileSystemBasedWriter;
+import org.apache.hadoop.hbase.wal.Writer;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -33,24 +30,23 @@ import org.apache.yetus.audience.InterfaceAudience;
  * custom dictionary compression.
  */
 @InterfaceAudience.Private
-public abstract class WriterBase implements FileSystemBasedWriter {
+public abstract class WriterBase implements Writer {
 
   protected CompressionContext compressionContext;
   protected Configuration conf;
+  protected boolean isRecoveredEdits;
 
-  @Override
-  public void init(FileSystem fs, Path path, Configuration conf, boolean overwritable)
+  public void init(Configuration conf)
     throws IOException {
     this.conf = conf;
   }
 
-  public boolean initializeCompressionContext(Configuration conf, Path path) throws IOException {
+  public boolean initializeCompressionContext(Configuration conf) throws IOException {
     boolean doCompress = conf.getBoolean(HConstants.ENABLE_WAL_COMPRESSION, false);
     if (doCompress) {
       try {
-        this.compressionContext = new CompressionContext(LRUDictionary.class,
-            FSUtils.isRecoveredEdits(path), conf.getBoolean(
-                CompressionContext.ENABLE_WAL_TAGS_COMPRESSION, true));
+        this.compressionContext = new CompressionContext(LRUDictionary.class, isRecoveredEdits,
+            conf.getBoolean(CompressionContext.ENABLE_WAL_TAGS_COMPRESSION, true));
       } catch (Exception e) {
         throw new IOException("Failed to initiate CompressionContext", e);
       }
