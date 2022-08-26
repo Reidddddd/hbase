@@ -2393,6 +2393,7 @@
           --add-opens java.base/java.lang=ALL-UNNAMED
           --add-opens java.base/jdk.internal.ref=ALL-UNNAMED
           --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+          --add-opens java.base/java.util=ALL-UNNAMED
           --add-exports java.base/jdk.internal.misc=ALL-UNNAMED
           ${hbase-surefire.argLine}</argLine>
         <!-- We need a minimum HDFS version of 3.2.0 for HADOOP-12760 -->
