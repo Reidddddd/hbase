@@ -20,6 +20,7 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.NavigableMap;
 import org.apache.commons.logging.Log;
@@ -30,6 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.Metadata;
@@ -38,7 +40,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX,
   HBaseInterfaceAudience.CONFIG})
-public class SequenceFileLogReader extends ReaderBase {
+public class SequenceFileLogReader extends ReaderBase implements FileSystemBasedReader {
   private static final Log LOG = LogFactory.getLog(SequenceFileLogReader.class);
 
   // Legacy stuff from pre-PB WAL metadata.
@@ -49,6 +51,18 @@ public class SequenceFileLogReader extends ReaderBase {
   private static final int COMPRESSION_VERSION = 1;
   private static final Text WAL_COMPRESSION_TYPE_KEY = new Text("compression.type");
   private static final Text DICTIONARY_COMPRESSION_TYPE = new Text("dictionary");
+
+  private FileSystem fs;
+  private Path path;
+
+  @Override
+  public void init(FileSystem fs, Path path, Configuration c, FSDataInputStream s)
+    throws IOException {
+    this.fs = fs;
+    this.path = path;
+    this.conf = c;
+    reset();
+  }
 
   /**
    * Hack just to set the correct file length up in SequenceFile.Reader.
@@ -154,6 +168,19 @@ public class SequenceFileLogReader extends ReaderBase {
   }
 
   @Override
+  public void seek(long pos) throws IOException {
+    if (compressionContext != null && emptyCompressionContext) {
+      while (next() != null) {
+        if (getPosition() == pos) {
+          emptyCompressionContext = false;
+          break;
+        }
+      }
+    }
+    seekOnFs(pos);
+  }
+
+  @Override
   public long getPosition() throws IOException {
     return reader != null ? reader.getPosition() : 0;
   }
@@ -166,7 +193,7 @@ public class SequenceFileLogReader extends ReaderBase {
   }
 
   @Override
-  protected String initReader(FSDataInputStream stream) throws IOException {
+  protected String initReader(InputStream stream) throws IOException {
     // We don't use the stream because we have to have the magic stream above.
     if (stream != null) {
       stream.close();
@@ -247,7 +274,6 @@ public class SequenceFileLogReader extends ReaderBase {
     }
   }
 
-  @Override
   protected void seekOnFs(long pos) throws IOException {
     try {
       reader.seek(pos);

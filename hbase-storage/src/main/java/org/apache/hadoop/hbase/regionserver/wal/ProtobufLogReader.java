@@ -19,18 +19,15 @@
 
 package org.apache.hadoop.hbase.regionserver.wal;
 
-import static org.apache.hadoop.hbase.wal.WALUtils.DEFAULT_WAL_TRAILER_WARN_SIZE;
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_COMPLETE_MAGIC;
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
-import static org.apache.hadoop.hbase.wal.WALUtils.WAL_TRAILER_WARN_SIZE;
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -38,7 +35,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.io.LimitInputStream;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
@@ -46,7 +42,10 @@ import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader.Builder;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALKey;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALTrailer;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.util.WALInputStream;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -62,29 +61,16 @@ import org.apache.yetus.audience.InterfaceAudience;
  */
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX,
   HBaseInterfaceAudience.CONFIG})
-public class ProtobufLogReader extends ReaderBase {
+public class ProtobufLogReader extends AbstractProtobufLogReader implements FileSystemBasedReader {
   private static final Log LOG = LogFactory.getLog(ProtobufLogReader.class);
 
-  protected FSDataInputStream inputStream;
-  protected Codec.Decoder cellDecoder;
-  protected WALCellCodec.ByteStringUncompressor byteStringUncompressor;
-  protected boolean hasCompression = false;
-  protected boolean hasTagCompression = false;
-  // walEditsStopOffset is the position of the last byte to read. After reading the last WALEdit
-  // entry in the wal, the inputstream's position is equal to walEditsStopOffset.
-  private long walEditsStopOffset;
-  private boolean trailerPresent;
-  protected WALTrailer trailer;
-  // maximum size of the wal Trailer in bytes. If a user writes/reads a trailer with size larger
-  // than this size, it is written/read respectively, with a WARN message in the log.
-  protected int trailerWarnSize;
-  private static List<String> writerClsNames = new ArrayList<String>();
+  protected FileSystem fs;
+  protected Path path;
+  protected long fileLength;
+
   static {
     writerClsNames.add(ProtobufLogWriter.class.getSimpleName());
   }
-  
-  // cell codec classname
-  private String codecClsName = null;
 
   @InterfaceAudience.Private
   public long trailerSize() {
@@ -108,34 +94,9 @@ public class ProtobufLogReader extends ReaderBase {
     SUCCESS,
     UNKNOWN_WRITER_CLS     // name of writer class isn't recognized
   }
-  
-  // context for WALHdr carrying information such as Cell Codec classname
-  static class WALHdrContext {
-    WALHdrResult result;
-    String cellCodecClsName;
-    
-    WALHdrContext(WALHdrResult result, String cellCodecClsName) {
-      this.result = result;
-      this.cellCodecClsName = cellCodecClsName;
-    }
-    WALHdrResult getResult() {
-      return result;
-    }
-    String getCellCodecClsName() {
-      return cellCodecClsName;
-    }
-  }
 
   public ProtobufLogReader() {
     super();
-  }
-
-  @Override
-  public void close() throws IOException {
-    if (this.inputStream != null) {
-      this.inputStream.close();
-      this.inputStream = null;
-    }
   }
 
   @Override
@@ -152,20 +113,33 @@ public class ProtobufLogReader extends ReaderBase {
   @Override
   public void init(FileSystem fs, Path path, Configuration conf, FSDataInputStream stream)
       throws IOException {
-    this.trailerWarnSize = conf.getInt(WAL_TRAILER_WARN_SIZE, DEFAULT_WAL_TRAILER_WARN_SIZE);
-    super.init(fs, path, conf, stream);
+    this.path = path;
+    this.fs = fs;
+    this.fileLength = this.fs.getFileStatus(path).getLen();
+    super.init(conf, stream);
   }
 
   @Override
-  protected String initReader(FSDataInputStream stream) throws IOException {
-    return initInternal(stream, true);
+  protected String initReader(InputStream stream) throws IOException {
+    return initInternal((FSDataInputStream) stream, true);
   }
 
-  /*
-   * Returns names of the accepted writer classes
-   */
-  public List<String> getWriterClsNames() {
-    return writerClsNames;
+  @Override
+  protected boolean checkRecoveredEdits() {
+    return FSUtils.isRecoveredEdits(this.path);
+  }
+
+  @Override
+  public void seek(long pos) throws IOException {
+    if (compressionContext != null && emptyCompressionContext) {
+      while (next() != null) {
+        if (getPosition() == pos) {
+          emptyCompressionContext = false;
+          break;
+        }
+      }
+    }
+    seekOnFs(pos);
   }
   
   /*
@@ -222,7 +196,7 @@ public class ProtobufLogReader extends ReaderBase {
       this.hasCompression = header.hasHasCompression() && header.getHasCompression();
       this.hasTagCompression = header.hasHasTagCompression() && header.getHasTagCompression();
     }
-    this.inputStream = stream;
+    this.inputStream = new FSWALInputStream(stream);
     this.walEditsStopOffset = this.fileLength;
     long currentPosition = stream.getPos();
     trailerPresent = setTrailerIfPresent();
@@ -293,33 +267,9 @@ public class ProtobufLogReader extends ReaderBase {
     return false;
   }
 
-  protected WALCellCodec getCodec(Configuration conf, String cellCodecClsName,
-      CompressionContext compressionContext) throws IOException {
-    return WALCellCodec.create(conf, cellCodecClsName, compressionContext);
-  }
-
   @Override
   protected void initAfterCompression() throws IOException {
     initAfterCompression(null);
-  }
-  
-  @Override
-  protected void initAfterCompression(String cellCodecClsName) throws IOException {
-    WALCellCodec codec = getCodec(this.conf, cellCodecClsName, this.compressionContext);
-    this.cellDecoder = codec.getDecoder(this.inputStream);
-    if (this.hasCompression) {
-      this.byteStringUncompressor = codec.getByteStringUncompressor();
-    }
-  }
-
-  @Override
-  protected boolean hasCompression() {
-    return this.hasCompression;
-  }
-
-  @Override
-  protected boolean hasTagCompression() {
-    return this.hasTagCompression;
   }
 
   @Override
@@ -457,8 +407,34 @@ public class ProtobufLogReader extends ReaderBase {
     return null;
   }
 
-  @Override
+  /**
+   * Performs a filesystem-level seek to a certain position in an underlying file.
+   */
   protected void seekOnFs(long pos) throws IOException {
     this.inputStream.seek(pos);
+  }
+
+  static class FSWALInputStream extends WALInputStream {
+    private final FSDataInputStream stream;
+    /**
+     * Creates a DataInputStream that uses the specified
+     * underlying InputStream.
+     *
+     * @param in the specified input stream
+     */
+    public FSWALInputStream(InputStream in) {
+      super(in);
+      stream = ((FSDataInputStream) in);
+    }
+
+    @Override
+    public long getPos() throws IOException {
+      return stream.getPos();
+    }
+
+    @Override
+    public void seek(long pos) throws IOException {
+      stream.seek(pos);
+    }
   }
 }
