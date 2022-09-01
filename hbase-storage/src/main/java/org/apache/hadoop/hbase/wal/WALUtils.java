@@ -191,6 +191,9 @@ public class WALUtils {
             if (reader instanceof FileSystemBasedReader) {
               ((FileSystemBasedReader) reader).init(fs, path, conf, null);
             }
+            if (reader instanceof ServiceBasedReader) {
+              ((ServiceBasedReader) reader).init(conf, path.getName());
+            }
             return reader;
           } else {
             stream = fs.open(path);
@@ -437,5 +440,13 @@ public class WALUtils {
    */
   public static Path getWALArchivePath(Path archiveDir, Path p) {
     return new Path(archiveDir, p.getName());
+  }
+
+  /**
+   * Checks if the given distributed logName is the one with 'recovered.edits'.
+   * @return True if we recovered edits
+   */
+  public static boolean isRecoveredEdits(String logName) {
+    return logName.contains(HConstants.RECOVERED_EDITS_DIR);
   }
 }

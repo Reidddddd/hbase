@@ -29,11 +29,9 @@ import org.apache.distributedlog.shaded.AppendOnlyStreamWriter;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
-import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.ServiceBasedWriter;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -58,19 +56,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void sync() throws IOException {
     appendOnlyStreamWriter.force(false);
-  }
-
-  @Override
-  public void append(Entry entry) throws IOException {
-    // Not support WAL compression.
-    entry.setCompressionContext(null);
-    byte[] keyBytes = entry.getKey().getBuilder(null).
-      setFollowingKvCount(entry.getEdit().size()).build().toByteArray();
-    appendOnlyStreamWriter.write(keyBytes);
-    for (Cell cell : entry.getEdit().getCells()) {
-      // cellEncoder must assume little about the stream, since we write PB and cells in turn.
-      cellEncoder.write(cell);
-    }
   }
 
   @Override
@@ -110,22 +95,30 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   }
 
   @Override
+  protected WALProtos.WALHeader buildWALHeader(Configuration conf,
+      WALProtos.WALHeader.Builder builder) throws IOException {
+    if (!builder.hasWriterClsName()) {
+      builder.setWriterClsName(DistributedLogWriter.class.getSimpleName());
+    }
+    if (!builder.hasCellCodecClsName()) {
+      builder.setCellCodecClsName(WALCellCodec.getWALCellCodecClass(conf).getName());
+    }
+    return builder.build();
+  }
+
+  @Override
   public long getLength() throws IOException {
     return appendOnlyStreamWriter.position();
   }
 
   @Override
   public void close() throws IOException {
+    super.close();
     if (appendOnlyStreamWriter != null) {
       appendOnlyStreamWriter.markEndOfStream();
       appendOnlyStreamWriter.close();
       appendOnlyStreamWriter = null;
     }
-    super.close();
-  }
-
-  WALProtos.WALTrailer buildWALTrailer(WALProtos.WALTrailer.Builder builder) {
-    return builder.build();
   }
 
   static class DistributedLogOutputStream extends OutputStream {

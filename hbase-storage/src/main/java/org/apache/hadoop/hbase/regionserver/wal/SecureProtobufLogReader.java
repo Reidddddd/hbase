@@ -19,13 +19,13 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.Key;
 import java.security.KeyException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.io.crypto.Cipher;
@@ -55,7 +55,7 @@ public class SecureProtobufLogReader extends ProtobufLogReader {
   }
 
   @Override
-  protected WALHdrContext readHeader(WALHeader.Builder builder, FSDataInputStream stream)
+  protected WALHdrContext readHeader(WALHeader.Builder builder, InputStream stream)
       throws IOException {
     WALHdrContext hdrCtxt = super.readHeader(builder, stream);
     WALHdrResult result = hdrCtxt.getResult();

@@ -21,13 +21,9 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_COMPLETE_MAGIC;
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
-import com.google.protobuf.CodedInputStream;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,7 +36,6 @@ import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader.Builder;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALKey;
-import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALTrailer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.WALInputStream;
@@ -66,7 +61,6 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
 
   protected FileSystem fs;
   protected Path path;
-  protected long fileLength;
 
   static {
     writerClsNames.add(ProtobufLogWriter.class.getSimpleName());
@@ -78,7 +72,7 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
       // sizeof PB_WAL_COMPLETE_MAGIC + sizof trailerSize + trailer
       final long calculatedSize = (long) PB_WAL_COMPLETE_MAGIC.length + Bytes.SIZEOF_INT +
         trailer.getSerializedSize();
-      final long expectedSize = fileLength - walEditsStopOffset;
+      final long expectedSize = logLength - walEditsStopOffset;
       if (expectedSize != calculatedSize) {
         LOG.warn("After parsing the trailer, we expect the total footer to be "+ expectedSize
           + " bytes, but we calculate it as being " + calculatedSize);
@@ -115,7 +109,7 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
       throws IOException {
     this.path = path;
     this.fs = fs;
-    this.fileLength = this.fs.getFileStatus(path).getLen();
+    this.logLength = this.fs.getFileStatus(path).getLen();
     super.init(conf, stream);
   }
 
@@ -149,29 +143,12 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
     return codecClsName;
   }
 
-  protected WALHdrContext readHeader(Builder builder, FSDataInputStream stream)
-    throws IOException {
-    boolean res = builder.mergeDelimitedFrom(stream);
-    if (!res) {
-      return new WALHdrContext(WALHdrResult.EOF, null);
-    }
-    if (builder.hasWriterClsName() &&
-      !getWriterClsNames().contains(builder.getWriterClsName())) {
-      return new WALHdrContext(WALHdrResult.UNKNOWN_WRITER_CLS, null);
-    }
-    String clsName = null;
-    if (builder.hasCellCodecClsName()) {
-      clsName = builder.getCellCodecClsName();
-    }
-    return new WALHdrContext(WALHdrResult.SUCCESS, clsName);
-  }
-
   private String initInternal(FSDataInputStream stream, boolean isFirst)
       throws IOException {
     close();
     if (!isFirst) {
       // Re-compute the file length.
-      this.fileLength = fs.getFileStatus(path).getLen();
+      this.logLength = fs.getFileStatus(path).getLen();
     }
     long expectedPos = PB_WAL_MAGIC.length;
     if (stream == null) {
@@ -197,13 +174,13 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
       this.hasTagCompression = header.hasHasTagCompression() && header.getHasTagCompression();
     }
     this.inputStream = new FSWALInputStream(stream);
-    this.walEditsStopOffset = this.fileLength;
+    this.walEditsStopOffset = this.logLength;
     long currentPosition = stream.getPos();
     trailerPresent = setTrailerIfPresent();
     this.seekOnFs(currentPosition);
     if (LOG.isTraceEnabled()) {
       LOG.trace("After reading the trailer: walEditsStopOffset: " + this.walEditsStopOffset
-        + ", fileLength: " + this.fileLength + ", " + "trailerPresent: "
+        + ", logLength: " + this.logLength + ", " + "trailerPresent: "
         + (trailerPresent ? "true, size: " + trailer.getSerializedSize() : "false")
         + ", currentPosition: " + currentPosition);
     }
@@ -213,180 +190,8 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
     return hdrCtxt.getCellCodecClsName();
   }
 
-  /**
-   * To check whether a trailer is present in a WAL, it seeks to position (fileLength -
-   * PB_WAL_COMPLETE_MAGIC.size() - Bytes.SIZEOF_INT). It reads the int value to know the size of
-   * the trailer, and checks whether the trailer is present at the end or not by comparing the last
-   * PB_WAL_COMPLETE_MAGIC.size() bytes. In case trailer is not present, it returns false;
-   * otherwise, sets the trailer and sets this.walEditsStopOffset variable up to the point just
-   * before the trailer.
-   * <ul>
-   * The trailer is ignored in case:
-   * <li>fileLength is 0 or not correct (when file is under recovery, etc).
-   * <li>the trailer size is negative.
-   * </ul>
-   * <p>
-   * In case the trailer size > this.trailerMaxSize, it is read after a WARN message.
-   * @return true if a valid trailer is present
-   */
-  private boolean setTrailerIfPresent() {
-    try {
-      long trailerSizeOffset = this.fileLength - (PB_WAL_COMPLETE_MAGIC.length + Bytes.SIZEOF_INT);
-      if (trailerSizeOffset <= 0) {
-        return false;// no trailer possible.
-      }
-      this.seekOnFs(trailerSizeOffset);
-      // read the int as trailer size.
-      int trailerSize = this.inputStream.readInt();
-      ByteBuffer buf = ByteBuffer.allocate(PB_WAL_COMPLETE_MAGIC.length);
-      this.inputStream.readFully(buf.array(), buf.arrayOffset(), buf.capacity());
-      if (!Arrays.equals(buf.array(), PB_WAL_COMPLETE_MAGIC)) {
-        LOG.trace("No trailer found.");
-        return false;
-      }
-      if (trailerSize < 0) {
-        LOG.warn("Invalid trailer Size " + trailerSize + ", ignoring the trailer");
-        return false;
-      } else if (trailerSize > this.trailerWarnSize) {
-        // continue reading after warning the user.
-        LOG.warn("Please investigate WALTrailer usage. Trailer size > maximum configured size : "
-          + trailerSize + " > " + this.trailerWarnSize);
-      }
-      // seek to the position where trailer starts.
-      long positionOfTrailer = trailerSizeOffset - trailerSize;
-      this.seekOnFs(positionOfTrailer);
-      // read the trailer.
-      buf = ByteBuffer.allocate(trailerSize);// for trailer.
-      this.inputStream.readFully(buf.array(), buf.arrayOffset(), buf.capacity());
-      trailer = WALTrailer.parseFrom(buf.array());
-      this.walEditsStopOffset = positionOfTrailer;
-      return true;
-    } catch (IOException ioe) {
-      LOG.warn("Got IOE while reading the trailer. Continuing as if no trailer is present.", ioe);
-    }
-    return false;
-  }
-
   @Override
-  protected void initAfterCompression() throws IOException {
-    initAfterCompression(null);
-  }
-
-  @Override
-  protected boolean readNext(Entry entry) throws IOException {
-    while (true) {
-      // OriginalPosition might be < 0 on local fs; if so, it is useless to us.
-      long originalPosition = this.inputStream.getPos();
-      if (trailerPresent && originalPosition > 0 && originalPosition == this.walEditsStopOffset) {
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Reached end of expected edits area at offset " + originalPosition);
-        }
-        return false;
-      }
-      WALKey.Builder builder = WALKey.newBuilder();
-      long size = 0;
-      boolean resetPosition = false;
-      try {
-        long available = -1;
-        try {
-          int firstByte = this.inputStream.read();
-          if (firstByte == -1) {
-            throw new EOFException("First byte is negative at offset " + originalPosition);
-          }
-          size = CodedInputStream.readRawVarint32(firstByte, this.inputStream);
-          // available may be < 0 on local fs for instance.  If so, can't depend on it.
-          available = this.inputStream.available();
-          if (available > 0 && available < size) {
-            throw new EOFException("Available stream not enough for edit, " +
-                "inputStream.available()= " + this.inputStream.available() + ", " +
-                "entry size= " + size + " at offset = " + this.inputStream.getPos());
-          }
-          ProtobufUtil.mergeFrom(builder, new LimitInputStream(this.inputStream, size),
-            (int)size);
-        } catch (InvalidProtocolBufferException ipbe) {
-          resetPosition = true;
-          throw (EOFException) new EOFException("Invalid PB, EOF? Ignoring; originalPosition=" +
-            originalPosition + ", currentPosition=" + this.inputStream.getPos() +
-            ", messageSize=" + size + ", currentAvailable=" + available).initCause(ipbe);
-        }
-        if (!builder.isInitialized()) {
-          // TODO: not clear if we should try to recover from corrupt PB that looks semi-legit.
-          //       If we can get the KV count, we could, theoretically, try to get next record.
-          throw new EOFException("Partial PB while reading WAL, " +
-              "probably an unexpected EOF, ignoring. current offset=" + this.inputStream.getPos());
-        }
-        WALKey walKey = builder.build();
-        entry.getKey().readFieldsFromPb(walKey, this.byteStringUncompressor);
-        if (!walKey.hasFollowingKvCount() || 0 == walKey.getFollowingKvCount()) {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("WALKey has no KVs that follow it; trying the next one. current offset="
-              + this.inputStream.getPos());
-          }
-          seekOnFs(originalPosition);
-          return false;
-        }
-        int expectedCells = walKey.getFollowingKvCount();
-        long posBefore = this.inputStream.getPos();
-        try {
-          int actualCells = entry.getEdit().readFromCells(cellDecoder, expectedCells);
-          if (expectedCells != actualCells) {
-            resetPosition = true;
-            throw new EOFException("Only read " + actualCells); // other info added in catch
-          }
-        } catch (Exception ex) {
-          String posAfterStr = "<unknown>";
-          try {
-            posAfterStr = this.inputStream.getPos() + "";
-          } catch (Throwable t) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Error getting pos for error message - ignoring", t);
-            }
-          }
-          String message = " while reading " + expectedCells + " WAL KVs; started reading at "
-              + posBefore + " and read up to " + posAfterStr;
-          IOException realEofEx = extractHiddenEof(ex);
-          throw (EOFException) new EOFException("EOF " + message).
-              initCause(realEofEx != null ? realEofEx : ex);
-        }
-        if (trailerPresent && this.inputStream.getPos() > this.walEditsStopOffset) {
-          LOG.error("Read WALTrailer while reading WALEdits. wal: " + this.path
-              + ", inputStream.getPos(): " + this.inputStream.getPos() + ", walEditsStopOffset: "
-              + this.walEditsStopOffset);
-          throw new EOFException("Read WALTrailer while reading WALEdits");
-        }
-      } catch (EOFException eof) {
-        // If originalPosition is < 0, it is rubbish and we cannot use it (probably local fs)
-        if (originalPosition < 0) {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("Encountered a malformed edit, but can't seek back to last good position "
-                + "because originalPosition is negative. last offset="
-                + this.inputStream.getPos(), eof);
-          }
-          throw eof;
-        }
-        // If stuck at the same place and we got and exception, lets go back at the beginning.
-        if (inputStream.getPos() == originalPosition && resetPosition) {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("Encountered a malformed edit, seeking to the beginning of the WAL since "
-                + "current position and original position match at " + originalPosition);
-          }
-          seekOnFs(0);
-        } else {
-          // Else restore our position to original location in hope that next time through we will
-          // read successfully.
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("Encountered a malformed edit, seeking back to last good position in file, "
-                + "from " + inputStream.getPos()+" to " + originalPosition, eof);
-          }
-          seekOnFs(originalPosition);
-        }
-        return false;
-      }
-      return true;
-    }
-  }
-
-  private IOException extractHiddenEof(Exception ex) {
+  protected IOException extractHiddenEof(Exception ex) {
     // There are two problems we are dealing with here. Hadoop stream throws generic exception
     // for EOF, not EOFException; and scanner further hides it inside RuntimeException.
     IOException ioEx = null;
@@ -412,6 +217,11 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
    */
   protected void seekOnFs(long pos) throws IOException {
     this.inputStream.seek(pos);
+  }
+
+  @Override
+  protected String getLogName() {
+    return this.path.toString();
   }
 
   static class FSWALInputStream extends WALInputStream {
