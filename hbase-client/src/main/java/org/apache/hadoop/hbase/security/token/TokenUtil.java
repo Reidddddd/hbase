@@ -415,12 +415,10 @@ public class TokenUtil {
     if (token == null) {
       AuthenticationTokenIdentifier identifier =
           new AuthenticationTokenIdentifier(user.getShortName());
-      Token<AuthenticationTokenIdentifier> newToken = new Token<>();
-
-      newToken.setID(identifier.getBytes());
-      newToken.setKind(identifier.getKind());
-      newToken.setPassword(Bytes.toBytes(password));
-      newToken.setService(new Text(HConstants.CLUSTER_ID_DEFAULT));
+      Token<AuthenticationTokenIdentifier> newToken = new Token<>(
+        identifier.getBytes(), Bytes.toBytes(password), identifier.getKind(),
+        new Text(HConstants.CLUSTER_ID_DEFAULT)
+      );
       user.addToken(newToken);
       user.getUGI().setAuthenticationMethod(AuthenticationMethod.TOKEN);
     }
