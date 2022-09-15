@@ -39,6 +39,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
@@ -432,36 +433,60 @@ public class RSGroupAdminServer implements RSGroupAdmin {
     Map<TableName, Map<ServerName, List<HRegionInfo>>> result = Maps.newHashMap();
     RSGroupInfo RSGroupInfo = getRSGroupInfo(groupName);
     Map<TableName, Map<ServerName, List<HRegionInfo>>> assignments = Maps.newHashMap();
-    for(Map.Entry<HRegionInfo, ServerName> entry:
-        master.getAssignmentManager().getRegionStates().getRegionAssignments().entrySet()) {
-      TableName currTable = entry.getKey().getTable();
-      ServerName currServer = entry.getValue();
-      HRegionInfo currRegion = entry.getKey();
-      if(RSGroupInfo.getTables().contains(currTable)) {
-        if(!assignments.containsKey(entry.getKey().getTable())) {
-          assignments.put(currTable, new HashMap<ServerName, List<HRegionInfo>>());
+    if (!master.getConfiguration().getBoolean(
+            HConstants.HBASE_MASTER_LOADBALANCE_BYTABLE, false)) {
+      Map<ServerName, List<HRegionInfo>> serverMap =
+              new HashMap<>();
+      for (ServerName serverName : master.getServerManager().getOnlineServers().keySet()) {
+        if (RSGroupInfo.getServers().contains(serverName.getAddress())) {
+          serverMap.put(serverName, new ArrayList<>());
         }
-        if(!assignments.get(currTable).containsKey(currServer)) {
-          assignments.get(currTable).put(currServer, new ArrayList<HRegionInfo>());
+      }
+      for (Map.Entry<HRegionInfo, ServerName> entry :
+              master.getAssignmentManager().getRegionStates().getRegionAssignments().entrySet()) {
+        TableName currTable = entry.getKey().getTable();
+        ServerName currServer = entry.getValue();
+        HRegionInfo currRegion = entry.getKey();
+        if (RSGroupInfo.getTables().contains(currTable)) {
+          if (!serverMap.containsKey(currServer)) {
+            serverMap.put(currServer, new ArrayList<>());
+          }
+          serverMap.get(currServer).add(currRegion);
         }
-        assignments.get(currTable).get(currServer).add(currRegion);
       }
-    }
-
-    Map<ServerName, List<HRegionInfo>> serverMap = Maps.newHashMap();
-    for(ServerName serverName: master.getServerManager().getOnlineServers().keySet()) {
-      if(RSGroupInfo.getServers().contains(serverName.getAddress())) {
-        serverMap.put(serverName, Collections.<HRegionInfo> emptyList());
+      result.put(TableName.valueOf(HConstants.ENSEMBLE_TABLE_NAME), serverMap);
+    } else {
+      for (Map.Entry<HRegionInfo, ServerName> entry :
+              master.getAssignmentManager().getRegionStates().getRegionAssignments().entrySet()) {
+        TableName currTable = entry.getKey().getTable();
+        ServerName currServer = entry.getValue();
+        HRegionInfo currRegion = entry.getKey();
+        if (RSGroupInfo.getTables().contains(currTable)) {
+          if (!assignments.containsKey(entry.getKey().getTable())) {
+            assignments.put(currTable, new HashMap<ServerName, List<HRegionInfo>>());
+          }
+          if (!assignments.get(currTable).containsKey(currServer)) {
+            assignments.get(currTable).put(currServer, new ArrayList<HRegionInfo>());
+          }
+          assignments.get(currTable).get(currServer).add(currRegion);
+        }
       }
-    }
 
-    //add all tables that are members of the group
-    for(TableName tableName : RSGroupInfo.getTables()) {
-      if(assignments.containsKey(tableName)) {
-        result.put(tableName, new HashMap<ServerName, List<HRegionInfo>>());
-        result.get(tableName).putAll(serverMap);
-        result.get(tableName).putAll(assignments.get(tableName));
-        LOG.debug("Adding assignments for "+tableName+": "+assignments.get(tableName));
+      Map<ServerName, List<HRegionInfo>> serverMap = Maps.newHashMap();
+      for (ServerName serverName : master.getServerManager().getOnlineServers().keySet()) {
+        if (RSGroupInfo.getServers().contains(serverName.getAddress())) {
+          serverMap.put(serverName, Collections.<HRegionInfo>emptyList());
+        }
+      }
+
+      //add all tables that are members of the group
+      for (TableName tableName : RSGroupInfo.getTables()) {
+        if (assignments.containsKey(tableName)) {
+          result.put(tableName, new HashMap<ServerName, List<HRegionInfo>>());
+          result.get(tableName).putAll(serverMap);
+          result.get(tableName).putAll(assignments.get(tableName));
+          LOG.debug("Adding assignments for " + tableName + ": " + assignments.get(tableName));
+        }
       }
     }
 
