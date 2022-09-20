@@ -19,7 +19,10 @@
 package org.apache.hadoop.hbase.wal;
 
 import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
 import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
+import org.apache.hadoop.hbase.regionserver.wal.WALCellCodec;
 import org.apache.hadoop.hbase.util.Bytes;
 
 public class InstrumentedLogWriter extends ProtobufLogWriter {
@@ -39,5 +42,17 @@ public class InstrumentedLogWriter extends ProtobufLogWriter {
       throw(new IOException("This exception is instrumented and should only be thrown for testing"
           ));
     }
+  }
+
+  @Override
+  protected WALProtos.WALHeader buildWALHeader(Configuration conf,
+      WALProtos.WALHeader.Builder builder) throws IOException {
+    if (!builder.hasWriterClsName()) {
+      builder.setWriterClsName(ProtobufLogWriter.class.getSimpleName());
+    }
+    if (!builder.hasCellCodecClsName()) {
+      builder.setCellCodecClsName(WALCellCodec.getWALCellCodecClass(conf).getName());
+    }
+    return builder.build();
   }
 }

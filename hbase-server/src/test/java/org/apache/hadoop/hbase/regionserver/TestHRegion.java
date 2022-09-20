@@ -1158,7 +1158,7 @@ public class TestHRegion {
       }
 
       @Override
-      protected Writer createWriterInstance(Path path) throws IOException {
+      protected Writer createWriterInstance(String path) throws IOException {
         final Writer w = super.createWriterInstance(path);
         return new Writer() {
           @Override

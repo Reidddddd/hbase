@@ -1047,8 +1047,8 @@ public class TestWALReplay {
     HBaseTestingUtility.closeRegionAndWAL(region);
     final byte[] family = htd.getColumnFamilies()[0].getName();
     final byte[] rowName = tableName.getName();
-    FSWALEntry entry1 = createFSWALEntry(htd, hri, 1L, rowName, family, ee, mvcc, 1);
-    FSWALEntry entry2 = createFSWALEntry(htd, hri, 2L, rowName, family, ee, mvcc, 2);
+    GenericWALEntry entry1 = createFSWALEntry(htd, hri, 1L, rowName, family, ee, mvcc, 1);
+    GenericWALEntry entry2 = createFSWALEntry(htd, hri, 2L, rowName, family, ee, mvcc, 2);
 
     Path largeFile = new Path(logDir, "wal-1");
     Path smallFile = new Path(logDir, "wal-2");
@@ -1163,11 +1163,11 @@ public class TestWALReplay {
     return edit;
   }
 
-  private FSWALEntry createFSWALEntry(HTableDescriptor htd, HRegionInfo hri, long sequence,
+  private GenericWALEntry createFSWALEntry(HTableDescriptor htd, HRegionInfo hri, long sequence,
       byte[] rowName, byte[] family, EnvironmentEdge ee, MultiVersionConcurrencyControl mvcc,
       int index) throws IOException {
-    FSWALEntry entry =
-        new FSWALEntry(sequence, createWALKey(htd.getTableName(), hri, mvcc), createWALEdit(
+    GenericWALEntry entry =
+        new GenericWALEntry(sequence, createWALKey(htd.getTableName(), hri, mvcc), createWALEdit(
           rowName, family, ee, index), htd, hri, true);
     entry.stampRegionSequenceId(mvcc.begin());
     return entry;
@@ -1246,11 +1246,11 @@ public class TestWALReplay {
     return htd;
   }
 
-  private void writerWALFile(Path file, List<FSWALEntry> entries) throws IOException {
+  private void writerWALFile(Path file, List<GenericWALEntry> entries) throws IOException {
     fs.mkdirs(file.getParent());
     ProtobufLogWriter writer = new ProtobufLogWriter();
     writer.init(fs, file, conf, true);
-    for (FSWALEntry entry : entries) {
+    for (GenericWALEntry entry : entries) {
       writer.append(entry);
     }
     writer.sync();

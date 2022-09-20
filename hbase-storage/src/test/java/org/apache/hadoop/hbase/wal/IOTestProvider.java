@@ -172,7 +172,8 @@ public class IOTestProvider implements WALProvider {
     // creatWriterInstance is where the new pipeline is set up for doing file rolls
     // if we are skipping it, just keep returning the same writer.
     @Override
-    protected Writer createWriterInstance(final Path path) throws IOException {
+    protected Writer createWriterInstance(final String pathStr) throws IOException {
+      Path path = pathStr == null ? null : new Path(pathStr);
       // we get called from the FSHLog constructor (!); always roll in this case since
       // we don't know yet if we're supposed to generally roll and
       // we need an initial file in the case of doing appends but no rolls.

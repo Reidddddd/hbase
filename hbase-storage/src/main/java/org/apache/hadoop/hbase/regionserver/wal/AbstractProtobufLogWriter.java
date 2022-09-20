@@ -23,8 +23,8 @@ import static org.apache.hadoop.hbase.wal.WALUtils.DEFAULT_WAL_TRAILER_WARN_SIZE
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_COMPLETE_MAGIC;
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
 import static org.apache.hadoop.hbase.wal.WALUtils.WAL_TRAILER_WARN_SIZE;
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALTrailer;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -44,7 +45,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 public abstract class AbstractProtobufLogWriter extends WriterBase {
   private static final Log LOG = LogFactory.getLog(AbstractProtobufLogWriter.class);
 
-  protected DataOutputStream output;
+  protected OutputStream output;
   protected Codec.Encoder cellEncoder;
   protected WALCellCodec.ByteStringCompressor compressor;
   protected boolean trailerWritten;
@@ -68,9 +69,8 @@ public abstract class AbstractProtobufLogWriter extends WriterBase {
     output.write(PB_WAL_MAGIC);
     boolean doTagCompress = doCompress
       && conf.getBoolean(CompressionContext.ENABLE_WAL_TAGS_COMPRESSION, true);
-    buildWALHeader(conf,
-      WALProtos.WALHeader.newBuilder().setHasCompression(doCompress).setHasTagCompression(doTagCompress))
-      .writeDelimitedTo(output);
+    buildWALHeader(conf, WALProtos.WALHeader.newBuilder().setHasCompression(doCompress).
+      setHasTagCompression(doTagCompress)).writeDelimitedTo(output);
 
     initAfterHeader(doCompress);
 
@@ -95,7 +95,7 @@ public abstract class AbstractProtobufLogWriter extends WriterBase {
   protected WALHeader buildWALHeader(Configuration conf, WALHeader.Builder builder)
       throws IOException {
     if (!builder.hasWriterClsName()) {
-      builder.setWriterClsName(ProtobufLogWriter.class.getSimpleName());
+      builder.setWriterClsName(this.getClass().getSimpleName());
     }
     if (!builder.hasCellCodecClsName()) {
       builder.setCellCodecClsName(WALCellCodec.getWALCellCodecClass(conf).getName());
@@ -142,7 +142,7 @@ public abstract class AbstractProtobufLogWriter extends WriterBase {
     return builder.build();
   }
 
-  private void writeWALTrailer() {
+  protected void writeWALTrailer() throws IOException {
     try {
       int trailerSize = 0;
       if (this.trailer == null) {
@@ -157,7 +157,7 @@ public abstract class AbstractProtobufLogWriter extends WriterBase {
           trailerSize + " > " + this.trailerWarnSize);
       }
       this.trailer.writeTo(output);
-      output.writeInt(trailerSize);
+      output.write(Bytes.toBytes(trailerSize));
       output.write(PB_WAL_COMPLETE_MAGIC);
       this.trailerWritten = true;
     } catch (IOException ioe) {

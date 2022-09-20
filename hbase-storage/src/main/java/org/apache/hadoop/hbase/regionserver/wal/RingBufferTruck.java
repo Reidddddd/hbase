@@ -24,7 +24,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A 'truck' to carry a payload across the {@link FSHLog} ring buffer from Handler to WAL.
- * Has EITHER a {@link FSWALEntry} for making an append OR it has a {@link SyncFuture} to
+ * Has EITHER a {@link GenericWALEntry} for making an append OR it has a {@link SyncFuture} to
  * represent a 'sync' invocation. Truck instances are reused by the disruptor when it gets
  * around to it so their payload references must be discarded on consumption to release them
  * to GC.
@@ -35,7 +35,7 @@ class RingBufferTruck {
    * Either this syncFuture is set or entry is set, but not both.
    */
   private SyncFuture syncFuture;
-  private FSWALEntry entry;
+  private GenericWALEntry entry;
 
   /**
    * The tracing span for this entry.  Can be null.
@@ -44,9 +44,9 @@ class RingBufferTruck {
   private Span span;
 
   /**
-   * Load the truck with a {@link FSWALEntry} and associated {@link Span}.
+   * Load the truck with a {@link GenericWALEntry} and associated {@link Span}.
    */
-  void loadPayload(final FSWALEntry entry, final Span span) {
+  void loadPayload(final GenericWALEntry entry, final Span span) {
     this.entry = entry;
     this.span = span;
     this.syncFuture = null;
@@ -62,7 +62,7 @@ class RingBufferTruck {
   }
 
   /**
-   * return {@code true} when this truck is carrying a {@link FSWALEntry},
+   * return {@code true} when this truck is carrying a {@link GenericWALEntry},
    * {@code false} otherwise.
    */
   boolean hasFSWALEntryPayload() {
@@ -78,10 +78,10 @@ class RingBufferTruck {
   }
 
   /**
-   * Unload the truck of its {@link FSWALEntry} payload. The internal refernce is released.
+   * Unload the truck of its {@link GenericWALEntry} payload. The internal refernce is released.
    */
-  FSWALEntry unloadFSWALEntryPayload() {
-    FSWALEntry ret = this.entry;
+  GenericWALEntry unloadFSWALEntryPayload() {
+    GenericWALEntry ret = this.entry;
     this.entry = null;
     return ret;
   }

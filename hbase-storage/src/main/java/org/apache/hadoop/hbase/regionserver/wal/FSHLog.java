@@ -23,13 +23,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.TimeoutException;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.lang.management.MemoryUsage;
-import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -50,23 +45,14 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HRegionInfo;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
-import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
-import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.ClassSize;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
-import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALPrettyPrinter;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
@@ -74,10 +60,7 @@ import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.htrace.NullScope;
-import org.apache.htrace.Span;
 import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -161,26 +144,6 @@ public class FSHLog extends AbstractLog {
   private final Path fullPathArchiveDir;
 
   /**
-   * Matches just those wal files that belong to this wal instance.
-   */
-  private final PathFilter ourFiles;
-
-  /**
-   * Prefix of a WAL file, usually the region server name it is hosted on.
-   */
-  private final String logFilePrefix;
-
-  /**
-   * Suffix included on generated wal file names
-   */
-  private final String logFileSuffix;
-
-  /**
-   * Prefix used when checking for wal membership.
-   */
-  private final String prefixPathStr;
-
-  /**
    * FSDataOutputStream associated with the current SequenceFile.writer
    */
   private FSDataOutputStream hdfs_out;
@@ -192,19 +155,6 @@ public class FSHLog extends AbstractLog {
 
   private final int lowReplicationRollLimit;
 
-  // If > than this size, roll the log.
-  private final long logrollsize;
-
-  /*
-   * If more than this many logs, force flush of oldest region to oldest edit
-   * goes to disk.  If too many and we crash, then will take forever replaying.
-   * Keep the number of logs tidy.
-   */
-  private final int maxLogs;
-
-  /** Number of log close errors tolerated before we abort */
-  private final int closeErrorsTolerated;
-
   private final AtomicInteger closeErrorCount = new AtomicInteger();
 
   private final ExecutorService closeExecutor = Executors.newCachedThreadPool(
@@ -213,28 +163,7 @@ public class FSHLog extends AbstractLog {
   // Last time to check low replication on hlog's pipeline
   private volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
 
-  /**
-   * WAL Comparator; it compares the timestamp (log filenum), present in the log file name.
-   * Throws an IllegalArgumentException if used to compare paths from different wals.
-   */
-  final Comparator<Path> LOG_NAME_COMPARATOR = new Comparator<Path>() {
-    @Override
-    public int compare(Path o1, Path o2) {
-      long t1 = getFileNumFromFileName(o1);
-      long t2 = getFileNumFromFileName(o2);
-      if (t1 == t2) {
-        return 0;
-      }
-      return (t1 > t2) ? 1 : -1;
-    }
-  };
-
-  /**
-   * Map of WAL log file to the latest sequence ids of all regions it has entries of.
-   * The map is sorted by the log file creation timestamp (contained in the log file name).
-   */
-  private NavigableMap<Path, Map<byte[], Long>> byWalRegionSequenceIds =
-    new ConcurrentSkipListMap<Path, Map<byte[], Long>>(LOG_NAME_COMPARATOR);
+  private long hdfsBlockSize;
 
   /**
    * Constructor.
@@ -277,10 +206,11 @@ public class FSHLog extends AbstractLog {
       final List<WALActionsListener> listeners,
       final boolean failIfWALExists, final String prefix, final String suffix)
     throws IOException {
-    super(conf, listeners);
+    super(conf, listeners, prefix, suffix);
     this.fs = fs;
     this.fullPathLogDir = new Path(rootDir, logDir);
     this.fullPathArchiveDir = new Path(rootDir, archiveDir);
+    init();
 
     if (!fs.exists(fullPathLogDir) && !fs.mkdirs(fullPathLogDir)) {
       throw new IOException("Unable to mkdir " + fullPathLogDir);
@@ -292,87 +222,37 @@ public class FSHLog extends AbstractLog {
       }
     }
 
-    // If prefix is null||empty then just name it wal
-    this.logFilePrefix =
-      prefix == null || prefix.isEmpty() ? "wal" : URLEncoder.encode(prefix, "UTF8");
-    // we only correctly differentiate suffices when numeric ones start with '.'
-    if (suffix != null && !(suffix.isEmpty()) && !(suffix.startsWith(WAL_FILE_NAME_DELIMITER))) {
-      throw new IllegalArgumentException("WAL suffix must start with '" + WAL_FILE_NAME_DELIMITER +
-          "' but instead was '" + suffix + "'");
-    }
     // Now that it exists, set the storage policy for the entire directory of wal files related to
     // this FSHLog instance
     FSUtils.setStoragePolicy(fs, conf, this.fullPathLogDir, HConstants.WAL_STORAGE_POLICY,
       HConstants.DEFAULT_WAL_STORAGE_POLICY);
-    this.logFileSuffix = (suffix == null) ? "" : URLEncoder.encode(suffix, "UTF8");
-    this.prefixPathStr = new Path(fullPathLogDir,
-        logFilePrefix + WAL_FILE_NAME_DELIMITER).toString();
-
-    this.ourFiles = new PathFilter() {
-      @Override
-      public boolean accept(final Path fileName) {
-        // The path should start with dir/<prefix> and end with our suffix
-        final String fileNameString = fileName.toString();
-        if (!fileNameString.startsWith(prefixPathStr)) {
-          return false;
-        }
-        if (logFileSuffix.isEmpty()) {
-          // in the case of the null suffix, we need to ensure the filename ends with a timestamp.
-          return org.apache.commons.lang.StringUtils.isNumeric(
-              fileNameString.substring(prefixPathStr.length()));
-        } else if (!fileNameString.endsWith(logFileSuffix)) {
-          return false;
-        }
-        return true;
-      }
-    };
+    this.ourLogs = new LogNameFilter(this.prefixLogStr, logNameSuffix);
 
     if (failIfWALExists) {
-      final FileStatus[] walFiles = FSUtils.listStatus(fs, fullPathLogDir, ourFiles);
+      final FileStatus[] walFiles = FSUtils.listStatus(fs, fullPathLogDir,
+        path -> ourLogs.accept(path.toString()));
       if (null != walFiles && 0 != walFiles.length) {
         throw new IOException("Target WAL already exists within directory " + fullPathLogDir);
       }
     }
 
-    // Get size to roll log at. Roll at 95% of HDFS block size so we avoid crossing HDFS blocks
-    // (it costs a little x'ing bocks)
-    final long blocksize = this.conf.getLong("hbase.regionserver.hlog.blocksize",
-        FSUtils.getDefaultBlockSize(this.fs, this.fullPathLogDir));
-    this.logrollsize =
-      (long)(blocksize * conf.getFloat("hbase.regionserver.logroll.multiplier", 0.95f));
-
-    float memstoreRatio = conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_KEY,
-      conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_OLD_KEY,
-        HeapMemorySizeUtil.DEFAULT_MEMSTORE_SIZE));
     boolean maxLogsDefined = conf.get("hbase.regionserver.maxlogs") != null;
     if(maxLogsDefined){
       LOG.warn("'hbase.regionserver.maxlogs' was deprecated.");
     }
-    this.maxLogs = conf.getInt("hbase.regionserver.maxlogs",
-        Math.max(32, calculateMaxLogFiles(memstoreRatio, logrollsize)));
+
     this.minTolerableReplication = conf.getInt("hbase.regionserver.hlog.tolerable.lowreplication",
         FSUtils.getDefaultReplication(fs, this.fullPathLogDir));
     this.lowReplicationRollLimit =
       conf.getInt("hbase.regionserver.hlog.lowreplication.rolllimit", 5);
-    this.closeErrorsTolerated = conf.getInt("hbase.regionserver.logroll.errors.tolerated", 0);
 
-    LOG.info("WAL configuration: blocksize=" + StringUtils.byteDesc(blocksize) +
+    LOG.info("WAL configuration: blocksize=" + StringUtils.byteDesc(hdfsBlockSize) +
       ", rollsize=" + StringUtils.byteDesc(this.logrollsize) +
-      ", prefix=" + this.logFilePrefix + ", suffix=" + logFileSuffix + ", logDir=" +
+      ", prefix=" + this.logNamePrefix + ", suffix=" + logNameSuffix + ", logDir=" +
       this.fullPathLogDir + ", archiveDir=" + this.fullPathArchiveDir);
 
     // rollWriter sets this.hdfs_out if it can.
     rollWriter();
-  }
-
-  private int calculateMaxLogFiles(float memstoreSizeRatio, long logRollSize) {
-    long max = -1L;
-    final MemoryUsage usage = HeapMemorySizeUtil.safeGetHeapMemoryUsage();
-    if (usage != null) {
-      max = usage.getMax();
-    }
-    int maxLogs = Math.round(max * memstoreSizeRatio * 2 / logRollSize);
-    return maxLogs;
   }
 
   /**
@@ -380,7 +260,23 @@ public class FSHLog extends AbstractLog {
    * @return may be null if there are no files.
    */
   protected FileStatus[] getFiles() throws IOException {
-    return FSUtils.listStatus(fs, fullPathLogDir, ourFiles);
+    return FSUtils.listStatus(fs, fullPathLogDir, path -> ourLogs.accept(path.toString()));
+  }
+
+  @Override
+  protected void init() {
+    // Get size to roll log at. Roll at 95% of HDFS block size so we avoid crossing HDFS blocks
+    // (it costs a little x'ing bocks)
+    try {
+      hdfsBlockSize = this.conf.getLong("hbase.regionserver.hlog.blocksize",
+        FSUtils.getDefaultBlockSize(this.fs, this.fullPathLogDir));
+      logrollsize = (long)(hdfsBlockSize * conf.getFloat("hbase.regionserver.logroll.multiplier",
+        0.95f));
+      this.prefixLogStr =
+        new Path(fullPathLogDir, logNamePrefix + WAL_FILE_NAME_DELIMITER).toString();
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to get hdfs block size. \n", e);
+    }
   }
 
   /**
@@ -400,63 +296,6 @@ public class FSHLog extends AbstractLog {
     return fsdos.getWrappedStream();
   }
 
-  @Override
-  public byte [][] rollWriter() throws FailedLogCloseException, IOException {
-    return rollWriter(false);
-  }
-
-  /**
-   * retrieve the next path to use for writing.
-   * Increments the internal filenum.
-   */
-  private Path getNewPath() throws IOException {
-    this.filenum.set(System.currentTimeMillis());
-    Path newPath = getCurrentFileName();
-    while (fs.exists(newPath)) {
-      this.filenum.incrementAndGet();
-      newPath = getCurrentFileName();
-    }
-    return newPath;
-  }
-
-  Path getOldPath() {
-    long currentFilenum = this.filenum.get();
-    Path oldPath = null;
-    if (currentFilenum > 0) {
-      // ComputeFilename  will take care of meta wal filename
-      oldPath = computeFilename(currentFilenum);
-    } // I presume if currentFilenum is <= 0, this is first file and null for oldPath if fine?
-    return oldPath;
-  }
-
-  /**
-   * Tell listeners about pre log roll.
-   */
-  private void tellListenersAboutPreLogRoll(final Path oldPath, final Path newPath)
-    throws IOException {
-    coprocessorHost.preWALRoll(oldPath, newPath);
-
-    if (!this.listeners.isEmpty()) {
-      for (WALActionsListener i : this.listeners) {
-        i.preLogRoll(oldPath, newPath);
-      }
-    }
-  }
-
-  /**
-   * Tell listeners about post log roll.
-   */
-  private void tellListenersAboutPostLogRoll(final Path oldPath, final Path newPath)
-    throws IOException {
-    if (!this.listeners.isEmpty()) {
-      for (WALActionsListener i : this.listeners) {
-        i.postLogRoll(oldPath, newPath);
-      }
-    }
-
-    coprocessorHost.postWALRoll(oldPath, newPath);
-  }
-
   /**
    * Run a sync after opening to set up the pipeline.
    */
@@ -472,287 +311,51 @@ public class FSHLog extends AbstractLog {
   }
 
   @Override
-  public byte [][] rollWriter(boolean force) throws FailedLogCloseException, IOException {
-    rollWriterLock.lock();
-    try {
-      // Return if nothing to flush.
-      if (!force && (this.writer != null && this.numEntries.get() <= 0)) {
-        return null;
-      }
-      byte [][] regionsToFlush = null;
-      if (this.closed) {
-        LOG.debug("WAL closed. Skipping rolling of writer");
-        return regionsToFlush;
-      }
-      if (!closeBarrier.beginOp()) {
-        LOG.debug("WAL closing. Skipping rolling of writer");
-        return regionsToFlush;
-      }
-      TraceScope scope = Trace.startSpan("FSHLog.rollWriter");
-      try {
-        Path oldPath = getOldPath();
-        Path newPath = getNewPath();
-        // Any exception from here on is catastrophic, non-recoverable so we currently abort.
-        Writer nextWriter = this.createWriterInstance(newPath);
-        FSDataOutputStream nextHdfsOut = null;
-        if (nextWriter instanceof ProtobufLogWriter) {
-          nextHdfsOut = ((ProtobufLogWriter)nextWriter).getStream();
-          // If a ProtobufLogWriter, go ahead and try and sync to force setup of pipeline.
-          // If this fails, we just keep going.... it is an optimization, not the end of the world.
-          preemptiveSync((ProtobufLogWriter)nextWriter);
-        }
-        tellListenersAboutPreLogRoll(oldPath, newPath);
-        // NewPath could be equal to oldPath if replaceWriter fails.
-        newPath = replaceWriter(oldPath, newPath, nextWriter, nextHdfsOut);
-        tellListenersAboutPostLogRoll(oldPath, newPath);
-        // Can we delete any of the old log files?
-        if (getNumRolledLogFiles() > 0) {
-          cleanOldLogs();
-          regionsToFlush = findRegionsToForceFlush();
-        }
-      } finally {
-        closeBarrier.endOp();
-        assert scope == NullScope.INSTANCE || !scope.isDetached();
-        scope.close();
-      }
-      return regionsToFlush;
-    } finally {
-      rollWriterLock.unlock();
+  protected void afterReplaceWriter(String newPathStr, String oldPathStr, Writer nextWriter)
+    throws IOException {
+    this.hdfs_out = nextWriter instanceof ProtobufLogWriter ?
+      ((ProtobufLogWriter) nextWriter).getStream() : null;
+    int oldNumEntries = this.numEntries.get();
+    this.numEntries.set(0);
+    Path newPath = newPathStr == null ? null : new Path(newPathStr);
+    Path oldPath = oldPathStr == null ? null : new Path(oldPathStr);
+
+    final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
+    if (oldPath != null) {
+      this.byWalRegionSequenceIds.put(oldPath.toString(), this.sequenceIdAccounting.resetHighest());
+      long oldFileLen = this.fs.getFileStatus(oldPath).getLen();
+      this.totalLogSize.addAndGet(oldFileLen);
+      LOG.info("Rolled WAL " + FSUtils.getPath(oldPath) + " with entries=" + oldNumEntries +
+        ", filesize=" + StringUtils.byteDesc(oldFileLen) + "; new WAL " +
+        newPathString);
+    } else {
+      LOG.info("New WAL " + newPathString);
     }
   }
 
-  /**
-   * This method allows subclasses to inject different writers without having to
-   * extend other methods like rollWriter().
-   *
-   * @return Writer instance
-   */
-  protected Writer createWriterInstance(final Path path) throws IOException {
-    return WALUtils.createWriter(conf, fs, path, false);
+  @Override
+  protected Writer createWriterInstance(final String newWriterName) throws IOException {
+    if (newWriterName == null) {
+      throw new IOException("Cannot create writer with null name.");
+    }
+    Writer writer = WALUtils.createWriter(conf, fs, new Path(newWriterName), false);
+    if (! (writer instanceof ProtobufLogWriter)) {
+      throw new IllegalArgumentIOException("FSHlog must create " +
+        ProtobufLogWriter.class.getName() + " but get: " + writer.getClass().getName());
+    }
+    return writer;
   }
 
-  /**
-   * Archive old logs. A WAL is eligible for archiving if all its WALEdits have been flushed.
-   */
-  private void cleanOldLogs() throws IOException {
-    List<Path> logsToArchive = null;
-    // For each log file, look at its Map of regions to highest sequence id; if all sequence ids
-    // are older than what is currently in memory, the WAL can be GC'd.
-    for (Map.Entry<Path, Map<byte[], Long>> e : this.byWalRegionSequenceIds.entrySet()) {
-      Path log = e.getKey();
-      Map<byte[], Long> sequenceNums = e.getValue();
-      if (this.sequenceIdAccounting.areAllLower(sequenceNums)) {
-        if (logsToArchive == null) {
-          logsToArchive = new ArrayList<Path>();
-        }
-        logsToArchive.add(log);
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("WAL file ready for archiving " + log);
-        }
-      }
-    }
+  @Override
+  protected void archiveLogUnities(List<String> logsToArchive) throws IOException {
     if (logsToArchive != null) {
-      for (Path p : logsToArchive) {
+      for (String logPath : logsToArchive) {
+        Path p = new Path(logPath);
         this.totalLogSize.addAndGet(-this.fs.getFileStatus(p).getLen());
         archiveLogFile(p);
-        this.byWalRegionSequenceIds.remove(p);
+        this.byWalRegionSequenceIds.remove(p.toString());
       }
     }
-  }
-
-  /**
-   * If the number of un-archived WAL files is greater than maximum allowed, check the first
-   * (oldest) WAL file, and returns those regions which should be flushed so that it can
-   * be archived.
-   * @return regions (encodedRegionNames) to flush in order to archive oldest WAL file.
-   */
-  byte[][] findRegionsToForceFlush() throws IOException {
-    byte [][] regions = null;
-    int logCount = getNumRolledLogFiles();
-    if (logCount > this.maxLogs && logCount > 0) {
-      Map.Entry<Path, Map<byte[], Long>> firstWALEntry =
-        this.byWalRegionSequenceIds.firstEntry();
-      regions = this.sequenceIdAccounting.findLower(firstWALEntry.getValue());
-    }
-    if (regions != null) {
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < regions.length; i++) {
-        if (i > 0) {
-          sb.append(", ");
-        }
-        sb.append(Bytes.toStringBinary(regions[i]));
-      }
-      LOG.info("Too many WALs; count=" + logCount + ", max=" + this.maxLogs +
-        "; forcing flush of " + regions.length + " regions(s): " + sb.toString());
-    }
-    return regions;
-  }
-
-  /**
-   * Cleans up current writer closing it and then puts in place the passed in
-   * <code>nextWriter</code>.
-   *
-   * In the case of creating a new WAL, oldPath will be null.
-   *
-   * In the case of rolling over from one file to the next, none of the params will be null.
-   *
-   * In the case of closing out this FSHLog with no further use newPath, nextWriter, and
-   * nextHdfsOut will be null.
-   *
-   * @param oldPath may be null
-   * @param newPath may be null
-   * @param nextWriter may be null
-   * @param nextHdfsOut may be null
-   * @return the passed in <code>newPath</code>
-   * @throws IOException if there is a problem flushing or closing the underlying FS
-   */
-  Path replaceWriter(final Path oldPath, final Path newPath, Writer nextWriter,
-      final FSDataOutputStream nextHdfsOut) throws IOException {
-    // Ask the ring buffer writer to pause at a safe point.  Once we do this, the writer
-    // thread will eventually pause. An error hereafter needs to release the writer thread
-    // regardless -- hence the finally block below.  Note, this method is called from the FSHLog
-    // constructor BEFORE the ring buffer is set running so it is null on first time through
-    // here; allow for that.
-    SyncFuture syncFuture = null;
-    SafePointZigZagLatch zigzagLatch = null;
-    long sequence = -1L;
-    if (this.ringBufferEventHandler != null) {
-      // Get sequence first to avoid dead lock when ring buffer is full
-      // Considering below sequence
-      // 1. replaceWriter is called and zigzagLatch is initialized
-      // 2. ringBufferEventHandler#onEvent is called and arrives at #attainSafePoint(long) then wait
-      // on safePointReleasedLatch
-      // 3. Since ring buffer is full, if we get sequence when publish sync, the replaceWriter
-      // thread will wait for the ring buffer to be consumed, but the only consumer is waiting
-      // replaceWriter thread to release safePointReleasedLatch, which causes a deadlock
-      sequence = getSequenceOnRingBuffer();
-      zigzagLatch = this.ringBufferEventHandler.attainSafePoint();
-    }
-    afterCreatingZigZagLatch();
-    TraceScope scope = Trace.startSpan("FSHFile.replaceWriter");
-    CompletableFuture<Void> closeFuture = null;
-    try {
-      // Wait on the safe point to be achieved.  Send in a sync in case nothing has hit the
-      // ring buffer between the above notification of writer that we want it to go to
-      // 'safe point' and then here where we are waiting on it to attain safe point.  Use
-      // 'sendSync' instead of 'sync' because we do not want this thread to block waiting on it
-      // to come back.  Cleanup this syncFuture down below after we are ready to run again.
-      try {
-        if (zigzagLatch != null) {
-          // use assert to make sure no change breaks the logic that
-          // sequence and zigzagLatch will be set together
-          assert sequence > 0L : "Failed to get sequence from ring buffer";
-          Trace.addTimelineAnnotation("awaiting safepoint");
-          syncFuture = zigzagLatch.waitSafePoint(publishSyncOnRingBuffer(sequence));
-        }
-      } catch (FailedSyncBeforeLogCloseException e) {
-        // If unflushed/unsynced entries on close, it is reason to abort.
-        if (isUnflushedEntries()) {
-          throw e;
-        }
-        LOG.warn("Failed sync-before-close but no outstanding appends; closing WAL: " +
-          e.getMessage());
-      }
-
-      // It is at the safe point.  Swap out writer from under the blocked writer thread.
-      Writer localWriter = this.writer;
-      closeFuture = asyncCloseWriter(localWriter, oldPath);
-      this.writer = nextWriter;
-      this.hdfs_out = nextHdfsOut;
-      int oldNumEntries = this.numEntries.get();
-      this.numEntries.set(0);
-      final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
-      if (oldPath != null) {
-        this.byWalRegionSequenceIds.put(oldPath, this.sequenceIdAccounting.resetHighest());
-        long oldFileLen = this.fs.getFileStatus(oldPath).getLen();
-        this.totalLogSize.addAndGet(oldFileLen);
-        LOG.info("Rolled WAL " + FSUtils.getPath(oldPath) + " with entries=" + oldNumEntries +
-          ", filesize=" + StringUtils.byteDesc(oldFileLen) + "; new WAL " +
-          newPathString);
-      } else {
-        LOG.info("New WAL " + newPathString);
-      }
-    } catch (InterruptedException ie) {
-      // Perpetuate the interrupt
-      Thread.currentThread().interrupt();
-    } catch (IOException e) {
-      long count = getUnflushedEntriesCount();
-      LOG.error("Failed close of WAL writer " + oldPath + ", unflushedEntries=" + count, e);
-      throw new FailedLogCloseException(oldPath + ", unflushedEntries=" + count, e);
-    } finally {
-      try {
-        // Let the writer thread go regardless, whether error or not.
-        if (zigzagLatch != null) {
-          zigzagLatch.releaseSafePoint();
-          // syncFuture will be null if we failed our wait on safe point above. Otherwise, if
-          // latch was obtained successfully, the sync we threw in either trigger the latch or it
-          // got stamped with an exception because the WAL was damaged and we could not sync. Now
-          // the write pipeline has been opened up again by releasing the safe point, process the
-          // syncFuture we got above. This is probably a noop but it may be stale exception from
-          // when old WAL was in place. Catch it if so.
-          if (syncFuture != null) {
-            try {
-              blockOnSync(syncFuture);
-            } catch (IOException ioe) {
-              if (LOG.isTraceEnabled()) {
-                LOG.trace("Stale sync exception", ioe);
-              }
-            }
-          }
-        }
-      } finally {
-        if (closeFuture != null) {
-          try {
-            closeFuture.join();
-          } catch (CompletionException e) {
-            if (e.getCause() instanceof IOException) {
-              throw (IOException) e.getCause();
-            }
-            throw e;
-          }
-        }
-        scope.close();
-      }
-    }
-    return newPath;
-  }
-
-  private CompletableFuture<Void> asyncCloseWriter(Writer writer, Path oldPath) {
-    CompletableFuture<Void> future = new CompletableFuture<>();
-
-    closeExecutor.execute(() -> {
-      try {
-        if (writer != null) {
-          Trace.addTimelineAnnotation("closing writer");
-          writer.close();
-          Trace.addTimelineAnnotation("writer closed");
-        }
-        this.closeErrorCount.set(0);
-        future.complete(null);
-      } catch (IOException ioe) {
-        int errors = closeErrorCount.incrementAndGet();
-        if (!isUnflushedEntries() && (errors <= this.closeErrorsTolerated)) {
-          LOG.warn("Riding over failed WAL close of " + oldPath + ", cause=\"" + ioe.getMessage()
-            + "\", errors=" + errors
-            + "; THIS FILE WAS NOT CLOSED BUT ALL EDITS SYNCED SO SHOULD BE OK");
-          future.complete(null);
-        } else {
-          future.completeExceptionally(ioe);
-        }
-      }
-    });
-
-    return future;
-  }
-
-  long getUnflushedEntriesCount() {
-    long highestSynced = this.highestSyncedSequence.get();
-    return highestSynced > this.highestUnsyncedSequence?
-      0: this.highestUnsyncedSequence - highestSynced;
-  }
-
-  boolean isUnflushedEntries() {
-    return getUnflushedEntriesCount() > 0;
   }
 
   /*
@@ -786,15 +389,11 @@ public class FSHLog extends AbstractLog {
   /**
    * This is a convenience method that computes a new filename with a given
    * file-number.
-   * @param filenum to use
+   * @param logNum to use
    * @return Path
    */
-  protected Path computeFilename(final long filenum) {
-    if (filenum < 0) {
-      throw new RuntimeException("WAL file number can't be < 0");
-    }
-    String child = logFilePrefix + WAL_FILE_NAME_DELIMITER + filenum + logFileSuffix;
-    return new Path(fullPathLogDir, child);
+  protected Path computeFilename(final long logNum) {
+    return new Path(fullPathLogDir, computeLogName(logNum));
   }
 
   /**
@@ -803,40 +402,19 @@ public class FSHLog extends AbstractLog {
    * @return Path
    */
   public Path getCurrentFileName() {
-    return computeFilename(this.filenum.get());
+    return computeFilename(this.logNum.get());
   }
 
   /**
    * @return current file number (timestamp)
    */
-  public long getFilenum() {
-    return filenum.get();
+  public long getLogNum() {
+    return logNum.get();
   }
 
   @Override
   public String toString() {
-    return "FSHLog " + logFilePrefix + ":" + logFileSuffix + "(num " + filenum + ")";
-  }
-
-/**
- * A log file has a creation timestamp (in ms) in its file name ({@link #filenum}.
- * This helper method returns the creation timestamp from a given log file.
- * It extracts the timestamp assuming the filename is created with the
- * {@link #computeFilename(long filenum)} method.
- * @return timestamp, as in the log file name.
- */
-  protected long getFileNumFromFileName(Path fileName) {
-    if (fileName == null) {
-      throw new IllegalArgumentException("file name can't be null");
-    }
-    if (!ourFiles.accept(fileName)) {
-      throw new IllegalArgumentException("The log file " + fileName +
-        " doesn't belong to this WAL. (" + toString() + ")");
-    }
-    final String fileNameString = fileName.toString();
-    String chompedPath = fileNameString.substring(prefixPathStr.length(),
-        (fileNameString.length() - logFileSuffix.length()));
-    return Long.parseLong(chompedPath);
+    return "FSHLog " + logNamePrefix + ":" + logNameSuffix + "(num " + logNum + ")";
   }
 
   @Override
@@ -870,83 +448,25 @@ public class FSHLog extends AbstractLog {
   }
 
   @Override
-  public void shutdown() throws IOException {
-    if (shutdown.compareAndSet(false, true)) {
-      try {
-        // Prevent all further flushing and rolling.
-        closeBarrier.stopAndDrainOps();
-      } catch (InterruptedException e) {
-        LOG.error("Exception while waiting for cache flushes and log rolls", e);
-        Thread.currentThread().interrupt();
-      }
-
-      // Shutdown the disruptor.  Will stop after all entries have been processed.  Make sure we
-      // have stopped incoming appends before calling this else it will not shutdown.  We are
-      // conservative below waiting a long time and if not elapsed, then halting.
-      if (this.disruptor != null) {
-        long timeoutms = conf.getLong("hbase.wal.disruptor.shutdown.timeout.ms", 60000);
-        try {
-          this.disruptor.shutdown(timeoutms, TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-          LOG.warn("Timed out bringing down disruptor after " + timeoutms + "ms; forcing halt " +
-            "(It is a problem if this is NOT an ABORT! -- DATALOSS!!!!)");
-          this.disruptor.halt();
-          this.disruptor.shutdown();
-        }
-      }
-      // With disruptor down, this is safe to let go.
-      if (this.appendExecutor !=  null) {
-        this.appendExecutor.shutdown();
-      }
-
-      if (syncFutureCache != null) {
-        syncFutureCache.clear();
-      }
-
-      // Tell our listeners that the log is closing
-      if (!this.listeners.isEmpty()) {
-        for (WALActionsListener i : this.listeners) {
-          i.logCloseRequested();
-        }
-      }
-      this.closed = true;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Closing WAL writer in " + FSUtils.getPath(fullPathLogDir));
-      }
-      if (this.writer != null) {
-        this.writer.close();
-        this.writer = null;
-      }
-    }
+  protected String getLogFullName() {
+    return FSUtils.getPath(fullPathLogDir);
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="NP_NULL_ON_SOME_PATH_EXCEPTION",
-      justification="Will never be null")
   @Override
-  public long append(final HTableDescriptor htd, final HRegionInfo hri, final WALKey key,
-      final WALEdit edits, final boolean inMemstore) throws IOException {
-    if (this.closed) {
-      throw new IOException("Cannot append; log is closed");
+  protected boolean checkExists(String logName) throws IOException {
+    if (logName == null) {
+      return false;
     }
-    // Make a trace scope for the append.  It is closed on other side of the ring buffer by the
-    // single consuming thread.  Don't have to worry about it.
-    TraceScope scope = Trace.startSpan("FSHLog.append");
-    final MutableLong txidHolder = new MutableLong();
-    final RingBuffer<RingBufferTruck> ringBuffer = disruptor.getRingBuffer();
-    MultiVersionConcurrencyControl.WriteEntry we = key.getMvcc().begin(new Runnable() {
-      @Override public void run() {
-        txidHolder.setValue(ringBuffer.next());
-      }
-    });
-    long txid = txidHolder.longValue();
-    try {
-      FSWALEntry entry = new FSWALEntry(txid, key, edits, htd, hri, inMemstore);
-      entry.stampRegionSequenceId(we);
-      ringBuffer.get(txid).loadPayload(entry, scope.detach());
-    } finally {
-      ringBuffer.publish(txid);
+    return fs.exists(new Path(logName));
+  }
+
+  @Override
+  protected void nextWriterInit(Writer nextWriter) {
+    if (nextWriter instanceof ProtobufLogWriter) {
+      // If a ProtobufLogWriter, go ahead and try and sync to force setup of pipeline.
+      // If this fails, we just keep going.... it is an optimization, not the end of the world.
+      preemptiveSync((ProtobufLogWriter) nextWriter);
     }
-    return txid;
   }
 
   /**
@@ -1024,62 +544,6 @@ public class FSHLog extends AbstractLog {
     return logRollNeeded;
   }
 
-  private SyncFuture publishSyncOnRingBuffer(long sequence) {
-    return publishSyncOnRingBuffer(sequence, null);
-  }
-
-  private long getSequenceOnRingBuffer() {
-    return this.disruptor.getRingBuffer().next();
-  }
-
-  @InterfaceAudience.Private
-  public SyncFuture publishSyncOnRingBuffer(Span span) {
-    long sequence = this.disruptor.getRingBuffer().next();
-    return publishSyncOnRingBuffer(sequence, span);
-  }
-
-  private SyncFuture publishSyncOnRingBuffer(long sequence, Span span) {
-    SyncFuture syncFuture = getSyncFuture(sequence, span);
-    try {
-      RingBufferTruck truck = this.disruptor.getRingBuffer().get(sequence);
-      truck.loadPayload(syncFuture);
-    } finally {
-      this.disruptor.getRingBuffer().publish(sequence);
-    }
-    return syncFuture;
-  }
-
-  // Sync all known transactions
-  private Span publishSyncThenBlockOnCompletion(Span span) throws IOException {
-    return blockOnSync(publishSyncOnRingBuffer(span));
-  }
-
-  private Span blockOnSync(final SyncFuture syncFuture) throws IOException {
-    // Now we have published the ringbuffer, halt the current thread until we get an answer back.
-    try {
-      syncFuture.get(walSyncTimeout);
-      return syncFuture.getSpan();
-    } catch (TimeoutIOException tioe) {
-      throw tioe;
-    } catch (InterruptedException ie) {
-      LOG.warn("Interrupted", ie);
-      throw convertInterruptedExceptionToIOException(ie);
-    } catch (ExecutionException e) {
-      throw ensureIOException(e.getCause());
-    }
-  }
-
-  private IOException convertInterruptedExceptionToIOException(final InterruptedException ie) {
-    Thread.currentThread().interrupt();
-    IOException ioe = new InterruptedIOException();
-    ioe.initCause(ie);
-    return ioe;
-  }
-
-  private SyncFuture getSyncFuture(final long sequence, Span span) {
-    return syncFutureCache.getIfPresentOrNew().reset(sequence);
-  }
-
   @Override
   protected void postSync(final long timeInNanos, final int handlerSyncs) {
     if (timeInNanos > this.slowSyncNs) {
@@ -1096,21 +560,6 @@ public class FSHLog extends AbstractLog {
       }
     }
   }
-
-  @Override
-  protected long postAppend(final Entry e, final long elapsedTime) throws IOException {
-    long len = 0;
-    if (!listeners.isEmpty()) {
-      for (Cell cell : e.getEdit().getCells()) {
-        len += CellUtil.estimatedSerializedSizeOf(cell);
-      }
-      for (WALActionsListener listener : listeners) {
-        listener.postAppend(len, elapsedTime, e.getKey(), e.getEdit());
-      }
-    }
-    return len;
-  }
-
 
   /**
    * This method gets the datanode replication count for the current WAL.
@@ -1132,32 +581,6 @@ public class FSHLog extends AbstractLog {
     return 0;
   }
 
-  @Override
-  public void sync() throws IOException {
-    TraceScope scope = Trace.startSpan("FSHLog.sync");
-    try {
-      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
-    } finally {
-      assert scope == NullScope.INSTANCE || !scope.isDetached();
-      scope.close();
-    }
-  }
-
-  @Override
-  public void sync(long txid) throws IOException {
-    if (this.highestSyncedSequence.get() >= txid){
-      // Already sync'd.
-      return;
-    }
-    TraceScope scope = Trace.startSpan("FSHLog.sync");
-    try {
-      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
-    } finally {
-      assert scope == NullScope.INSTANCE || !scope.isDetached();
-      scope.close();
-    }
-  }
-
   // public only until class moves to o.a.h.h.wal
   @Override
   public void requestLogRoll() {
@@ -1172,77 +595,9 @@ public class FSHLog extends AbstractLog {
     }
   }
 
-  // public only until class moves to o.a.h.h.wal
-  /** @return the number of rolled log files */
-  public int getNumRolledLogFiles() {
-    return byWalRegionSequenceIds.size();
-  }
-
-  // public only until class moves to o.a.h.h.wal
-  /** @return the number of log files in use */
-  public int getNumLogFiles() {
-    // +1 for current use log
-    return getNumRolledLogFiles() + 1;
-  }
-
-  // public only until class moves to o.a.h.h.wal
-  /** @return the size of log files in use */
-  public long getLogFileSize() {
-    return this.totalLogSize.get();
-  }
-
-  @Override
-  public Long startCacheFlush(final byte[] encodedRegionName, Set<byte[]> families) {
-    if (!closeBarrier.beginOp()) {
-      LOG.info("Flush not started for " + Bytes.toString(encodedRegionName) + "; server closing.");
-      return null;
-    }
-    return this.sequenceIdAccounting.startCacheFlush(encodedRegionName, families);
-  }
-
-  @Override
-  public void completeCacheFlush(final byte[] encodedRegionName) {
-    this.sequenceIdAccounting.completeCacheFlush(encodedRegionName);
-    closeBarrier.endOp();
-  }
-
-  @Override
-  public void abortCacheFlush(byte[] encodedRegionName) {
-    this.sequenceIdAccounting.abortCacheFlush(encodedRegionName);
-    closeBarrier.endOp();
-  }
-
-  @VisibleForTesting
-  boolean isLowReplicationRollEnabled() {
-    return lowReplicationRollEnabled;
-  }
-
   public static final long FIXED_OVERHEAD = ClassSize.align(
     ClassSize.OBJECT + (5 * ClassSize.REFERENCE) +
       ClassSize.ATOMIC_INTEGER + Bytes.SIZEOF_INT + (3 * Bytes.SIZEOF_LONG));
-
-  @Override
-  public long getEarliestMemstoreSeqNum(byte[] encodedRegionName) {
-    // Used by tests. Deprecated as too subtle for general usage.
-    return this.sequenceIdAccounting.getLowestSequenceId(encodedRegionName);
-  }
-
-  @Override
-  public long getEarliestMemstoreSeqNum(byte[] encodedRegionName, byte[] familyName) {
-    // This method is used by tests and for figuring if we should flush or not because our
-    // sequenceids are too old. It is also used reporting the master our oldest sequenceid for use
-    // figuring what edits can be skipped during log recovery. getEarliestMemStoreSequenceId
-    // from this.sequenceIdAccounting is looking first in flushingOldestStoreSequenceIds, the
-    // currently flushing sequence ids, and if anything found there, it is returning these. This is
-    // the right thing to do for the reporting oldest sequenceids to master; we won't skip edits if
-    // we crash during the flush. For figuring what to flush, we might get requeued if our sequence
-    // id is old even though we are currently flushing. This may mean we do too much flushing.
-    return this.sequenceIdAccounting.getLowestSequenceId(encodedRegionName, familyName);
-  }
-
-  private static IOException ensureIOException(final Throwable t) {
-    return (t instanceof IOException)? (IOException)t: new IOException(t);
-  }
 
   private static void usage() {
     System.err.println("Usage: FSHLog <ARGS>");

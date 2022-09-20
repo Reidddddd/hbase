@@ -19,10 +19,14 @@
 
 package org.apache.hadoop.hbase.regionserver.wal;
 
-import java.io.DataOutputStream;
+import com.google.common.annotations.VisibleForTesting;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URISyntaxException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.AppendOnlyStreamWriter;
@@ -31,8 +35,9 @@ import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
+import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.ServiceBasedWriter;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -43,6 +48,12 @@ import org.apache.yetus.audience.InterfaceAudience;
 public class DistributedLogWriter extends AbstractProtobufLogWriter implements ServiceBasedWriter {
   private static final Log LOG = LogFactory.getLog(DistributedLogWriter.class);
 
+  private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
+  private final AtomicLong actualHighestSequenceId = new AtomicLong(0);
+  private final AtomicLong recordCount = new AtomicLong(0);
+
+  private volatile long highestUnsyncedSequenceId = 0;
+
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
@@ -51,16 +62,18 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     this.logName = logName;
     super.init(conf);
+    forceScheduler.scheduleAtFixedRate(this::forceWriter, 100, 1, TimeUnit.MILLISECONDS);
   }
 
   @Override
   public void sync() throws IOException {
-    appendOnlyStreamWriter.force(false);
+    // Do nothing.
   }
 
   @Override
   protected void initOutput() throws IOException {
     Namespace namespace;
+    LOG.info("Init DistributedLog writer once. ");
     try {
       namespace = DistributedLogAccessor.getInstance(this.conf).getNamespace();
     } catch (Exception e) {
@@ -70,13 +83,54 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     if (namespace.logExists(logName)) {
       throw new IOException("Should not create multi writers to an existing DistributedLog. ");
     }
+    // Check if a log with same name is in splitting.
+    if (namespace.logExists(logName + WALUtils.SPLITTING_EXT)) {
+      throw new IOException("A log with name " + logName + " is under splitting, cannot create "
+        + "a new log with name: " + logName);
+    }
+    // Check if a log with same name is archived.
+    if (namespace.logExists(logName + "-old")) {
+      throw new IOException("A log with name " + logName + " is already archived, cannot create "
+        + "a new log with name: " + logName);
+    }
 
     distributedLogManager = namespace.openLog(logName);
     if (distributedLogManager == null) {
       throw new IllegalStateException("Failed to access DistributedLog. ");
     }
     appendOnlyStreamWriter = distributedLogManager.getAppendOnlyStreamWriter();
-    output = new DataOutputStream(new DistributedLogOutputStream(appendOnlyStreamWriter));
+    output = new ByteArrayOutputStream();
+  }
+
+
+  @Override
+  public void append(Entry entry) throws IOException {
+    ByteArrayOutputStream buffer = (ByteArrayOutputStream) this.output;
+    // Clear the buffer first.
+    // The data of WALHeader and codec should be already written.
+    buffer.reset();
+
+    super.append(entry);
+    appendOnlyStreamWriter.write(buffer.toByteArray());
+    buffer.reset();
+    recordCount.incrementAndGet();
+  }
+
+  @VisibleForTesting
+  public void forceWriter() {
+    try {
+      if (appendOnlyStreamWriter != null &&
+        highestUnsyncedSequenceId > actualHighestSequenceId.get()) {
+        this.appendOnlyStreamWriter.force(false);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Forced writer from sequenceId: " + actualHighestSequenceId.get() +
+            " to: " + highestUnsyncedSequenceId);
+        }
+        actualHighestSequenceId.updateAndGet(self -> Math.max(self, highestUnsyncedSequenceId));
+      }
+    } catch (IOException e) {
+      LOG.warn(e);
+    }
   }
 
   @Override
@@ -89,23 +143,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     return this.logName;
   }
 
-  protected WALCellCodec getCodec(Configuration conf, CompressionContext compressionContext)
-      throws IOException {
-    return WALCellCodec.create(conf, null, compressionContext);
-  }
-
-  @Override
-  protected WALProtos.WALHeader buildWALHeader(Configuration conf,
-      WALProtos.WALHeader.Builder builder) throws IOException {
-    if (!builder.hasWriterClsName()) {
-      builder.setWriterClsName(DistributedLogWriter.class.getSimpleName());
-    }
-    if (!builder.hasCellCodecClsName()) {
-      builder.setCellCodecClsName(WALCellCodec.getWALCellCodecClass(conf).getName());
-    }
-    return builder.build();
-  }
-
   @Override
   public long getLength() throws IOException {
     return appendOnlyStreamWriter.position();
@@ -114,28 +151,47 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void close() throws IOException {
     super.close();
+    forceScheduler.shutdown();
     if (appendOnlyStreamWriter != null) {
+      forceWriter();
       appendOnlyStreamWriter.markEndOfStream();
       appendOnlyStreamWriter.close();
+      if (distributedLogManager.getLogRecordCount() != recordCount.get()) {
+        throw new IOException("We wrote " + recordCount.get() + " records to log: " + logName
+          + " but only " + distributedLogManager.getLogRecordCount()
+          + " were received by DistributedLog.");
+      }
       appendOnlyStreamWriter = null;
     }
   }
 
-  static class DistributedLogOutputStream extends OutputStream {
-    private final AppendOnlyStreamWriter writer;
+  @Override
+  protected void initAfterHeader(boolean doCompress) throws IOException {
+    super.initAfterHeader(doCompress);
+    // Need to transmit the bytes of WALHeader.
+    ByteArrayOutputStream buffer = (ByteArrayOutputStream) this.output;
+    appendOnlyStreamWriter.write(buffer.toByteArray());
+    buffer.reset();
+    recordCount.incrementAndGet();
+  }
 
-    DistributedLogOutputStream(AppendOnlyStreamWriter writer) {
-      this.writer = writer;
-    }
+  @Override
+  protected void writeWALTrailer() throws IOException {
+    ByteArrayOutputStream buffer = (ByteArrayOutputStream) this.output;
+    buffer.reset();
+    super.writeWALTrailer();
+    appendOnlyStreamWriter.write(buffer.toByteArray());
+    buffer.reset();
+    recordCount.incrementAndGet();
+  }
 
-    @Override
-    public void write(int b) throws IOException {
-      try {
-        writer.write(new byte[] { (byte) b });
-      } catch (Exception e) {
-        throw new IOException("Failed to write into DistributedLog output stream with "
-          + "exception: \n", e);
-      }
-    }
+  // For WAL to update the highest sequenceId.
+  void setHighestUnsyncedSequenceId(long sequenceId) {
+    this.highestUnsyncedSequenceId = sequenceId;
+  }
+
+  @VisibleForTesting
+  public void force() throws IOException {
+    this.appendOnlyStreamWriter.force(false);
   }
 }

@@ -27,6 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.AppendOnlyStreamReader;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
 import org.apache.distributedlog.shaded.exceptions.EndOfStreamException;
+import org.apache.distributedlog.shaded.exceptions.LogEmptyException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
@@ -179,6 +180,18 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
     @Override
     public void seek(long pos) throws IOException {
       reader.skipTo(pos);
+    }
+    @Override
+    public int read() throws IOException {
+      try {
+        return super.read();
+      } catch (IOException e) {
+        if (e instanceof EndOfStreamException || e instanceof LogEmptyException) {
+          return -1;
+        } else {
+          throw e;
+        }
+      }
     }
   }
 }

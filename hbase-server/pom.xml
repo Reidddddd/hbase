@@ -617,6 +617,19 @@
       <version>${parent.version}</version>
       <scope>compile</scope>
     </dependency>
+      <dependency>
+          <artifactId>hbase-bookkeeper-shaded</artifactId>
+          <groupId>com.shopee.data-infra.hbase</groupId>
+          <version>1.0.0</version>
+          <scope>test</scope>
+          <type>test-jar</type>
+          <exclusions>
+            <exclusion>
+              <groupId>com.google.code.findbugs</groupId>
+              <artifactId>jsr305</artifactId>
+            </exclusion>
+          </exclusions>
+      </dependency>
   </dependencies>
   <profiles>
     <!-- Needs to make the profile in apache parent pom -->

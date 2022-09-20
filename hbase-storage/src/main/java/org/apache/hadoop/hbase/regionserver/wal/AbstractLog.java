@@ -17,11 +17,22 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.apache.hadoop.hbase.wal.WALUtils.WAL_FILE_NAME_DELIMITER;
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.lang.management.MemoryUsage;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -35,12 +46,24 @@ import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.LifecycleAware;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.TimeoutException;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
+import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
+import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
+import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.DrainBarrier;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.HasThread;
@@ -50,6 +73,7 @@ import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.apache.htrace.NullScope;
+import org.apache.htrace.Span;
 import org.apache.htrace.Trace;
 import org.apache.htrace.TraceScope;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -110,6 +134,9 @@ public abstract class AbstractLog implements WAL {
   protected final List<WALActionsListener> listeners =
     new CopyOnWriteArrayList<WALActionsListener>();
 
+  // If > than this size, roll the log.
+  protected long logrollsize;
+
   @Override
   public void registerWALActionsListener(final WALActionsListener listener) {
     this.listeners.add(listener);
@@ -167,8 +194,8 @@ public abstract class AbstractLog implements WAL {
   protected volatile boolean closed = false;
   protected final AtomicBoolean shutdown = new AtomicBoolean(false);
 
-  // The timestamp (in ms) when the log file was created.
-  protected final AtomicLong filenum = new AtomicLong(-1);
+  // The timestamp (in ms) when the log entry (hfile or a distributed log) was created.
+  protected final AtomicLong logNum = new AtomicLong(-1);
 
   // Number of transactions in the current Wal.
   protected final AtomicInteger numEntries = new AtomicInteger(0);
@@ -183,9 +210,100 @@ public abstract class AbstractLog implements WAL {
   // Last time to check low replication on hlog's pipeline
   protected volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
 
-  public AbstractLog(Configuration conf, final List<WALActionsListener> listeners) {
+  protected final float memstoreRatio;
+
+  /*
+   * If more than this many logs, force flush of oldest region to oldest edit
+   * goes to disk.  If too many and we crash, then will take forever replaying.
+   * Keep the number of logs tidy.
+   */
+  protected final int maxLogs;
+
+  /**
+   * Prefix of a WAL file, usually the region server name it is hosted on.
+   */
+  protected final String logNamePrefix;
+
+  /**
+   * Suffix included on generated wal file names
+   */
+  protected final String logNameSuffix;
+
+  /** Number of log close errors tolerated before we abort */
+  private final int closeErrorsTolerated;
+
+  /**
+   * Prefix used when checking for wal membership.
+   */
+  protected String prefixLogStr;
+
+  /**
+   * WAL Comparator; it compares the timestamp (log logNum), present in the log file name.
+   * Throws an IllegalArgumentException if used to compare paths from different wals.
+   */
+  final Comparator<String> LOG_NAME_COMPARATOR = new Comparator<String>() {
+    @Override
+    public int compare(String s1, String s2) {
+      long t1 = getLogNumFromName(s1);
+      long t2 = getLogNumFromName(s2);
+      if (t1 == t2) {
+        return 0;
+      }
+      return (t1 > t2) ? 1 : -1;
+    }
+  };
+
+  /**
+   * Matches just those wal files that belong to this wal instance.
+   */
+  protected LogNameFilter ourLogs;
+
+  static class LogNameFilter {
+    private final String logPrefix;
+    private final String logSuffix;
+
+    LogNameFilter(String logPrefix, String logSuffix) {
+      this.logPrefix = logPrefix;
+      this.logSuffix = logSuffix;
+    }
+
+    public boolean accept(String logName) {
+      // The path should start with dir/<prefix> and end with our suffix
+      if (!logName.startsWith(logPrefix)) {
+        return false;
+      }
+      if (logSuffix.isEmpty()) {
+        // in the case of the null suffix, we need to ensure the filename ends with a timestamp.
+        return org.apache.commons.lang.StringUtils.isNumeric(
+          logName.substring(logPrefix.length() + WAL_FILE_NAME_DELIMITER.length()));
+      } else {
+        return logName.endsWith(logSuffix);
+      }
+    }
+  }
+
+  /**
+   * Map of WAL log file to the latest sequence ids of all regions it has entries of.
+   * The map is sorted by the log file creation timestamp (contained in the log file name).
+   */
+  protected NavigableMap<String, Map<byte[], Long>> byWalRegionSequenceIds =
+    new ConcurrentSkipListMap<String, Map<byte[], Long>>(LOG_NAME_COMPARATOR);
+
+  public AbstractLog(Configuration conf, final List<WALActionsListener> listeners,
+      final String prefix, final String suffix) throws IOException {
     this.conf = conf;
     this.coprocessorHost = new WALCoprocessorHost(this, conf);
+
+    // If prefix is null||empty then just name it wal
+    this.logNamePrefix =
+      prefix == null || prefix.isEmpty() ? "wal" : URLEncoder.encode(prefix, "UTF8");
+    // we only correctly differentiate suffices when numeric ones start with '.'
+    if (suffix != null && !(suffix.isEmpty()) && !(suffix.startsWith(WAL_FILE_NAME_DELIMITER))) {
+      throw new IllegalArgumentException("WAL suffix must start with '" + WAL_FILE_NAME_DELIMITER +
+        "' but instead was '" + suffix + "'");
+    }
+    this.closeErrorsTolerated = conf.getInt("hbase.regionserver.logroll.errors.tolerated", 0);
+    this.logNameSuffix = (suffix == null) ? "" : URLEncoder.encode(suffix, "UTF8");
 
     // Register listeners.  TODO: Should this exist anymore?  We have CPs?
     if (listeners != null) {
@@ -233,11 +351,645 @@ public abstract class AbstractLog implements WAL {
     this.disruptor.handleEventsWith(new RingBufferEventHandler [] {this.ringBufferEventHandler});
     // Starting up threads in constructor is a no no; Interface should have an init call.
     this.disruptor.start();
+
+    this.memstoreRatio = conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_KEY,
+      conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_OLD_KEY,
+        HeapMemorySizeUtil.DEFAULT_MEMSTORE_SIZE));
+    this.maxLogs = conf.getInt("hbase.regionserver.maxlogs",
+      Math.max(32, calculateMaxLogFiles(memstoreRatio, logrollsize)));
   }
+
+  private int calculateMaxLogFiles(float memstoreSizeRatio, long logRollSize) {
+    long max = -1L;
+    final MemoryUsage usage = HeapMemorySizeUtil.safeGetHeapMemoryUsage();
+    if (usage != null) {
+      max = usage.getMax();
+    }
+    int maxLogs = Math.round(max * memstoreSizeRatio * 2 / logRollSize);
+    return maxLogs;
+  }
+
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="NP_NULL_ON_SOME_PATH_EXCEPTION",
+    justification="Will never be null")
+  @Override
+  public long append(final HTableDescriptor htd, final HRegionInfo hri, final WALKey key,
+    final WALEdit edits, final boolean inMemstore) throws IOException {
+    if (this.closed) {
+      throw new IOException("Cannot append; log is closed");
+    }
+    // Make a trace scope for the append.  It is closed on other side of the ring buffer by the
+    // single consuming thread.  Don't have to worry about it.
+    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".append");
+    final MutableLong txidHolder = new MutableLong();
+    final RingBuffer<RingBufferTruck> ringBuffer = disruptor.getRingBuffer();
+    MultiVersionConcurrencyControl.WriteEntry we = key.getMvcc().begin(new Runnable() {
+      @Override public void run() {
+        txidHolder.setValue(ringBuffer.next());
+      }
+    });
+    long txid = txidHolder.longValue();
+    try {
+      GenericWALEntry entry = new GenericWALEntry(txid, key, edits, htd, hri, inMemstore);
+      entry.stampRegionSequenceId(we);
+      ringBuffer.get(txid).loadPayload(entry, scope.detach());
+    } finally {
+      ringBuffer.publish(txid);
+    }
+    return txid;
+  }
+
+  @Override
+  public void sync() throws IOException {
+    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".sync");
+    try {
+      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
+    } finally {
+      assert scope == NullScope.INSTANCE || !scope.isDetached();
+      scope.close();
+    }
+  }
+
+  @Override
+  public void sync(long txid) throws IOException {
+    if (this.highestSyncedSequence.get() >= txid){
+      // Already sync'd.
+      return;
+    }
+    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".sync");
+    try {
+      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
+    } finally {
+      assert scope == NullScope.INSTANCE || !scope.isDetached();
+      scope.close();
+    }
+  }
+
+  // Sync all known transactions
+  protected Span publishSyncThenBlockOnCompletion(Span span) throws IOException {
+    return blockOnSync(publishSyncOnRingBuffer(span));
+  }
+
+  protected Span blockOnSync(final SyncFuture syncFuture) throws IOException {
+    // Now we have published the ringbuffer, halt the current thread until we get an answer back.
+    try {
+      syncFuture.get(walSyncTimeout);
+      return syncFuture.getSpan();
+    } catch (TimeoutIOException tioe) {
+      throw tioe;
+    } catch (InterruptedException ie) {
+      LOG.warn("Interrupted", ie);
+      throw convertInterruptedExceptionToIOException(ie);
+    } catch (ExecutionException e) {
+      throw ensureIOException(e.getCause());
+    }
+  }
+
+  /**
+   * This is a convenience method that computes a new filename with a given
+   * file-number.
+   * @param logNum to use
+   * @return Path
+   */
+  protected String computeLogName(final long logNum) {
+    if (logNum < 0) {
+      throw new RuntimeException("WAL file number can't be < 0");
+    }
+    return prefixLogStr + logNum + logNameSuffix;
+  }
+
+  @InterfaceAudience.Private
+  public SyncFuture publishSyncOnRingBuffer(Span span) {
+    long sequence = this.disruptor.getRingBuffer().next();
+    return publishSyncOnRingBuffer(sequence, span);
+  }
+
+  protected SyncFuture publishSyncOnRingBuffer(long sequence) {
+    return publishSyncOnRingBuffer(sequence, null);
+  }
+
+  private SyncFuture publishSyncOnRingBuffer(long sequence, Span span) {
+    SyncFuture syncFuture = getSyncFuture(sequence, span);
+    try {
+      RingBufferTruck truck = this.disruptor.getRingBuffer().get(sequence);
+      truck.loadPayload(syncFuture);
+    } finally {
+      this.disruptor.getRingBuffer().publish(sequence);
+    }
+    return syncFuture;
+  }
+
+  private SyncFuture getSyncFuture(final long sequence, Span span) {
+    return syncFutureCache.getIfPresentOrNew().reset(sequence);
+  }
+
+  private IOException convertInterruptedExceptionToIOException(final InterruptedException ie) {
+    Thread.currentThread().interrupt();
+    IOException ioe = new InterruptedIOException();
+    ioe.initCause(ie);
+    return ioe;
+  }
+
+  private static IOException ensureIOException(final Throwable t) {
+    return (t instanceof IOException)? (IOException)t: new IOException(t);
+  }
+
+  @Override
+  public Long startCacheFlush(final byte[] encodedRegionName, Set<byte[]> families) {
+    if (!closeBarrier.beginOp()) {
+      LOG.info("Flush not started for " + Bytes.toString(encodedRegionName) + "; server closing.");
+      return null;
+    }
+    return this.sequenceIdAccounting.startCacheFlush(encodedRegionName, families);
+  }
+
+  @Override
+  public void completeCacheFlush(final byte[] encodedRegionName) {
+    this.sequenceIdAccounting.completeCacheFlush(encodedRegionName);
+    closeBarrier.endOp();
+  }
+
+  @Override
+  public void abortCacheFlush(byte[] encodedRegionName) {
+    this.sequenceIdAccounting.abortCacheFlush(encodedRegionName);
+    closeBarrier.endOp();
+  }
+
+  @Override
+  public long getEarliestMemstoreSeqNum(byte[] encodedRegionName) {
+    // Used by tests. Deprecated as too subtle for general usage.
+    return this.sequenceIdAccounting.getLowestSequenceId(encodedRegionName);
+  }
+
+  @Override
+  public long getEarliestMemstoreSeqNum(byte[] encodedRegionName, byte[] familyName) {
+    // This method is used by tests and for figuring if we should flush or not because our
+    // sequenceids are too old. It is also used reporting the master our oldest sequenceid for use
+    // figuring what edits can be skipped during log recovery. getEarliestMemStoreSequenceId
+    // from this.sequenceIdAccounting is looking first in flushingOldestStoreSequenceIds, the
+    // currently flushing sequence ids, and if anything found there, it is returning these. This is
+    // the right thing to do for the reporting oldest sequenceids to master; we won't skip edits if
+    // we crash during the flush. For figuring what to flush, we might get requeued if our sequence
+    // id is old even though we are currently flushing. This may mean we do too much flushing.
+    return this.sequenceIdAccounting.getLowestSequenceId(encodedRegionName, familyName);
+  }
+
+  @Override
+  public void shutdown() throws IOException {
+    if (shutdown.compareAndSet(false, true)) {
+      try {
+        // Prevent all further flushing and rolling.
+        closeBarrier.stopAndDrainOps();
+      } catch (InterruptedException e) {
+        LOG.error("Exception while waiting for cache flushes and log rolls", e);
+        Thread.currentThread().interrupt();
+      }
+
+      // Shutdown the disruptor.  Will stop after all entries have been processed.  Make sure we
+      // have stopped incoming appends before calling this else it will not shutdown.  We are
+      // conservative below waiting a long time and if not elapsed, then halting.
+      if (this.disruptor != null) {
+        long timeoutms = conf.getLong("hbase.wal.disruptor.shutdown.timeout.ms", 60000);
+        try {
+          this.disruptor.shutdown(timeoutms, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+          LOG.warn("Timed out bringing down disruptor after " + timeoutms + "ms; forcing halt " +
+            "(It is a problem if this is NOT an ABORT! -- DATALOSS!!!!)");
+          this.disruptor.halt();
+          this.disruptor.shutdown();
+        }
+      }
+      // With disruptor down, this is safe to let go.
+      if (this.appendExecutor !=  null) {
+        this.appendExecutor.shutdown();
+      }
+
+      if (syncFutureCache != null) {
+        syncFutureCache.clear();
+      }
+
+      // Tell our listeners that the log is closing
+      if (!this.listeners.isEmpty()) {
+        for (WALActionsListener i : this.listeners) {
+          i.logCloseRequested();
+        }
+      }
+      this.closed = true;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Closing WAL writer in " + getLogFullName());
+
+      }
+      if (this.writer != null) {
+        this.writer.close();
+        this.writer = null;
+      }
+    }
+  }
+
+  @Override
+  public byte[][] rollWriter() throws FailedLogCloseException, IOException {
+    return rollWriter(false);
+  }
+
+  @Override
+  public byte [][] rollWriter(boolean force) throws FailedLogCloseException, IOException {
+    rollWriterLock.lock();
+    try {
+      // Return if nothing to flush.
+      if (!force && (this.writer != null && this.numEntries.get() <= 0)) {
+        return null;
+      }
+      byte [][] regionsToFlush = null;
+      if (this.closed) {
+        LOG.debug("WAL closed. Skipping rolling of writer");
+        return regionsToFlush;
+      }
+      if (!closeBarrier.beginOp()) {
+        LOG.debug("WAL closing. Skipping rolling of writer");
+        return regionsToFlush;
+      }
+      TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".rollWriter");
+      try {
+        regionsToFlush = doRolling();
+      } finally {
+        closeBarrier.endOp();
+        assert scope == NullScope.INSTANCE || !scope.isDetached();
+        scope.close();
+      }
+      return regionsToFlush;
+    } finally {
+      rollWriterLock.unlock();
+    }
+  }
+
+  /**
+   * A log file has a creation timestamp (in ms) in its file name ({@link #logNum}.
+   * This helper method returns the creation timestamp from a given log file.
+   * It extracts the timestamp assuming the filename is created with the
+   * {@link #computeFilename(long logNum)} method.
+   * @return timestamp, as in the log file name.
+   */
+  protected long getLogNumFromName(String logName) {
+    if (logName == null || logName.length() == 0) {
+      throw new IllegalArgumentException("Log name can't be null");
+    }
+    if (!ourLogs.accept(logName)) {
+      throw new IllegalArgumentException("The log file " + logName +
+        " doesn't belong to this WAL. (" + toString() + ")");
+    }
+    try {
+      String chompedPath = logName.substring(prefixLogStr.length(),
+        logName.length() - logNameSuffix.length());
+      return Long.parseLong(chompedPath);
+    } catch (StringIndexOutOfBoundsException e) {
+      LOG.info(e);
+    }
+    return 0;
+  }
+
+  /**
+   * Cleans up current writer closing it and then puts in place the passed in
+   * <code>nextWriter</code>.
+   *
+   * In the case of creating a new WAL, oldPath will be null.
+   *
+   * In the case of rolling over from one file to the next, none of the params will be null.
+   *
+   * In the case of closing out this FSHLog with no further use newPath, nextWriter, and
+   * nextHdfsOut will be null.
+   *
+   * @param oldPathStr may be null
+   * @param newPathStr may be null
+   * @param nextWriter may be null
+   * @return the passed in <code>newPath</code>
+   * @throws IOException if there is a problem flushing or closing the underlying FS
+   */
+  String replaceWriter(final String oldPathStr, final String newPathStr, Writer nextWriter)
+    throws IOException {
+    // Ask the ring buffer writer to pause at a safe point.  Once we do this, the writer
+    // thread will eventually pause. An error hereafter needs to release the writer thread
+    // regardless -- hence the finally block below.  Note, this method is called from the FSHLog
+    // constructor BEFORE the ring buffer is set running so it is null on first time through
+    // here; allow for that.
+    SyncFuture syncFuture = null;
+    SafePointZigZagLatch zigzagLatch = null;
+    long sequence = -1L;
+    if (this.ringBufferEventHandler != null) {
+      // Get sequence first to avoid dead lock when ring buffer is full
+      // Considering below sequence
+      // 1. replaceWriter is called and zigzagLatch is initialized
+      // 2. ringBufferEventHandler#onEvent is called and arrives at #attainSafePoint(long) then wait
+      // on safePointReleasedLatch
+      // 3. Since ring buffer is full, if we get sequence when publish sync, the replaceWriter
+      // thread will wait for the ring buffer to be consumed, but the only consumer is waiting
+      // replaceWriter thread to release safePointReleasedLatch, which causes a deadlock
+      sequence = getSequenceOnRingBuffer();
+      zigzagLatch = this.ringBufferEventHandler.attainSafePoint();
+    }
+    afterCreatingZigZagLatch();
+    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".replaceWriter");
+    try {
+      // Wait on the safe point to be achieved.  Send in a sync in case nothing has hit the
+      // ring buffer between the above notification of writer that we want it to go to
+      // 'safe point' and then here where we are waiting on it to attain safe point.  Use
+      // 'sendSync' instead of 'sync' because we do not want this thread to block waiting on it
+      // to come back.  Cleanup this syncFuture down below after we are ready to run again.
+      try {
+        if (zigzagLatch != null) {
+          // use assert to make sure no change breaks the logic that
+          // sequence and zigzagLatch will be set together
+          assert sequence > 0L : "Failed to get sequence from ring buffer";
+          Trace.addTimelineAnnotation("awaiting safepoint");
+          syncFuture = zigzagLatch.waitSafePoint(publishSyncOnRingBuffer(sequence));
+        }
+      } catch (FailedSyncBeforeLogCloseException e) {
+        // If unflushed/unsynced entries on close, it is reason to abort.
+        if (isUnflushedEntries()) {
+          throw e;
+        }
+        LOG.warn("Failed sync-before-close but no outstanding appends; closing WAL: " +
+          e.getMessage());
+      }
+
+      // It is at the safe point.  Swap out writer from under the blocked writer thread.
+      // TODO: This is close is inline with critical section.  Should happen in background?
+      try {
+        if (this.writer != null) {
+          Trace.addTimelineAnnotation("closing writer");
+          this.writer.close();
+          Trace.addTimelineAnnotation("writer closed");
+        }
+        this.closeErrorCount.set(0);
+      } catch (IOException ioe) {
+        int errors = closeErrorCount.incrementAndGet();
+        if (!isUnflushedEntries() && (errors <= this.closeErrorsTolerated)) {
+          LOG.warn("Riding over failed WAL close of " + oldPathStr + ", cause=\"" +
+            ioe.getMessage() + "\", errors=" + errors +
+            "; THIS FILE WAS NOT CLOSED BUT ALL EDITS SYNCED SO SHOULD BE OK");
+        } else {
+          throw ioe;
+        }
+      }
+      this.writer = nextWriter;
+      afterReplaceWriter(newPathStr, oldPathStr, nextWriter);
+    } catch (InterruptedException ie) {
+      // Perpetuate the interrupt
+      Thread.currentThread().interrupt();
+    } catch (IOException e) {
+      long count = getUnflushedEntriesCount();
+      LOG.error("Failed close of WAL writer " + oldPathStr + ", unflushedEntries=" + count, e);
+      throw new FailedLogCloseException(oldPathStr + ", unflushedEntries=" + count, e);
+    } finally {
+      try {
+        // Let the writer thread go regardless, whether error or not.
+        if (zigzagLatch != null) {
+          zigzagLatch.releaseSafePoint();
+          // syncFuture will be null if we failed our wait on safe point above. Otherwise, if
+          // latch was obtained successfully, the sync we threw in either trigger the latch or it
+          // got stamped with an exception because the WAL was damaged and we could not sync. Now
+          // the write pipeline has been opened up again by releasing the safe point, process the
+          // syncFuture we got above. This is probably a noop but it may be stale exception from
+          // when old WAL was in place. Catch it if so.
+          if (syncFuture != null) {
+            try {
+              blockOnSync(syncFuture);
+            } catch (IOException ioe) {
+              if (LOG.isTraceEnabled()) {
+                LOG.trace("Stale sync exception", ioe);
+              }
+            }
+          }
+        }
+      } finally {
+        scope.close();
+      }
+    }
+    return newPathStr;
+  }
+
+  protected long getUnflushedEntriesCount() {
+    long highestSynced = this.highestSyncedSequence.get();
+    return highestSynced > this.highestUnsyncedSequence?
+      0: this.highestUnsyncedSequence - highestSynced;
+  }
+
+  protected boolean isUnflushedEntries() {
+    return getUnflushedEntriesCount() > 0;
+  }
+
+  private long getSequenceOnRingBuffer() {
+    return this.disruptor.getRingBuffer().next();
+  }
+
+  // TODO: we currently must use Path to support coprocessors. Need to change it in the future.
+  public byte[][] doRolling() throws IOException {
+    byte [][] regionsToFlush = null;
+    try {
+      String oldLogName = getOldLogName();
+      String newLogName = getNewLogName();
+      // Any exception from here on is catastrophic, non-recoverable so we currently abort.
+      Writer nextWriter = this.createWriterInstance(newLogName);
+      nextWriterInit(nextWriter);
+
+      Path newPath = newLogName == null ? null : new Path(newLogName);
+      Path oldPath = oldLogName == null ? null : new Path(oldLogName);
+
+      tellListenersAboutPreLogRoll(oldPath, newPath);
+      // NewPath could be equal to oldPath if replaceWriter fails.
+      newLogName = replaceWriter(oldLogName, newLogName, nextWriter);
+      newPath = newLogName == null ? null : new Path(newLogName);
+      tellListenersAboutPostLogRoll(oldPath, newPath);
+      regionsToFlush = calculateRegionsToFlushForRolling();
+    } catch (IOException e) {
+      LOG.warn("Met exception to roll log writer. \n", e);
+      throw e;
+    }
+    return regionsToFlush;
+  }
+
+  protected byte[][] calculateRegionsToFlushForRolling() throws IOException {
+    byte[][] regionsToFlush = null;
+    // Can we delete any of the old log files?
+    if (getNumRolledLogFiles() > 0) {
+      cleanOldLogs();
+      regionsToFlush = findRegionsToForceFlush();
+    }
+    return regionsToFlush;
+  }
+
+  /**
+   * If the number of un-archived WAL files is greater than maximum allowed, check the first
+   * (oldest) WAL file, and returns those regions which should be flushed so that it can
+   * be archived.
+   * @return regions (encodedRegionNames) to flush in order to archive oldest WAL file.
+   */
+  protected byte[][] findRegionsToForceFlush() throws IOException {
+    byte [][] regions = null;
+    int logCount = getNumRolledLogFiles();
+    if (logCount > this.maxLogs && logCount > 0) {
+      Map.Entry<String, Map<byte[], Long>> firstWALEntry =
+        this.byWalRegionSequenceIds.firstEntry();
+      regions = this.sequenceIdAccounting.findLower(firstWALEntry.getValue());
+    }
+    if (regions != null) {
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < regions.length; i++) {
+        if (i > 0) {
+          sb.append(", ");
+        }
+        sb.append(Bytes.toStringBinary(regions[i]));
+      }
+      LOG.info("Too many WALs; count=" + logCount + ", max=" + this.maxLogs +
+        "; forcing flush of " + regions.length + " regions(s): " + sb.toString());
+    }
+    return regions;
+  }
+
+  /**
+   * Archive old logs. A WAL is eligible for archiving if all its WALEdits have been flushed.
+   */
+  protected void cleanOldLogs() throws IOException {
+    List<String> logsToArchive = null;
+    // For each log file, look at its Map of regions to highest sequence id; if all sequence ids
+    // are older than what is currently in memory, the WAL can be GC'd.
+    for (Map.Entry<String, Map<byte[], Long>> e : this.byWalRegionSequenceIds.entrySet()) {
+      String log = e.getKey();
+      Map<byte[], Long> sequenceNums = e.getValue();
+      if (this.sequenceIdAccounting.areAllLower(sequenceNums)) {
+        if (logsToArchive == null) {
+          logsToArchive = new ArrayList<String>();
+        }
+        logsToArchive.add(log);
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("WAL unity ready for archiving " + log);
+        }
+      }
+    }
+
+    archiveLogUnities(logsToArchive);
+  }
+
+  protected abstract void archiveLogUnities(List<String> logsToArchive) throws IOException;
+
+  /**
+   * retrieve the next path to use for writing.
+   * Increments the internal logNum.
+   */
+  protected String getNewLogName() throws IOException {
+    this.logNum.set(System.currentTimeMillis());
+    String newLogName = getOldLogName();
+    while (checkExists(newLogName)) {
+      this.logNum.incrementAndGet();
+      newLogName = getOldLogName();
+    }
+    return newLogName;
+  }
+
+  protected String getOldLogName() {
+    long currentlogNum = this.logNum.get();
+    String oldLogName = null;
+    if (currentlogNum > 0) {
+      // ComputeFilename  will take care of meta wal filename
+      oldLogName = computeLogName(currentlogNum);
+    } // I presume if currentlogNum is <= 0, this is first file and null for oldPath if fine?
+    return oldLogName;
+  }
+
+  /**
+   * Tell listeners about pre log roll.
+   */
+  private void tellListenersAboutPreLogRoll(final Path oldPath, final Path newPath)
+    throws IOException {
+    coprocessorHost.preWALRoll(oldPath, newPath);
+
+    if (!this.listeners.isEmpty()) {
+      for (WALActionsListener i : this.listeners) {
+        i.preLogRoll(oldPath, newPath);
+      }
+    }
+  }
+
+  /**
+   * Tell listeners about post log roll.
+   */
+  private void tellListenersAboutPostLogRoll(final Path oldPath, final Path newPath)
+    throws IOException {
+    if (!this.listeners.isEmpty()) {
+      for (WALActionsListener i : this.listeners) {
+        i.postLogRoll(oldPath, newPath);
+      }
+    }
+
+    coprocessorHost.postWALRoll(oldPath, newPath);
+  }
+
+  /**
+   * @param sequence The sequence we ran the filesystem sync against.
+   * @return Current highest synced sequence.
+   */
+  protected long updateHighestSyncedSequence(long sequence) {
+    long currentHighestSyncedSequence;
+    // Set the highestSyncedSequence IFF our current sequence id is the 'highest'.
+    do {
+      currentHighestSyncedSequence = highestSyncedSequence.get();
+      if (currentHighestSyncedSequence >= sequence) {
+        // Set the sync number to current highwater mark; might be able to let go more
+        // queued sync futures
+        sequence = currentHighestSyncedSequence;
+        break;
+      }
+    } while (!highestSyncedSequence.compareAndSet(currentHighestSyncedSequence, sequence));
+    return sequence;
+  }
+
+  // public only until class moves to o.a.h.h.wal
+  /** @return the number of rolled log files */
+  public int getNumRolledLogFiles() {
+    return byWalRegionSequenceIds.size();
+  }
+
+  // public only until class moves to o.a.h.h.wal
+  /** @return the number of log files in use */
+  public int getNumLogFiles() {
+    // +1 for current use log
+    return getNumRolledLogFiles() + 1;
+  }
+
+  // public only until class moves to o.a.h.h.wal
+  /** @return the size of log files in use */
+  public long getLogFileSize() {
+    return this.totalLogSize.get();
+  }
+
+  @VisibleForTesting
+  boolean isLowReplicationRollEnabled() {
+    return lowReplicationRollEnabled;
+  }
+
+  /**
+   * This method allows subclasses to inject different writers without having to
+   * extend other methods like rollWriter().
+   *
+   * @return Writer instance
+   */
+  protected abstract Writer createWriterInstance(final String newWriterName) throws IOException;
+
+  // For subclasses to handle internal variables after writer rolled.
+  protected abstract void afterReplaceWriter(String newPathStr, String oldPathStr,
+      Writer nextWriter) throws IOException;
+
+  // For subclasses to invoke in their own construction function.
+  protected abstract void init();
 
   protected abstract void checkLogRoll();
 
   protected abstract void requestLogRoll();
+
+  protected abstract String getLogFullName();
+
+  protected abstract boolean checkExists(String logName) throws IOException;
+
+  // For subclass to do some initialisation when rolling writer.
+  protected abstract void nextWriterInit(Writer nextWriter);
 
   /**
    * Handler that is run by the disruptor ringbuffer consumer. Consumer is a SINGLE
@@ -348,7 +1100,7 @@ public abstract class AbstractLog implements WAL {
         } else if (truck.hasFSWALEntryPayload()) {
           TraceScope scope = Trace.continueSpan(truck.unloadSpanPayload());
           try {
-            FSWALEntry entry = truck.unloadFSWALEntryPayload();
+            GenericWALEntry entry = truck.unloadFSWALEntryPayload();
             if (this.exception != null) {
               // Return to keep processing events coming off the ringbuffer
               return;
@@ -435,8 +1187,8 @@ public abstract class AbstractLog implements WAL {
       this.syncFuturesCount.set(0);
     }
 
-    FSHLog.SafePointZigZagLatch attainSafePoint() {
-      this.zigzagLatch = new FSHLog.SafePointZigZagLatch();
+    SafePointZigZagLatch attainSafePoint() {
+      this.zigzagLatch = new SafePointZigZagLatch();
       return this.zigzagLatch;
     }
 
@@ -479,7 +1231,7 @@ public abstract class AbstractLog implements WAL {
     /**
      * Append to the WAL.  Does all CP and WAL listener calls.
      */
-    void append(final FSWALEntry entry) throws Exception {
+    void append(final GenericWALEntry entry) throws Exception {
       // TODO: WORK ON MAKING THIS APPEND FASTER. DOING WAY TOO MUCH WORK WITH CPs, PBing, etc.
       atHeadOfRingBufferEventHandlerAppend();
 
@@ -566,9 +1318,31 @@ public abstract class AbstractLog implements WAL {
     // Noop
   }
 
-  protected abstract long postAppend(final Entry e, final long elapsedTime) throws IOException;
+  protected long postAppend(final Entry e, final long elapsedTime) throws IOException {
+    long len = 0;
+    if (!listeners.isEmpty()) {
+      for (Cell cell : e.getEdit().getCells()) {
+        len += CellUtil.estimatedSerializedSizeOf(cell);
+      }
+      for (WALActionsListener listener : listeners) {
+        listener.postAppend(len, elapsedTime, e.getKey(), e.getEdit());
+      }
+    }
+    return len;
+  }
 
-  protected abstract void postSync(final long timeInNanos, final int handlerSyncs);
+  protected void postSync(final long timeInNanos, final int handlerSyncs) {
+    if (timeInNanos > this.slowSyncNs) {
+      String msg = "Slow sync cost: " + timeInNanos / 1000000 + " ms.";
+      Trace.addTimelineAnnotation(msg);
+      LOG.info(msg);
+    }
+    if (!listeners.isEmpty()) {
+      for (WALActionsListener listener : listeners) {
+        listener.postSync(timeInNanos, handlerSyncs);
+      }
+    }
+  }
 
   /**
    * Thread to runs the hdfs sync call. This call takes a while to complete.  This is the longest
@@ -659,25 +1433,6 @@ public abstract class AbstractLog implements WAL {
         syncCount++;
       }
       return syncCount;
-    }
-
-    /**
-     * @param sequence The sequence we ran the filesystem sync against.
-     * @return Current highest synced sequence.
-     */
-    private long updateHighestSyncedSequence(long sequence) {
-      long currentHighestSyncedSequence;
-      // Set the highestSyncedSequence IFF our current sequence id is the 'highest'.
-      do {
-        currentHighestSyncedSequence = highestSyncedSequence.get();
-        if (currentHighestSyncedSequence >= sequence) {
-          // Set the sync number to current highwater mark; might be able to let go more
-          // queued sync futures
-          sequence = currentHighestSyncedSequence;
-          break;
-        }
-      } while (!highestSyncedSequence.compareAndSet(currentHighestSyncedSequence, sequence));
-      return sequence;
     }
 
     boolean areSyncFuturesReleased() {
