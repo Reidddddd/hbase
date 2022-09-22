@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -47,6 +48,11 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
 public class DistributedLogWriter extends AbstractProtobufLogWriter implements ServiceBasedWriter {
   private static final Log LOG = LogFactory.getLog(DistributedLogWriter.class);
+  // LogRecord limit - meta overhead - (2 Long + 1 Integer) overhead
+  // Comes from BookKeeper, org.apache.distributedlog.LogRecord#MAX_LOGRECORD_SIZE
+  // The last 20 bytes is 2 Long and 1 Integer for LogRecord serialisation.
+  // Refer to org.apache.distributedlog.LogRecord#getPersistentSize()
+  private static final int LOG_RECORD_SIZE_LIMIT = 1024 * 1024 - 1024 * 8 - 20;
 
   private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
   private final AtomicLong actualHighestSequenceId = new AtomicLong(0);
@@ -99,7 +105,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
       throw new IllegalStateException("Failed to access DistributedLog. ");
     }
     appendOnlyStreamWriter = distributedLogManager.getAppendOnlyStreamWriter();
-    output = new ByteArrayOutputStream();
+    output = new ByteArrayOutputStream(LOG_RECORD_SIZE_LIMIT);
   }
 
 
@@ -111,9 +117,24 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     buffer.reset();
 
     super.append(entry);
-    appendOnlyStreamWriter.write(buffer.toByteArray());
+    byte[] recordArray = buffer.toByteArray();
+    if (recordArray.length > LOG_RECORD_SIZE_LIMIT) {
+      int numOfRecord = recordArray.length / LOG_RECORD_SIZE_LIMIT;
+      if (recordArray.length % LOG_RECORD_SIZE_LIMIT != 0) {
+        numOfRecord += 1;
+      }
+
+      for (int i = 0; i < numOfRecord; i++) {
+        // Here we must use the min here to prevent the padded 0.
+        appendOnlyStreamWriter.write(Arrays.copyOfRange(recordArray, i * LOG_RECORD_SIZE_LIMIT,
+          Math.min((i + 1) * LOG_RECORD_SIZE_LIMIT, recordArray.length)));
+        recordCount.incrementAndGet();
+      }
+    } else {
+      appendOnlyStreamWriter.write(recordArray);
+      recordCount.incrementAndGet();
+    }
     buffer.reset();
-    recordCount.incrementAndGet();
   }
 
   @VisibleForTesting

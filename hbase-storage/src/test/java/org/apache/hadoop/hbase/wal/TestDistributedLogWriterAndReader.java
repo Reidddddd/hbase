@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.wal;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -114,6 +115,7 @@ public class TestDistributedLogWriterAndReader extends TestDistributedLogBase {
     Entry entry = new Entry(key, cols);
     writer.append(entry);
     writer.sync();
+    ((DistributedLogWriter) writer).force();
     writer.close();
 
     Reader reader = WALUtils.createReader(null, new Path(runtime.getMethodName()), conf);
@@ -157,6 +159,53 @@ public class TestDistributedLogWriterAndReader extends TestDistributedLogBase {
     Entry entry = new Entry(key, cols);
     writer.append(entry);
     writer.sync();
+    ((DistributedLogWriter) writer).force();
+    writer.close();
+
+    Reader reader = WALUtils.createReader(null, new Path(runtime.getMethodName()), conf);
+    Entry readEntry = reader.next();
+
+    assertEquals(readEntry.toString(), entry.toString());
+
+    List<Cell> writeCells = entry.getEdit().getCells();
+    List<Cell> readCells = readEntry.getEdit().getCells();
+
+    assertEquals(writeCells.size(), readCells.size());
+
+    for (int i = 0; i < writeCells.size(); i++) {
+      assertTrue(CellComparator.equals(writeCells.get(i), readCells.get(i)));
+    }
+  }
+
+  @Test
+  public void testCorrectnessWithLargeKVs() throws IOException {
+    Configuration conf = HBaseConfiguration.create();
+    // The following two DistributedLog related parameters are initialized by the super class.
+    // We just copy them to our hbase configuration.
+    conf.set("distributedlog.znode.parent", "/messaging/distributedlog");
+    conf.set("distributedlog.zk.quorum", zkServers);
+    conf.setClass("hbase.regionserver.hlog.writer.impl", DistributedLogWriter.class,
+      Writer.class);
+    conf.setClass("hbase.regionserver.hlog.reader.impl", DistributedLogReader.class,
+      Reader.class);
+
+    Writer writer = WALUtils.createWriter(conf, null, new Path(runtime.getMethodName()), false);
+    WALEdit cols = new WALEdit();
+    cols.add(new KeyValue(ROW, CF, QUALIFIER, VALUE));
+    // 2MB large kvs.
+    List<Cell> cells = getRandomCellsWithValueLength(10, 1024 * 1024 * 2);
+    for (Cell cell : cells) {
+      cols.add(cell);
+    }
+
+    HRegionInfo hri = new HRegionInfo(TableName.valueOf(runtime.getMethodName()),
+      HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);
+    WALKey key = new WALKey(hri.getEncodedNameAsBytes(), hri.getTable());
+
+    Entry entry = new Entry(key, cols);
+    writer.append(entry);
+    writer.sync();
+    ((DistributedLogWriter) writer).force();
     writer.close();
 
     Reader reader = WALUtils.createReader(null, new Path(runtime.getMethodName()), conf);
@@ -175,12 +224,16 @@ public class TestDistributedLogWriterAndReader extends TestDistributedLogBase {
   }
 
   private List<Cell> getRandomCells(int num) {
+    return getRandomCellsWithValueLength(num, 10);
+  }
+
+  private List<Cell> getRandomCellsWithValueLength(int num, int valueLength) {
     List<Cell> res = new ArrayList<>(num);
     for (int i = 0; i < num; i++) {
       byte[] row = new byte[ThreadLocalRandom.current().nextInt(1, 10)];
       byte[] family = new byte[ThreadLocalRandom.current().nextInt(1, 10)];
       byte[] qualifier = new byte[ThreadLocalRandom.current().nextInt(1, 10)];
-      byte[] value = new byte[ThreadLocalRandom.current().nextInt(1, 10)];
+      byte[] value = new byte[valueLength];
       ThreadLocalRandom.current().nextBytes(row);
       ThreadLocalRandom.current().nextBytes(family);
       ThreadLocalRandom.current().nextBytes(qualifier);
