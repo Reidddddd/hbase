@@ -497,8 +497,8 @@ public class TestAdmin2 extends TestAdminBase {
     }
     byte[] value = Bytes.toBytes(v.toString());
     HRegionServer regionServer = startAndWriteData(TableName.valueOf("TestLogRolling"), value);
-    LOG.info("after writing there are " + ((FSHLog)regionServer.getWAL(null)).getNumRolledLogFiles()
-        + " log files");
+    LOG.info("after writing there are " + ((FSHLog)regionServer.getWAL(null))
+      .getNumRolledLogFiles() + " log files");
 
     // flush all regions
     for (Region r : regionServer.getOnlineRegionsLocalContext()) {

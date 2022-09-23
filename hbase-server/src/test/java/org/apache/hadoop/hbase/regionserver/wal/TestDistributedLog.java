@@ -62,10 +62,13 @@ import org.apache.hadoop.hbase.regionserver.Region;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Threads;
+import org.apache.hadoop.hbase.wal.DistributedLogWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALPerformanceEvaluation;
+import org.apache.hadoop.hbase.wal.WALProvider;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.Before;
@@ -82,6 +85,7 @@ import org.junit.rules.TestName;
 public class TestDistributedLog extends TestDistributedLogBase {
   private static final Log LOG = LogFactory.getLog(TestDistributedLog.class);
   private static final long TEST_TIMEOUT_MS = 10000;
+
   protected final static HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
 
   private static Configuration conf;
@@ -133,6 +137,8 @@ public class TestDistributedLog extends TestDistributedLogBase {
       Writer.class);
     conf.setClass("hbase.regionserver.hlog.reader.impl", DistributedLogReader.class,
       Reader.class);
+    conf.setClass("hbase.wal.provider", DistributedLogWALProvider.class, WALProvider.class);
+    conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
 
     this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
 
@@ -436,7 +442,10 @@ public class TestDistributedLog extends TestDistributedLogBase {
   public void testConcurrentWrites() throws Exception {
     // Run the WPE tool with three threads writing 3000 edits each concurrently.
     // When done, verify that all edits were written.
-    // TODO: implement the DistributedLogProvider and finish this UT.
+    int errCode = WALPerformanceEvaluation.innerMain(
+      new Configuration(TEST_UTIL.getConfiguration()),
+        new String [] {"-threads", "3", "-verify", "-noclosefs", "-iterations", "500"});
+    assertEquals(0, errCode);
   }
 
   /**

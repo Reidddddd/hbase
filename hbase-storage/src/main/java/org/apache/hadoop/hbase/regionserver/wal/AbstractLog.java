@@ -207,9 +207,6 @@ public abstract class AbstractLog implements WAL {
 
   protected final AtomicInteger closeErrorCount = new AtomicInteger();
 
-  // Last time to check low replication on hlog's pipeline
-  protected volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
-
   protected final float memstoreRatio;
 
   /*
@@ -479,7 +476,7 @@ public abstract class AbstractLog implements WAL {
   }
 
   private SyncFuture getSyncFuture(final long sequence, Span span) {
-    return syncFutureCache.getIfPresentOrNew().reset(sequence);
+    return syncFutureCache.getIfPresentOrNew().reset(sequence, span);
   }
 
   private IOException convertInterruptedExceptionToIOException(final InterruptedException ie) {
@@ -982,7 +979,7 @@ public abstract class AbstractLog implements WAL {
 
   protected abstract void checkLogRoll();
 
-  protected abstract void requestLogRoll();
+  public abstract void requestLogRoll();
 
   protected abstract String getLogFullName();
 

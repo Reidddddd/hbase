@@ -22,34 +22,19 @@ import static org.apache.hadoop.hbase.wal.WALUtils.META_WAL_PROVIDER_ID;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.regionserver.wal.AbstractLog;
-import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
-import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.regionserver.wal.DistributedLog;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 
-/**
- * A WAL Provider that returns a single thread safe WAL that writes to Hadoop FS.
- * By default, this implementation picks a directory in Hadoop FS based on a combination of
- * <ul>
- *   <li>the HBase root WAL directory
- *   <li>HConstants.HREGION_LOGDIR_NAME
- *   <li>the given factory's factoryId (usually identifying the regionserver by host:port)
- * </ul>
- * It also uses the providerId to diffentiate among files.
- *
- */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class DefaultWALProvider extends AbstractWALProvider {
-  private static final Log LOG = LogFactory.getLog(DefaultWALProvider.class);
+public class DistributedLogWALProvider extends AbstractWALProvider {
+  private static final Log LOG = LogFactory.getLog(DistributedLogWALProvider.class);
 
   @Override
   protected AbstractLog createWAL() throws IOException {
-    return new FSHLog(FSUtils.getWALFileSystem(conf), FSUtils.getWALRootDir(conf),
-      WALUtils.getWALDirectoryName(factory.factoryId), HConstants.HREGION_OLDLOGDIR_NAME,
-      conf, listeners, true, logPrefix,
+    return new DistributedLog(conf, listeners, logPrefix,
       META_WAL_PROVIDER_ID.equals(providerId) ? META_WAL_PROVIDER_ID : null);
   }
 }

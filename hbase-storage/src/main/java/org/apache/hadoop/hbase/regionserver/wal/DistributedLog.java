@@ -128,7 +128,7 @@ public class DistributedLog extends AbstractLog {
   }
 
   @Override
-  protected void requestLogRoll() {
+  public void requestLogRoll() {
     if (!this.listeners.isEmpty()) {
       for (WALActionsListener i: this.listeners) {
         // We do not care the number of replicas when we use DistributedLog to store WAL.

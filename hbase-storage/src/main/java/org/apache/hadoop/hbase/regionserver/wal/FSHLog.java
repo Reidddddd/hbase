@@ -165,6 +165,9 @@ public class FSHLog extends AbstractLog {
 
   private long hdfsBlockSize;
 
+  // Last time to check low replication on hlog's pipeline
+  protected volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
+
   /**
    * Constructor.
    *

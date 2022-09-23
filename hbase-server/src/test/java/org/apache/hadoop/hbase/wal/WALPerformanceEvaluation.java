@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hbase.wal;
 
+import static org.apache.hadoop.hbase.wal.RegionGroupingProvider.DEFAULT_DELEGATE_PROVIDER;
+import static org.apache.hadoop.hbase.wal.RegionGroupingProvider.DELEGATE_PROVIDER;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.Meter;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -25,6 +27,7 @@ import com.yammer.metrics.reporting.ConsoleReporter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -32,6 +35,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.distributedlog.shaded.api.DistributedLogManager;
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
@@ -51,6 +56,7 @@ import org.apache.hadoop.hbase.io.crypto.KeyProviderForTesting;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.LogRoller;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
+import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
 import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter;
@@ -338,15 +344,35 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
         }
         if (verify) {
           LOG.info("verifying written log entries.");
-          Path dir = new Path(FSUtils.getWALRootDir(getConf()),
-              WALUtils.getWALDirectoryName("wals"));
           long editCount = 0;
-          FileStatus [] fsss = fs.listStatus(dir);
-          if (fsss.length == 0) throw new IllegalStateException("No WAL found");
-          for (FileStatus fss: fsss) {
-            Path p = fss.getPath();
-            if (!fs.exists(p)) throw new IllegalStateException(p.toString());
-            editCount += verify(wals, p, verbose);
+          WALProvider walProvider = wals.getWALProvider();
+          if ((walProvider instanceof DefaultWALProvider) ||
+            ((walProvider instanceof RegionGroupingProvider) &&
+              (wals.getProviderClass(DELEGATE_PROVIDER, DEFAULT_DELEGATE_PROVIDER) ==
+                DefaultWALProvider.class))) {
+            Path dir = new Path(FSUtils.getWALRootDir(getConf()),
+              WALUtils.getWALDirectoryName("wals"));
+            FileStatus[] fsss = fs.listStatus(dir);
+            if (fsss.length == 0) throw new IllegalStateException("No WAL found");
+            for (FileStatus fss : fsss) {
+              Path p = fss.getPath();
+              if (!fs.exists(p)) throw new IllegalStateException(p.toString());
+              editCount += verify(wals, p, verbose);
+            }
+          } else {
+            Namespace namespace = DistributedLogAccessor.getInstance(getConf()).getNamespace();
+            Iterator<String> logs = namespace.getLogs();
+            while (logs.hasNext()) {
+              String log = logs.next();
+              DistributedLogManager distributedLogManager = namespace.openLog(log);
+              if (!distributedLogManager.isEndOfStreamMarked()) {
+                throw new IllegalStateException("Distributed log is not closed after finishing.");
+              }
+              if (distributedLogManager.getLastTxId() == 0) {
+                throw new IllegalStateException("Distributed log is empty.");
+              }
+              editCount += verify(wals, new Path(log), verbose);
+            }
           }
           long expected = numIterations * numThreads;
           if (editCount != expected) {
