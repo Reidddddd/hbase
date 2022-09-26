@@ -256,6 +256,7 @@ public class FSHLog extends AbstractLog {
 
     // rollWriter sets this.hdfs_out if it can.
     rollWriter();
+    initDisruptor();
   }
 
   /**

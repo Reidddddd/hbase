@@ -51,6 +51,7 @@ public class DistributedLog extends AbstractLog {
     init();
     ourLogs = new LogNameFilter(logNamePrefix, logNameSuffix);
     rollWriter();
+    initDisruptor();
   }
 
   @Override

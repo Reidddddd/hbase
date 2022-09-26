@@ -93,12 +93,12 @@ public abstract class AbstractLog implements WAL {
    * the sync).  The ring is where we make sure of our ordering and it is also where we do
    * batching up of handler sync calls.
    */
-  protected final Disruptor<RingBufferTruck> disruptor;
+  protected Disruptor<RingBufferTruck> disruptor;
 
   /**
    * An executorservice that runs the disruptor AppendEventHandler append executor.
    */
-  protected final ExecutorService appendExecutor;
+  protected ExecutorService appendExecutor;
 
   /**
    * This fellow is run by the above appendExecutor service but it is all about batching up appends
@@ -106,9 +106,9 @@ public abstract class AbstractLog implements WAL {
    * against this, keep a reference to this handler and do explicit close on way out to make sure
    * all flushed out before we exit.
    */
-  protected final RingBufferEventHandler ringBufferEventHandler;
+  protected RingBufferEventHandler ringBufferEventHandler;
 
-  protected final SyncFutureCache syncFutureCache;
+  protected SyncFutureCache syncFutureCache;
 
   /**
    * The highest known outstanding unsync'd WALEdit sequence number where sequence number is the
@@ -302,52 +302,19 @@ public abstract class AbstractLog implements WAL {
     this.closeErrorsTolerated = conf.getInt("hbase.regionserver.logroll.errors.tolerated", 0);
     this.logNameSuffix = (suffix == null) ? "" : URLEncoder.encode(suffix, "UTF8");
 
-    // Register listeners.  TODO: Should this exist anymore?  We have CPs?
+    // Register listeners.
+    // TODO: Should this exist anymore?  We have CPs?
     if (listeners != null) {
       for (WALActionsListener i: listeners) {
         registerWALActionsListener(i);
       }
     }
 
-    // This is the 'writer' -- a single threaded executor.  This single thread 'consumes' what is
-    // put on the ring buffer.
-    String hostingThreadName = Thread.currentThread().getName();
-    this.appendExecutor = Executors.
-      newSingleThreadExecutor(Threads.getNamedThreadFactory(hostingThreadName + ".append"));
-
-    // Preallocate objects to use on the ring buffer.  The way that appends and syncs work, we will
-    // be stuck and make no progress if the buffer is filled with appends only and there is no
-    // sync. If no sync, then the handlers will be outstanding just waiting on sync completion
-    // before they return.
-    final int preallocatedEventCount =
-      this.conf.getInt("hbase.regionserver.wal.disruptor.event.count", 1024 * 16);
-    // Using BlockingWaitStrategy.  Stuff that is going on here takes so long it makes no sense
-    // spinning as other strategies do.
-    this.disruptor =
-      new Disruptor<RingBufferTruck>(RingBufferTruck.EVENT_FACTORY, preallocatedEventCount,
-        this.appendExecutor, ProducerType.MULTI, new BlockingWaitStrategy());
-    // Advance the ring buffer sequence so that it starts from 1 instead of 0,
-    // because SyncFuture.NOT_DONE = 0.
-    this.disruptor.getRingBuffer().next();
-
-    int syncerCount = conf.getInt("hbase.regionserver.hlog.syncer.count", 5);
-    int maxBatchCount = conf.getInt("hbase.regionserver.wal.sync.batch.count",
-      conf.getInt(HConstants.REGION_SERVER_HANDLER_COUNT, 200));
-
-    this.ringBufferEventHandler = new RingBufferEventHandler(syncerCount, maxBatchCount);
-    this.syncFutureCache = new SyncFutureCache(conf);
-
     this.slowSyncNs =
       1000000 * conf.getInt("hbase.regionserver.hlog.slowsync.ms",
         DEFAULT_SLOW_SYNC_TIME_MS);
     this.walSyncTimeout = conf.getLong("hbase.regionserver.hlog.sync.timeout",
       DEFAULT_WAL_SYNC_TIMEOUT_MS);
-
-    // Start disruptor at the last step.
-    this.disruptor.handleExceptionsWith(new RingBufferExceptionHandler());
-    this.disruptor.handleEventsWith(new RingBufferEventHandler [] {this.ringBufferEventHandler});
-    // Starting up threads in constructor is a no no; Interface should have an init call.
-    this.disruptor.start();
 
     this.memstoreRatio = conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_KEY,
       conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_OLD_KEY,
@@ -362,8 +329,7 @@ public abstract class AbstractLog implements WAL {
     if (usage != null) {
       max = usage.getMax();
     }
-    int maxLogs = Math.round(max * memstoreSizeRatio * 2 / logRollSize);
-    return maxLogs;
+    return Math.round(max * memstoreSizeRatio * 2 / logRollSize);
   }
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="NP_NULL_ON_SOME_PATH_EXCEPTION",
@@ -393,6 +359,46 @@ public abstract class AbstractLog implements WAL {
       ringBuffer.publish(txid);
     }
     return txid;
+  }
+
+  /**
+   * To init and start disruptor.
+   * The purpose to extract to this independent function is to make the initialisation sequence
+   * customisable in subclass.
+   * Must guarantee this function is invoked and only once in the subclass construction.
+   * Additionally, this init should be invoked after the first time rolling writer.
+   */
+  protected void initDisruptor() {
+    // This is the 'writer' -- a single threaded executor.  This single thread 'consumes' what is
+    // put on the ring buffer.
+    String hostingThreadName = Thread.currentThread().getName();
+    this.appendExecutor = Executors.
+      newSingleThreadExecutor(Threads.getNamedThreadFactory(hostingThreadName + ".append"));
+    // Preallocate objects to use on the ring buffer.  The way that appends and syncs work, we will
+    // be stuck and make no progress if the buffer is filled with appends only and there is no
+    // sync. If no sync, then the handlers will be outstanding just waiting on sync completion
+    // before they return.
+    final int preallocatedEventCount =
+      this.conf.getInt("hbase.regionserver.wal.disruptor.event.count", 1024 * 16);
+    // Using BlockingWaitStrategy.  Stuff that is going on here takes so long it makes no sense
+    // spinning as other strategies do.
+    this.disruptor =
+      new Disruptor<RingBufferTruck>(RingBufferTruck.EVENT_FACTORY, preallocatedEventCount,
+        this.appendExecutor, ProducerType.MULTI, new BlockingWaitStrategy());
+    // Advance the ring buffer sequence so that it starts from 1 instead of 0,
+    // because SyncFuture.NOT_DONE = 0.
+    this.disruptor.getRingBuffer().next();
+    int syncerCount = conf.getInt("hbase.regionserver.hlog.syncer.count", 5);
+    int maxBatchCount = conf.getInt("hbase.regionserver.wal.sync.batch.count",
+      conf.getInt(HConstants.REGION_SERVER_HANDLER_COUNT, 200));
+
+    this.ringBufferEventHandler = new RingBufferEventHandler(syncerCount, maxBatchCount);
+    this.syncFutureCache = new SyncFutureCache(conf);
+    // Start disruptor at the last step.
+    this.disruptor.handleExceptionsWith(new RingBufferExceptionHandler());
+    this.disruptor.handleEventsWith(new RingBufferEventHandler [] {this.ringBufferEventHandler});
+    // Starting up threads in constructor is a no no; Interface should have an init call.
+    this.disruptor.start();
   }
 
   @Override
