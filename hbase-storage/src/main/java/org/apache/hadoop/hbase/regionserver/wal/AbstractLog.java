@@ -499,7 +499,6 @@ public abstract class AbstractLog implements WAL {
   @Override
   public Long startCacheFlush(final byte[] encodedRegionName, Set<byte[]> families) {
     if (!closeBarrier.beginOp()) {
-      LOG.info("Flush not started for " + Bytes.toString(encodedRegionName) + "; server closing.");
       return null;
     }
     return this.sequenceIdAccounting.startCacheFlush(encodedRegionName, families);

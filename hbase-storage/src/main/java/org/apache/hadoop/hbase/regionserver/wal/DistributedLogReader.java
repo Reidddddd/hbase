@@ -181,6 +181,7 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
     public void seek(long pos) throws IOException {
       reader.skipTo(pos);
     }
+
     @Override
     public int read() throws IOException {
       try {

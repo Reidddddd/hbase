@@ -24,9 +24,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -54,7 +51,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   // Refer to org.apache.distributedlog.LogRecord#getPersistentSize()
   private static final int LOG_RECORD_SIZE_LIMIT = 1024 * 1024 - 1024 * 8 - 20;
 
-  private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
   private final AtomicLong actualHighestSequenceId = new AtomicLong(0);
   private final AtomicLong recordCount = new AtomicLong(0);
 
@@ -68,7 +64,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     this.logName = logName;
     super.init(conf);
-    forceScheduler.scheduleAtFixedRate(this::forceWriter, 100, 1, TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -138,19 +133,15 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   }
 
   @VisibleForTesting
-  public void forceWriter() {
-    try {
-      if (appendOnlyStreamWriter != null &&
+  public void forceWriter() throws IOException {
+    if (appendOnlyStreamWriter != null &&
         highestUnsyncedSequenceId > actualHighestSequenceId.get()) {
-        this.appendOnlyStreamWriter.force(false);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Forced writer from sequenceId: " + actualHighestSequenceId.get() +
-            " to: " + highestUnsyncedSequenceId);
-        }
-        actualHighestSequenceId.updateAndGet(self -> Math.max(self, highestUnsyncedSequenceId));
+      this.appendOnlyStreamWriter.force(false);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Forced writer from sequenceId: " + actualHighestSequenceId.get() + " to: "
+          + highestUnsyncedSequenceId);
       }
-    } catch (IOException e) {
-      LOG.warn(e);
+      actualHighestSequenceId.updateAndGet(self -> Math.max(self, highestUnsyncedSequenceId));
     }
   }
 
@@ -172,7 +163,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void close() throws IOException {
     super.close();
-    forceScheduler.shutdown();
     if (appendOnlyStreamWriter != null) {
       forceWriter();
       appendOnlyStreamWriter.markEndOfStream();

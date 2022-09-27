@@ -20,6 +20,9 @@ package org.apache.hadoop.hbase.regionserver.wal;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
@@ -43,7 +46,12 @@ public class DistributedLog extends AbstractLog {
   private static final String DISTRIBUTED_LOG_ROLL_SIZE =
     "hbase.regionserver.wal.distributedlog.rollsize";
   private static final long DEFAULT_DISTRIBUTED_LOG_ROLL_SIZE = 134217728; // 128 MB
+  private static final String DISTRIBUTED_LOG_SYNC_PERIOD =
+    "hbase.regionserver.wal.distributedlog.sync.period";
+  private static final int DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD = 100;
   private static final String ARCHIVE_LOG_SUFFIX = "-old";
+
+  private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
 
   public DistributedLog(Configuration conf, List<WALActionsListener> listeners, final String prefix,
       final String suffix) throws IOException {
@@ -52,6 +60,28 @@ public class DistributedLog extends AbstractLog {
     ourLogs = new LogNameFilter(logNamePrefix, logNameSuffix);
     rollWriter();
     initDisruptor();
+    forceScheduler.scheduleAtFixedRate(
+      () -> {
+        Exception lastException = null;
+        try {
+          if (writer != null) {
+            ((DistributedLogWriter) writer).forceWriter();
+          }
+        } catch (IOException e) {
+          LOG.error("Error syncing, request close of WAL", e);
+          lastException = e;
+        } catch (Exception e) {
+          LOG.warn("UNEXPECTED", e);
+          lastException = e;
+        } finally {
+          if (lastException != null) {
+            requestLogRoll();
+          } else {
+            checkLogRoll();
+          }
+        }
+      }, 100, conf.getInt(DISTRIBUTED_LOG_SYNC_PERIOD, DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD),
+      TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -183,6 +213,7 @@ public class DistributedLog extends AbstractLog {
   public void close() throws IOException {
     shutdown();
     try {
+      forceScheduler.shutdown();
       Namespace distributedLogNamespace =
         DistributedLogAccessor.getInstance(this.conf).getNamespace();
       Iterator<String> logNames = distributedLogNamespace.getLogs();
