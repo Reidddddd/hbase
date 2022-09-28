@@ -35,6 +35,6 @@ public class DistributedLogWALProvider extends AbstractWALProvider {
   @Override
   protected AbstractLog createWAL() throws IOException {
     return new DistributedLog(conf, listeners, logPrefix,
-      META_WAL_PROVIDER_ID.equals(providerId) ? META_WAL_PROVIDER_ID : null);
+      META_WAL_PROVIDER_ID.equals(providerId) ? META_WAL_PROVIDER_ID : null, factory.factoryId);
   }
 }

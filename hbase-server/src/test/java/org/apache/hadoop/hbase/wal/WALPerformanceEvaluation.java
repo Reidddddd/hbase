@@ -360,7 +360,8 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
               editCount += verify(wals, p, verbose);
             }
           } else {
-            Namespace namespace = DistributedLogAccessor.getInstance(getConf()).getNamespace();
+            Namespace namespace =
+              DistributedLogAccessor.getInstance(getConf()).getNamespace(wals.factoryId);
             Iterator<String> logs = namespace.getLogs();
             while (logs.hasNext()) {
               String log = logs.next();
@@ -371,7 +372,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
               if (distributedLogManager.getLastTxId() == 0) {
                 throw new IllegalStateException("Distributed log is empty.");
               }
-              editCount += verify(wals, new Path(log), verbose);
+              editCount += verify(wals, new Path(wals.factoryId, log), verbose);
             }
           }
           long expected = numIterations * numThreads;

@@ -50,12 +50,14 @@ public class DistributedLog extends AbstractLog {
     "hbase.regionserver.wal.distributedlog.sync.period";
   private static final int DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD = 100;
   private static final String ARCHIVE_LOG_SUFFIX = "-old";
-
+  
   private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
+  private final String serverName;
 
   public DistributedLog(Configuration conf, List<WALActionsListener> listeners, final String prefix,
-      final String suffix) throws IOException {
+      final String suffix, String serverName) throws IOException {
     super(conf, listeners, prefix, suffix);
+    this.serverName = serverName;
     init();
     ourLogs = new LogNameFilter(logNamePrefix, logNameSuffix);
     rollWriter();
@@ -88,7 +90,7 @@ public class DistributedLog extends AbstractLog {
   protected void archiveLogUnities(List<String> logsToArchive) throws IOException {
     try {
       if (logsToArchive != null) {
-        Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+        Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace(serverName);
         for (String p : logsToArchive) {
           DistributedLogManager distributedLogManager = namespace.openLog(p);
           long size = distributedLogManager.getLogRecordCount() == 0 ? 0 :
@@ -111,7 +113,7 @@ public class DistributedLog extends AbstractLog {
     if (newWriterName == null) {
       throw new IOException("Cannot create writer with null name.");
     }
-    Writer writer = WALUtils.createWriter(conf, null, new Path(newWriterName), false);
+    Writer writer = WALUtils.createWriter(conf, null, new Path(serverName, newWriterName), false);
     if (! (writer instanceof DistributedLogWriter)) {
       throw new IllegalArgumentIOException("DistributedLog must create " +
         DistributedLogWriter.class.getName() + " but get: " + writer.getClass().getName());
@@ -125,7 +127,7 @@ public class DistributedLog extends AbstractLog {
     int oldNumEntries = this.numEntries.get();
     this.numEntries.set(0);
     try {
-      Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+      Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace(serverName);
       if (oldPathStr != null) {
         this.byWalRegionSequenceIds.put(oldPathStr, this.sequenceIdAccounting.resetHighest());
         DistributedLogManager distributedLogManager = namespace.openLog(oldPathStr);
@@ -187,7 +189,7 @@ public class DistributedLog extends AbstractLog {
   @Override
   protected boolean checkExists(String logName) throws IOException {
     try {
-      return DistributedLogAccessor.getInstance(conf).getNamespace().logExists(logName);
+      return DistributedLogAccessor.getInstance(conf).getNamespace(serverName).logExists(logName);
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -215,7 +217,7 @@ public class DistributedLog extends AbstractLog {
     try {
       forceScheduler.shutdown();
       Namespace distributedLogNamespace =
-        DistributedLogAccessor.getInstance(this.conf).getNamespace();
+        DistributedLogAccessor.getInstance(this.conf).getNamespace(serverName);
       Iterator<String> logNames = distributedLogNamespace.getLogs();
       String logBaseURL = distributedLogNamespace.getNamespaceDriver().getUri().getPath();
       int numOfLogs = 0;

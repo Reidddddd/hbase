@@ -49,6 +49,9 @@ public class WALUtils {
   // should be package private; more visible for use in FSHLog
   public static final String WAL_FILE_NAME_DELIMITER = ".";
   /** The hbase:meta region's WAL filename extension */
+  public static final String DISTRIBUTED_LOG_NAMESPACE_DELIMITER = "/";
+  public static final String DISTRIBUTED_LOG_DEFAULT_NAMESPACE = "default";
+
   @VisibleForTesting
   public static final String META_WAL_PROVIDER_ID = ".meta";
   static final String DEFAULT_PROVIDER_ID = "default";
@@ -107,7 +110,7 @@ public class WALUtils {
       if (writer instanceof FileSystemBasedWriter) {
         ((FileSystemBasedWriter) writer).init(rootFs, path, conf, overwritable);
       } else if (writer instanceof ServiceBasedWriter) {
-        ((ServiceBasedWriter) writer).init(conf, path.getName());
+        ((ServiceBasedWriter) writer).init(conf, path.toString());
       }
       return writer;
     } catch (Exception e) {
@@ -192,7 +195,7 @@ public class WALUtils {
               ((FileSystemBasedReader) reader).init(fs, path, conf, null);
             }
             if (reader instanceof ServiceBasedReader) {
-              ((ServiceBasedReader) reader).init(conf, path.getName());
+              ((ServiceBasedReader) reader).init(conf, path.toString());
             }
             return reader;
           } else {
@@ -448,5 +451,20 @@ public class WALUtils {
    */
   public static boolean isRecoveredEdits(String logName) {
     return logName.contains(HConstants.RECOVERED_EDITS_DIR);
+  }
+
+  /**
+   * Parse namespace from a string for distributed log.
+   */
+  public static String[] parseDistributedLogName(String logNameWithNamespace) {
+    String[] nameArray = logNameWithNamespace.split(DISTRIBUTED_LOG_NAMESPACE_DELIMITER);
+    if (nameArray.length == 1) {
+      return new String[] {DISTRIBUTED_LOG_DEFAULT_NAMESPACE, nameArray[0]};
+    } else if (nameArray.length == 2) {
+      return nameArray;
+    } else {
+      throw new IllegalArgumentException("Unknown name of distributed log name: "
+        + logNameWithNamespace);
+    }
   }
 }

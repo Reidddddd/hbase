@@ -21,11 +21,13 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.WAL_DIR_NAME_DELIMITER;
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.DistributedLogConfiguration;
@@ -34,6 +36,7 @@ import org.apache.distributedlog.shaded.api.namespace.NamespaceBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
@@ -58,33 +61,45 @@ public class DistributedLogAccessor implements Closeable {
   private final Configuration conf;
   private final String zkAddress;
   private final String zkRoot;
-  private final URI uri;
   private final DistributedLogConfiguration distributedLogConfiguration;
   private final String streamName;
+  private final NamespaceBuilder namespaceBuilder;
+  private final Map<String, Namespace> namespaceMap = new HashMap<>();
 
-  private final Namespace namespace;
-
-  private DistributedLogAccessor(Configuration conf) throws Exception {
+  private DistributedLogAccessor(Configuration conf) {
     this.conf = conf;
     this.zkAddress = conf.get(DISTRIBUTED_LOG_ZK_QUORUM, DEFAULT_DISTRIBUTED_LOG_ZK_QUORUM);
     this.zkRoot = conf.get(DISTRIBUTED_LOG_ZNODE_PARENT, DEFAULT_DISTRIBUTED_LOG_ZNODE_PARENT);
     this.streamName = conf.get(DISTRIBUTED_LOG_STREAM_NAME, DEFAULT_DISTRIBUTED_LOG_STREAM_NAME);
-    String zkNode = zkRoot + "/" + getNamespaceZNodePath();
-    ensureZNodeExists(zkNode);
-
-    // Set URI
-    uri = new URI("distributedlog-bk://" + zkAddress.replace(',', ';') + zkNode);
-
     // Set dl conf properties.
     distributedLogConfiguration = new DistributedLogConfiguration();
     distributedLogConfiguration.setCreateStreamIfNotExists(true);
     distributedLogConfiguration.setUnpartitionedStreamName(streamName);
+    namespaceBuilder = NamespaceBuilder.newBuilder();
+    namespaceBuilder.conf(distributedLogConfiguration);
+  }
 
-    NamespaceBuilder builder = NamespaceBuilder.newBuilder();
-    builder.uri(uri);
-    builder.conf(distributedLogConfiguration);
+  /**
+   * We need to keep this function synchronized as the namespace builder is not thread safe.
+   */
+  public synchronized Namespace getNamespace(String serverName) throws Exception {
+    if (namespaceMap.containsKey(serverName)) {
+      Namespace ns = namespaceMap.get(serverName);
+      if (ns != null) {
+        return ns;
+      }
+    }
+    String zkNode = zkRoot + "/" + getNamespaceZNodePath(serverName);
+    ensureZNodeExists(zkNode);
 
-    namespace = builder.build();
+    // Set URI
+    URI uri = new URI("distributedlog-bk://" + zkAddress.replace(',', ';') + zkNode);
+
+    namespaceBuilder.uri(uri);
+    Namespace ns = namespaceBuilder.build();
+    namespaceMap.put(serverName, ns);
+
+    return ns;
   }
 
   private void ensureZNodeExists(String zNode) throws Exception {
@@ -94,15 +109,14 @@ public class DistributedLogAccessor implements Closeable {
     }
   }
 
-  private String getNamespaceZNodePath() throws UnknownHostException {
-    String host = InetAddress.getLocalHost().getHostName();
+  private String getNamespaceZNodePath(String serverName) throws UnknownHostException {
     int port = conf.getInt(HConstants.REGIONSERVER_PORT, HConstants.DEFAULT_REGIONSERVER_PORT);
     long timeStamp = EnvironmentEdgeManager.currentTime();
-    return String.join(WAL_DIR_NAME_DELIMITER, host, Integer.toString(port),
+    return String.join(WAL_DIR_NAME_DELIMITER, serverName, Integer.toString(port),
       Long.toString(timeStamp));
   }
 
-  public static DistributedLogAccessor getInstance(Configuration conf) throws Exception {
+  public static DistributedLogAccessor getInstance(Configuration conf) {
     // Double check
     if (instance == null) {
       synchronized (obj) {
@@ -119,10 +133,13 @@ public class DistributedLogAccessor implements Closeable {
    */
   @Override
   public void close() throws IOException {
-    namespace.close();
+    // As Namespace is AutoCloseable, we just clear the map here.
+    namespaceMap.clear();
   }
 
-  public Namespace getNamespace() {
-    return namespace;
+  // Get the default namespace, only used for UTs.
+  @VisibleForTesting
+  public Namespace getNamespace() throws Exception {
+    return getNamespace(WALUtils.DISTRIBUTED_LOG_DEFAULT_NAMESPACE);
   }
 }

@@ -77,7 +77,9 @@ public class TestBoundedRegionGroupingStrategyWithDistributedLog extends TestDis
     conf.set(REGION_GROUPING_STRATEGY, RegionGroupingProvider.Strategies.bounded.name());
     conf.setClass(DELEGATE_PROVIDER, DistributedLogWALProvider.class, WALProvider.class);
 
-    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    // In the WALPerformanceEvaluation, the used WALFactory id is "wals", so we need to clear
+    // the logs in each UT, otherwise, the UTs will fail.
+    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace("wals");
     Iterator<String> logs = namespace.getLogs();
     while (logs.hasNext()) {
       namespace.deleteLog(logs.next());

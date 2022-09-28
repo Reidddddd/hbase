@@ -140,7 +140,8 @@ public class TestDistributedLog extends TestDistributedLogBase {
     conf.setClass("hbase.wal.provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
 
-    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace(
+      currentTest.getMethodName());
 
     FileStatus[] entries = fs.listStatus(new Path("/"));
     for (FileStatus dir : entries) {
@@ -154,7 +155,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     // test to see whether the coprocessor is loaded or not.
     DistributedLog log = null;
     try {
-      log = new DistributedLog(conf,null, null, null);
+      log = new DistributedLog(conf,null, null, null, currentTest.getMethodName());
       WALCoprocessorHost host = log.getCoprocessorHost();
       Coprocessor c = host.findCoprocessor(SampleRegionWALObserver.class.getName());
       assertNotNull(c);
@@ -194,7 +195,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     class CustomDistributedLog extends DistributedLog {
       public CustomDistributedLog(Configuration conf, List<WALActionsListener> listeners,
         String prefix, String suffix) throws IOException {
-        super(conf, listeners, prefix, suffix);
+        super(conf, listeners, prefix, suffix, currentTest.getMethodName());
       }
 
       @Override
@@ -255,7 +256,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     DistributedLog wal1 = null;
     DistributedLog walMeta = null;
     try {
-      wal1 = new DistributedLog(conf, null, null, null);
+      wal1 = new DistributedLog(conf, null, null, null, currentTest.getMethodName());
       LOG.debug("Log obtained is: " + wal1);
       Comparator<String> comp = wal1.LOG_NAME_COMPARATOR;
       String p1 = wal1.computeLogName(11);
@@ -264,7 +265,8 @@ public class TestDistributedLog extends TestDistributedLogBase {
       assertTrue(comp.compare(p1, p1) == 0);
       // comparing with different filenum.
       assertTrue(comp.compare(p1, p2) < 0);
-      walMeta = new DistributedLog(conf, null, null, WALUtils.META_WAL_PROVIDER_ID);
+      walMeta = new DistributedLog(conf, null, null, WALUtils.META_WAL_PROVIDER_ID,
+        currentTest.getMethodName());
       Comparator<String> compMeta = walMeta.LOG_NAME_COMPARATOR;
 
       String p1WithMeta = walMeta.computeLogName(11);
@@ -309,7 +311,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     LOG.debug("testFindMemStoresEligibleForFlush");
     Configuration conf1 = HBaseConfiguration.create(conf);
     conf1.setInt("hbase.regionserver.maxlogs", 1);
-    DistributedLog wal = new DistributedLog(conf1, null,null, null);
+    DistributedLog wal = new DistributedLog(conf1, null,null, null, currentTest.getMethodName());
     HTableDescriptor t1 =
       new HTableDescriptor(TableName.valueOf("t1")).addFamily(new HColumnDescriptor("row"));
     HTableDescriptor t2 =
@@ -385,7 +387,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
   @Test(expected=IOException.class)
   public void testFailedToCreateWALIfParentRenamed() throws IOException {
     final String name = "testFailedToCreateWALIfParentRenamed";
-    DistributedLog log = new DistributedLog(conf, null, null, null);
+    DistributedLog log = new DistributedLog(conf, null, null, null, currentTest.getMethodName());
     long logNum = System.currentTimeMillis();
     String logName = log.computeLogName(logNum);
     log.createWriterInstance(logName);
@@ -411,7 +413,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
   public void testSyncRunnerIndexOverflow() throws IOException, NoSuchFieldException,
     SecurityException, IllegalArgumentException, IllegalAccessException {
     final String name = "testSyncRunnerIndexOverflow";
-    DistributedLog log = new DistributedLog(conf, null, name, null);
+    DistributedLog log = new DistributedLog(conf, null, name, null, currentTest.getMethodName());
     try {
       Field ringBufferEventHandlerField =
         AbstractLog.class.getDeclaredField("ringBufferEventHandler");
@@ -444,7 +446,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     // When done, verify that all edits were written.
     int errCode = WALPerformanceEvaluation.innerMain(
       new Configuration(TEST_UTIL.getConfiguration()),
-        new String [] {"-threads", "3", "-verify", "-noclosefs", "-iterations", "500"});
+        new String [] {"-threads", "3", "-verify", "-noclosefs", "-iterations", "3000"});
     assertEquals(0, errCode);
   }
 
@@ -462,7 +464,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     final CountDownLatch putFinished = new CountDownLatch(1);
 
     try (DistributedLog log =
-      new DistributedLog(conf, null, null, null)) {
+      new DistributedLog(conf, null, null, null, currentTest.getMethodName())) {
 
       log.registerWALActionsListener(new WALActionsListener.Base() {
         @Override
