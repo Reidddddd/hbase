@@ -398,7 +398,8 @@ public class RSGroupAdminServer implements RSGroupAdmin {
   public void removeServers(Set<Address> servers) throws IOException {
     {
       if (servers == null || servers.isEmpty()) {
-        throw new ConstraintException("The set of servers to remove cannot be null or empty.");
+        LOG.warn("The set of servers to remove is null or empty, skip processing it.");
+        return;
       }
       // Hold a lock on the manager instance while moving servers to prevent
       // another writer changing our state while we are working.
