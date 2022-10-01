@@ -74,7 +74,7 @@ public class ReflectionUtils {
 
   @SuppressWarnings("unchecked")
   public static <T> Constructor<T> findConstructor(Class<T> type, Object... paramTypes) {
-    Constructor<T>[] constructors = (Constructor<T>[])type.getConstructors();
+    Constructor<T>[] constructors = (Constructor<T>[])type.getDeclaredConstructors();
     for (Constructor<T> ctor : constructors) {
       Class<?>[] ctorParamTypes = ctor.getParameterTypes();
       if (ctorParamTypes.length != paramTypes.length) {

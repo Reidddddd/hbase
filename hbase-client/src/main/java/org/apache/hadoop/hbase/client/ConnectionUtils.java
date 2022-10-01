@@ -23,13 +23,17 @@ import static org.apache.hadoop.hbase.HConstants.EMPTY_START_ROW;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellComparator;
@@ -51,6 +55,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 @InterfaceAudience.Private
 public class ConnectionUtils {
 
+  private static final Log LOG = LogFactory.getLog(ConnectionUtils.class);
   /**
    * Calculate pause time.
    * Built on {@link HConstants#RETRY_BACKOFF}.
@@ -297,5 +302,35 @@ public class ConnectionUtils {
     } else {
       return new CompleteScanResultCache(cache);
     }
+  }
+
+  /**
+   * Return retires + 1. The returned value will be in range [1, Integer.MAX_VALUE].
+   */
+  static int retries2Attempts(int retries) {
+    return Math.max(1, retries == Integer.MAX_VALUE ? Integer.MAX_VALUE : retries + 1);
+  }
+
+  /**
+   * Get a unique key for the rpc stub to the given server.
+   */
+  static String getStubKey(String serviceName, ServerName serverName,
+                           boolean hostnameCanChange) {
+    // Sometimes, servers go down and they come back up with the same hostname but a different
+    // IP address. Force a resolution of the rsHostname by trying to instantiate an
+    // InetSocketAddress, and this way we will rightfully get a new stubKey.
+    // Also, include the hostname in the key so as to take care of those cases where the
+    // DNS name is different but IP address remains the same.
+    String hostname = serverName.getHostname();
+    int port = serverName.getPort();
+    if (hostnameCanChange) {
+      try {
+        InetAddress ip = InetAddress.getByName(hostname);
+        return serviceName + "@" + hostname + "-" + ip.getHostAddress() + ":" + port;
+      } catch (UnknownHostException e) {
+        LOG.warn("Can not resolve " + hostname + ", please check your network", e);
+      }
+    }
+    return serviceName + "@" + hostname + ":" + port;
   }
 }
