@@ -1164,7 +1164,11 @@ public class RSGroupAdminEndpoint extends RSGroupAdminService
         clearedServer.add(server.getAddress());
       }
     }
-    groupAdminServer.removeServers(clearedServer);
+    // The original impl was calling groupAdminServer.removeServers
+    // But clear dead servers doesn't mean remove servers,
+    // dead servers could come back again, like after maintenance
+    // If so, the RSGroupInfo will be all gone,
+    // removeServers should be explicitly called by client side, other than in a hook
   }
 
   @Override

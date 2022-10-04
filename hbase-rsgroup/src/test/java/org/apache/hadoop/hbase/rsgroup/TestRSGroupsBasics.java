@@ -209,7 +209,8 @@ public class TestRSGroupsBasics extends TestRSGroupsBase {
     assertEquals(0, notClearedServers.size());
 
     Set<Address> newGroupServers = rsGroupAdmin.getRSGroupInfo(newGroup.getName()).getServers();
-    assertFalse(newGroupServers.contains(targetServer.getAddress()));
-    assertEquals(2, newGroupServers.size());
+    // should be true, clear dead server != remove servers
+    assertTrue(newGroupServers.contains(targetServer.getAddress()));
+    assertEquals(3, newGroupServers.size());
   }
 }
