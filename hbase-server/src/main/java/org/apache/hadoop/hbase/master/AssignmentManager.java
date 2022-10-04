@@ -2604,7 +2604,7 @@ public class AssignmentManager extends ZooKeeperListener {
       } catch (HBaseIOException e) {
         LOG.warn(e);
       }
-      if (destination == null) {
+      if (destination == null || destination.equals(LoadBalancer.BOGUS_SERVER_NAME)) {
         LOG.warn("Can't find a destination for " + encodedName);
         return null;
       }

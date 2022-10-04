@@ -23,8 +23,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import com.google.common.collect.ArrayListMultimap;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +32,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Lists;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -185,5 +187,56 @@ public class TestRSGroupBasedLoadBalancer extends RSGroupableBalancerTestBase {
     Map<ServerName, List<HRegionInfo>> assignments = loadBalancer
         .roundRobinAssignment(regions, onlineServers);
     assertEquals(bogusRegion, assignments.get(LoadBalancer.BOGUS_SERVER_NAME).size());
+  }
+
+  @Test
+  public void testRSGroupWithOneDeadServerGetRegionPlan() throws Exception {
+    Map<ServerName, List<HRegionInfo>> currentAssignments = mockClusterServers();
+
+    RSGroupInfo oneServerRSGroup = null;
+    for (Map.Entry<String, RSGroupInfo> group : groupMap.entrySet()) {
+      RSGroupInfo info = group.getValue();
+      if (info.getServers().size() == 1) {
+        oneServerRSGroup = info;
+        break;
+      }
+    }
+    if (oneServerRSGroup == null) {
+      // since 4 rsgroups + 7 servers
+      // It must at least one RSGroup holding exactly one server
+      throw new IllegalStateException("It must at least one RSGroup holding one server");
+    }
+
+    Address rsGroupServer = oneServerRSGroup.getServers().iterator().next();
+    String host = rsGroupServer.getHostname();
+    int port = rsGroupServer.getPort();
+    ServerName targetServer = null;
+    HRegionInfo targetRegion = null;
+    for (Map.Entry<ServerName, List<HRegionInfo>> server : currentAssignments.entrySet()) {
+      if (host.equals(server.getKey().getHostname()) &&
+          port == server.getKey().getPort()) {
+        targetRegion = server.getValue().get(0);
+        targetServer = server.getKey();
+        break;
+      }
+    }
+    if (targetRegion == null || targetServer == null) {
+      throw new IllegalStateException("Each server should at least holding one region");
+    }
+
+    List<ServerName> mockTargetServerIsDead = Lists.newLinkedList(servers);
+    mockTargetServerIsDead.remove(targetServer);
+    assertFalse(mockTargetServerIsDead.contains(targetServer));
+
+    ListMultimap<String, ServerName> serverMap = LinkedListMultimap.create();
+    ListMultimap<String, HRegionInfo> regionMap = LinkedListMultimap.create();
+    loadBalancer.generateGroupMaps(Lists.newArrayList(targetRegion),
+                                   mockTargetServerIsDead, regionMap,
+                                   serverMap);
+    List<ServerName> filteredServers = serverMap.get(regionMap.keySet().iterator().next());
+    assertEquals(1, filteredServers.size());
+    assertEquals(LoadBalancer.BOGUS_SERVER_NAME, filteredServers.get(0));
+    assertEquals(LoadBalancer.BOGUS_SERVER_NAME,
+                 loadBalancer.randomAssignment(targetRegion, mockTargetServerIsDead));
   }
 }

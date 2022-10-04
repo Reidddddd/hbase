@@ -274,7 +274,9 @@ public class RSGroupBasedLoadBalancer implements RSGroupableBalancer, LoadBalanc
     return this.internalBalancer.randomAssignment(region, filteredServers);
   }
 
-  private void generateGroupMaps(
+  // Fot test only
+  @VisibleForTesting
+  public void generateGroupMaps(
     List<HRegionInfo> regions,
     List<ServerName> servers,
     ListMultimap<String, HRegionInfo> regionMap,
