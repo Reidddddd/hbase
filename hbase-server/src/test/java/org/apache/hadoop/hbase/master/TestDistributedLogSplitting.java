@@ -319,7 +319,9 @@ public class TestDistributedLogSplitting {
     }
   }
 
-  private static class NonceGeneratorWithDups extends PerClientRandomNonceGenerator {
+  private static class NonceGeneratorWithDups implements NonceGenerator {
+
+    private final PerClientRandomNonceGenerator delegate = PerClientRandomNonceGenerator.get();
     private boolean isDups = false;
     private LinkedList<Long> nonces = new LinkedList<Long>();
 
@@ -329,11 +331,16 @@ public class TestDistributedLogSplitting {
 
     @Override
     public long newNonce() {
-      long nonce = isDups ? nonces.removeFirst() : super.newNonce();
+      long nonce = isDups ? nonces.removeFirst() : delegate.newNonce();
       if (!isDups) {
         nonces.add(nonce);
       }
       return nonce;
+    }
+
+    @Override
+    public long getNonceGroup() {
+      return delegate.getNonceGroup();
     }
   }
 

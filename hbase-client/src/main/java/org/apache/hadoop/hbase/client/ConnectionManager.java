@@ -18,8 +18,8 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import static org.apache.hadoop.hbase.client.ConnectionUtils.NO_NONCE_GENERATOR;
 import static org.apache.hadoop.hbase.client.MetricsConnection.CLIENT_SIDE_METRICS_ENABLED_KEY;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -217,7 +217,6 @@ class ConnectionManager {
   static final Log LOG = LogFactory.getLog(ConnectionManager.class);
 
   public static final String RETRIES_BY_SERVER_KEY = "hbase.client.retries.by.server";
-  private static final String CLIENT_NONCES_ENABLED_KEY = "hbase.client.nonces.enabled";
   private static final String RESOLVE_HOSTNAME_ON_FAIL_KEY = "hbase.resolve.hostnames.on.failure";
 
   // An LRU Map of HConnectionKey -> HConnection (TableServer).  All
@@ -243,25 +242,13 @@ class ConnectionManager {
     MAX_CACHED_CONNECTION_INSTANCES = HBaseConfiguration.create().getInt(
       HConstants.ZOOKEEPER_MAX_CLIENT_CNXNS, HConstants.DEFAULT_ZOOKEPER_MAX_CLIENT_CNXNS) + 1;
     CONNECTION_INSTANCES = new LinkedHashMap<HConnectionKey, HConnectionImplementation>(
-        (int) (MAX_CACHED_CONNECTION_INSTANCES / 0.75F) + 1, 0.75F, true) {
+            (int) (MAX_CACHED_CONNECTION_INSTANCES / 0.75F) + 1, 0.75F, true) {
       @Override
       protected boolean removeEldestEntry(
-          Map.Entry<HConnectionKey, HConnectionImplementation> eldest) {
-         return size() > MAX_CACHED_CONNECTION_INSTANCES;
-       }
+              Map.Entry<HConnectionKey, HConnectionImplementation> eldest) {
+        return size() > MAX_CACHED_CONNECTION_INSTANCES;
+      }
     };
-  }
-
-  /** Dummy nonce generator for disabled nonces. */
-  static class NoNonceGenerator implements NonceGenerator {
-    @Override
-    public long getNonceGroup() {
-      return HConstants.NO_NONCE;
-    }
-    @Override
-    public long newNonce() {
-      return HConstants.NO_NONCE;
-    }
   }
 
   /*
@@ -681,15 +668,15 @@ class ConnectionManager {
       this.writeRpcTimeout = conf.getInt(
         HConstants.HBASE_RPC_WRITE_TIMEOUT_KEY,
         HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
-      if (conf.getBoolean(CLIENT_NONCES_ENABLED_KEY, true)) {
+      if (conf.getBoolean(NonceGenerator.CLIENT_NONCES_ENABLED_KEY, true)) {
         synchronized (nonceGeneratorCreateLock) {
           if (ConnectionManager.nonceGenerator == null) {
-            ConnectionManager.nonceGenerator = new PerClientRandomNonceGenerator();
+            ConnectionManager.nonceGenerator = PerClientRandomNonceGenerator.get();
           }
           this.nonceGenerator = ConnectionManager.nonceGenerator;
         }
       } else {
-        this.nonceGenerator = new NoNonceGenerator();
+        this.nonceGenerator = NO_NONCE_GENERATOR;
       }
 
       this.stats = ServerStatisticTracker.create(conf);

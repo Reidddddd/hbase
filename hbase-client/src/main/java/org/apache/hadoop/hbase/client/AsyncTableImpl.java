@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import static org.apache.hadoop.hbase.client.ConnectionUtils.checkHasFamilies;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +36,6 @@ import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetResponse;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutateRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutateResponse;
-import org.apache.hadoop.hbase.util.ReflectionUtils;
 
 /**
  * The implementation of AsyncTable.
@@ -90,25 +90,72 @@ class AsyncTableImpl implements AsyncTable {
     CompletableFuture<RESP> future = new CompletableFuture<>();
     try {
       rpcCall.call(stub, controller, reqConvert.convert(loc.getRegionInfo().getRegionName(), req),
-              new RpcCallback<PRESP>() {
-
-                @Override
-                public void run(PRESP resp) {
-                  if (controller.failed()) {
-                    future.completeExceptionally(controller.getFailed());
-                  } else {
-                    try {
-                      future.complete(respConverter.convert(controller, resp));
-                    } catch (IOException e) {
-                      future.completeExceptionally(e);
-                    }
-                  }
-                }
-              });
+        new RpcCallback<PRESP>() {
+          @Override
+          public void run(PRESP resp) {
+            if (controller.failed()) {
+              future.completeExceptionally(controller.getFailed());
+            } else {
+              try {
+                future.complete(respConverter.convert(controller, resp));
+              } catch (IOException e) {
+                future.completeExceptionally(e);
+              }
+            }
+          }
+        });
     } catch (IOException e) {
       future.completeExceptionally(e);
     }
     return future;
+  }
+
+  private static <REQ, RESP> CompletableFuture<RESP> mutate(HBaseRpcController controller,
+                                                            HRegionLocation loc,
+                                                            ClientService.Interface stub, REQ req,
+                                                            Converter<MutateRequest, byte[], REQ>
+                                                                    reqConvert,
+                                                            Converter<RESP, HBaseRpcController,
+                                                                    MutateResponse> respConverter) {
+    return call(controller, loc, stub, req, reqConvert, (s, c, r, done) -> s.mutate(c, r, done),
+            respConverter);
+  }
+
+  private static <REQ> CompletableFuture<Void> voidMutate(HBaseRpcController controller,
+                                                          HRegionLocation loc,
+                                                          ClientService.Interface stub, REQ req,
+                                                          Converter<MutateRequest, byte[], REQ>
+                                                                  reqConvert) {
+    return mutate(controller, loc, stub, req, reqConvert, (c, resp) -> {
+      return null;
+    });
+  }
+
+  private static Result toResult(HBaseRpcController controller, MutateResponse resp)
+          throws IOException {
+    if (!resp.hasResult()) {
+      return null;
+    }
+    return ProtobufUtil.toResult(resp.getResult(), controller.cellScanner());
+  }
+
+  @FunctionalInterface
+  private interface NoncedConverter<D, I, S> {
+    D convert(I info, S src, long nonceGroup, long nonce) throws IOException;
+  }
+
+  private <REQ, RESP> CompletableFuture<RESP> noncedMutate(HBaseRpcController controller,
+                                                           HRegionLocation loc,
+                                                           ClientService.Interface stub, REQ req,
+                                                           NoncedConverter
+                                                                   <MutateRequest, byte[], REQ>
+                                                                   reqConvert,
+                                                           Converter<RESP, HBaseRpcController,
+                                                                   MutateResponse> respConverter) {
+    long nonceGroup = conn.getNonceGenerator().getNonceGroup();
+    long nonce = conn.getNonceGenerator().newNonce();
+    return mutate(controller, loc, stub, req,
+            (info, src) -> reqConvert.convert(info, src, nonceGroup, nonce), respConverter);
   }
 
   private <T> SingleRequestCallerBuilder<T> newCaller(Row row, long rpcTimeoutNs) {
@@ -118,45 +165,53 @@ class AsyncTableImpl implements AsyncTable {
   }
 
   @Override
-  public CompletableFuture<Boolean> exists(Get get) {
-    if (!get.isCheckExistenceOnly()) {
-      get = ReflectionUtils.newInstance(get.getClass(), get);
-      get.setCheckExistenceOnly(true);
-    }
-    return get(get).thenApply(r -> r.getExists());
-  }
-
-  @Override
   public CompletableFuture<Result> get(Get get) {
     return this.<Result> newCaller(get, readRpcTimeoutNs)
             .action((controller, loc, stub) -> AsyncTableImpl
                     .<Get, GetRequest, GetResponse, Result> call(controller, loc, stub, get,
-                            RequestConverter::buildGetRequest, (s, c, req, done) -> s.get(c, req, done),
+                            RequestConverter::buildGetRequest,
+                            (s, c, req, done) -> s.get(c, req, done),
                             (c, resp) -> ProtobufUtil.toResult(resp.getResult(), c.cellScanner())))
             .call();
   }
 
   @Override
   public CompletableFuture<Void> put(Put put) {
-    return this.<Void> newCaller(put, writeRpcTimeoutNs)
-            .action(
-                    (controller, loc, stub) -> AsyncTableImpl.<Put, MutateRequest, MutateResponse, Void> call(
-                            controller, loc, stub, put, RequestConverter::buildMutateRequest,
-                            (s, c, req, done) -> s.mutate(c, req, done), (c, resp) -> {
-                              return null;
-                            }))
+    return this
+            .<Void> newCaller(put, writeRpcTimeoutNs).action((controller, loc, stub) ->
+                    AsyncTableImpl
+                    .<Put> voidMutate(controller, loc, stub, put,
+                            RequestConverter::buildMutateRequest))
             .call();
   }
 
   @Override
   public CompletableFuture<Void> delete(Delete delete) {
     return this.<Void> newCaller(delete, writeRpcTimeoutNs)
-            .action((controller, loc, stub) -> AsyncTableImpl
-                    .<Delete, MutateRequest, MutateResponse, Void> call(controller, loc, stub, delete,
-                            RequestConverter::buildMutateRequest, (s, c, req, done) -> s.mutate(c, req, done),
-                            (c, resp) -> {
-                              return null;
-                            }))
+            .action((controller, loc, stub) ->
+                    AsyncTableImpl.<Delete> voidMutate(controller, loc, stub,
+                    delete, RequestConverter::buildMutateRequest))
+            .call();
+  }
+
+  @Override
+  public CompletableFuture<Result> append(Append append) {
+    checkHasFamilies(append);
+    return this.<Result> newCaller(append, writeRpcTimeoutNs)
+            .action((controller, loc, stub) ->
+                    this.<Append, Result> noncedMutate(controller, loc, stub,
+                    append, RequestConverter::buildMutateRequest, AsyncTableImpl::toResult))
+            .call();
+  }
+
+  @Override
+  public CompletableFuture<Result> increment(Increment increment) {
+    checkHasFamilies(increment);
+    return this.<Result> newCaller(increment, writeRpcTimeoutNs)
+            .action((controller, loc, stub) ->
+                    this.<Increment, Result> noncedMutate(controller, loc,
+                    stub, increment, RequestConverter::buildMutateRequest,
+                            AsyncTableImpl::toResult))
             .call();
   }
 

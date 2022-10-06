@@ -18,9 +18,6 @@
 package org.apache.hadoop.hbase.client;
 
 import java.io.IOException;
-
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.ServerName;
@@ -29,6 +26,8 @@ import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Connection to an HTable from within a Coprocessor. We can do some nice tricks since we know we
@@ -41,7 +40,6 @@ import org.apache.hadoop.hbase.security.UserProvider;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class CoprocessorHConnection extends HConnectionImplementation {
-  private static final NonceGenerator NO_NONCE_GEN = new ConnectionManager.NoNonceGenerator();
 
   /**
    * Create an unmanaged {@link HConnection} based on the environment in which we are running the
@@ -115,6 +113,6 @@ public class CoprocessorHConnection extends HConnectionImplementation {
 
   @Override
   public NonceGenerator getNonceGenerator() {
-    return NO_NONCE_GEN; // don't use nonces for coprocessor connection
+    return ConnectionUtils.NO_NONCE_GENERATOR; // don't use nonces for coprocessor connection
   }
 }
