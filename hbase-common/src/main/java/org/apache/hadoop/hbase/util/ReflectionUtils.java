@@ -54,6 +54,7 @@ public class ReflectionUtils {
 
   private static <T> T instantiate(final String className, Constructor<T> ctor, Object[] ctorArgs) {
     try {
+      ctor.setAccessible(true);
       return ctor.newInstance(ctorArgs);
     } catch (IllegalAccessException e) {
       throw new UnsupportedOperationException(
