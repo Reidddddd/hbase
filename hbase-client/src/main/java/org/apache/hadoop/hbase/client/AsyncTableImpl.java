@@ -21,13 +21,14 @@ import static org.apache.hadoop.hbase.client.ConnectionUtils.checkHasFamilies;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
 import com.google.protobuf.RpcCallback;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.AsyncRpcRetryingCallerFactory.SingleRequestCallerBuilder;
+import org.apache.hadoop.hbase.filter.BinaryComparator;
+import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
@@ -36,6 +37,8 @@ import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetResponse;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutateRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.MutateResponse;
+import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.CompareType;
+import org.apache.hadoop.hbase.util.ReflectionUtils;
 
 /**
  * The implementation of AsyncTable.
@@ -158,10 +161,14 @@ class AsyncTableImpl implements AsyncTable {
             (info, src) -> reqConvert.convert(info, src, nonceGroup, nonce), respConverter);
   }
 
-  private <T> SingleRequestCallerBuilder<T> newCaller(Row row, long rpcTimeoutNs) {
-    return conn.callerFactory.<T> single().table(tableName).row(row.getRow())
+  private <T> SingleRequestCallerBuilder<T> newCaller(byte[] row, long rpcTimeoutNs) {
+    return conn.callerFactory.<T> single().table(tableName).row(row)
             .rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
             .operationTimeout(operationTimeoutNs, TimeUnit.NANOSECONDS);
+  }
+
+  private <T> SingleRequestCallerBuilder<T> newCaller(Row row, long rpcTimeoutNs) {
+    return newCaller(row.getRow(), rpcTimeoutNs);
   }
 
   @Override
@@ -212,6 +219,30 @@ class AsyncTableImpl implements AsyncTable {
                     this.<Increment, Result> noncedMutate(controller, loc,
                     stub, increment, RequestConverter::buildMutateRequest,
                             AsyncTableImpl::toResult))
+            .call();
+  }
+
+  @Override
+  public CompletableFuture<Boolean> checkAndPut(byte[] row, byte[] family, byte[] qualifier,
+                                                CompareOp compareOp, byte[] value, Put put) {
+    return this.<Boolean> newCaller(row, writeRpcTimeoutNs)
+            .action((controller, loc, stub) -> AsyncTableImpl.<Put, Boolean> mutate(controller, loc,
+                    stub, put,
+                    (rn, p) -> RequestConverter.buildMutateRequest(rn, row, family, qualifier,
+                            new BinaryComparator(value), CompareType.valueOf(compareOp.name()), p),
+                    (c, r) -> r.getProcessed()))
+            .call();
+  }
+
+  @Override
+  public CompletableFuture<Boolean> checkAndDelete(byte[] row, byte[] family, byte[] qualifier,
+                                                   CompareOp compareOp, byte[] value, Delete delete) {
+    return this.<Boolean> newCaller(row, writeRpcTimeoutNs)
+            .action((controller, loc, stub) -> AsyncTableImpl.<Delete, Boolean> mutate(controller, loc,
+                    stub, delete,
+                    (rn, d) -> RequestConverter.buildMutateRequest(rn, row, family, qualifier,
+                            new BinaryComparator(value), CompareType.valueOf(compareOp.name()), d),
+                    (c, r) -> r.getProcessed()))
             .call();
   }
 
