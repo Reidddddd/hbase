@@ -61,6 +61,12 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
                               ClientService.Interface stub);
   }
 
+  @FunctionalInterface
+  public interface RegionLocator {
+    CompletableFuture<HRegionLocation> locate(AsyncConnectionImpl conn, TableName tableName,
+                                              byte[] row, boolean reload);
+  }
+
   private final HashedWheelTimer retryTimer;
 
   private final AsyncConnectionImpl conn;
@@ -68,6 +74,8 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
   private final TableName tableName;
 
   private final byte[] row;
+
+  private final RegionLocator locator;
 
   private final Callable<T> callable;
 
@@ -89,13 +97,16 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
 
   private final long startNs;
 
-  public AsyncSingleRequestRpcRetryingCaller(HashedWheelTimer retryTimer, AsyncConnectionImpl conn,
-                                             TableName tableName, byte[] row, Callable<T> callable, long pauseNs, int maxRetries,
-                                             long operationTimeoutNs, long rpcTimeoutNs, int startLogErrorsCnt) {
+  public AsyncSingleRequestRpcRetryingCaller(
+          HashedWheelTimer retryTimer, AsyncConnectionImpl conn,
+          TableName tableName, byte[] row, RegionLocator locator, Callable<T> callable,
+          long pauseNs, int maxRetries, long operationTimeoutNs,
+          long rpcTimeoutNs, int startLogErrorsCnt) {
     this.retryTimer = retryTimer;
     this.conn = conn;
     this.tableName = tableName;
     this.row = row;
+    this.locator = locator;
     this.callable = callable;
     this.pauseNs = pauseNs;
     this.maxAttempts = retries2Attempts(maxRetries);
@@ -208,7 +219,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
   }
 
   private void locateThenCall() {
-    conn.getLocator().getRegionLocation(tableName, row, tries > 1).whenComplete((loc, error) -> {
+    locator.locate(conn, tableName, row, tries > 1).whenComplete((loc, error) -> {
       if (error != null) {
         onError(error,
                 () -> "Locate '" + Bytes.toStringBinary(row) + "' in " + tableName + " failed, tries = "
