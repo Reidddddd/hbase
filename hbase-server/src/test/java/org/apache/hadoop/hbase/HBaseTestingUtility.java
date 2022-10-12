@@ -3610,7 +3610,8 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
         @Override
         public boolean evaluate() throws IOException {
           List<HRegionInfo> hris = states.getRegionsOfTable(tableName);
-          return hris != null && !hris.isEmpty();
+          boolean result = hris != null && !hris.isEmpty();
+          return result;
         }
       });
     }

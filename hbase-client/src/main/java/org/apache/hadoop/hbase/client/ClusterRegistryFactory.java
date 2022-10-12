@@ -18,8 +18,8 @@
 package org.apache.hadoop.hbase.client;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.util.ReflectionUtils;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Get instance of configured Registry.
@@ -35,9 +35,9 @@ final class ClusterRegistryFactory {
   /**
    * @return The cluster registry implementation to use.
    */
-  static ClusterRegistry getRegistry(Configuration conf) {
-    Class<? extends ClusterRegistry> clazz =
-            conf.getClass(REGISTRY_IMPL_CONF_KEY, ZKClusterRegistry.class, ClusterRegistry.class);
+  static AsyncRegistry getRegistry(Configuration conf) {
+    Class<? extends AsyncRegistry> clazz =
+            conf.getClass(REGISTRY_IMPL_CONF_KEY, ZKAsyncRegistry.class, AsyncRegistry.class);
     return ReflectionUtils.newInstance(clazz, conf);
   }
 }

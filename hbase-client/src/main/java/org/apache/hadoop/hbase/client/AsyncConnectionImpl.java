@@ -25,13 +25,11 @@ import static org.apache.hadoop.hbase.client.ConnectionUtils.getStubKey;
 import static org.apache.hadoop.hbase.client.NonceGenerator.CLIENT_NONCES_ENABLED_KEY;
 
 import io.netty.util.HashedWheelTimer;
-
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -66,7 +64,7 @@ class AsyncConnectionImpl implements AsyncConnection {
 
   private final User user;
 
-  private final ClusterRegistry registry;
+  private final AsyncRegistry registry;
 
   private final String clusterId;
 
