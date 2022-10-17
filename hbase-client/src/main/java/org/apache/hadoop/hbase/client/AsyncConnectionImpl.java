@@ -36,7 +36,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.ipc.RpcClient;
 import org.apache.hadoop.hbase.ipc.RpcClientFactory;
 import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
@@ -44,6 +43,7 @@ import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
 import org.apache.hadoop.hbase.util.CollectionUtils;
 import org.apache.hadoop.hbase.util.Threads;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The implementation of AsyncConnection.
@@ -64,7 +64,7 @@ class AsyncConnectionImpl implements AsyncConnection {
 
   private final User user;
 
-  private final AsyncRegistry registry;
+  final AsyncRegistry registry;
 
   private final String clusterId;
 
@@ -88,12 +88,8 @@ class AsyncConnectionImpl implements AsyncConnection {
   public AsyncConnectionImpl(Configuration conf, User user) throws IOException {
     this.conf = conf;
     this.user = user;
-
     this.connConf = new AsyncConnectionConfiguration(conf);
-
-    this.locator = new AsyncRegionLocator(conf);
-
-    // action below will not throw exception so no need to catch and close.
+    this.locator = new AsyncRegionLocator(this);
     this.registry = ClusterRegistryFactory.getRegistry(conf);
     this.clusterId = Optional.ofNullable(registry.getClusterId()).orElseGet(() -> {
       if (LOG.isDebugEnabled()) {
@@ -120,8 +116,8 @@ class AsyncConnectionImpl implements AsyncConnection {
 
   @Override
   public void close() {
-    IOUtils.closeQuietly(locator);
     IOUtils.closeQuietly(rpcClient);
+    IOUtils.closeQuietly(registry);
   }
 
   @Override
