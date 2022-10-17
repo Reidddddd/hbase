@@ -89,10 +89,8 @@ public class TokenUtil {
       AuthenticationTokenIdentifier ident =
           new AuthenticationTokenIdentifier(User.getCurrent().getShortName());
       String localPassword = conf.get(User.DIGEST_PASSWORD_KEY);
-      Token<AuthenticationTokenIdentifier> token = new Token<>();
-      token.setID(ident.getBytes());
-      token.setKind(AuthenticationTokenIdentifier.AUTH_TOKEN_TYPE);
-      token.setPassword(Bytes.toBytes(localPassword));
+      Token<AuthenticationTokenIdentifier> token = new Token<>(ident.getBytes(),
+        Bytes.toBytes(localPassword), AuthenticationTokenIdentifier.AUTH_TOKEN_TYPE, null);
 
       try (ZooKeeperWatcher zkw =
           new ZooKeeperWatcher(conf, "TokenUtil-getAuthToken", null)) {

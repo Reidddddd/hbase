@@ -59,6 +59,7 @@ import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSelector;
 import org.apache.hadoop.hbase.security.token.TokenUtil;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.hbase.client.MetricsConnection;
 import org.apache.hadoop.hbase.codec.Codec;
@@ -421,6 +422,7 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
           Token<? extends TokenIdentifier> newToken = new Token<>(token);
           newToken.setService(new Text(clusterId));
           remoteId.getTicket().addToken(newToken);
+          remoteId.getTicket().getUGI().setAuthenticationMethod(AuthenticationMethod.TOKEN);
         }
       }
     }
