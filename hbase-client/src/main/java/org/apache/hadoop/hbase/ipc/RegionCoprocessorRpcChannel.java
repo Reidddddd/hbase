@@ -85,18 +85,24 @@ public class RegionCoprocessorRpcChannel extends CoprocessorRpcChannel{
     final ClientProtos.CoprocessorServiceCall call =
         CoprocessorRpcUtils.buildServiceCall(row, method, request);
     RegionServerCallable<CoprocessorServiceResponse> callable =
-        new RegionServerCallable<CoprocessorServiceResponse>(connection, table, row, HConstants.PRIORITY_UNSET) {
-      @Override
-      public CoprocessorServiceResponse call(int callTimeout) throws Exception {
-        if (rpcController instanceof HBaseRpcController) {
-          HBaseRpcController hrc = (HBaseRpcController) rpcController;
-          hrc.setPriority(tableName);
-          hrc.setCallTimeout(callTimeout);
+      new RegionServerCallable<CoprocessorServiceResponse>(connection, table, row, HConstants.PRIORITY_UNSET) {
+        @Override
+        public CoprocessorServiceResponse call(int callTimeout) throws Exception {
+          if (rpcController instanceof HBaseRpcController) {
+            HBaseRpcController hrc = (HBaseRpcController) rpcController;
+            // As the retrying reuses rpcController, we need to check if it fails in the last retry.
+            // If so, we need to reset it. Otherwise, the retry mechanism does not work as expected.
+            // Because the failed hrc will be marked as done.
+            if (hrc.failed()) {
+              hrc.reset();
+            }
+            hrc.setPriority(tableName);
+            hrc.setCallTimeout(callTimeout);
+          }
+          byte[] regionName = getLocation().getRegionInfo().getRegionName();
+          return ProtobufUtil.execService(rpcController, getStub(), call, regionName);
         }
-        byte[] regionName = getLocation().getRegionInfo().getRegionName();
-        return ProtobufUtil.execService(rpcController, getStub(), call, regionName);
-      }
-    };
+      };
     CoprocessorServiceResponse result = rpcCallerFactory.<CoprocessorServiceResponse> newCaller()
         .callWithRetries(callable, operationTimeout);
     Message response = null;
