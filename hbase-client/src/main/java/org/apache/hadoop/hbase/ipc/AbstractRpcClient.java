@@ -412,6 +412,8 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
           // as the region server has added the auth token at the RS initialization phase.
           // So we directly read password from local configuration.
           TokenUtil.setUserPassword(remoteId.getTicket(), conf.get(User.DIGEST_PASSWORD_KEY));
+          // Here we need to get tokens once more. Otherwise, the tokens will be still empty.
+          tokens = remoteId.getTicket().getTokens();
           token = selector.selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), tokens);
           token.setService(new Text(clusterId));
         } else {
