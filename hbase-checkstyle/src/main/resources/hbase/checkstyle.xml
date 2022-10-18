@@ -102,6 +102,9 @@
     http://checkstyle.sourceforge.net/config_whitespace.html -->
     <module name="MethodParamPad"/>
     <module name="ParenPad"/>
+
+    <!-- Make the @SuppressWarnings annotations available to Checkstyle -->
+    <module name="SuppressWarningsHolder" />
   </module>
 
     <!-- Size Violation Checks
@@ -110,4 +113,6 @@
     <property name="max" value="100"/>
     <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://|org.apache.thrift.|com.google.protobuf.|hbase.protobuf.generated"/>
   </module>
+
+  <module name="SuppressWarningsFilter" />
 </module>

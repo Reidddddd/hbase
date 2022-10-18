@@ -22,7 +22,6 @@ import static org.apache.hadoop.hbase.HConstants.HBASE_CLIENT_RETRIES_NUMBER;
 import static org.apache.hadoop.hbase.HConstants.HBASE_RPC_READ_TIMEOUT_KEY;
 import static org.apache.hadoop.hbase.master.balancer.BaseLoadBalancer.TABLES_ON_MASTER;
 import static org.junit.Assert.assertEquals;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,7 +36,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -109,7 +107,8 @@ public class TestAsyncGetMultiThread {
     while (!stop.get()) {
       int i = ThreadLocalRandom.current().nextInt(COUNT);
       assertEquals(i,
-              Bytes.toInt(CONN.getTable(TABLE_NAME).get(new Get(Bytes.toBytes(String.format("%03d", i))))
+              Bytes.toInt(CONN.getTable(TABLE_NAME)
+                      .get(new Get(Bytes.toBytes(String.format("%03d", i))))
                       .get().getValue(FAMILY, QUALIFIER)));
     }
   }
@@ -120,7 +119,8 @@ public class TestAsyncGetMultiThread {
     int numThreads = 7;
     AtomicBoolean stop = new AtomicBoolean(false);
     ExecutorService executor =
-            Executors.newFixedThreadPool(numThreads, Threads.newDaemonThreadFactory("TestAsyncGet-"));
+            Executors.newFixedThreadPool(
+                    numThreads, Threads.newDaemonThreadFactory("TestAsyncGet-"));
     List<Future<?>> futures = new ArrayList<>();
     IntStream.range(0, numThreads).forEach(i -> futures.add(executor.submit(() -> {
       run(stop);

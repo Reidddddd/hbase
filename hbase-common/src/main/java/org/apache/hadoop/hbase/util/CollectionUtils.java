@@ -115,6 +115,7 @@ public class CollectionUtils {
    * putIfAbsent to implement computeIfAbsent. And notice that the implementation does not guarantee
    * that the supplier will only be executed once.
    */
+  @SuppressWarnings("checkstyle:InnerAssignment")
   public static <K, V> V computeIfAbsent(ConcurrentMap<K, V> map, K key, Supplier<V> supplier) {
     V v, newValue;
     return ((v = map.get(key)) == null && (newValue = supplier.get()) != null
@@ -136,6 +137,7 @@ public class CollectionUtils {
    * putIfAbsent to implement computeIfAbsent. And notice that the implementation does not guarantee
    * that the supplier will only be executed once.
    */
+  @SuppressWarnings("checkstyle:InnerAssignment")
   public static <K, V> V computeIfAbsentEx(ConcurrentMap<K, V> map, K key,
                                            IOExceptionSupplier<V> supplier) throws IOException {
     V v, newValue;

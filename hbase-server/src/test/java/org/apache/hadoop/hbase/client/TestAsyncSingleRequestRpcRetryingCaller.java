@@ -22,19 +22,16 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionLocation;
-import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.testclassification.ClientTests;
@@ -99,7 +96,8 @@ public class TestAsyncSingleRequestRpcRetryingCaller {
     HRegionLocation loc = asyncConn.getRegionLocator(TABLE_NAME).getRegionLocation(ROW).get();
     int index = TEST_UTIL.getHBaseCluster().getServerWith(loc.getRegionInfo().getRegionName());
     TEST_UTIL.getHBaseAdmin().move(loc.getRegionInfo().getEncodedNameAsBytes(), Bytes.toBytes(
-            TEST_UTIL.getHBaseCluster().getRegionServer(1 - index).getServerName().getServerName()));
+            TEST_UTIL.getHBaseCluster().getRegionServer(1 - index)
+                    .getServerName().getServerName()));
     AsyncTable table = asyncConn.getTable(TABLE_NAME);
     table.put(new Put(ROW).addColumn(FAMILY, QUALIFIER, VALUE)).get();
 
@@ -134,7 +132,8 @@ public class TestAsyncSingleRequestRpcRetryingCaller {
     long startNs = System.nanoTime();
     try {
       asyncConn.callerFactory.single().table(TABLE_NAME).row(ROW)
-              .operationTimeout(1, TimeUnit.SECONDS).action((controller, loc, stub) -> failedFuture())
+              .operationTimeout(1, TimeUnit.SECONDS)
+              .action((controller, loc, stub) -> failedFuture())
               .call().get();
       fail();
     } catch (ExecutionException e) {
@@ -180,12 +179,11 @@ public class TestAsyncSingleRequestRpcRetryingCaller {
     };
     try (AsyncConnectionImpl mockedConn =
                  new AsyncConnectionImpl(asyncConn.getConfiguration(), User.getCurrent()) {
-
-           @Override
-           AsyncRegionLocator getLocator() {
-             return mockedLocator;
-           }
-         }) {
+        @Override
+        AsyncRegionLocator getLocator() {
+          return mockedLocator;
+        }
+      }) {
       AsyncTable table = new AsyncTableImpl(mockedConn, TABLE_NAME);
       table.put(new Put(ROW).addColumn(FAMILY, QUALIFIER, VALUE)).get();
       assertTrue(errorTriggered.get());

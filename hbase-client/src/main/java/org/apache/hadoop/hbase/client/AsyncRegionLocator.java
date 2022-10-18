@@ -26,7 +26,6 @@ import static org.apache.hadoop.hbase.client.ConnectionUtils.isEmptyStopRow;
 import static org.apache.hadoop.hbase.exceptions.ClientExceptionsUtil.findException;
 import static org.apache.hadoop.hbase.exceptions.ClientExceptionsUtil.isMetaClearingException;
 import static org.apache.hadoop.hbase.util.CollectionUtils.computeIfAbsent;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -39,7 +38,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -191,9 +189,10 @@ class AsyncRegionLocator {
     }
   }
 
-  private void onScanComplete(CompletableFuture<HRegionLocation> future, TableName tableName,
-                              byte[] row, List<Result> results, Throwable error, String rowNameInErrorMsg,
-                              Consumer<HRegionLocation> otherCheck) {
+  private void onScanComplete(
+          CompletableFuture<HRegionLocation> future, TableName tableName,
+          byte[] row, List<Result> results, Throwable error, String rowNameInErrorMsg,
+          Consumer<HRegionLocation> otherCheck) {
     if (error != null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Failed to fetch location of '" + tableName + "', " + rowNameInErrorMsg + "='"
@@ -234,7 +233,8 @@ class AsyncRegionLocator {
     if (info.isSplit()) {
       future.completeExceptionally(new RegionOfflineException(
               "the only available region for the required row is a split parent,"
-                      + " the daughters should be online soon: '" + info.getRegionNameAsString() + "'"));
+                      + " the daughters should be online soon: '"
+                      + info.getRegionNameAsString() + "'"));
       return;
     }
     if (info.isOffline()) {
@@ -263,10 +263,12 @@ class AsyncRegionLocator {
     CompletableFuture<HRegionLocation> future = new CompletableFuture<>();
     byte[] metaKey = createRegionName(tableName, row, NINES, false);
     conn.getTable(META_TABLE_NAME)
-            .smallScan(new Scan(metaKey).setReversed(true).setSmall(true).addFamily(CATALOG_FAMILY), 1)
+            .smallScan(new Scan(metaKey).setReversed(true).setSmall(true)
+                    .addFamily(CATALOG_FAMILY), 1)
             .whenComplete(
-                    (results, error) -> onScanComplete(future, tableName, row, results, error, "row", loc -> {
-                    }));
+                    (results, error) -> onScanComplete(
+                            future, tableName, row, results, error, "row", loc -> {
+                      }));
     return future;
   }
 
@@ -328,14 +330,18 @@ class AsyncRegionLocator {
     }
     CompletableFuture<HRegionLocation> future = new CompletableFuture<>();
     conn.getTable(META_TABLE_NAME)
-            .smallScan(new Scan(metaKey).setReversed(true).setSmall(true).addFamily(CATALOG_FAMILY), 1)
-            .whenComplete((results, error) -> onScanComplete(future, tableName, startRowOfCurrentRegion,
+            .smallScan(new Scan(metaKey).setReversed(true).setSmall(true)
+                    .addFamily(CATALOG_FAMILY), 1)
+            .whenComplete((results, error) ->
+                    onScanComplete(future, tableName, startRowOfCurrentRegion,
                     results, error, "startRowOfCurrentRegion", loc -> {
                       HRegionInfo info = loc.getRegionInfo();
                       if (!Bytes.equals(info.getEndKey(), startRowOfCurrentRegion)) {
                         future.completeExceptionally(new IOException("The end key of '"
-                                + info.getRegionNameAsString() + "' is '" + Bytes.toStringBinary(info.getEndKey())
-                                + "', expected '" + Bytes.toStringBinary(startRowOfCurrentRegion) + "'"));
+                                + info.getRegionNameAsString() + "' is '"
+                                + Bytes.toStringBinary(info.getEndKey())
+                                + "', expected '"
+                                + Bytes.toStringBinary(startRowOfCurrentRegion) + "'"));
                       }
                     }));
     return future;
@@ -373,9 +379,10 @@ class AsyncRegionLocator {
             && oldLoc.getServerName().equals(loc.getServerName());
   }
 
-  private void updateCachedLoation(HRegionLocation loc, Throwable exception,
-                                   Function<HRegionLocation, HRegionLocation> cachedLocationSupplier,
-                                   Consumer<HRegionLocation> addToCache, Consumer<HRegionLocation> removeFromCache) {
+  private void updateCachedLoation(
+          HRegionLocation loc, Throwable exception,
+          Function<HRegionLocation, HRegionLocation> cachedLocationSupplier,
+          Consumer<HRegionLocation> addToCache, Consumer<HRegionLocation> removeFromCache) {
     HRegionLocation oldLoc = cachedLocationSupplier.apply(loc);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Try updating " + loc + ", the old value is " + oldLoc, exception);
@@ -390,17 +397,20 @@ class AsyncRegionLocator {
     if (cause == null || !isMetaClearingException(cause)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(
-                "Will not update " + loc + " because the exception is null or not the one we care about");
+                "Will not update " + loc
+                        + " because the exception is null or not the one we care about");
       }
       return;
     }
     if (cause instanceof RegionMovedException) {
       RegionMovedException rme = (RegionMovedException) cause;
       HRegionLocation newLoc =
-              new HRegionLocation(loc.getRegionInfo(), rme.getServerName(), rme.getLocationSeqNum());
+              new HRegionLocation(loc.getRegionInfo(),
+                      rme.getServerName(), rme.getLocationSeqNum());
       if (LOG.isDebugEnabled()) {
         LOG.debug(
-                "Try updating " + loc + " with the new location " + newLoc + " constructed by " + rme);
+                "Try updating " + loc + " with the new location "
+                        + newLoc + " constructed by " + rme);
       }
       addToCache.accept(newLoc);
     } else {

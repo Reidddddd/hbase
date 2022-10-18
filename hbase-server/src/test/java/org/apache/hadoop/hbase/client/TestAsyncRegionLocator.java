@@ -25,13 +25,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
-
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
@@ -203,7 +201,8 @@ public class TestAsyncRegionLocator {
     IntStream.range(0, 2).forEach(
             n -> IntStream.range(0, endKeys.length).map(i -> endKeys.length - 1 - i).forEach(i -> {
               try {
-                assertLocEquals(i == 0 ? EMPTY_START_ROW : endKeys[i - 1], endKeys[i], serverNames[i],
+                assertLocEquals(i == 0 ? EMPTY_START_ROW
+                                : endKeys[i - 1], endKeys[i], serverNames[i],
                         LOCATOR.getPreviousRegionLocation(TABLE_NAME, endKeys[i]).get());
               } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException(e);
