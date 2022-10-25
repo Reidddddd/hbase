@@ -236,9 +236,7 @@ class AsyncRpcRetryingCallerFactory {
     }
 
     public AsyncScanSingleRegionRpcRetryingCaller build() {
-      LOG.info("====== scanner.startScan 1-1 ====== scannerId = " + scannerId + "scannerId >= 0 ? " + (scannerId >=0));
-//      Preconditions.checkArgument(scannerId >= 0, "invalid scannerId %d", scannerId);
-      LOG.info("====== scanner.startScan 1-2 ======");
+      Preconditions.checkArgument(scannerId != -1L, "invalid scannerId %d", scannerId);
       return new AsyncScanSingleRegionRpcRetryingCaller(retryTimer, conn,
               checkNotNull(scan, "scan is null"), scannerId,
               checkNotNull(resultCache, "resultCache is null"),

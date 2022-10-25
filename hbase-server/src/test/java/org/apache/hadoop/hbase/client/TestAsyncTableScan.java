@@ -17,7 +17,18 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import static org.junit.Assert.assertTrue;
 import com.google.common.base.Throwables;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Queue;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.testclassification.ClientTests;
@@ -27,15 +38,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.*;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
 @Category({ MediumTests.class, ClientTests.class })
@@ -127,7 +129,6 @@ public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
     SimpleScanResultConsumer scanObserver = new SimpleScanResultConsumer();
     table.scan(scan, scanObserver);
     List<Result> results = new ArrayList<>();
-    LOG.info("====== start to traverse results ======");
     for (Result result; (result = scanObserver.take()) != null;) {
       results.add(result);
     }

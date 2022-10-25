@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HRegionLocation;
@@ -86,11 +85,23 @@ class AsyncClientScanner {
 
   private static final class OpenScannerResponse {
 
-    public final HRegionLocation loc;
+    public HRegionLocation getLoc() {
+      return loc;
+    }
 
-    public final ClientService.Interface stub;
+    private final HRegionLocation loc;
 
-    public final long scannerId;
+    public Interface getStub() {
+      return stub;
+    }
+
+    private final ClientService.Interface stub;
+
+    public long getScannerId() {
+      return scannerId;
+    }
+
+    private final long scannerId;
 
     public OpenScannerResponse(HRegionLocation loc, Interface stub, long scannerId) {
       this.loc = loc;
@@ -119,22 +130,19 @@ class AsyncClientScanner {
   }
 
   private void startScan(OpenScannerResponse resp) {
-    LOG.info("====== scanner.startScan 1 ======");
-    conn.callerFactory.scanSingleRegion().id(resp.scannerId).location(resp.loc).stub(resp.stub)
+    conn.callerFactory.scanSingleRegion().id(resp.getScannerId()).location(resp.getLoc())
+        .stub(resp.getStub())
         .setScan(scan).consumer(consumer).resultCache(resultCache)
         .rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
         .scanTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS).start()
         .whenComplete((locateToPreviousRegion, error) -> {
-          LOG.info("===== end scan single call ======");
           if (error != null) {
             consumer.onError(error);
             return;
           }
           if (locateToPreviousRegion == null) {
-            LOG.info("===== complete consumer ======");
             consumer.onComplete();
           } else {
-            LOG.info("===== open next scanner, locateToPreviousRegion = " + locateToPreviousRegion.booleanValue());
             openScanner(locateToPreviousRegion.booleanValue());
           }
         });
@@ -146,9 +154,7 @@ class AsyncClientScanner {
         .rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
         .operationTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS).action(this::callOpenScanner).call()
         .whenComplete((resp, error) -> {
-          LOG.info("===== done locate, table = " + tableName + ", row = " + scan.getStartRow() + ", loc = " + resp.loc);
           if (error != null) {
-            LOG.error("===== locate error, ", error);
             consumer.onError(error);
             return;
           }

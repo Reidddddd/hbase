@@ -17,6 +17,11 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import static org.junit.Assert.assertEquals;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.IntStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -25,13 +30,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.IntStream;
-
-import static org.junit.Assert.assertEquals;
 
 public abstract class AbstractTestAsyncTableScan {
 
@@ -67,7 +65,6 @@ public abstract class AbstractTestAsyncTableScan {
       i -> futures.add(table.put(new Put(Bytes.toBytes(String.format("%03d", i)))
           .addColumn(FAMILY, CQ1, Bytes.toBytes(i)).addColumn(FAMILY, CQ2, Bytes.toBytes(i * i)))));
     CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])).get();
-    LOG.info("====== setup done ======");
   }
 
   @AfterClass
@@ -83,9 +80,7 @@ public abstract class AbstractTestAsyncTableScan {
   @Test
   public void testScanAll() throws Exception {
     Scan scan = createScan();
-    LOG.info("====== start to scan all, scan = " + scan.toString());
     List<Result> results = doScan(ASYNC_CONN.getTable(TABLE_NAME), scan);
-    LOG.info("====== done scan all ======" + scan.toString());
     assertEquals(COUNT, results.size());
     IntStream.range(0, COUNT).forEach(i -> {
       Result result = results.get(i);

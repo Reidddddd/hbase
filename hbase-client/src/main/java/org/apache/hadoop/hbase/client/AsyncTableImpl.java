@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -383,7 +382,8 @@ class AsyncTableImpl implements AsyncTable {
     if (scan.isSmall()) {
       if (scan.getBatch() > 0 || scan.getAllowPartialResults()) {
         consumer.onError(
-                new IllegalArgumentException("Batch and allowPartial is not allowed for small scan"));
+                new IllegalArgumentException(
+                        "Batch and allowPartial is not allowed for small scan"));
       } else {
         LOG.warn("This is small scan " + scan + ", consider using smallScan directly?");
       }

@@ -25,13 +25,13 @@ import static org.apache.hadoop.hbase.client.ConnectionUtils.isEmptyStopRow;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.resetController;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.translateException;
+import io.netty.util.HashedWheelTimer;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import io.netty.util.HashedWheelTimer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
@@ -41,13 +41,13 @@ import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.exceptions.OutOfOrderScannerNextException;
 import org.apache.hadoop.hbase.exceptions.ScannerResetException;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
-import org.apache.hadoop.hbase.regionserver.RegionServerStoppedException;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService.Interface;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ScanRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ScanResponse;
+import org.apache.hadoop.hbase.regionserver.RegionServerStoppedException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -107,11 +107,12 @@ class AsyncScanSingleRegionRpcRetryingCaller {
 
   private long nextCallSeq = -1L;
 
-  public AsyncScanSingleRegionRpcRetryingCaller(HashedWheelTimer retryTimer,
-                                                AsyncConnectionImpl conn, Scan scan, long scannerId, ScanResultCache resultCache,
-                                                ScanResultConsumer consumer, Interface stub, HRegionLocation loc, long pauseNs,
-                                                int maxRetries, long scanTimeoutNs, long rpcTimeoutNs, int startLogErrorsCnt) {
-    LOG.info("====== scanner.startScan 1-3 ======");
+  public AsyncScanSingleRegionRpcRetryingCaller(
+          HashedWheelTimer retryTimer, AsyncConnectionImpl conn,
+          Scan scan, long scannerId, ScanResultCache resultCache,
+          ScanResultConsumer consumer, Interface stub, HRegionLocation loc,
+          long pauseNs, int maxRetries, long scanTimeoutNs,
+          long rpcTimeoutNs, int startLogErrorsCnt) {
     this.retryTimer = retryTimer;
     this.scan = scan;
     this.scannerId = scannerId;
@@ -134,7 +135,6 @@ class AsyncScanSingleRegionRpcRetryingCaller {
     this.future = new CompletableFuture<>();
     this.controller = conn.rpcControllerFactory.newController();
     this.exceptions = new ArrayList<>();
-    LOG.info("====== scanner.startScan 1-4 ======");
   }
 
   private long elapsedMs() {
@@ -274,7 +274,6 @@ class AsyncScanSingleRegionRpcRetryingCaller {
   }
 
   private void onComplete(ScanResponse resp) {
-    LOG.info("====== caller onComplete 1");
     if (controller.failed()) {
       onError(controller.getFailed());
       return;
@@ -294,24 +293,19 @@ class AsyncScanSingleRegionRpcRetryingCaller {
       return;
     }
 
-    LOG.info("====== caller onComplete 2");
     boolean stopByUser;
     if (results.length == 0) {
       // if we have nothing to return then this must be a heartbeat message.
       stopByUser = !consumer.onHeartbeat();
-      LOG.info("====== caller onComplete 2-1");
     } else {
       updateNextStartRowWhenError(results[results.length - 1]);
       stopByUser = !consumer.onNext(results);
-      LOG.info("====== caller onComplete 2-2");
     }
     if (resp.hasMoreResults() && !resp.getMoreResults()) {
       // RS tells us there is no more data for the whole scan
-      LOG.info("====== caller onComplete 3");
       completeNoMoreResults();
       return;
     }
-    LOG.info("====== caller onComplete 4");
     if (stopByUser) {
       if (resp.getMoreResultsInRegion()) {
         // we have more results in region but user request to stop the scan, so we need to close the
@@ -321,18 +315,15 @@ class AsyncScanSingleRegionRpcRetryingCaller {
       completeNoMoreResults();
       return;
     }
-    LOG.info("====== caller onComplete 5");
     // as in 2.0 this value will always be set
-    if (!resp.getMoreResultsInRegion()) {
+    if (!resp.getMoreResultsInRegion() || (results.length == 0 && !isHeartbeatMessage)) {
       completeWhenNoMoreResultsInRegion.run();
       return;
     }
-    LOG.info("====== caller onComplete 6");
     next();
   }
 
   private void call() {
-    LOG.info("===== start scan single call ======");
     resetController(controller, rpcTimeoutNs);
     ScanRequest req = RequestConverter.buildScanRequest(scannerId, scan.getCaching(), false,
       nextCallSeq, false, false, scan.getLimit());
@@ -351,7 +342,6 @@ class AsyncScanSingleRegionRpcRetryingCaller {
    * @return return locate direction for next open scanner call, or null if we should stop.
    */
   public CompletableFuture<Boolean> start() {
-    LOG.info("====== scanner.startScan 2 ======");
     next();
     return future;
   }
