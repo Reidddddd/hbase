@@ -18,13 +18,11 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.apache.hadoop.hbase.client.ConnectionUtils.getPauseTime;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.resetController;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
-import com.google.protobuf.ServiceException;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.translateException;
 import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timeout;
-import io.netty.util.TimerTask;
 import java.io.IOException;
-import java.lang.reflect.UndeclaredThrowableException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -40,7 +38,6 @@ import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.hadoop.ipc.RemoteException;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -119,19 +116,6 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
     return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
   }
 
-  private static Throwable translateException(Throwable t) {
-    if (t instanceof UndeclaredThrowableException && t.getCause() != null) {
-      t = t.getCause();
-    }
-    if (t instanceof RemoteException) {
-      t = ((RemoteException) t).unwrapRemoteException();
-    }
-    if (t instanceof ServiceException && t.getCause() != null) {
-      t = translateException(t.getCause());
-    }
-    return t;
-  }
-
   private void completeExceptionally() {
     future.completeExceptionally(new RetriesExhaustedException(tries, exceptions));
   }
@@ -163,22 +147,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
     }
     updateCachedLocation.accept(error);
     tries++;
-    retryTimer.newTimeout(new TimerTask() {
-
-      @Override
-      public void run(Timeout timeout) throws Exception {
-        // always restart from beginning.
-        locateThenCall();
-      }
-    }, delayNs, TimeUnit.NANOSECONDS);
-  }
-
-  private void resetController() {
-    controller.reset();
-    if (rpcTimeoutNs >= 0) {
-      controller.setCallTimeout(
-              (int) Math.min(Integer.MAX_VALUE, TimeUnit.NANOSECONDS.toMillis(rpcTimeoutNs)));
-    }
+    retryTimer.newTimeout(t -> locateThenCall(), delayNs, TimeUnit.NANOSECONDS);
   }
 
   private void call(HRegionLocation loc) {
@@ -195,7 +164,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
               err -> conn.getLocator().updateCachedLocation(loc, err));
       return;
     }
-    resetController();
+    resetController(controller, rpcTimeoutNs);
     callable.call(controller, loc, stub).whenComplete((result, error) -> {
       if (error != null) {
         onError(error,

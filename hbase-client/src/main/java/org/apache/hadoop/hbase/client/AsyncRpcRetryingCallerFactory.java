@@ -20,13 +20,17 @@ package org.apache.hadoop.hbase.client;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.base.Preconditions;
 import io.netty.util.HashedWheelTimer;
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -35,6 +39,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Private
 class AsyncRpcRetryingCallerFactory {
 
+  private static Log LOG = LogFactory.getLog(AsyncRpcRetryingCallerFactory.class);
   private final AsyncConnectionImpl conn;
 
   private final HashedWheelTimer retryTimer;
@@ -170,5 +175,91 @@ class AsyncRpcRetryingCallerFactory {
    */
   public SmallScanCallerBuilder smallScan() {
     return new SmallScanCallerBuilder();
+  }
+
+  public class ScanSingleRegionCallerBuilder {
+
+    private long scannerId = -1L;
+
+    private Scan scan;
+
+    private ScanResultCache resultCache;
+
+    private ScanResultConsumer consumer;
+
+    private ClientService.Interface stub;
+
+    private HRegionLocation loc;
+
+    private long scanTimeoutNs;
+
+    private long rpcTimeoutNs;
+
+    public ScanSingleRegionCallerBuilder id(long scannerId) {
+      this.scannerId = scannerId;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder setScan(Scan scan) {
+      this.scan = scan;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder resultCache(ScanResultCache resultCache) {
+      this.resultCache = resultCache;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder consumer(ScanResultConsumer consumer) {
+      this.consumer = consumer;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder stub(ClientService.Interface stub) {
+      this.stub = stub;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder location(HRegionLocation loc) {
+      this.loc = loc;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder scanTimeout(long scanTimeout, TimeUnit unit) {
+      this.scanTimeoutNs = unit.toNanos(scanTimeout);
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder rpcTimeout(long rpcTimeout, TimeUnit unit) {
+      this.rpcTimeoutNs = unit.toNanos(rpcTimeout);
+      return this;
+    }
+
+    public AsyncScanSingleRegionRpcRetryingCaller build() {
+      LOG.info("====== scanner.startScan 1-1 ====== scannerId = " + scannerId + "scannerId >= 0 ? " + (scannerId >=0));
+//      Preconditions.checkArgument(scannerId >= 0, "invalid scannerId %d", scannerId);
+      LOG.info("====== scanner.startScan 1-2 ======");
+      return new AsyncScanSingleRegionRpcRetryingCaller(retryTimer, conn,
+              checkNotNull(scan, "scan is null"), scannerId,
+              checkNotNull(resultCache, "resultCache is null"),
+              checkNotNull(consumer, "consumer is null"), checkNotNull(stub, "stub is null"),
+              checkNotNull(loc, "location is null"), conn.connConf.getPauseNs(),
+              conn.connConf.getMaxRetries(), scanTimeoutNs, rpcTimeoutNs,
+              conn.connConf.getStartLogErrorsCnt());
+    }
+
+    /**
+     * Short cut for {@code build().start()}.
+     */
+    public CompletableFuture<Boolean> start() {
+      return build().start();
+    }
+  }
+
+  /**
+   * Create retry caller for scanning a region.
+   */
+  public ScanSingleRegionCallerBuilder scanSingleRegion() {
+    return new ScanSingleRegionCallerBuilder();
   }
 }
