@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +56,6 @@ import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import org.mockito.Matchers;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -91,8 +91,8 @@ public class TestHBaseAdminNoCluster {
     // Mock so we get back the master interface.  Make it so when createTable is called, we throw
     // the PleaseHoldException.
     MasterKeepAliveConnection masterAdmin = Mockito.mock(MasterKeepAliveConnection.class);
-    Mockito.when(masterAdmin.createTable((RpcController)Mockito.any(),
-      (CreateTableRequest)Mockito.any())).
+    Mockito.when(masterAdmin.createTable((RpcController) any(),
+      (CreateTableRequest) any())).
         thenThrow(new ServiceException("Test fail").initCause(new PleaseHoldException("test")));
     Mockito.when(connection.getKeepAliveMasterService()).thenReturn(masterAdmin);
     Admin admin = new HBaseAdmin(connection);
@@ -107,8 +107,8 @@ public class TestHBaseAdminNoCluster {
         LOG.info("Expected fail", e);
       }
       // Assert we were called 'count' times.
-      Mockito.verify(masterAdmin, Mockito.atLeast(count)).createTable((RpcController)Mockito.any(),
-        (CreateTableRequest)Mockito.any());
+      Mockito.verify(masterAdmin, Mockito.atLeast(count)).createTable((RpcController) any(),
+        (CreateTableRequest) any());
     } finally {
       admin.close();
       if (connection != null) connection.close();
@@ -127,8 +127,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .getTableDescriptors((RpcController)Mockito.any(),
-            (GetTableDescriptorsRequest)Mockito.any());
+          .getTableDescriptors((RpcController) any(),
+            (GetTableDescriptorsRequest) any());
       }
     });
 
@@ -141,8 +141,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .getTableNames((RpcController)Mockito.any(),
-            (GetTableNamesRequest)Mockito.any());
+          .getTableNames((RpcController) any(),
+            (GetTableNamesRequest) any());
       }
     });
 
@@ -155,8 +155,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .getTableDescriptors((RpcController)Mockito.any(),
-            (GetTableDescriptorsRequest)Mockito.any());
+          .getTableDescriptors((RpcController) any(),
+            (GetTableDescriptorsRequest) any());
       }
     });
 
@@ -169,8 +169,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .getTableDescriptors((RpcController)Mockito.any(),
-            (GetTableDescriptorsRequest)Mockito.any());
+          .getTableDescriptors((RpcController) any(),
+            (GetTableDescriptorsRequest) any());
       }
     });
 
@@ -183,8 +183,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .moveRegion((RpcController)Mockito.any(),
-            (MoveRegionRequest)Mockito.any());
+          .moveRegion((RpcController) any(),
+            (MoveRegionRequest) any());
       }
     });
 
@@ -197,8 +197,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .offlineRegion((RpcController)Mockito.any(),
-            (OfflineRegionRequest)Mockito.any());
+          .offlineRegion((RpcController) any(),
+            (OfflineRegionRequest) any());
       }
     });
 
@@ -211,8 +211,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .setBalancerRunning((RpcController)Mockito.any(),
-            (SetBalancerRunningRequest)Mockito.any());
+          .setBalancerRunning((RpcController) any(),
+            (SetBalancerRunningRequest) any());
       }
     });
 
@@ -225,8 +225,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .balance((RpcController)Mockito.any(),
-            (BalanceRequest)Mockito.any());
+          .balance((RpcController) any(),
+            (BalanceRequest) any());
       }
     });
 
@@ -239,8 +239,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .enableCatalogJanitor((RpcController)Mockito.any(),
-            (EnableCatalogJanitorRequest)Mockito.any());
+          .enableCatalogJanitor((RpcController) any(),
+            (EnableCatalogJanitorRequest) any());
       }
     });
 
@@ -253,8 +253,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .runCatalogScan((RpcController)Mockito.any(),
-            (RunCatalogScanRequest)Mockito.any());
+          .runCatalogScan((RpcController) any(),
+            (RunCatalogScanRequest) any());
       }
     });
 
@@ -267,8 +267,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .isCatalogJanitorEnabled((RpcController)Mockito.any(),
-            (IsCatalogJanitorEnabledRequest)Mockito.any());
+          .isCatalogJanitorEnabled((RpcController) any(),
+            (IsCatalogJanitorEnabledRequest) any());
       }
     });
     // Admin.mergeRegions()
@@ -280,8 +280,8 @@ public class TestHBaseAdminNoCluster {
       @Override
       public void verify(MasterKeepAliveConnection masterAdmin, int count) throws Exception {
         Mockito.verify(masterAdmin, Mockito.atLeast(count))
-          .dispatchMergingRegions((RpcController)Mockito.any(),
-            (DispatchMergingRegionsRequest)Mockito.any());
+          .dispatchMergingRegions((RpcController) any(),
+            (DispatchMergingRegionsRequest) any());
       }
     });
   }
@@ -325,7 +325,7 @@ public class TestHBaseAdminNoCluster {
       admin = Mockito.spy(new HBaseAdmin(connection));
       // mock the call to getRegion since in the absence of a cluster (which means the meta
       // is not assigned), getRegion can't function
-      Mockito.doReturn(null).when(((HBaseAdmin)admin)).getRegion(Matchers.<byte[]>any());
+      Mockito.doReturn(null).when(((HBaseAdmin)admin)).getRegion(any());
       try {
         caller.call(admin); // invoke the HBaseAdmin method
         fail();

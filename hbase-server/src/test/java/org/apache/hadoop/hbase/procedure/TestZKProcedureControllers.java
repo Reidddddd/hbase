@@ -362,7 +362,7 @@ public class TestZKProcedureControllers {
 //    verify(member, Mockito.times(cohortSize)).submitSubprocedure(Mockito.eq(operationName),
 //      (byte[]) Mockito.argThat(new ArrayEquals(data)));
     Mockito.verify(member,
-      Mockito.atLeast(cohortSize)).submitSubprocedure(Mockito.any(Subprocedure.class));
+      Mockito.atLeast(cohortSize)).submitSubprocedure(Mockito.nullable(Subprocedure.class));
 
   }
 

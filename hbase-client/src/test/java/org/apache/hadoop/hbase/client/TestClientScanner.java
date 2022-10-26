@@ -24,9 +24,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -140,7 +140,7 @@ public class TestClientScanner {
         private int count = 0;
         @Override
         public Result[] answer(InvocationOnMock invocation) throws Throwable {
-            ScannerCallableWithReplicas callable = invocation.getArgumentAt(0,
+            ScannerCallableWithReplicas callable = invocation.getArgument(0,
                 ScannerCallableWithReplicas.class);
           switch (count) {
             case 0: // initialize
@@ -201,7 +201,7 @@ public class TestClientScanner {
         private int count = 0;
         @Override
         public Result[] answer(InvocationOnMock invocation) throws Throwable {
-          ScannerCallableWithReplicas callable = invocation.getArgumentAt(0,
+          ScannerCallableWithReplicas callable = invocation.getArgument(0,
               ScannerCallableWithReplicas.class);
           switch (count) {
             case 0: // initialize
@@ -264,7 +264,7 @@ public class TestClientScanner {
         private int count = 0;
         @Override
         public Result[] answer(InvocationOnMock invocation) throws Throwable {
-          ScannerCallableWithReplicas callable = invocation.getArgumentAt(0,
+          ScannerCallableWithReplicas callable = invocation.getArgument(0,
               ScannerCallableWithReplicas.class);
           switch (count) {
             case 0: // initialize
@@ -337,7 +337,7 @@ public class TestClientScanner {
         private int count = 0;
         @Override
         public Result[] answer(InvocationOnMock invocation) throws Throwable {
-          ScannerCallableWithReplicas callable = invocation.getArgumentAt(0,
+          ScannerCallableWithReplicas callable = invocation.getArgument(0,
               ScannerCallableWithReplicas.class);
           switch (count) {
             case 0: // initialize
@@ -402,7 +402,7 @@ public class TestClientScanner {
           private int count = 0;
           @Override
           public Result[] answer(InvocationOnMock invocation) throws Throwable {
-            ScannerCallableWithReplicas callable = invocation.getArgumentAt(0,
+            ScannerCallableWithReplicas callable = invocation.getArgument(0,
                 ScannerCallableWithReplicas.class);
             switch (count) {
               case 0: // initialize

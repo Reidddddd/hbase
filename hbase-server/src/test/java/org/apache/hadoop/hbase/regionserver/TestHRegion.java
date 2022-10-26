@@ -33,9 +33,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -1096,14 +1096,15 @@ public class TestHRegion {
     }
   }
 
-  class IsFlushWALMarker extends ArgumentMatcher<WALEdit> {
+  class IsFlushWALMarker implements ArgumentMatcher<WALEdit> {
     volatile FlushAction[] actions;
     public IsFlushWALMarker(FlushAction... actions) {
       this.actions = actions;
     }
+
     @Override
-    public boolean matches(Object edit) {
-      List<Cell> cells = ((WALEdit)edit).getCells();
+    public boolean matches(WALEdit edit) {
+      List<Cell> cells = edit.getCells();
       if (cells.isEmpty()) {
         return false;
       }
@@ -2335,7 +2336,7 @@ public class TestHRegion {
     Answer<Boolean> answer = new Answer<Boolean>() {
       @Override
       public Boolean answer(InvocationOnMock invocation) throws Throwable {
-        MiniBatchOperationInProgress<Mutation> mb = invocation.getArgumentAt(0,
+        MiniBatchOperationInProgress<Mutation> mb = invocation.getArgument(0,
                 MiniBatchOperationInProgress.class);
         mb.addOperationsFromCP(0, new Mutation[]{addPut});
         return false;
@@ -4267,7 +4268,7 @@ public class TestHRegion {
     HRegionInfo info = null;
     try {
       FileSystem fs = Mockito.mock(FileSystem.class);
-      Mockito.when(fs.exists((Path) Mockito.anyObject())).thenThrow(new IOException());
+      Mockito.when(fs.exists((Path) Mockito.any())).thenThrow(new IOException());
       HTableDescriptor htd = new HTableDescriptor(tableName);
       htd.addFamily(new HColumnDescriptor("cf"));
       info = new HRegionInfo(htd.getTableName(), HConstants.EMPTY_BYTE_ARRAY,
@@ -5958,7 +5959,7 @@ public class TestHRegion {
       thenAnswer(new Answer<Long>() {
         @Override
         public Long answer(InvocationOnMock invocation) throws Throwable {
-          WALKey key = invocation.getArgumentAt(2, WALKey.class);
+          WALKey key = invocation.getArgument(2, WALKey.class);
           MultiVersionConcurrencyControl.WriteEntry we = key.getMvcc().begin();
           key.setWriteEntry(we);
           return 1L;

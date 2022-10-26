@@ -32,7 +32,7 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 
 @Category(SmallTests.class)
@@ -62,7 +62,7 @@ public class TestHelpScreenPresenter {
     verify(helpScreenView).showHelpScreen(eq(TEST_REFRESH_DELAY), argThat(
       new ArgumentMatcher<CommandDescription[]>() {
         @Override
-        public boolean matches(Object o) {
+        public boolean matches(CommandDescription[] o) {
           return ((CommandDescription[]) o).length == 14;
         }
       }));

@@ -36,7 +36,7 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 
 @Category(SmallTests.class)
@@ -74,7 +74,7 @@ public class TestFilterDisplayModeScreenPresenter {
       new ArgumentMatcher<List<RecordFilter>>() {
         @Override
         @SuppressWarnings("unchecked")
-        public boolean matches(Object argument) {
+        public boolean matches(List<RecordFilter> argument) {
           List<RecordFilter> filters = (List<RecordFilter>) argument;
           return filters.size() == 2
             && filters.get(0).toString().equals("NAMESPACE==namespace")

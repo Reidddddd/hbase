@@ -20,11 +20,10 @@ package org.apache.hadoop.hbase.mapred;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertNull;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -75,7 +74,7 @@ public class TestGroupingTableMap {
           mock(OutputCollector.class);
       gTableMap.map(null, result, outputCollectorMock, reporter);
       verify(result).listCells();
-      verifyZeroInteractions(outputCollectorMock);
+      verifyNoMoreInteractions(outputCollectorMock);
     } finally {
       if (gTableMap != null)
         gTableMap.close();    

@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hbase.client;
 
-import static org.mockito.Matchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -83,31 +83,31 @@ public class TestMetaScanner {
 
     MetaScanner.MetaScannerVisitor visitor =
       mock(MetaScanner.MetaScannerVisitor.class);
-    doReturn(true).when(visitor).processRow((Result)anyObject());
+    doReturn(true).when(visitor).processRow((Result)any());
 
     // Scanning the entire table should give us three rows
     MetaScanner.metaScan(connection, visitor, TABLENAME);
-    verify(visitor, times(3)).processRow((Result)anyObject());
+    verify(visitor, times(3)).processRow((Result)any());
 
     // Scanning the table with a specified empty start row should also
     // give us three hbase:meta rows
     reset(visitor);
-    doReturn(true).when(visitor).processRow((Result)anyObject());
+    doReturn(true).when(visitor).processRow((Result)any());
     MetaScanner.metaScan(connection, visitor, TABLENAME, HConstants.EMPTY_BYTE_ARRAY, 1000);
-    verify(visitor, times(3)).processRow((Result)anyObject());
+    verify(visitor, times(3)).processRow((Result)any());
 
     // Scanning the table starting in the middle should give us two rows:
     // region_a and region_b
     reset(visitor);
-    doReturn(true).when(visitor).processRow((Result)anyObject());
+    doReturn(true).when(visitor).processRow((Result)any());
     MetaScanner.metaScan(connection, visitor, TABLENAME, Bytes.toBytes("region_ac"), 1000);
-    verify(visitor, times(2)).processRow((Result)anyObject());
+    verify(visitor, times(2)).processRow((Result)any());
 
     // Scanning with a limit of 1 should only give us one row
     reset(visitor);
-    doReturn(true).when(visitor).processRow((Result) anyObject());
+    doReturn(true).when(visitor).processRow((Result) any());
     MetaScanner.metaScan(connection, visitor, TABLENAME, Bytes.toBytes("region_ac"), 1);
-    verify(visitor, times(1)).processRow((Result) anyObject());
+    verify(visitor, times(1)).processRow((Result) any());
 
     // Verifying whether passed meta is honored by call or not
     try {

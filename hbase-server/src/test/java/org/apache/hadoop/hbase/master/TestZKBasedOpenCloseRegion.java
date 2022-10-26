@@ -55,7 +55,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.Mockito;
-import org.mockito.internal.util.reflection.Whitebox;
+import org.mockito.internal.util.reflection.ReflectionMemberAccessor;
 
 /**
  * Test open and close of regions using zk.
@@ -212,9 +212,11 @@ public class TestZKBasedOpenCloseRegion {
     HRegionInfo REGIONINFO = new HRegionInfo(TableName.valueOf("t"),
         HConstants.EMPTY_START_ROW, HConstants.EMPTY_START_ROW);
     HRegionServer regionServer = TEST_UTIL.getHBaseCluster().getRegionServer(0);
+    ReflectionMemberAccessor accessor = new ReflectionMemberAccessor();
+    Class clz = regionServer.getClass().getSuperclass();
+    Object orizinalState = accessor.get(clz.getDeclaredField("tableDescriptors"), regionServer);
     TableDescriptors htd = Mockito.mock(TableDescriptors.class);
-    Object orizinalState = Whitebox.getInternalState(regionServer,"tableDescriptors");
-    Whitebox.setInternalState(regionServer, "tableDescriptors", htd);
+    accessor.set(clz.getDeclaredField("tableDescriptors"), regionServer, htd);
     Mockito.doThrow(new IOException()).when(htd).get((TableName) Mockito.any());
     try {
       ProtobufUtil.openRegion(null, regionServer.getRSRpcServices(),
@@ -222,7 +224,7 @@ public class TestZKBasedOpenCloseRegion {
       fail("It should throw IOException ");
     } catch (IOException e) {
     }
-    Whitebox.setInternalState(regionServer, "tableDescriptors", orizinalState);
+    accessor.set(clz.getDeclaredField("tableDescriptors"), regionServer, orizinalState);
     assertFalse("Region should not be in RIT",
         regionServer.getRegionsInTransitionInRS().containsKey(REGIONINFO.getEncodedNameAsBytes()));
   }

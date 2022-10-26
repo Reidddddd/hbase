@@ -19,7 +19,7 @@ package org.apache.hadoop.hbase.client.coprocessor;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -86,9 +86,9 @@ public class TestSecureBulkLoadClient {
     doAnswer(new Answer<Void>() {
       @Override
       public Void answer(InvocationOnMock invocation) throws Throwable {
-        MethodDescriptor method = invocation.getArgumentAt(0, MethodDescriptor.class);
-        ServerRpcController controller = invocation.getArgumentAt(1, ServerRpcController.class);
-        RpcCallback<Message> rpcCallback = invocation.getArgumentAt(4, RpcCallback.class);
+        MethodDescriptor method = invocation.getArgument(0, MethodDescriptor.class);
+        ServerRpcController controller = invocation.getArgument(1, ServerRpcController.class);
+        RpcCallback<Message> rpcCallback = invocation.getArgument(4, RpcCallback.class);
 
         assertEquals(expectedMethodName, method.getName());
         controller.setFailedOn(failureCause);

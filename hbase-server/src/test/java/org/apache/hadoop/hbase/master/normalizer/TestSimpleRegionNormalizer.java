@@ -27,7 +27,6 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.master.MasterRpcServices;
 import org.apache.hadoop.hbase.master.MasterServices;
-import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.IsSplitOrMergeEnabledRequest;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.IsSplitOrMergeEnabledResponse;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
@@ -47,7 +46,8 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.when;
 
@@ -288,7 +288,7 @@ public class TestSimpleRegionNormalizer {
         getRegionsLoad().get(region.getKey())).thenReturn(regionLoad);
     }
     try {
-      when(masterRpcServices.isSplitOrMergeEnabled(any(RpcController.class),
+      when(masterRpcServices.isSplitOrMergeEnabled(nullable(RpcController.class),
         any(IsSplitOrMergeEnabledRequest.class))).thenReturn(
           IsSplitOrMergeEnabledResponse.newBuilder().setEnabled(true).build());
     } catch (ServiceException se) {

@@ -388,9 +388,9 @@ public class TestRegionMergeTransaction {
     RegionMergeTransactionImpl mt = prepareOnGoodRegions();
     Mockito.doThrow(new MockedFailedMergedRegionOpen())
         .when(mt)
-        .openMergedRegion((Server) Mockito.anyObject(),
-            (RegionServerServices) Mockito.anyObject(),
-            (HRegion) Mockito.anyObject());
+        .openMergedRegion((Server) Mockito.any(),
+            (RegionServerServices) Mockito.any(),
+            (HRegion) Mockito.any());
 
     // Run the execute. Look at what it returns.
     boolean expectedException = false;

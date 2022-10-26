@@ -33,7 +33,7 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
 @Category({ ClientTests.class, SmallTests.class })
@@ -59,11 +59,11 @@ public class TestReversedScannerCallable {
 
     Mockito.when(connection.getConfiguration()).thenReturn(new Configuration());
     Mockito.when(regionLocations.size()).thenReturn(1);
-    Mockito.when(regionLocations.getRegionLocation(0)).thenReturn(regionLocation);
+    Mockito.lenient().when(regionLocations.getRegionLocation(0)).thenReturn(regionLocation);
     Mockito.when(regionLocation.getHostname()).thenReturn("localhost");
-    Mockito.when(regionLocation.getRegionInfo()).thenReturn(regionInfo);
+    Mockito.lenient().when(regionLocation.getRegionInfo()).thenReturn(regionInfo);
     Mockito.when(regionLocation.getServerName()).thenReturn(serverName);
-    Mockito.when(regionInfo.containsRow(ROW_BEFORE)).thenReturn(true);
+    Mockito.lenient().when(regionInfo.containsRow(ROW_BEFORE)).thenReturn(true);
     Mockito.when(scan.includeStartRow()).thenReturn(true);
     Mockito.when(scan.getStartRow()).thenReturn(ROW);
   }

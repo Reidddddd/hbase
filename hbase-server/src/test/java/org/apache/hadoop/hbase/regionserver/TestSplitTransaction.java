@@ -21,8 +21,8 @@ package org.apache.hadoop.hbase.regionserver;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import org.apache.hadoop.hbase.MockRegionServerServicesWithWALs;
@@ -154,8 +154,8 @@ public class TestSplitTransaction {
     Mockito
         .doThrow(new MockedFailedDaughterOpen())
         .when(spiedUponSt)
-        .openDaughterRegion((Server) Mockito.anyObject(),
-            (HRegion) Mockito.anyObject());
+        .openDaughterRegion((Server) Mockito.any(),
+            (HRegion) Mockito.any());
 
     // Run the execute.  Look at what it returns.
     boolean expectedException = false;

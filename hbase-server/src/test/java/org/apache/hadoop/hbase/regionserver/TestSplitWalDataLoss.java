@@ -53,7 +53,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import org.mockito.Matchers;
+import org.mockito.ArgumentMatchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -115,9 +115,9 @@ public class TestSplitWalDataLoss {
           region.getRegionInfo().getEncodedNameAsBytes());
         throw new DroppedSnapshotException("testcase");
       }
-    }).when(spiedRegion).internalFlushCacheAndCommit(Matchers.<WAL> any(),
-      Matchers.<MonitoredTask> any(), Matchers.<PrepareFlushResult> any(),
-      Matchers.<Collection<Store>> any());
+    }).when(spiedRegion).internalFlushCacheAndCommit(ArgumentMatchers.<WAL> any(),
+        ArgumentMatchers.<MonitoredTask> any(), ArgumentMatchers.<PrepareFlushResult> any(),
+        ArgumentMatchers.<Collection<Store>> any());
     // Find region key; don't pick up key for hbase:meta by mistake.
     String key = null;
     for (Map.Entry<String, Region> entry: rs.onlineRegions.entrySet()) {

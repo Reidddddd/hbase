@@ -19,7 +19,6 @@
 package org.apache.hadoop.hbase.master;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
 
 import java.io.IOException;
 import java.io.StringWriter;

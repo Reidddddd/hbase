@@ -39,7 +39,7 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatcher;
 import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.MockitoJUnitRunner;
 
 @Category(SmallTests.class)
 @RunWith(MockitoJUnitRunner.class)
@@ -105,24 +105,24 @@ public class TestTopScreenPresenter {
     verify(topScreenView).showTopScreen(
       argThat(new ArgumentMatcher<Summary>() {
         @Override
-        public boolean matches(Object argument) {
+        public boolean matches(Summary argument) {
           return assertSummary((Summary) argument);
         }
       }), argThat(new ArgumentMatcher<List<Header>>() {
         @Override
         @SuppressWarnings("unchecked")
-        public boolean matches(Object argument) {
+        public boolean matches(List<Header> argument) {
           return assertHeaders((List<Header>) argument);
         }
       }), argThat(new ArgumentMatcher<List<Record>>() {
         @Override
         @SuppressWarnings("unchecked")
-        public boolean matches(Object argument) {
+        public boolean matches(List<Record> argument) {
           return assertRecords((List<Record>) argument);
         }
       }), argThat(new ArgumentMatcher<Record>() {
         @Override
-        public boolean matches(Object argument) {
+        public boolean matches(Record argument) {
           return assertSelectedRecord((Record) argument, 0);
         }
       }));
@@ -174,7 +174,7 @@ public class TestTopScreenPresenter {
     inOrder.verify(topScreenView).showTopScreen(any(Summary.class), any(List.class),
       any(List.class), argThat(new ArgumentMatcher<Record>() {
         @Override
-        public boolean matches(Object argument) {
+        public boolean matches(Record argument) {
           return assertSelectedRecord((Record) argument, expectedSelectedRecodeIndex);
         }
       })
@@ -223,7 +223,7 @@ public class TestTopScreenPresenter {
     inOrder.verify(topScreenView).showTopScreen(any(Summary.class),
       argThat(new ArgumentMatcher<List<Header>>() {
         @Override
-        public boolean matches(Object argument) {
+        public boolean matches(List<Header> argument) {
           List<Header> headers = (List<Header>) argument;
           return headers.size() == expectedHeaderCount;
         }

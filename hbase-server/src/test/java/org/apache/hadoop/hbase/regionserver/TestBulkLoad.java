@@ -22,6 +22,12 @@ import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -55,14 +61,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.hamcrest.Description;
-import org.hamcrest.Matcher;
-import org.hamcrest.TypeSafeMatcher;
 
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.mockito.ArgumentMatcher;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -112,7 +112,7 @@ public class TestBulkLoad {
                     familyName, storeFileNames)),
             any(boolean.class))).thenAnswer(new Answer() {
       public Object answer(InvocationOnMock invocation) {
-        WALKey walKey = invocation.getArgumentAt(2, WALKey.class);
+        WALKey walKey = invocation.getArgument(2, WALKey.class);
         MultiVersionConcurrencyControl mvcc = walKey.getMvcc();
         if (mvcc != null) {
           MultiVersionConcurrencyControl.WriteEntry we = mvcc.begin();
@@ -138,7 +138,7 @@ public class TestBulkLoad {
             any(WALKey.class), argThat(bulkLogWalEditType(WALEdit.BULK_LOAD)),
             any(boolean.class))).thenAnswer(new Answer() {
       public Object answer(InvocationOnMock invocation) {
-        WALKey walKey = invocation.getArgumentAt(2, WALKey.class);
+        WALKey walKey = invocation.getArgument(2, WALKey.class);
         MultiVersionConcurrencyControl mvcc = walKey.getMvcc();
         if (mvcc != null) {
           MultiVersionConcurrencyControl.WriteEntry we = mvcc.begin();
@@ -157,7 +157,7 @@ public class TestBulkLoad {
             any(WALKey.class), argThat(bulkLogWalEditType(WALEdit.BULK_LOAD)),
             any(boolean.class))).thenAnswer(new Answer() {
               public Object answer(InvocationOnMock invocation) {
-                WALKey walKey = invocation.getArgumentAt(2, WALKey.class);
+                WALKey walKey = invocation.getArgument(2, WALKey.class);
                 MultiVersionConcurrencyControl mvcc = walKey.getMvcc();
                 if (mvcc != null) {
                   MultiVersionConcurrencyControl.WriteEntry we = mvcc.begin();
@@ -177,7 +177,7 @@ public class TestBulkLoad {
             any(WALKey.class), argThat(bulkLogWalEditType(WALEdit.BULK_LOAD)),
             any(boolean.class))).thenAnswer(new Answer() {
       public Object answer(InvocationOnMock invocation) {
-        WALKey walKey = invocation.getArgumentAt(2, WALKey.class);
+        WALKey walKey = invocation.getArgument(2, WALKey.class);
         MultiVersionConcurrencyControl mvcc = walKey.getMvcc();
         if (mvcc != null) {
           MultiVersionConcurrencyControl.WriteEntry we = mvcc.begin();
@@ -293,16 +293,16 @@ public class TestBulkLoad {
     return hFileLocation.getAbsoluteFile().getAbsolutePath();
   }
 
-  private static Matcher<WALEdit> bulkLogWalEditType(byte[] typeBytes) {
+  private static ArgumentMatcher<WALEdit> bulkLogWalEditType(byte[] typeBytes) {
     return new WalMatcher(typeBytes);
   }
 
-  private static Matcher<WALEdit> bulkLogWalEdit(byte[] typeBytes, byte[] tableName,
+  private static ArgumentMatcher<WALEdit> bulkLogWalEdit(byte[] typeBytes, byte[] tableName,
       byte[] familyName, List<String> storeFileNames) {
     return new WalMatcher(typeBytes, tableName, familyName, storeFileNames);
   }
 
-  private static class WalMatcher extends TypeSafeMatcher<WALEdit> {
+  private static class WalMatcher implements ArgumentMatcher<WALEdit> {
     private final byte[] typeBytes;
     private final byte[] tableName;
     private final byte[] familyName;
@@ -321,7 +321,7 @@ public class TestBulkLoad {
     }
 
     @Override
-    protected boolean matchesSafely(WALEdit item) {
+    public boolean matches(WALEdit item) {
       assertTrue(Arrays.equals(item.getCells().get(0).getQualifier(), typeBytes));
       BulkLoadDescriptor desc;
       try {
@@ -333,7 +333,7 @@ public class TestBulkLoad {
 
       if (tableName != null) {
         assertTrue(Bytes.equals(ProtobufUtil.toTableName(desc.getTableName()).getName(),
-          tableName));
+            tableName));
       }
 
       if(storeFileNames != null) {
@@ -347,9 +347,5 @@ public class TestBulkLoad {
       return true;
     }
 
-    @Override
-    public void describeTo(Description description) {
-
-    }
   }
 }

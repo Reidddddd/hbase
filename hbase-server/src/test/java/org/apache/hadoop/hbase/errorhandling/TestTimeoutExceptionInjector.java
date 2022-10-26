@@ -77,7 +77,7 @@ public class TestTimeoutExceptionInjector {
       LOG.debug("Correctly failed timer: " + e.getMessage());
     }
     Thread.sleep(time + 1);
-    Mockito.verifyZeroInteractions(listener);
+    Mockito.verifyNoMoreInteractions(listener);
   }
 
   /**

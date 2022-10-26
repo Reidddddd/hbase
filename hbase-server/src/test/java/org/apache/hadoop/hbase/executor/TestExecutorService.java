@@ -198,7 +198,7 @@ public class TestExecutorService {
       @Override
       public boolean evaluate() throws Exception {
         try {
-          verify(server, times(1)).abort(anyString(), (Throwable) anyObject());
+          verify(server, times(1)).abort(anyString(), (Throwable) any());
           return true;
         } catch (Throwable t) {
           return false;

@@ -59,7 +59,7 @@ public class TestStaticUserWebFilter {
     suf.doFilter(mock(HttpServletRequest.class), mock(ServletResponse.class),
         chain);
         
-    Mockito.verify(chain).doFilter(wrapperArg.capture(), Mockito.<ServletResponse>anyObject());
+    Mockito.verify(chain).doFilter(wrapperArg.capture(), Mockito.<ServletResponse>any());
     
     HttpServletRequestWrapper wrapper = wrapperArg.getValue();
     assertEquals("myuser", wrapper.getUserPrincipal().getName());

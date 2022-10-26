@@ -220,7 +220,7 @@ public class TestFailedAppendAndSync {
 
       // So, should be no abort at this stage. Verify.
       Mockito.verify(server, Mockito.atLeast(0)).
-        abort(Mockito.anyString(), (Throwable)Mockito.anyObject());
+        abort(Mockito.anyString(), (Throwable)Mockito.any());
       try {
         dodgyWAL.throwAppendException = false;
         dodgyWAL.throwSyncException = true;
@@ -236,7 +236,7 @@ public class TestFailedAppendAndSync {
       while (true) {
         try {
           Mockito.verify(server, Mockito.atLeast(1)).
-            abort(Mockito.anyString(), (Throwable)Mockito.anyObject());
+            abort(Mockito.anyString(), (Throwable)Mockito.any());
           break;
         } catch (WantedButNotInvoked t) {
           Threads.sleep(1);

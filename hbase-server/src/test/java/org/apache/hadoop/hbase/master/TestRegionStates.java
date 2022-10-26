@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static junit.framework.Assert.assertFalse;
-import static org.mockito.Matchers.isA;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 

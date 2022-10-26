@@ -20,9 +20,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -139,8 +139,8 @@ public class TestSimpleRpcScheduler {
     scheduler.init(CONTEXT);
     scheduler.start();
     for (CallRunner task : tasks) {
-      when(qosFunction.getPriority((RPCProtos.RequestHeader) anyObject(),
-        (Message) anyObject(), (User) anyObject()))
+      when(qosFunction.getPriority((RPCProtos.RequestHeader) any(),
+        (Message) any(), (User) any()))
           .thenReturn(qos.get(task));
       scheduler.dispatch(task);
     }
@@ -199,9 +199,9 @@ public class TestSimpleRpcScheduler {
       when(hugeCallTask.getCall()).thenReturn(hugeCall);
       when(hugeCall.getHeader()).thenReturn(hugeHead);
 
-      when(priority.getDeadline(eq(smallHead), any(Message.class))).thenReturn(0L);
-      when(priority.getDeadline(eq(largeHead), any(Message.class))).thenReturn(50L);
-      when(priority.getDeadline(eq(hugeHead), any(Message.class))).thenReturn(100L);
+      when(priority.getDeadline(eq(smallHead), nullable(Message.class))).thenReturn(0L);
+      when(priority.getDeadline(eq(largeHead), nullable(Message.class))).thenReturn(50L);
+      when(priority.getDeadline(eq(hugeHead), nullable(Message.class))).thenReturn(100L);
 
       final ArrayList<Integer> work = new ArrayList<Integer>();
       doAnswerTaskExecution(smallCallTask, work, 10, 250);
