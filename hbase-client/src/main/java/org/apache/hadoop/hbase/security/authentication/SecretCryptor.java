@@ -19,9 +19,10 @@ package org.apache.hadoop.hbase.security.authentication;
 
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.codec.binary.Base64;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
 import org.apache.hadoop.hbase.secret.crypto.AbstractSecretCryptor;
@@ -34,15 +35,15 @@ import org.apache.yetus.audience.InterfaceAudience;
  * So that this class cannot be static.
  */
 @InterfaceAudience.Private
-public class SecretDecryptor extends AbstractSecretCryptor {
-  private static final Log LOG = LogFactory.getLog(SecretDecryptor.class);
+public class SecretCryptor extends AbstractSecretCryptor {
+  private static final Log LOG = LogFactory.getLog(SecretCryptor.class);
 
-  public SecretDecryptor() {
+  public SecretCryptor() {
     super();
   }
 
   @Override
-  public void initDecryption(Object obj) throws IOException {
+  public void initCryptos(Object obj, byte[] cf, byte[] passwordQualifier) throws IOException {
     if (!(obj instanceof Table)) {
       throw new IllegalArgumentIOException("There should be a Table object to initialize server "
         + "side decryptor, but got: " + obj.getClass().getName());
@@ -55,16 +56,18 @@ public class SecretDecryptor extends AbstractSecretCryptor {
       byte[] key = null;
       for (SecretCryptoType type : SecretCryptoType.values()) {
         try {
-          byte[] keyBytes = SecretTableAccessor.getUserPassword(type.getHashedName(), table);
+          Get get = new Get(type.getHashedName());
+          get.addColumn(cf, passwordQualifier);
+          byte[] keyBytes = table.get(get).value();
           key = Base64.decodeBase64(keyBytes);
           if (key == null || key.length != type.getKeyLength()) {
             throw new IllegalArgumentException("Failed to get valid secret key for algo: "
-                + type.getName() + " from secret table. ");
+              + type.getName() + " from secret table. ");
           }
           secretCryptoSet.initOneDecryption(type, key);
         } catch (Throwable t) {
           String msg = "Invalid secret key: " + Arrays.toString(key) +
-              " detected for algo " + type.getName() + '\n';
+            " detected for algo " + type.getName() + '\n';
           LOG.warn(msg, t);
           throw t;
         }

@@ -75,7 +75,7 @@ public class TestCredentialCache {
   public void testRefresh() throws IOException, InterruptedException {
     HRegionServer rs = TEST_UTIL.getMiniHBaseCluster().getRegionServer(0);
     CredentialCache cc = new CredentialCache(rs, SUPER_USERNAME);
-    DummyDecryptor decryptor = new DummyDecryptor();
+    DummyCryptor decryptor = new DummyCryptor();
     decryptor.setInitialized(false);
     cc.setDecryptor(decryptor);
 
@@ -128,7 +128,7 @@ public class TestCredentialCache {
     return Encryption.hash256Hex(username);
   }
 
-  static class DummyDecryptor extends SecretDecryptor {
+  static class DummyCryptor extends SecretCryptor {
     private boolean initialized = false;
 
     @Override

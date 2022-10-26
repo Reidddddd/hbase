@@ -36,7 +36,7 @@ public class TestSecretCryptor {
   @Test
   public void testCorrectness() throws IOException {
     TestCryptor cryptor = new TestCryptor();
-    cryptor.initDecryption(null);
+    cryptor.initCryptos(null, (byte[])null, (byte[])null);
 
     // Here we repeat 10 times to try to cover all 4 types of encryption.
     for (int i = 0; i < 10; i++) {
@@ -49,7 +49,7 @@ public class TestSecretCryptor {
   static class TestCryptor extends AbstractSecretCryptor {
 
     @Override
-    public void initDecryption(Object obj) {
+    public void initCryptos(Object obj, byte[] cf, byte[] passwordQualifier) {
       SecretCryptoType[] types = SecretCryptoType.values();
       for (SecretCryptoType type : types) {
         byte[] key = new byte[type.getKeyLength()];

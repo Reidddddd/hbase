@@ -52,7 +52,7 @@ public abstract class AbstractSecretCryptor {
       // We should never go here.
       throw new IllegalArgumentIOException("The secret for decryption is invalid. ");
     }
-    SecretCrypto decryption = secretCryptoSet.getDecryptionFromType(type);
+    SecretCrypto decryption = secretCryptoSet.getCryptoFromType(type);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Select decryption " + decryption.getClass() + " from type: " + type.getName());
     }
@@ -67,8 +67,7 @@ public abstract class AbstractSecretCryptor {
     try {
       int typeNum = (ThreadLocalRandom.current().nextInt(0, Integer.MAX_VALUE)
         % SecretCryptoType.values().length) + 1;
-      SecretCrypto crypto =
-        secretCryptoSet.getDecryptionFromType(SecretCryptoType.getType(typeNum));
+      SecretCrypto crypto = secretCryptoSet.getCryptoFromType(SecretCryptoType.getType(typeNum));
       return Base64.encodeBase64(crypto.encryptSecret(secret));
     } catch (GeneralSecurityException e) {
       throw new IOException(e.getMessage());
@@ -83,5 +82,11 @@ public abstract class AbstractSecretCryptor {
     return initialized;
   }
 
-  public abstract void initDecryption(Object obj) throws IOException;
+  public void initCryptos(Object obj, String cf, String passwordQualifier)
+    throws IOException {
+    initCryptos(obj, Bytes.toBytes(cf), Bytes.toBytes(passwordQualifier));
+  }
+
+  public abstract void initCryptos(Object obj, byte[] cf, byte[] passwordQualifier)
+    throws IOException;
 }

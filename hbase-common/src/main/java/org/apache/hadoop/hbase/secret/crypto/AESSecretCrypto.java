@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hbase.secret.crypto;
 
-import java.security.GeneralSecurityException;
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**

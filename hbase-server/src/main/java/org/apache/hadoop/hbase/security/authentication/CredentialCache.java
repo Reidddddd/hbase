@@ -46,7 +46,7 @@ public class CredentialCache {
   private static final String CREDENTIAL_REFRESH_PERIOD = "hbase.secret.refresh.period";
   private static final int CREDENTIAL_REFRESH_PERIOD_DEFAULT = 600000;  // In milliseconds
 
-  private SecretDecryptor decryptor = new SecretDecryptor();
+  private SecretCryptor decryptor = new SecretCryptor();
   private final ThreadLocal<Table> authTable = new ThreadLocal<>();
 
   private final ConcurrentMap<String, CredentialEntry> credentialMap = new ConcurrentHashMap<>();
@@ -101,7 +101,8 @@ public class CredentialCache {
               Thread.sleep(1000);
             }
             Thread.sleep(1000);
-            decryptor.initDecryption(getAuthTable());
+            decryptor.initCryptos(getAuthTable(), SecretTableAccessor.getSecretTableColumnFamily(),
+              SecretTableAccessor.getSecretTablePasswordQualifier());
           } catch (Throwable t) {
             LOG.warn(msg, t);
           }
@@ -252,7 +253,7 @@ public class CredentialCache {
   }
 
   @VisibleForTesting
-  void setDecryptor(SecretDecryptor decryptor) {
+  void setDecryptor(SecretCryptor decryptor) {
     this.decryptor = decryptor;
   }
 }

@@ -19,15 +19,22 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -41,8 +48,14 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
+import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
+import org.apache.hadoop.hbase.secret.crypto.SecretCryptoType;
+import org.apache.hadoop.hbase.security.authentication.SecretAdmin;
+import org.apache.hadoop.hbase.security.authentication.SecretCryptor;
+import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
+import org.apache.hadoop.hbase.util.Base64;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZKTableStateClientSideReader;
 import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
@@ -170,9 +183,9 @@ public class TestAdmin3 extends TestAdminBase {
   public void testEnableTableRetainAssignment() throws IOException {
     final TableName tableName = TableName.valueOf("testEnableTableAssignment");
     byte[][] splitKeys = { new byte[] { 1, 1, 1 }, new byte[] { 2, 2, 2 },
-        new byte[] { 3, 3, 3 }, new byte[] { 4, 4, 4 }, new byte[] { 5, 5, 5 },
-        new byte[] { 6, 6, 6 }, new byte[] { 7, 7, 7 }, new byte[] { 8, 8, 8 },
-        new byte[] { 9, 9, 9 } };
+      new byte[] { 3, 3, 3 }, new byte[] { 4, 4, 4 }, new byte[] { 5, 5, 5 },
+      new byte[] { 6, 6, 6 }, new byte[] { 7, 7, 7 }, new byte[] { 8, 8, 8 },
+      new byte[] { 9, 9, 9 } };
     int expectedRegions = splitKeys.length + 1;
     HTableDescriptor desc = new HTableDescriptor(tableName);
     desc.addFamily(new HColumnDescriptor(HConstants.CATALOG_FAMILY));
@@ -370,5 +383,106 @@ public class TestAdmin3 extends TestAdminBase {
     Map<String, Integer> collect = zNodeInfoList.stream().collect(
             Collectors.toMap(node -> node.getPath(), node -> node.getCount()));
     assertEquals(Integer.valueOf(1), collect.get("/hbase/master"));
+  }
+
+  @Test(timeout = 300000)
+  public void testInitSecretAdminWithoutSecretTable() throws IOException {
+    TableName secretTable = SecretTableAccessor.getSecretTableName();
+    // If hbase:secret exist, delete it and refresh the admin to guarantee the inner cryptor is not
+    // initialized.
+    if (admin.tableExists(secretTable)) {
+      TEST_UTIL.deleteTable(secretTable);
+    }
+    try {
+      SecretAdmin secretAdmin = createSecretAdmin(TEST_UTIL.getConnection());
+      fail("We should raise IOException when secretTable does not exist.");
+    } catch (Exception e) {
+      assertTrue(e.getCause() instanceof IOException);
+      assertTrue(e.getCause().getMessage().contains("Try to initialize cryptor the cluster is not "
+        + "initialized with secret key"));
+    }
+  }
+
+  @Test(timeout = 300000)
+  public void testUpdateAndRemoveAccountPassword()
+    throws IOException, InvocationTargetException, NoSuchMethodException, InstantiationException,
+    IllegalAccessException {
+    createSecretTableIfNotExist();
+
+    String username = "username";
+    String password = "password";
+    SecretAdmin secretAdmin = createSecretAdmin(TEST_UTIL.getConnection());
+    secretAdmin.setAccountPassword(username, password);
+    Table secretTable =
+      TEST_UTIL.getConnection().getTable(SecretTableAccessor.getSecretTableName());
+    SecretCryptor secretCryptor = new SecretCryptor();
+    secretCryptor.initCryptos(secretTable, "i", "p");
+
+    byte[] secret = SecretTableAccessor.getUserPassword(
+      Bytes.toBytes(Hex.encodeHexString(Encryption.hash256(username))), secretTable);
+    byte[] plainPasswordBytes = secretCryptor.decryptSecret(secret);
+    assertEquals(Bytes.toString(plainPasswordBytes), password);
+
+    // Remove the account.
+    secretAdmin.removeAccount(username);
+    secret = SecretTableAccessor.getUserPassword(
+      Bytes.toBytes(Hex.encodeHexString(Encryption.hash256(username))), secretTable);
+    assertNull(secret);
+  }
+
+  @Test(timeout = 300000)
+  public void testUpdateAccountAllowFallback()
+    throws IOException, InvocationTargetException, NoSuchMethodException, InstantiationException,
+    IllegalAccessException {
+    createSecretTableIfNotExist();
+    String username = "username";
+    SecretAdmin secretAdmin = createSecretAdmin(TEST_UTIL.getConnection());
+
+    secretAdmin.allowAccountFallback(username);
+    Table secretTable =
+      TEST_UTIL.getConnection().getTable(SecretTableAccessor.getSecretTableName());
+    assertTrue(SecretTableAccessor.allowFallback(Hex.encodeHexString(Encryption.hash256(username)),
+      secretTable));
+
+    secretAdmin.disallowAccountFallback(username);
+    assertFalse(SecretTableAccessor.allowFallback(Hex.encodeHexString(Encryption.hash256(username)),
+      secretTable));
+  }
+
+  private void createSecretTableIfNotExist() throws IOException {
+    if (!admin.tableExists(SecretTableAccessor.getSecretTableName())) {
+      Table secretTable = TEST_UTIL.createTable(SecretTableAccessor.getSecretTableName(),
+        SecretTableAccessor.getSecretTableColumnFamily());
+      SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
+      Arrays.stream(SecretCryptoType.values()).forEach((SecretCryptoType type) -> {
+        try {
+          // If there is no secret key for this algo, generate a new one.
+          if (secretTable.get(new Get(type.getHashedName())).isEmpty()) {
+            byte[] newKey = new byte[type.getKeyLength()];
+            rand.nextBytes(newKey);
+            SecretTableAccessor.insertSecretKey(type.getHashedName(),
+              Bytes.toBytes(Base64.encodeBytes(newKey)), secretTable);
+          }
+        } catch (IOException e) {
+          LOG.error(e);
+        }
+      });
+    }
+  }
+
+  private SecretAdmin createSecretAdmin(Connection connection)
+      throws NoSuchMethodException, InvocationTargetException, InstantiationException,
+      IllegalAccessException {
+    Constructor<SecretAdmin> constructor =
+      SecretAdmin.class.getDeclaredConstructor(Connection.class, String.class,
+        String.class, String.class, String.class);
+    SecretAdmin admin;
+    try {
+      constructor.setAccessible(true);
+      admin = constructor.newInstance(connection, "hbase:secret", "i", "p", "a");
+    } finally {
+      constructor.setAccessible(false);
+    }
+    return admin;
   }
 }

@@ -25,7 +25,6 @@ import java.security.SecureRandom;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-
 import org.apache.hadoop.hbase.secret.crypto.AESSecretCrypto;
 import org.apache.hadoop.hbase.secret.crypto.BFSecretCrypto;
 import org.apache.hadoop.hbase.secret.crypto.DES3SecretCrypto;
@@ -44,7 +43,7 @@ public class TestSecretCrypto {
   private static final String VALID_USER_PASSWORD = "password0";
 
   @Test
-  public void testAESDecryption() throws GeneralSecurityException {
+  public void testAESCrypto() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
     SecretCryptoType type = SecretCryptoType.AES;
     byte[] key = new byte[type.getKeyLength()];
@@ -72,7 +71,7 @@ public class TestSecretCrypto {
   }
 
   @Test
-  public void TestRC4SecretDecryption() throws GeneralSecurityException {
+  public void TestRC4SecretCrypto() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
     SecretCryptoType type = SecretCryptoType.RC4;
     byte[] key = new byte[type.getKeyLength()];
@@ -91,7 +90,7 @@ public class TestSecretCrypto {
   }
 
   @Test
-  public void TestBFSecretDecryption() throws GeneralSecurityException {
+  public void TestBFSecretCrypto() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
     SecretCryptoType type = SecretCryptoType.BLOW_FISH;
     byte[] key = new byte[type.getKeyLength()];
@@ -110,7 +109,7 @@ public class TestSecretCrypto {
   }
 
   @Test
-  public void testDES3Decryption() throws GeneralSecurityException {
+  public void testDES3Crypto() throws GeneralSecurityException {
     SecureRandom rand = new SecureRandom(Bytes.toBytes(System.currentTimeMillis()));
     SecretCryptoType type = SecretCryptoType.DES3;
     byte[] key = new byte[type.getKeyLength()];

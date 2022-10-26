@@ -27,16 +27,16 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Private
 public class SecretCryptoSet {
 
-  private final Map<SecretCryptoType, SecretCrypto> decryptionMap =
+  private final Map<SecretCryptoType, SecretCrypto> cryptoMap =
       new ConcurrentHashMap<>(SecretCryptoType.values().length);
 
-  public SecretCrypto getDecryptionFromType(SecretCryptoType type) {
-    return decryptionMap.get(type);
+  public SecretCrypto getCryptoFromType(SecretCryptoType type) {
+    return cryptoMap.get(type);
   }
 
   public void initOneDecryption(SecretCryptoType type, byte[] key)
       throws IllegalArgumentException {
-    SecretCrypto res = decryptionMap.get(type);
+    SecretCrypto res = cryptoMap.get(type);
     if (res == null) {
       switch (type) {
         case AES:
@@ -55,7 +55,7 @@ public class SecretCryptoSet {
           throw new IllegalArgumentException("Invalid encryption type "
               + type.getName() + " detected");
       }
-      decryptionMap.putIfAbsent(type, res);
+      cryptoMap.putIfAbsent(type, res);
     }
   }
 }

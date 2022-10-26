@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.security.authentication;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -160,9 +161,31 @@ public final class SecretTableAccessor {
   /**
    * Util function only used for secret table initialization.
    */
-  static void insertSecretKey(byte[] algoName, byte[] key, Table table) throws IOException {
+  @VisibleForTesting
+  public static void insertSecretKey(byte[] algoName, byte[] key, Table table) throws IOException {
     Put put = new Put(algoName);
     put.addColumn(Bytes.toBytes(SECRET_FAMILY_KEY), Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY), key);
     table.put(put);
+  }
+
+  /**
+   * Return the cf key in byte[].
+   */
+  public static byte[] getSecretTableColumnFamily() {
+    return Bytes.toBytes(SECRET_FAMILY_KEY);
+  }
+
+  /**
+   * Return the password qualifier in byte[].
+   */
+  public static byte[] getSecretTablePasswordQualifier() {
+    return Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY);
+  }
+
+  /**
+   * return the allow fallback key in byte[].
+   */
+  public static byte[] getSecretTableAllowFallbackQualifier() {
+    return Bytes.toBytes(SECRET_COLUMN_ALLOW_FALLBACK_KEY);
   }
 }
