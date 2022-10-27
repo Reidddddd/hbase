@@ -25,6 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -72,6 +73,7 @@ import org.apache.hadoop.hbase.wal.WAL;
 import org.junit.After;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -86,30 +88,32 @@ import org.mockito.stubbing.Answer;
  */
 @Category(MediumTests.class)
 public class TestCompaction {
+  private final static Log LOG = LogFactory.getLog(TestCompaction.class.getName());
+  private final static HBaseTestingUtility UTIL = HBaseTestingUtility.createLocalHTU();
+  private final static byte [] COLUMN_FAMILY = fam1;
+  private final static byte [] STARTROW = Bytes.toBytes(START_KEY);
+  private final static byte [] COLUMN_FAMILY_TEXT = COLUMN_FAMILY;
+  private final static long MAX_FILES_TO_COMPACT = 10;
+  private final static byte[] FAMILY = Bytes.toBytes("cf");
+  private final static HColumnDescriptor hcd = new HColumnDescriptor(FAMILY).setMaxVersions(65536);
+
+  protected final static Configuration conf = UTIL.getConfiguration();
+
+  private static int compactionThreshold;
+  private static byte[] secondRowBytes;
+  private static byte[] thirdRowBytes;
+
   @Rule public TestName name = new TestName();
-  private static final Log LOG = LogFactory.getLog(TestCompaction.class.getName());
-  private static final HBaseTestingUtility UTIL = HBaseTestingUtility.createLocalHTU();
-  protected Configuration conf = UTIL.getConfiguration();
 
   private HRegion r = null;
   private HTableDescriptor htd = null;
-  private static final byte [] COLUMN_FAMILY = fam1;
-  private final byte [] STARTROW = Bytes.toBytes(START_KEY);
-  private static final byte [] COLUMN_FAMILY_TEXT = COLUMN_FAMILY;
-  private int compactionThreshold;
-  private byte[] secondRowBytes, thirdRowBytes;
-  private static final long MAX_FILES_TO_COMPACT = 10;
-  private final byte[] FAMILY = Bytes.toBytes("cf");
 
-  /** constructor */
-  public TestCompaction() {
-    super();
-
-    // Set cache flush size to 1MB
+  @BeforeClass
+  public static void init() throws Exception {
     conf.setInt(HConstants.HREGION_MEMSTORE_FLUSH_SIZE, 1024 * 1024);
     conf.setInt(HConstants.HREGION_MEMSTORE_BLOCK_MULTIPLIER, 100);
     conf.set(CompactionThroughputControllerFactory.HBASE_THROUGHPUT_CONTROLLER_KEY,
-      NoLimitThroughputController.class.getName());
+        NoLimitThroughputController.class.getName());
     compactionThreshold = conf.getInt("hbase.hstore.compactionThreshold", 3);
 
     secondRowBytes = START_KEY_BYTES.clone();
@@ -127,8 +131,6 @@ public class TestCompaction {
       UTIL.getConfiguration().set(
           DefaultStoreEngine.DEFAULT_COMPACTOR_CLASS_KEY,
           DummyCompactor.class.getName());
-      HColumnDescriptor hcd = new HColumnDescriptor(FAMILY);
-      hcd.setMaxVersions(65536);
       this.htd.addFamily(hcd);
     }
     this.r = UTIL.createLocalHRegion(htd, null, null);
@@ -558,17 +560,15 @@ public class TestCompaction {
     cst.shutdownLongCompactions();
     // Set up the region mock that redirects compactions.
     HRegion r = mock(HRegion.class);
-    when(
-      r.compact(any(CompactionContext.class), any(Store.class),
-        any(ThroughputController.class), any(User.class))).then(new Answer<Boolean>() {
+    when(r.compact(any(CompactionContext.class), any(Store.class),
+            any(ThroughputController.class), nullable(User.class))).then(new Answer<Boolean>() {
       @Override
       public Boolean answer(InvocationOnMock invocation) throws Throwable {
         invocation.getArgument(0, CompactionContext.class).compact(
-          invocation.getArgument(2, ThroughputController.class), null);
+            invocation.getArgument(2, ThroughputController.class), null);
         return true;
       }
     });
-
     // Set up store mocks for 2 "real" stores and the one we use for blocking CST.
     ArrayList<Integer> results = new ArrayList<Integer>();
     StoreMockMaker sm = new StoreMockMaker(results), sm2 = new StoreMockMaker(results);

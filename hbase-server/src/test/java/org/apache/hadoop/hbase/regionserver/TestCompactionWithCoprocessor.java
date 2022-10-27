@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.regionserver;
 
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
+import org.junit.BeforeClass;
 import org.junit.experimental.categories.Category;
 
 /**
@@ -27,10 +28,12 @@ import org.junit.experimental.categories.Category;
  */
 @Category(MediumTests.class)
 public class TestCompactionWithCoprocessor extends TestCompaction {
-  /** constructor */
-  public TestCompactionWithCoprocessor() throws Exception {
-    super();
+
+  @BeforeClass
+  public static void init() throws Exception {
+    TestCompaction.init();
     conf.setStrings(CoprocessorHost.USER_REGION_COPROCESSOR_CONF_KEY,
         NoOpScanPolicyObserver.class.getName());
   }
+
 }

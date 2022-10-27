@@ -57,7 +57,7 @@ public class StatefulStoreMockMaker {
     when(store.requestCompaction(
         anyInt(), isNull())).then(new SelectAnswer());
     when(store.requestCompaction(
-      anyInt(), isNull(), any(User.class))).then(new SelectAnswer());
+      anyInt(), isNull(), nullable(User.class))).then(new SelectAnswer());
     when(store.getCompactPriority()).then(new PriorityAnswer());
     doAnswer(new CancelAnswer()).when(
         store).cancelRequestedCompaction(any(CompactionContext.class));

@@ -25,7 +25,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -641,7 +641,7 @@ public class TestWALEntryStream {
     // start up a reader
     Path walPath = getQueue().peek();
     ReplicationSource source = Mockito.mock(ReplicationSource.class);
-    when(source.getSourceMetrics()).thenReturn(new MetricsSource("1"));
+    lenient().when(source.getSourceMetrics()).thenReturn(new MetricsSource("1"));
 
     final AtomicBoolean enabled = new AtomicBoolean(false);
     when(source.isPeerEnabled()).thenAnswer(new Answer<Boolean>() {
@@ -761,9 +761,9 @@ public class TestWALEntryStream {
 
   private MetricsSource getMockMetrics() {
     MetricsSource source = mock(MetricsSource.class);
-    doNothing().when(source).incrSizeOfLogQueue();
-    doNothing().when(source).decrSizeOfLogQueue();
-    doNothing().when(source).setOldestWalAge(Mockito.anyInt());
+    lenient().doNothing().when(source).incrSizeOfLogQueue();
+    lenient().doNothing().when(source).decrSizeOfLogQueue();
+    lenient().doNothing().when(source).setOldestWalAge(Mockito.anyInt());
     return source;
   }
 
