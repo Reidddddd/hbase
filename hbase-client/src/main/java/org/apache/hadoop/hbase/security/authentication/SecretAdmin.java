@@ -140,7 +140,7 @@ public final class SecretAdmin {
     }
     Table secretTable = this.connection.getTable(TableName.valueOf(tableName));
     if (!this.secretCryptor.isInitialized()) {
-      this.secretCryptor.initCryptos(secretTable, tableName, passwordQualifier);
+      this.secretCryptor.initCryptos(secretTable, columnFamily, passwordQualifier);
     }
   }
 }

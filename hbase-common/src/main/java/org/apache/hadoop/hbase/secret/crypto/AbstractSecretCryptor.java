@@ -82,9 +82,9 @@ public abstract class AbstractSecretCryptor {
     return initialized;
   }
 
-  public void initCryptos(Object obj, String cf, String passwordQualifier)
+  public void initCryptos(Object obj, String columnFamily, String passwordQualifier)
     throws IOException {
-    initCryptos(obj, Bytes.toBytes(cf), Bytes.toBytes(passwordQualifier));
+    initCryptos(obj, Bytes.toBytes(columnFamily), Bytes.toBytes(passwordQualifier));
   }
 
   public abstract void initCryptos(Object obj, byte[] cf, byte[] passwordQualifier)
