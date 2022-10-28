@@ -98,7 +98,7 @@ public class TestAsyncSingleRequestRpcRetryingCaller {
     TEST_UTIL.getHBaseAdmin().move(loc.getRegionInfo().getEncodedNameAsBytes(), Bytes.toBytes(
             TEST_UTIL.getHBaseCluster().getRegionServer(1 - index)
                     .getServerName().getServerName()));
-    AsyncTable table = asyncConn.getTable(TABLE_NAME);
+    RawAsyncTable table = asyncConn.getRawTable(TABLE_NAME);
     table.put(new Put(ROW).addColumn(FAMILY, QUALIFIER, VALUE)).get();
 
     // move back
@@ -184,7 +184,7 @@ public class TestAsyncSingleRequestRpcRetryingCaller {
           return mockedLocator;
         }
       }) {
-      AsyncTable table = new AsyncTableImpl(mockedConn, TABLE_NAME);
+      RawAsyncTable table = new RawAsyncTableImpl(mockedConn, TABLE_NAME);
       table.put(new Put(ROW).addColumn(FAMILY, QUALIFIER, VALUE)).get();
       assertTrue(errorTriggered.get());
       errorTriggered.set(false);
