@@ -50,6 +50,14 @@ public abstract class ScanResultCache {
   }
 
   /**
+   * Add the given results to cache and get valid results back.
+   * @param results the results of a scan next. Must not be null.
+   * @param isHeartbeatMessage indicate whether the results is gotten from a heartbeat response.
+   * @return valid results, never null.
+   */
+  abstract Result[] addAndGet(Result[] results, boolean isHeartbeatMessage) throws IOException;
+
+  /**
    * Process the results from the server and load it to cache.
    * @param results the results of a scan next. Must not be null.
    * @param isHeartbeatMessage indicate whether the results is gotten from a heartbeat response.

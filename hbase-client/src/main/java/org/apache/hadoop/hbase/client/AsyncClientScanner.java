@@ -52,7 +52,7 @@ class AsyncClientScanner {
   // AsyncScanSingleRegionRpcRetryingCaller will modify this scan object directly.
   private final Scan scan;
 
-  private final ScanResultConsumer consumer;
+  private final RawScanResultConsumer consumer;
 
   private final TableName tableName;
 
@@ -66,7 +66,7 @@ class AsyncClientScanner {
 
   private final ScanResultCache resultCache;
 
-  public AsyncClientScanner(Scan scan, ScanResultConsumer consumer, TableName tableName,
+  public AsyncClientScanner(Scan scan, RawScanResultConsumer consumer, TableName tableName,
                             AsyncConnectionImpl conn, long scanTimeoutNs, long rpcTimeoutNs) {
     if (scan.getStartRow() == null) {
       scan.setStartRow(EMPTY_START_ROW);

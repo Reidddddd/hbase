@@ -248,6 +248,15 @@ public class ConnectionUtils {
     }
   };
 
+  static long calcEstimatedSize(Result rs) {
+    long estimatedHeapSizeOfResult = 0;
+    // We don't make Iterator here
+    for (Cell cell : rs.rawCells()) {
+      estimatedHeapSizeOfResult += CellUtil.estimatedHeapSizeOf(cell);
+    }
+    return estimatedHeapSizeOfResult;
+  }
+
   static Result filterCells(Result result, Cell keepCellsAfter) {
     if (keepCellsAfter == null) {
       // do not need to filter

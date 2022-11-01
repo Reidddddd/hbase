@@ -21,6 +21,7 @@ import static org.apache.hadoop.hbase.client.ConnectionUtils.filterCells;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
@@ -104,6 +105,61 @@ public class BatchScanResultCache extends ScanResultCache {
     numCellsOfPartialResults -= batch;
     return Result.create(cells, null, stale,
       result.mayHaveMoreCellsInRow() || !partialResults.isEmpty());
+  }
+
+  @Override
+  public Result[] addAndGet(Result[] results, boolean isHeartbeatMessage) throws IOException {
+    if (results.length == 0) {
+      if (!isHeartbeatMessage) {
+        if (!partialResults.isEmpty()) {
+          return new Result[] { createCompletedResult() };
+        }
+        if (lastResultPartial) {
+          // An empty non heartbeat result indicate that there must be a row change. So if the
+          // lastResultPartial is true then we need to increase numberOfCompleteRows.
+          numberOfCompleteRows++;
+        }
+      }
+      return EMPTY_RESULT_ARRAY;
+    }
+    List<Result> regroupedResults = new ArrayList<>();
+    for (Result result : results) {
+      result = filterCells(result, lastCell);
+      if (result == null) {
+        continue;
+      }
+      if (!partialResults.isEmpty()) {
+        if (!Bytes.equals(partialResults.peek().getRow(), result.getRow())) {
+          // there is a row change
+          regroupedResults.add(createCompletedResult());
+        }
+      } else if (lastResultPartial && !CellUtil.matchingRow(lastCell, result.getRow())) {
+        // As for batched scan we may return partial results to user if we reach the batch limit, so
+        // here we need to use lastCell to determine if there is row change and increase
+        // numberOfCompleteRows.
+        numberOfCompleteRows++;
+      }
+      // check if we have a row change
+      if (
+              !partialResults.isEmpty() && !Bytes.equals(partialResults.peek().getRow(), result.getRow())
+      ) {
+        regroupedResults.add(createCompletedResult());
+      }
+      Result regroupedResult = regroupResults(result);
+      if (regroupedResult != null) {
+        if (!regroupedResult.mayHaveMoreCellsInRow()) {
+          numberOfCompleteRows++;
+        }
+        regroupedResults.add(regroupedResult);
+        // only update last cell when we actually return it to user.
+        recordLastResult(regroupedResult);
+      }
+      if (!result.mayHaveMoreCellsInRow() && !partialResults.isEmpty()) {
+        // We are done for this row
+        regroupedResults.add(createCompletedResult());
+      }
+    }
+    return regroupedResults.toArray(new Result[0]);
   }
 
   @Override

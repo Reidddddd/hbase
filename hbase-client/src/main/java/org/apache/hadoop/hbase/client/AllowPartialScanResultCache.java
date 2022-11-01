@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.client;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.filterCells;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.hbase.Cell;
@@ -62,7 +63,7 @@ class AllowPartialScanResultCache extends ScanResultCache {
     }
     int i;
     for (i = 0; i < results.length; i++) {
-      Result r = filterCells(results[i], lastCell);
+      Result r = ConnectionUtils.filterCells(results[i], lastCell);
       if (r != null) {
         results[i] = r;
         break;
@@ -77,6 +78,37 @@ class AllowPartialScanResultCache extends ScanResultCache {
     }
     recordLastResult(results[results.length - 1]);
     addResultArrayToCache(results, i, results.length);
+  }
+
+  private Result filterCells(Result result) {
+    return lastCell == null ? result : ConnectionUtils.filterCells(result, lastCell);
+  }
+
+  private void updateLastCell(Result result) {
+    lastCell = result.rawCells()[result.rawCells().length - 1];
+  }
+
+  @Override
+  public Result[] addAndGet(Result[] results, boolean isHeartbeatMessage) throws IOException {
+    if (results.length == 0) {
+      return EMPTY_RESULT_ARRAY;
+    }
+    Result first = filterCells(results[0]);
+    if (results.length == 1) {
+      if (first == null) {
+        // do not update last cell if we filter out all cells
+        return EMPTY_RESULT_ARRAY;
+      }
+      updateLastCell(results[0]);
+      results[0] = first;
+      return results;
+    }
+    updateLastCell(results[results.length - 1]);
+    if (first == null) {
+      return Arrays.copyOfRange(results, 1, results.length);
+    }
+    results[0] = first;
+    return results;
   }
 
   @Override

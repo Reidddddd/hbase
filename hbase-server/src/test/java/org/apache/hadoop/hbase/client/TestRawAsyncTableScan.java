@@ -18,17 +18,17 @@
 package org.apache.hadoop.hbase.client;
 
 import com.google.common.base.Throwables;
+
+import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ForkJoinPool;
+import java.util.Queue;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+
 import org.apache.hadoop.hbase.testclassification.ClientTests;
-import org.apache.hadoop.hbase.testclassification.LargeTests;
+import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -36,27 +36,35 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
-@Category({ LargeTests.class, ClientTests.class })
-public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
+@Category({ MediumTests.class, ClientTests.class })
+public class TestRawAsyncTableScan extends AbstractTestAsyncTableScan {
 
-  private static final class SimpleScanResultConsumer implements ScanResultConsumer {
+  private static final class SimpleRawScanResultConsumer implements RawScanResultConsumer {
 
-    private final List<Result> results = new ArrayList<>();
+    private final Queue<Result> queue = new ArrayDeque<>();
 
-    private boolean finished = false;
+    private boolean finished;
 
     private Throwable error;
 
     @Override
-    public synchronized boolean onNext(Result result) {
-      results.add(result);
+    public synchronized boolean onNext(Result[] results) {
+      for (Result result : results) {
+        queue.offer(result);
+      }
+      notifyAll();
+      return true;
+    }
+
+    @Override
+    public boolean onHeartbeat() {
       return true;
     }
 
     @Override
     public synchronized void onError(Throwable error) {
-      this.error = error;
       finished = true;
+      this.error = error;
       notifyAll();
     }
 
@@ -66,15 +74,21 @@ public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
       notifyAll();
     }
 
-    public synchronized List<Result> getAll() throws Exception {
-      while (!finished) {
+    public synchronized Result take() throws IOException, InterruptedException {
+      for (;;) {
+        if (!queue.isEmpty()) {
+          return queue.poll();
+        }
+        if (finished) {
+          if (error != null) {
+            Throwables.propagateIfPossible(error, IOException.class);
+            throw new IOException(error);
+          } else {
+            return null;
+          }
+        }
         wait();
       }
-      if (error != null) {
-        Throwables.propagateIfPossible(error, Exception.class);
-        throw new Exception(error);
-      }
-      return results;
     }
   }
 
@@ -83,10 +97,8 @@ public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
 
   @Parameters
   public static List<Object[]> params() {
-    return Arrays.asList(new Supplier<?>[] { TestAsyncTableScan::createNormalScan },
-            new Supplier<?>[] { TestAsyncTableScan::createBatchScan },
-            new Supplier<?>[] { TestAsyncTableScan::createSmallResultSizeScan },
-            new Supplier<?>[] { TestAsyncTableScan::createBatchSmallResultSizeScan });
+    return Arrays.asList(new Supplier<?>[] { TestRawAsyncTableScan::createNormalScan },
+            new Supplier<?>[] { TestRawAsyncTableScan::createBatchScan });
   }
 
   private static Scan createNormalScan() {
@@ -97,30 +109,19 @@ public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
     return new Scan().setBatch(1);
   }
 
-  // set a small result size for testing flow control
-  private static Scan createSmallResultSizeScan() {
-    return new Scan().setMaxResultSize(1);
-  }
-
-  private static Scan createBatchSmallResultSizeScan() {
-    return new Scan().setBatch(1).setMaxResultSize(1);
-  }
-
   @Override
   protected Scan createScan() {
     return scanCreater.get();
   }
 
-  private Result convertToPartial(Result result) {
-    return Result.create(result.rawCells(), result.getExists(), result.isStale(), true);
-  }
-
   @Override
   protected List<Result> doScan(Scan scan) throws Exception {
-    AsyncTable table = ASYNC_CONN.getTable(TABLE_NAME, ForkJoinPool.commonPool());
-    SimpleScanResultConsumer consumer = new SimpleScanResultConsumer();
-    table.scan(scan, consumer);
-    List<Result> results = consumer.getAll();
+    SimpleRawScanResultConsumer scanConsumer = new SimpleRawScanResultConsumer();
+    ASYNC_CONN.getRawTable(TABLE_NAME).scan(scan, scanConsumer);
+    List<Result> results = new ArrayList<>();
+    for (Result result; (result = scanConsumer.take()) != null;) {
+      results.add(result);
+    }
     if (scan.getBatch() > 0) {
       results = convertFromBatchResult(results);
     }

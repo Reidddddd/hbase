@@ -71,7 +71,7 @@ class AsyncScanSingleRegionRpcRetryingCaller {
 
   private final ScanResultCache resultCache;
 
-  private final ScanResultConsumer consumer;
+  private final RawScanResultConsumer consumer;
 
   private final ClientService.Interface stub;
 
@@ -110,7 +110,7 @@ class AsyncScanSingleRegionRpcRetryingCaller {
   public AsyncScanSingleRegionRpcRetryingCaller(
           HashedWheelTimer retryTimer, AsyncConnectionImpl conn,
           Scan scan, long scannerId, ScanResultCache resultCache,
-          ScanResultConsumer consumer, Interface stub, HRegionLocation loc,
+          RawScanResultConsumer consumer, Interface stub, HRegionLocation loc,
           long pauseNs, int maxRetries, long scanTimeoutNs,
           long rpcTimeoutNs, int startLogErrorsCnt) {
     this.retryTimer = retryTimer;
@@ -244,7 +244,7 @@ class AsyncScanSingleRegionRpcRetryingCaller {
 
   private void updateNextStartRowWhenError(Result result) {
     nextStartRowWhenError = result.getRow();
-    includeNextStartRowWhenError = result.isPartial();
+    includeNextStartRowWhenError = scan.getBatch() > 0 || result.isPartial();
   }
 
   private void completeWhenNoMoreResultsInRegion() {
@@ -280,10 +280,14 @@ class AsyncScanSingleRegionRpcRetryingCaller {
     }
     boolean isHeartbeatMessage = resp.hasHeartbeatMessage() && resp.getHeartbeatMessage();
     Result[] results;
+    boolean nullResults = false;
     try {
       results = ResponseConverter.getResults(controller.cellScanner(), resp);
-      results = results != null ? results : ScanResultCache.EMPTY_RESULT_ARRAY;
-      resultCache.loadResultsToCache(results, isHeartbeatMessage);
+      if (results == null) {
+        nullResults = true;
+        results = ScanResultCache.EMPTY_RESULT_ARRAY;
+      }
+      results = resultCache.addAndGet(results, isHeartbeatMessage);
     } catch (IOException e) {
       // We can not retry here. The server has responded normally and the call sequence has been
       // increased so a new scan with the same call sequence will cause an
@@ -316,7 +320,7 @@ class AsyncScanSingleRegionRpcRetryingCaller {
       return;
     }
     // as in 2.0 this value will always be set
-    if (!resp.getMoreResultsInRegion() || (results.length == 0 && !isHeartbeatMessage)) {
+    if (!resp.getMoreResultsInRegion() || (nullResults && !isHeartbeatMessage)) {
       completeWhenNoMoreResultsInRegion.run();
       return;
     }
