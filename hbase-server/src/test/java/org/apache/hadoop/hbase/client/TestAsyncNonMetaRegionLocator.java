@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
@@ -48,7 +49,7 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 @Category({ MediumTests.class, ClientTests.class })
-public class TestAsyncRegionLocator {
+public class TestAsyncNonMetaRegionLocator {
 
   private static final HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
 
@@ -58,7 +59,7 @@ public class TestAsyncRegionLocator {
 
   private static AsyncConnectionImpl CONN;
 
-  private static AsyncRegionLocator LOCATOR;
+  private static AsyncNonMetaRegionLocator LOCATOR;
 
   private static byte[][] SPLIT_KEYS;
 
@@ -67,7 +68,7 @@ public class TestAsyncRegionLocator {
     TEST_UTIL.startMiniCluster(3);
     TEST_UTIL.getHBaseAdmin().setBalancerRunning(false, true);
     CONN = new AsyncConnectionImpl(TEST_UTIL.getConfiguration(), User.getCurrent());
-    LOCATOR = CONN.getLocator();
+    LOCATOR = new AsyncNonMetaRegionLocator(CONN);
     SPLIT_KEYS = new byte[8][];
     for (int i = 111; i < 999; i += 111) {
       SPLIT_KEYS[i / 111 - 1] = Bytes.toBytes(String.format("%03d", i));
@@ -76,7 +77,7 @@ public class TestAsyncRegionLocator {
 
   @AfterClass
   public static void tearDown() throws Exception {
-    CONN.close();
+    IOUtils.closeQuietly(CONN);
     TEST_UTIL.shutdownMiniCluster();
   }
 
@@ -100,12 +101,12 @@ public class TestAsyncRegionLocator {
   @Test
   public void testNoTable() throws InterruptedException {
     try {
-      LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get();
+      LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get();
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(TableNotFoundException.class));
     }
     try {
-      LOCATOR.getPreviousRegionLocation(TABLE_NAME, EMPTY_END_ROW, 0L).get();
+      LOCATOR.getPreviousRegionLocation(TABLE_NAME, EMPTY_END_ROW).get();
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(TableNotFoundException.class));
     }
@@ -116,12 +117,12 @@ public class TestAsyncRegionLocator {
     createSingleRegionTable();
     TEST_UTIL.getHBaseAdmin().disableTable(TABLE_NAME);
     try {
-      LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get();
+      LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get();
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(TableNotFoundException.class));
     }
     try {
-      LOCATOR.getPreviousRegionLocation(TABLE_NAME, EMPTY_END_ROW, 0L).get();
+      LOCATOR.getPreviousRegionLocation(TABLE_NAME, EMPTY_END_ROW).get();
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(TableNotFoundException.class));
     }
@@ -141,17 +142,17 @@ public class TestAsyncRegionLocator {
     createSingleRegionTable();
     ServerName serverName = TEST_UTIL.getRSForFirstRegionInTable(TABLE_NAME).getServerName();
     assertLocEquals(EMPTY_START_ROW, EMPTY_END_ROW, serverName,
-            LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get());
+            LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get());
     assertLocEquals(EMPTY_START_ROW, EMPTY_END_ROW, serverName,
-            LOCATOR.getPreviousRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get());
+            LOCATOR.getPreviousRegionLocation(TABLE_NAME, EMPTY_START_ROW).get());
     byte[] randKey = new byte[ThreadLocalRandom.current().nextInt(128)];
     ThreadLocalRandom.current().nextBytes(randKey);
     assertLocEquals(EMPTY_START_ROW, EMPTY_END_ROW, serverName,
-            LOCATOR.getRegionLocation(TABLE_NAME, randKey, 0L).get());
+            LOCATOR.getRegionLocation(TABLE_NAME, randKey).get());
     // Use a key which is not the endKey of a region will cause error
     try {
       assertLocEquals(EMPTY_START_ROW, EMPTY_END_ROW, serverName,
-              LOCATOR.getPreviousRegionLocation(TABLE_NAME, new byte[] { 1 }, 0L).get());
+              LOCATOR.getPreviousRegionLocation(TABLE_NAME, new byte[] { 1 }).get());
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(IOException.class));
       assertTrue(e.getCause().getMessage().contains("end key of"));
@@ -191,7 +192,7 @@ public class TestAsyncRegionLocator {
     IntStream.range(0, 2).forEach(n -> IntStream.range(0, startKeys.length).forEach(i -> {
       try {
         assertLocEquals(startKeys[i], i == startKeys.length - 1 ? EMPTY_END_ROW : startKeys[i + 1],
-                serverNames[i], LOCATOR.getRegionLocation(TABLE_NAME, startKeys[i], 0L).get());
+                serverNames[i], LOCATOR.getRegionLocation(TABLE_NAME, startKeys[i]).get());
       } catch (InterruptedException | ExecutionException e) {
         throw new RuntimeException(e);
       }
@@ -203,7 +204,7 @@ public class TestAsyncRegionLocator {
               try {
                 assertLocEquals(i == 0 ? EMPTY_START_ROW
                                 : endKeys[i - 1], endKeys[i], serverNames[i],
-                        LOCATOR.getPreviousRegionLocation(TABLE_NAME, endKeys[i], 0L).get());
+                        LOCATOR.getPreviousRegionLocation(TABLE_NAME, endKeys[i]).get());
               } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException(e);
               }
@@ -214,7 +215,7 @@ public class TestAsyncRegionLocator {
   public void testRegionMove() throws IOException, InterruptedException, ExecutionException {
     createSingleRegionTable();
     ServerName serverName = TEST_UTIL.getRSForFirstRegionInTable(TABLE_NAME).getServerName();
-    HRegionLocation loc = LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get();
+    HRegionLocation loc = LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get();
     assertLocEquals(EMPTY_START_ROW, EMPTY_END_ROW, serverName, loc);
     ServerName newServerName = TEST_UTIL.getHBaseCluster().getRegionServerThreads().stream()
             .map(t -> t.getRegionServer().getServerName()).filter(sn -> !sn.equals(serverName))
@@ -227,12 +228,12 @@ public class TestAsyncRegionLocator {
       Thread.sleep(100);
     }
     // Should be same as it is in cache
-    assertSame(loc, LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get());
+    assertSame(loc, LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get());
     LOCATOR.updateCachedLocation(loc, null);
     // null error will not trigger a cache cleanup
-    assertSame(loc, LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get());
+    assertSame(loc, LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get());
     LOCATOR.updateCachedLocation(loc, new NotServingRegionException());
     assertLocEquals(EMPTY_START_ROW, EMPTY_END_ROW, newServerName,
-            LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW, 0L).get());
+            LOCATOR.getRegionLocation(TABLE_NAME, EMPTY_START_ROW).get());
   }
 }

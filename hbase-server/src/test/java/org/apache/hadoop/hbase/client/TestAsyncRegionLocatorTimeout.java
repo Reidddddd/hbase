@@ -25,11 +25,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HRegionLocation;
@@ -90,7 +89,7 @@ public class TestAsyncRegionLocatorTimeout {
 
   @AfterClass
   public static void tearDown() throws Exception {
-    CONN.close();
+    IOUtils.closeQuietly(CONN);
     TEST_UTIL.shutdownMiniCluster();
   }
 
@@ -112,8 +111,8 @@ public class TestAsyncRegionLocatorTimeout {
     // wait for the background task finish
     Thread.sleep(2000);
     // Now the location should be in cache, so we will not visit meta again.
-    HRegionLocation loc = LOCATOR
-            .getRegionLocation(TABLE_NAME, EMPTY_START_ROW, TimeUnit.MILLISECONDS.toNanos(500)).get();
+    HRegionLocation loc = LOCATOR.getRegionLocation(
+            TABLE_NAME, EMPTY_START_ROW, TimeUnit.MILLISECONDS.toNanos(500)).get();
     assertEquals(loc.getServerName(),
             TEST_UTIL.getHBaseCluster().getRegionServer(0).getServerName());
   }

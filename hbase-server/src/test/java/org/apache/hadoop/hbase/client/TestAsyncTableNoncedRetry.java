@@ -21,6 +21,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.security.User;
@@ -86,7 +87,7 @@ public class TestAsyncTableNoncedRetry {
 
   @AfterClass
   public static void tearDownAfterClass() throws Exception {
-    ASYNC_CONN.close();
+    IOUtils.closeQuietly(ASYNC_CONN);
     TEST_UTIL.shutdownMiniCluster();
   }
 
