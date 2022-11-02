@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -48,6 +49,9 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
 
   private static final Log LOG = LogFactory.getLog(AsyncSingleRequestRpcRetryingCaller.class);
 
+  // Add a delta to avoid timeout immediately after a retry sleeping.
+  private static final long SLEEP_DELTA_NS = TimeUnit.MILLISECONDS.toNanos(1);
+
   @FunctionalInterface
   public interface Callable<T> {
     CompletableFuture<T> call(HBaseRpcController controller, HRegionLocation loc,
@@ -62,7 +66,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
 
   private final byte[] row;
 
-  private final Supplier<CompletableFuture<HRegionLocation>> locate;
+  private final Function<Long, CompletableFuture<HRegionLocation>> locate;
 
   private final Callable<T> callable;
 
@@ -116,6 +120,10 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
     return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
   }
 
+  private long remainingTimeNs() {
+    return operationTimeoutNs - (System.nanoTime() - startNs);
+  }
+
   private void completeExceptionally() {
     future.completeExceptionally(new RetriesExhaustedException(tries, exceptions));
   }
@@ -136,7 +144,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
     }
     long delayNs;
     if (operationTimeoutNs > 0) {
-      long maxDelayNs = operationTimeoutNs - (System.nanoTime() - startNs);
+      long maxDelayNs = operationTimeoutNs - (System.nanoTime() - startNs)  - SLEEP_DELTA_NS;
       if (maxDelayNs <= 0) {
         completeExceptionally();
         return;
@@ -151,6 +159,17 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
   }
 
   private void call(HRegionLocation loc) {
+    long callTimeoutNs;
+    if (operationTimeoutNs > 0) {
+      callTimeoutNs = remainingTimeNs();
+      if (callTimeoutNs <= 0) {
+        completeExceptionally();
+        return;
+      }
+      callTimeoutNs = Math.min(callTimeoutNs, rpcTimeoutNs);
+    } else {
+      callTimeoutNs = rpcTimeoutNs;
+    }
     ClientService.Interface stub;
     try {
       stub = conn.getRegionServerStub(loc.getServerName());
@@ -164,7 +183,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
               err -> conn.getLocator().updateCachedLocation(loc, err));
       return;
     }
-    resetController(controller, rpcTimeoutNs);
+    resetController(controller, callTimeoutNs);
     callable.call(controller, loc, stub).whenComplete((result, error) -> {
       if (error != null) {
         onError(error,
@@ -181,7 +200,17 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
   }
 
   private void locateThenCall() {
-    locate.get().whenComplete((loc, error) -> {
+    long locateTimeoutNs;
+    if (operationTimeoutNs > 0) {
+      locateTimeoutNs = remainingTimeNs();
+      if (locateTimeoutNs <= 0) {
+        completeExceptionally();
+        return;
+      }
+    } else {
+      locateTimeoutNs = -1L;
+    }
+    locate.apply(locateTimeoutNs).whenComplete((loc, error) -> {
       if (error != null) {
         onError(error,
                 () -> "Locate '" + Bytes.toStringBinary(row) + "' in " + tableName + " failed, tries = "
@@ -196,12 +225,12 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
     });
   }
 
-  private CompletableFuture<HRegionLocation> locate() {
-    return conn.getLocator().getRegionLocation(tableName, row);
+  private CompletableFuture<HRegionLocation> locate(long timeoutNs) {
+    return conn.getLocator().getRegionLocation(tableName, row, timeoutNs);
   }
 
-  private CompletableFuture<HRegionLocation> locatePrevious() {
-    return conn.getLocator().getPreviousRegionLocation(tableName, row);
+  private CompletableFuture<HRegionLocation> locatePrevious(long timeoutNs) {
+    return conn.getLocator().getPreviousRegionLocation(tableName, row, timeoutNs);
   }
 
   public CompletableFuture<T> call() {

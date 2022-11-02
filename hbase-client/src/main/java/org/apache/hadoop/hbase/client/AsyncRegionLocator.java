@@ -30,14 +30,14 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
+
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timeout;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HRegionInfo;
@@ -47,6 +47,7 @@ import org.apache.hadoop.hbase.RegionLocations;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.exceptions.RegionMovedException;
+import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -60,6 +61,8 @@ class AsyncRegionLocator {
 
   private final AsyncConnectionImpl conn;
 
+  private final HashedWheelTimer retryTimer;
+
   private final AtomicReference<HRegionLocation> metaRegionLocation = new AtomicReference<>();
 
   private final AtomicReference<CompletableFuture<HRegionLocation>> metaRelocateFuture =
@@ -68,8 +71,9 @@ class AsyncRegionLocator {
   private final ConcurrentMap<TableName, ConcurrentNavigableMap<byte[], HRegionLocation>> cache =
           new ConcurrentHashMap<>();
 
-  AsyncRegionLocator(AsyncConnectionImpl conn) {
+  AsyncRegionLocator(AsyncConnectionImpl conn, HashedWheelTimer retryTimer) {
     this.conn = conn;
+    this.retryTimer = retryTimer;
   }
 
   private CompletableFuture<HRegionLocation> locateMetaRegion() {
@@ -249,9 +253,6 @@ class AsyncRegionLocator {
       return;
     }
     otherCheck.accept(loc);
-    if (future.isDone()) {
-      return;
-    }
     addToCache(loc);
     future.complete(loc);
   }
@@ -284,12 +285,34 @@ class AsyncRegionLocator {
     return locateInMeta(tableName, row);
   }
 
-  CompletableFuture<HRegionLocation> getRegionLocation(TableName tableName, byte[] row) {
-    if (tableName.equals(META_TABLE_NAME)) {
-      return locateMetaRegion();
-    } else {
-      return locateRegion(tableName, row);
+  private CompletableFuture<HRegionLocation> withTimeout(CompletableFuture<HRegionLocation> future,
+                                                         long timeoutNs, Supplier<String> timeoutMsg) {
+    if (future.isDone() || timeoutNs <= 0) {
+      return future;
     }
+    CompletableFuture<HRegionLocation> timeoutFuture = new CompletableFuture<>();
+    Timeout timeoutTask = retryTimer.newTimeout(
+            t -> timeoutFuture.completeExceptionally(new TimeoutIOException(timeoutMsg.get())), timeoutNs,
+            TimeUnit.NANOSECONDS);
+    future.whenComplete((loc, error) -> {
+      timeoutTask.cancel();
+      if (error != null) {
+        timeoutFuture.completeExceptionally(error);
+      } else {
+        timeoutFuture.complete(loc);
+      }
+    });
+    return timeoutFuture;
+  }
+
+  CompletableFuture<HRegionLocation> getRegionLocation(TableName tableName, byte[] row,
+                                                       long timeoutNs) {
+    CompletableFuture<HRegionLocation> future =
+            tableName.equals(META_TABLE_NAME) ? locateMetaRegion() : locateRegion(tableName, row);
+    return withTimeout(future, timeoutNs,
+            () -> "Timeout(" + TimeUnit.NANOSECONDS.toMillis(timeoutNs)
+                    + "ms) waiting for region location for " + tableName + ", row='"
+                    + Bytes.toStringBinary(row) + "'");
   }
 
   private HRegionLocation locatePreviousInCache(TableName tableName,
@@ -362,14 +385,18 @@ class AsyncRegionLocator {
 
   /**
    * Locate the previous region using the current regions start key. Used for reverse scan.
+   * <p>
+   * TODO: need to deal with region merge where the startRowOfCurrentRegion will not be the endRow
+   * of a region.
    */
   CompletableFuture<HRegionLocation> getPreviousRegionLocation(TableName tableName,
-                                                               byte[] startRowOfCurrentRegion) {
-    if (tableName.equals(META_TABLE_NAME)) {
-      return locateMetaRegion();
-    } else {
-      return locatePreviousRegion(tableName, startRowOfCurrentRegion);
-    }
+                                                               byte[] startRowOfCurrentRegion, long timeoutNs) {
+    CompletableFuture<HRegionLocation> future = tableName.equals(META_TABLE_NAME)
+            ? locateMetaRegion() : locatePreviousRegion(tableName, startRowOfCurrentRegion);
+    return withTimeout(future, timeoutNs,
+            () -> "Timeout(" + TimeUnit.NANOSECONDS.toMillis(timeoutNs)
+                    + "ms) waiting for region location for " + tableName + ", startRowOfCurrentRegion='"
+                    + Bytes.toStringBinary(startRowOfCurrentRegion) + "'");
   }
 
   private boolean canUpdate(HRegionLocation loc, HRegionLocation oldLoc) {
