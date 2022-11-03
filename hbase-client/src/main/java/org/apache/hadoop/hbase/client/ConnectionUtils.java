@@ -406,4 +406,7 @@ public class ConnectionUtils {
     }
     return t;
   }
+
+  // Add a delta to avoid timeout immediately after a retry sleeping.
+  static final long SLEEP_DELTA_NS = TimeUnit.MILLISECONDS.toNanos(1);
 }
