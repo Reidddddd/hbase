@@ -144,7 +144,7 @@ class AsyncSmallScanRpcRetryingCaller {
         scan.setStartRow(
                 createClosestNextRow.apply(resp.results[resp.results.length - 1].getRow()));
       }
-      scan(false);
+      scan(RegionLocateType.CURRENT);
       return;
     }
     if (!nextScan.apply(resp.currentRegion)) {
@@ -152,11 +152,11 @@ class AsyncSmallScanRpcRetryingCaller {
     }
   }
 
-  private void scan(boolean locateToPreviousRegion) {
+  private void scan(RegionLocateType locateType) {
     conn.callerFactory.<SmallScanResponse> single().table(tableName).row(scan.getStartRow())
             .rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
             .operationTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS)
-            .locateToPreviousRegion(locateToPreviousRegion).action(this::scan).call()
+            .locateType(locateType).action(this::scan).call()
             .whenComplete((resp, error) -> {
               if (error != null) {
                 future.completeExceptionally(error);
@@ -172,11 +172,11 @@ class AsyncSmallScanRpcRetryingCaller {
   }
 
   private void firstScan() {
-    scan(false);
+    scan(RegionLocateType.CURRENT);
   }
 
   private void reversedFirstScan() {
-    scan(isEmptyStartRow(scan.getStartRow()));
+    scan(isEmptyStartRow(scan.getStartRow()) ? RegionLocateType.BEFORE : RegionLocateType.CURRENT);
   }
 
   private boolean nextScan(HRegionInfo region) {
@@ -190,7 +190,7 @@ class AsyncSmallScanRpcRetryingCaller {
       }
     }
     scan.setStartRow(region.getEndKey());
-    scan(false);
+    scan(RegionLocateType.CURRENT);
     return true;
   }
 
@@ -205,7 +205,7 @@ class AsyncSmallScanRpcRetryingCaller {
       }
     }
     scan.setStartRow(region.getStartKey());
-    scan(true);
+    scan(RegionLocateType.BEFORE);
     return true;
   }
 }
