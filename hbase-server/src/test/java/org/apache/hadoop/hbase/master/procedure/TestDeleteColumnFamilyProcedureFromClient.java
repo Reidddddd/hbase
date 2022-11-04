@@ -40,7 +40,7 @@ import org.apache.hadoop.hbase.InvalidFamilyOperationException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -160,7 +160,7 @@ public class TestDeleteColumnFamilyProcedureFromClient {
         FileStatus[] cf = fs.listStatus(fileStatus[i].getPath(), new PathFilter() {
           @Override
           public boolean accept(Path p) {
-            if (WALSplitter.isSequenceIdFile(p)) {
+            if (WALSplitterUtil.isSequenceIdFile(p)) {
               return false;
             }
             return true;
@@ -241,7 +241,7 @@ public class TestDeleteColumnFamilyProcedureFromClient {
         FileStatus[] cf = fs.listStatus(fileStatus[i].getPath(), new PathFilter() {
           @Override
           public boolean accept(Path p) {
-            if (WALSplitter.isSequenceIdFile(p)) {
+            if (WALSplitterUtil.isSequenceIdFile(p)) {
               return false;
             }
             return true;

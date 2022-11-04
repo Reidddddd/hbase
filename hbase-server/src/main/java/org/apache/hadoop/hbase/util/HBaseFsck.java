@@ -94,6 +94,7 @@ import org.apache.hadoop.hbase.RegionLocations;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.Admin;
@@ -135,7 +136,6 @@ import org.apache.hadoop.hbase.util.hbck.ReplicationChecker;
 import org.apache.hadoop.hbase.util.hbck.TableIntegrityErrorHandler;
 import org.apache.hadoop.hbase.util.hbck.TableIntegrityErrorHandlerImpl;
 import org.apache.hadoop.hbase.util.hbck.TableLockChecker;
-import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.zookeeper.ZKTableStateClientSideReader;
 import org.apache.hadoop.hbase.zookeeper.ZKTableStateManager;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -4408,7 +4408,7 @@ public class HBaseFsck extends Configured implements Closeable {
                   // This is special case if a region is left after split
                   he.hdfsOnlyEdits = true;
                   FileStatus[] subDirs = fs.listStatus(regionDir.getPath());
-                  Path ePath = WALSplitter.getRegionDirRecoveredEditsDir(regionDir.getPath());
+                  Path ePath = WALSplitterUtil.getRegionDirRecoveredEditsDir(regionDir.getPath());
                   for (FileStatus subDir : subDirs) {
                     errors.progress();
                     String sdName = subDir.getPath().getName();

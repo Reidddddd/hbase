@@ -159,14 +159,13 @@ import org.apache.hadoop.hbase.util.IncrementingEnvironmentEdge;
 import org.apache.hadoop.hbase.util.ManualEnvironmentEdge;
 import org.apache.hadoop.hbase.util.PairOfSameType;
 import org.apache.hadoop.hbase.util.Threads;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.FaultyFSLog;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.junit.After;
@@ -677,7 +676,7 @@ public class TestHRegion {
       FileSystem fs = region.getRegionFileSystem().getFileSystem();
       byte[] regionName = region.getRegionInfo().getEncodedNameAsBytes();
 
-      Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+      Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
 
       long maxSeqId = 1050;
       long minSeqId = 1000;
@@ -730,7 +729,7 @@ public class TestHRegion {
       FileSystem fs = region.getRegionFileSystem().getFileSystem();
       byte[] regionName = region.getRegionInfo().getEncodedNameAsBytes();
 
-      Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+      Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
 
       long maxSeqId = 1050;
       long minSeqId = 1000;
@@ -783,7 +782,7 @@ public class TestHRegion {
     Path regiondir = region.getRegionFileSystem().getRegionDir();
     FileSystem fs = region.getRegionFileSystem().getFileSystem();
 
-    Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+    Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
     for (int i = 1000; i < 1050; i += 10) {
       Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", i));
       FSDataOutputStream dos = fs.create(recoveredEdits);
@@ -818,7 +817,7 @@ public class TestHRegion {
 
       assertEquals(0, region.getStoreFileList(columns).size());
 
-      Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+      Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
 
       long maxSeqId = 1050;
       long minSeqId = 1000;
@@ -934,7 +933,7 @@ public class TestHRegion {
       WALUtil.writeCompactionMarker(region.getWAL(), this.region.getTableDesc(),
           this.region.getRegionInfo(), compactionDescriptor, region.getMVCC());
 
-      Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+      Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
 
       Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", 1000));
       fs.create(recoveredEdits);
@@ -1060,7 +1059,7 @@ public class TestHRegion {
 
         // now write those markers to the recovered edits again.
 
-        Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+        Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
 
         Path recoveredEdits = new Path(recoveredEditsDir, String.format("%019d", 1000));
         fs.create(recoveredEdits);

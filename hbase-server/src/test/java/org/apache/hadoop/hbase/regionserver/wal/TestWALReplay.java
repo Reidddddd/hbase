@@ -91,6 +91,7 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HFileTestUtil;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
 import org.apache.hadoop.hbase.wal.Reader;
@@ -917,7 +918,7 @@ public class TestWALReplay {
           "recovered.edits")), new PathFilter() {
         @Override
         public boolean accept(Path p) {
-          if (WALSplitter.isSequenceIdFile(p)) {
+          if (WALSplitterUtil.isSequenceIdFile(p)) {
             return false;
           }
           return true;
@@ -967,7 +968,7 @@ public class TestWALReplay {
     runWALSplit(this.conf);
 
     // here we let the DFSInputStream throw an IOException just after the WALHeader.
-    Path editFile = WALSplitter.getSplitEditFilesSorted(this.fs, regionDir).first();
+    Path editFile = WALSplitterUtil.getSplitEditFilesSorted(this.fs, regionDir).first();
     FSDataInputStream stream = fs.open(editFile);
     stream.seek(PB_WAL_MAGIC.length);
     Class<? extends Reader> logReaderClass =

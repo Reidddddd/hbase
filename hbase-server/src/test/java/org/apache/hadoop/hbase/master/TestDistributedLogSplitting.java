@@ -97,12 +97,10 @@ import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.JVMClusterUtil.MasterThread;
 import org.apache.hadoop.hbase.util.JVMClusterUtil.RegionServerThread;
 import org.apache.hadoop.hbase.util.Threads;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
-import org.apache.hadoop.hbase.wal.WALFactory;
-import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.MiniZooKeeperCluster;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -262,13 +260,13 @@ public class TestDistributedLogSplitting {
 
         Path tdir = FSUtils.getTableDir(rootdir, table);
         Path editsdir =
-            WALSplitter.getRegionDirRecoveredEditsDir(
+            WALSplitterUtil.getRegionDirRecoveredEditsDir(
                 FSUtils.getRegionDirFromTableDir(tdir, hri));
         LOG.debug("checking edits dir " + editsdir);
         FileStatus[] files = fs.listStatus(editsdir, new PathFilter() {
           @Override
           public boolean accept(Path p) {
-            if (WALSplitter.isSequenceIdFile(p)) {
+            if (WALSplitterUtil.isSequenceIdFile(p)) {
               return false;
             }
             return true;
@@ -879,14 +877,14 @@ public class TestDistributedLogSplitting {
       Path tdir = FSUtils.getTableDir(rootdir, TableName.valueOf("disableTable"));
       for (HRegionInfo hri : regions) {
         Path editsdir =
-            WALSplitter.getRegionDirRecoveredEditsDir(
+            WALSplitterUtil.getRegionDirRecoveredEditsDir(
               FSUtils.getRegionDirFromTableDir(tdir, hri));
         LOG.debug("checking edits dir " + editsdir);
         if(!fs.exists(editsdir)) continue;
         FileStatus[] files = fs.listStatus(editsdir, new PathFilter() {
           @Override
           public boolean accept(Path p) {
-            if (WALSplitter.isSequenceIdFile(p)) {
+            if (WALSplitterUtil.isSequenceIdFile(p)) {
               return false;
             }
             return true;
@@ -909,7 +907,7 @@ public class TestDistributedLogSplitting {
       // clean up
       for (HRegionInfo hri : regions) {
         Path editsdir =
-            WALSplitter.getRegionDirRecoveredEditsDir(
+            WALSplitterUtil.getRegionDirRecoveredEditsDir(
               FSUtils.getRegionDirFromTableDir(tdir, hri));
         fs.delete(editsdir, true);
       }
@@ -1453,16 +1451,16 @@ public class TestDistributedLogSplitting {
       FileSystem fs = master.getMasterFileSystem().getFileSystem();
       Path tableDir = FSUtils.getTableDir(FSUtils.getRootDir(conf), TableName.valueOf("table"));
       List<Path> regionDirs = FSUtils.getRegionDirs(fs, tableDir);
-      long newSeqId = WALSplitter.writeRegionSequenceIdFile(fs, regionDirs.get(0), 1L, 1000L);
-      WALSplitter.writeRegionSequenceIdFile(fs, regionDirs.get(0) , 1L, 1000L);
+      long newSeqId = WALSplitterUtil.writeRegionSequenceIdFile(fs, regionDirs.get(0), 1L, 1000L);
+      WALSplitterUtil.writeRegionSequenceIdFile(fs, regionDirs.get(0) , 1L, 1000L);
       assertEquals(newSeqId + 2000,
-          WALSplitter.writeRegionSequenceIdFile(fs, regionDirs.get(0), 3L, 1000L));
+          WALSplitterUtil.writeRegionSequenceIdFile(fs, regionDirs.get(0), 3L, 1000L));
 
-      Path editsdir = WALSplitter.getRegionDirRecoveredEditsDir(regionDirs.get(0));
+      Path editsdir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regionDirs.get(0));
       FileStatus[] files = FSUtils.listStatus(fs, editsdir, new PathFilter() {
         @Override
         public boolean accept(Path p) {
-          return WALSplitter.isSequenceIdFile(p);
+          return WALSplitterUtil.isSequenceIdFile(p);
         }
       });
       // only one seqid file should exist
@@ -1470,7 +1468,7 @@ public class TestDistributedLogSplitting {
 
       // verify all seqId files aren't treated as recovered.edits files
       NavigableSet<Path> recoveredEdits =
-          WALSplitter.getSplitEditFilesSorted(fs, regionDirs.get(0));
+          WALSplitterUtil.getSplitEditFilesSorted(fs, regionDirs.get(0));
       assertEquals(0, recoveredEdits.size());
     } finally {
       if (ht != null) ht.close();

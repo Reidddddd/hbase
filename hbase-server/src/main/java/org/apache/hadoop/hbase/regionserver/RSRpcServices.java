@@ -70,8 +70,6 @@ import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.UnknownScannerException;
-import org.apache.hadoop.hbase.protobuf.generated.AdminProtos;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
 import org.apache.hadoop.hbase.client.Delete;
@@ -110,6 +108,7 @@ import org.apache.hadoop.hbase.master.MasterRpcServices;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.ResponseConverter;
+import org.apache.hadoop.hbase.protobuf.generated.AdminProtos;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.AdminService;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
@@ -197,10 +196,12 @@ import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
 import org.apache.hadoop.hbase.util.Strings;
+import org.apache.hadoop.hbase.wal.MutationReplay;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.zookeeper.ZKSplitLog;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -981,20 +982,20 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
    * @throws IOException
    */
   private OperationStatus [] doReplayBatchOp(final Region region,
-      final List<WALSplitter.MutationReplay> mutations, long replaySeqId) throws IOException {
+      final List<MutationReplay> mutations, long replaySeqId) throws IOException {
     long before = EnvironmentEdgeManager.currentTime();
     boolean batchContainsPuts = false, batchContainsDelete = false;
     try {
-      for (Iterator<WALSplitter.MutationReplay> it = mutations.iterator(); it.hasNext();) {
-        WALSplitter.MutationReplay m = it.next();
+      for (Iterator<MutationReplay> it = mutations.iterator(); it.hasNext();) {
+        MutationReplay m = it.next();
 
-        if (m.type == MutationType.PUT) {
+        if (m.getType() == MutationType.PUT) {
           batchContainsPuts = true;
         } else {
           batchContainsDelete = true;
         }
 
-        NavigableMap<byte[], List<Cell>> map = m.mutation.getFamilyCellMap();
+        NavigableMap<byte[], List<Cell>> map = m.getMutation().getFamilyCellMap();
         List<Cell> metaCells = map.get(WALEdit.METAFAMILY);
         if (metaCells != null && !metaCells.isEmpty()) {
           for (Cell metaCell : metaCells) {
@@ -1032,7 +1033,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         regionServer.cacheFlusher.reclaimMemStoreMemory();
       }
       return region.batchReplay(mutations.toArray(
-        new WALSplitter.MutationReplay[mutations.size()]), replaySeqId);
+        new MutationReplay[mutations.size()]), replaySeqId);
     } finally {
       if (regionServer.metricsRegionServer != null) {
         long after = EnvironmentEdgeManager.currentTime();
@@ -2018,7 +2019,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         }
         Pair<WALKey, WALEdit> walEntry = (coprocessorHost == null) ? null :
           new Pair<WALKey, WALEdit>();
-        List<WALSplitter.MutationReplay> edits = WALSplitter.getMutationsFromWALEntry(entry,
+        List<MutationReplay> edits = WALSplitter.getMutationsFromWALEntry(entry,
           cells, walEntry, durability);
         if (coprocessorHost != null) {
           // Start coprocessor replay here. The coprocessor is for each WALEdit instead of a

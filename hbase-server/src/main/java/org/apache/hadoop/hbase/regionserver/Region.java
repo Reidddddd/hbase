@@ -17,18 +17,19 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.Message;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.Service;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HDFSBlocksDistribution;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
@@ -46,12 +47,9 @@ import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetRegionInfoResponse.CompactionState;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceCall;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.hadoop.hbase.wal.WALSplitter.MutationReplay;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.Message;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.Service;
+import org.apache.hadoop.hbase.wal.MutationReplay;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Regions store data for a certain region of a table.  It stores all columns
@@ -334,7 +332,8 @@ public interface Region extends ConfigurationObserver {
    *         OperationStatusCode and the exceptionMessage if any.
    * @throws IOException
    */
-   OperationStatus[] batchReplay(MutationReplay[] mutations, long replaySeqId) throws IOException;
+   OperationStatus[] batchReplay(MutationReplay[] mutations, long replaySeqId)
+       throws IOException;
 
   /**
    * Atomically checks if a row/family/qualifier value matches the expected val

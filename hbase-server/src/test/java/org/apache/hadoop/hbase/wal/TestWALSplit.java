@@ -381,7 +381,7 @@ public class TestWALSplit {
         new Entry(new WALKey(encoded,
             TableName.META_TABLE_NAME, 1, now, HConstants.DEFAULT_CLUSTER_ID),
             new WALEdit());
-    Path p = WALSplitter.getRegionSplitEditsPath(entry,
+    Path p = WALSplitterUtil.getRegionSplitEditsPath(entry,
         FILENAME_BEING_SPLIT, TMPDIRNAME, conf);
     String parentOfParent = p.getParent().getParent().getName();
     assertEquals(parentOfParent, HRegionInfo.FIRST_META_REGIONINFO.getEncodedName());
@@ -403,11 +403,11 @@ public class TestWALSplit {
         new Entry(new WALKey(encoded,
             TableName.META_TABLE_NAME, 1, now, HConstants.DEFAULT_CLUSTER_ID),
             new WALEdit());
-    Path parent = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
+    Path parent = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
     assertEquals(parent.getName(), HConstants.RECOVERED_EDITS_DIR);
     fs.createNewFile(parent); // create a recovered.edits file
 
-    Path p = WALSplitter.getRegionSplitEditsPath(entry,
+    Path p = WALSplitterUtil.getRegionSplitEditsPath(entry,
         FILENAME_BEING_SPLIT, TMPDIRNAME, conf);
     String parentOfParent = p.getParent().getParent().getName();
     assertEquals(parentOfParent, HRegionInfo.FIRST_META_REGIONINFO.getEncodedName());
@@ -1142,7 +1142,7 @@ public class TestWALSplit {
         // After creating writer, simulate region's
         // replayRecoveredEditsIfAny() which gets SplitEditFiles of this
         // region and delete them, excluding files with '.temp' suffix.
-        NavigableSet<Path> files = getSplitEditFilesSorted(fs, regiondir);
+        NavigableSet<Path> files = WALSplitterUtil.getSplitEditFilesSorted(fs, regiondir);
         if (files != null && !files.isEmpty()) {
           for (Path file : files) {
             if (!this.walFS.delete(file, false)) {
@@ -1190,7 +1190,7 @@ public class TestWALSplit {
             new Entry(new WALKey(encoded,
                     TableName.META_TABLE_NAME, 1, now, HConstants.DEFAULT_CLUSTER_ID),
                     new WALEdit());
-    Path p = WALSplitter.getRegionSplitEditsPath(entry,
+    Path p = WALSplitterUtil.getRegionSplitEditsPath(entry,
             FILENAME_BEING_SPLIT, TMPDIRNAME, conf);
     return p;
   }
@@ -1252,12 +1252,12 @@ public class TestWALSplit {
       throws IOException {
     Path tdir = FSUtils.getWALTableDir(conf, table);
     @SuppressWarnings("deprecation")
-    Path editsdir = WALSplitter.getRegionDirRecoveredEditsDir(new Path(tdir,
+    Path editsdir = WALSplitterUtil.getRegionDirRecoveredEditsDir(new Path(tdir,
         Bytes.toString(region.getBytes())));
     FileStatus[] files = fs.listStatus(editsdir, new PathFilter() {
       @Override
       public boolean accept(Path p) {
-        if (WALSplitter.isSequenceIdFile(p)) {
+        if (WALSplitterUtil.isSequenceIdFile(p)) {
           return false;
         }
         return true;

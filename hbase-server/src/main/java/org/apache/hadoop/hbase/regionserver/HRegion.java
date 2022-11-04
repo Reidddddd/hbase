@@ -195,12 +195,12 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.hadoop.hbase.wal.MutationReplay;
 import org.apache.hadoop.hbase.wal.Reader;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALSplitter;
-import org.apache.hadoop.hbase.wal.WALSplitter.MutationReplay;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.util.StringUtils;
@@ -975,7 +975,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     // is opened before recovery completes. So we add a safety bumper to avoid new sequence number
     // overlaps used sequence numbers
     if (this.writestate.writesEnabled) {
-      nextSeqid = WALSplitter.writeRegionSequenceIdFile(getWalFileSystem(), getWALRegionDir(),
+      nextSeqid = WALSplitterUtil.writeRegionSequenceIdFile(getWalFileSystem(), getWALRegionDir(),
           nextSeqid, (this.recovering ? (this.flushPerChanges + 10000000) : 1));
     } else {
       nextSeqid++;
@@ -1118,7 +1118,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     // checking region folder exists is due to many tests which delete the table folder while a
     // table is still online
     if (getWalFileSystem().exists(getWALRegionDir())) {
-      WALSplitter.writeRegionSequenceIdFile(getWalFileSystem(), getWALRegionDir(),
+      WALSplitterUtil.writeRegionSequenceIdFile(getWalFileSystem(), getWALRegionDir(),
         mvcc.getReadPoint(), 0);
     }
   }
@@ -3068,17 +3068,17 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
 
     @Override
     public Mutation getMutation(int index) {
-      return this.operations[index].mutation;
+      return this.operations[index].getMutation();
     }
 
     @Override
     public long getNonceGroup(int index) {
-      return this.operations[index].nonceGroup;
+      return this.operations[index].getNonceGroup();
     }
 
     @Override
     public long getNonce(int index) {
-      return this.operations[index].nonce;
+      return this.operations[index].getNonce();
     }
 
     @Override
@@ -3124,7 +3124,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           + "Skipping " + mutations.length + " mutations with replaySeqId=" + replaySeqId
           + " which is < than lastReplayedOpenRegionSeqId=" + lastReplayedOpenRegionSeqId);
         for (MutationReplay mut : mutations) {
-          LOG.trace(getRegionInfo().getEncodedName() + " : Skipping : " + mut.mutation);
+          LOG.trace(getRegionInfo().getEncodedName() + " : Skipping : " + mut.getMutation());
         }
       }
 
@@ -4324,18 +4324,18 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
 
     // We made a mistake in HBASE-20734 so we need to do this dirty hack...
     NavigableSet<Path> filesUnderWrongRegionWALDir =
-      WALSplitter.getSplitEditFilesSorted(walFS, wrongRegionWALDir);
+      WALSplitterUtil.getSplitEditFilesSorted(walFS, wrongRegionWALDir);
     seqId = Math.max(seqId, replayRecoveredEditsForPaths(minSeqIdForTheRegion, walFS,
       filesUnderWrongRegionWALDir, reporter, regionDir));
     // This is to ensure backwards compatability with HBASE-20723 where recovered edits can appear
     // under the root dir even if walDir is set.
     NavigableSet<Path> filesUnderRootDir = Sets.newTreeSet();
     if (!regionWALDir.equals(regionDir)) {
-      filesUnderRootDir = WALSplitter.getSplitEditFilesSorted(rootFS, regionDir);
+      filesUnderRootDir = WALSplitterUtil.getSplitEditFilesSorted(rootFS, regionDir);
       seqId = Math.max(seqId, replayRecoveredEditsForPaths(minSeqIdForTheRegion, rootFS,
         filesUnderRootDir, reporter, regionDir));
     }
-    NavigableSet<Path> files = WALSplitter.getSplitEditFilesSorted(walFS, regionWALDir);
+    NavigableSet<Path> files = WALSplitterUtil.getSplitEditFilesSorted(walFS, regionWALDir);
     seqId = Math.max(seqId, replayRecoveredEditsForPaths(minSeqIdForTheRegion, walFS,
         files, reporter, regionWALDir));
     if (seqId > minSeqIdForTheRegion) {
@@ -4347,7 +4347,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       // For debugging data loss issues!
       // If this flag is set, make use of the hfile archiving by making recovered.edits a fake
       // column family. Have to fake out file type too by casting our recovered.edits as storefiles
-      String fakeFamilyName = WALSplitter.getRegionDirRecoveredEditsDir(regionWALDir).getName();
+      String fakeFamilyName = WALSplitterUtil.getRegionDirRecoveredEditsDir(regionWALDir).getName();
       Set<StoreFile> fakeStoreFiles = new HashSet<>();
       for (Path file: Iterables.concat(files, filesUnderWrongRegionWALDir)) {
         fakeStoreFiles.add(new StoreFile(walFS, file, conf, null, null));
@@ -4433,7 +4433,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
               HConstants.HREGION_EDITS_REPLAY_SKIP_ERRORS + " instead.");
         }
         if (skipErrors) {
-          Path p = WALSplitter.moveAsideBadEditsFile(fs, edits);
+          Path p = WALSplitterUtil.moveAsideBadEditsFile(fs, edits);
           LOG.error(HConstants.HREGION_EDITS_REPLAY_SKIP_ERRORS +
               "=true so continuing. Renamed " + edits + " as " + p, e);
         } else {
@@ -4609,7 +4609,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           coprocessorHost.postReplayWALs(this.getRegionInfo(), edits);
         }
       } catch (EOFException eof) {
-        Path p = WALSplitter.moveAsideBadEditsFile(fs, edits);
+        Path p = WALSplitterUtil.moveAsideBadEditsFile(fs, edits);
         msg = "Encountered EOF. Most likely due to Master failure during " +
             "wal splitting, so we have this data in another edit.  " +
             "Continuing, but renaming " + edits + " as " + p;
@@ -4619,7 +4619,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         // If the IOE resulted from bad file format,
         // then this problem is idempotent and retrying won't help
         if (ioe.getCause() instanceof ParseException) {
-          Path p = WALSplitter.moveAsideBadEditsFile(fs, edits);
+          Path p = WALSplitterUtil.moveAsideBadEditsFile(fs, edits);
           msg = "File corruption encountered!  " +
               "Continuing, but renaming " + edits + " as " + p;
           LOG.warn(msg, ioe);

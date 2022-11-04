@@ -46,9 +46,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.Reader;
-import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.apache.hadoop.hbase.wal.WALSplitter;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -115,7 +114,7 @@ public class TestRecoveredEdits {
     assertTrue(storeFiles.isEmpty());
     region.close();
     Path regionDir = region.getWALRegionDir();
-    Path recoveredEditsDir = WALSplitter.getRegionDirRecoveredEditsDir(regionDir);
+    Path recoveredEditsDir = WALSplitterUtil.getRegionDirRecoveredEditsDir(regionDir);
     // This is a little fragile getting this path to a file of 10M of edits.
     Path recoveredEditsFile = new Path(
       System.getProperty("test.build.classes", "target/test-classes"),

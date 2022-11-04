@@ -38,9 +38,6 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
-import org.apache.hadoop.hbase.wal.WALSplitter.EntryBuffers;
-import org.apache.hadoop.hbase.wal.WALSplitter.PipelineController;
-import org.apache.hadoop.hbase.wal.WALSplitter.RegionEntryBuffer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.junit.Test;
@@ -84,17 +81,15 @@ public class TestWALMethods {
     Path regiondir = util.getDataTestDir("regiondir");
     fs.delete(regiondir, true);
     fs.mkdirs(regiondir);
-    Path recoverededits = WALSplitter.getRegionDirRecoveredEditsDir(regiondir);
-    String first = WALSplitter.formatRecoveredEditsFileName(-1);
+    Path recoverededits = WALSplitterUtil.getRegionDirRecoveredEditsDir(regiondir);
+    String first = WALSplitterUtil.formatRecoveredEditsFileName(-1);
     createFile(fs, recoverededits, first);
-    createFile(fs, recoverededits, WALSplitter.formatRecoveredEditsFileName(0));
-    createFile(fs, recoverededits, WALSplitter.formatRecoveredEditsFileName(1));
-    createFile(fs, recoverededits, WALSplitter
-        .formatRecoveredEditsFileName(11));
-    createFile(fs, recoverededits, WALSplitter.formatRecoveredEditsFileName(2));
-    createFile(fs, recoverededits, WALSplitter
-        .formatRecoveredEditsFileName(50));
-    String last = WALSplitter.formatRecoveredEditsFileName(Long.MAX_VALUE);
+    createFile(fs, recoverededits, WALSplitterUtil.formatRecoveredEditsFileName(0));
+    createFile(fs, recoverededits, WALSplitterUtil.formatRecoveredEditsFileName(1));
+    createFile(fs, recoverededits, WALSplitterUtil.formatRecoveredEditsFileName(11));
+    createFile(fs, recoverededits, WALSplitterUtil.formatRecoveredEditsFileName(2));
+    createFile(fs, recoverededits, WALSplitterUtil.formatRecoveredEditsFileName(50));
+    String last = WALSplitterUtil.formatRecoveredEditsFileName(Long.MAX_VALUE);
     createFile(fs, recoverededits, last);
     createFile(fs, recoverededits,
       Long.toString(Long.MAX_VALUE) + "." + System.currentTimeMillis());
@@ -103,22 +98,18 @@ public class TestWALMethods {
     FSUtils.setRootDir(walConf, regiondir);
     (new WALFactory(walConf, null, "dummyLogName")).getWAL(new byte[] {}, null);
 
-    NavigableSet<Path> files = WALSplitter.getSplitEditFilesSorted(fs, regiondir);
+    NavigableSet<Path> files = WALSplitterUtil.getSplitEditFilesSorted(fs, regiondir);
     assertEquals(7, files.size());
     assertEquals(files.pollFirst().getName(), first);
     assertEquals(files.pollLast().getName(), last);
     assertEquals(files.pollFirst().getName(),
-      WALSplitter
-        .formatRecoveredEditsFileName(0));
+      WALSplitterUtil.formatRecoveredEditsFileName(0));
     assertEquals(files.pollFirst().getName(),
-      WALSplitter
-        .formatRecoveredEditsFileName(1));
+      WALSplitterUtil.formatRecoveredEditsFileName(1));
     assertEquals(files.pollFirst().getName(),
-      WALSplitter
-        .formatRecoveredEditsFileName(2));
+      WALSplitterUtil.formatRecoveredEditsFileName(2));
     assertEquals(files.pollFirst().getName(),
-      WALSplitter
-        .formatRecoveredEditsFileName(11));
+      WALSplitterUtil.formatRecoveredEditsFileName(11));
   }
 
   private void createFile(final FileSystem fs, final Path testdir,
@@ -130,8 +121,7 @@ public class TestWALMethods {
 
   @Test
   public void testRegionEntryBuffer() throws Exception {
-    WALSplitter.RegionEntryBuffer reb = new WALSplitter.RegionEntryBuffer(
-        TEST_TABLE, TEST_REGION);
+    RegionEntryBuffer reb = new RegionEntryBuffer(TEST_TABLE, TEST_REGION);
     assertEquals(0, reb.heapSize());
 
     reb.appendEntry(createTestLogEntry(1));
