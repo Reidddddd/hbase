@@ -1,0 +1,80 @@
+// This is a simple jenkins decleartive pipeline scritp example
+pipeline {
+    environment {
+        log_dir = "${sh(script:'TZ=UTC-8 date +%Y%m%d_%H%M%S | xargs echo -n', returnStdout: true)}"
+    }
+    // agent config; for data infra, this should always be `kubernetes {}`
+    agent {kubernetes {
+            // jenkins agent won't provide build environment for you, your need declare all rely environment on  agent kubernetes
+            // you can denfine all containers you need during ci
+            // here we declare two containers we will use in the process of ci
+            // golang: use to build go binary
+            // kaniko: use to push image to harbor(all image push will use kaniko on jenkins)
+            yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: kubectl
+    image: bitnami/kubectl:1.22.5
+    imagePullPolicy: Always
+    command: ["cat"]
+    tty: true
+"""
+    }} 
+    // set this options to output time on console log
+    options { timestamps () }
+    stages { // stages to execute
+        stage("Pull SourceCode") {
+            steps {
+                // checkout step config checkout options for jenkins agent, jenkins agent will use this scm config to execute all ci stage
+                // if your jenkinsfile branch is same to branch your want to build. your can easily use `checkout scm` to instead below checkout codes.
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "*/master"]],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential', // gitlab credential id                                
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/workload_benchmark_configs.git'
+                            ]
+                            ]
+                    ]
+                )
+            }
+        }
+
+        stage("Deploy the job to the test k8s") {
+            steps {
+                withKubeConfig([credentialsId: 'hbase-k8s',contextName: 'app.di-hbase-auto@kube-test01-general-at']) {
+                    container('kubectl') {    
+                    // set parallelism 
+                    sh """
+                       sed -i 's/<parallelism>/${parallelism}/g' workload_job.yml
+                       sed -i 's/<workload_type>/${workload_type}/g' workload_job.yml
+                       sed -i 's/<size>/${size}/g' workload_job.yml
+                       sed -i 's/<mix_type>/${mix_type}/g' workload_job.yml
+                       sed -i 's/<log_dir>/${log_dir}/g' workload_job.yml
+                       """
+                    sh "cat workload_job.yml"
+                    // start job                    
+                    sh "kubectl get po -n di-hbase-auto"
+                    sh "kubectl replace --force -f workload_job.yml"
+                    sh "kubectl get po -n di-hbase-auto"
+
+                    // print k8s job log url
+                    // print hbase-driver log url  
+                    sh """
+                    echo 'k8s pods log url https://dashboard.kube-test.data-infra.shopee.io/#/log/di-hbase-auto/workload/job?namespace=di-hbase-auto&container=aries-workload'
+                    curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "Workload-Benchmark k8s pods log url https://dashboard.kube-test.data-infra.shopee.io/#/log/di-hbase-auto/workload/job?namespace=di-hbase-auto&container=aries-workload"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw                                 
+                    echo 'Pods logs can be also found here after the job have be completed'
+                    echo "http://hbase-driver.data-infra.shopee.io/logs/hbase-workload/${log_dir}"
+                    curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "Workload-Benchmark hbase-driver log url http://hbase-driver.data-infra.shopee.io/logs/hbase-workload/${log_dir}"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+                    """
+                    }          
+                }  
+
+            }
+        }
+    }
+}

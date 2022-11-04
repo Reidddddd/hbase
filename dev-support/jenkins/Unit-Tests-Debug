@@ -1,0 +1,148 @@
+def build_container
+
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: maven-jdk-8
+                    image: "harbor.shopeemobile.com/di-basic-service/di-maven:3.6.3-openjdk-8"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  - name: maven-jdk-15
+                    image: "harbor.shopeemobile.com/di-cicd-base-image/di-maven:3.6.3-openjdk-15"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  - name: maven-jdk-17
+                    image: "harbor.shopeemobile.com/di-cicd-base-image/di-maven:3.6.3-openjdk-17"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  - name: python
+                    image: "python:2.7.18"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                  volumes:
+                  - hostPath:
+                      path: "/data/jenkins/maven-cache/hbase/.m2"
+                    name: "hbase-mave"
+            """
+        }
+    }
+    environment {
+        MAVEN_OPTS = "-Xmx8g"
+    }
+    stages{
+        stage('JDK Version'){
+            steps{
+                sshagent(credentials: ['jenkins-gitlab-credential']) { 
+                    sh """
+                        [ -d ~/.ssh ] || mkdir ~/.ssh && chmod 0700 ~/.ssh
+                        ssh-keyscan -t rsa,dsa git.garena.com >> ~/.ssh/known_hosts
+                    """
+                    addGitLabMRComment comment: "Console for this build: ${BUILD_URL}console"
+                }
+                script{
+                    if (jdk_version == "jdk_15") {
+                        env.MVN_OPTS = "-DcompileSource=15 -P jdk15"
+                        build_container = "maven-jdk-15"
+                    } else if (jdk_version == "jdk_8") {
+                        env.MVN_OPTS = ""
+                        build_container = "maven-jdk-8"
+                    } else if (jdk_version == "jdk_17") {
+                        env.MVN_OPTS = "-DcompileSource=17 -P jdk15"
+                        build_container = "maven-jdk-17"
+                    }
+                    echo "build_container is ${build_container}"
+                    
+                    env.X = ""
+                    if (params.turn_on_debug) {
+                        env.X = "-X"
+                    }
+                }
+                container(build_container) {
+                    script {
+                        env.GEM_PATH = sh(
+                            returnStdout: true,
+                            script: "gem environment gemdir",
+                        ).trim()
+                    }
+                    sh 'gem install rake'
+                    sh 'gem install test-unit'
+                    sh 'gem list'
+                    sh 'java -version'
+                    sh 'echo $JAVA_HOME'
+                    sh 'mvn -version'
+                }
+                echo 'Environment variables are:'
+                sh "printenv"
+            }
+        }
+        stage('Pre-build') {
+            steps {
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "${branch}"]],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential',
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase.git'
+                            ]
+                        ]
+                    ]
+                )
+            }
+        }
+        stage('Unit Test') {
+            steps {
+                container(build_container) {
+                    sh """
+                        set +e
+                        mvn -fn clean test -Dtest=${unit_tests} -Dmaven.test.failure.ignore=true -Dsurefire.rerunFailingTestsCount=${run_cycles} -Dsurefire.Xmx=8g -Dsurefire.timeout=1800 -Dsurefire.enableProcessChecker=native -pl "!hbase-rest" ${MVN_OPTS} ${X}
+                    """
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, keepLongStdio: true, testResults: '**/target/surefire-reports/*.xml'
+                    archiveArtifacts allowEmptyArchive: true, artifacts: '**/target/surefire-reports/*.txt,**/target/surefire-reports/*.xml', followSymlinks: false
+                }
+            }
+        }
+        
+    }
+}

@@ -1,0 +1,116 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+
+                  - name: kaniko
+                    image: harbor.shopeemobile.com/di-cicd/kaniko:v1.1
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+
+                  - name: maven-jdk-8
+                    image: "harbor.shopeemobile.com/di-basic-service/di-maven:3.6.3-openjdk-8"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      limits:
+                        memory: 16Gi
+                  volumes:
+                  - hostPath:
+                      path: "/data/jenkins/maven-cache/hbase/.m2"
+                    name: "hbase-mave"
+            """
+        }
+    }
+    stages{
+
+        stage("Pull SourceCode") {
+            steps {
+                // checkout step config checkout options for jenkins agent, jenkins agent will use this scm config to execute all ci stage
+                // if your jenkinsfile branch is same to branch your want to build. your can easily use `checkout scm` to instead below checkout codes.
+                // aries git
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "*/master"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'aries']],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential', // gitlab credential id                                
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/aries.git'
+                            ]
+                            ]
+                    ]
+                )
+                // Dockerfile git
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "*/master"]],
+                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'docker']],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential', // gitlab credential id                                
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/workload_benchmark_configs.git'
+                            ]
+                            ]
+                    ]
+                )
+                
+            }
+        }
+
+        stage('Maven Build') {
+            steps {
+                dir('aries'){
+                    container("maven-jdk-8") {
+                        sh '''
+                            ls
+                            pwd
+                            mvn clean package -DskipTests -DcompileSource=1.8
+                            cd ..
+                            tar -zcvf aries.tar.gz aries
+                            mv aries.tar.gz docker/
+                            ls
+                        '''
+                    }                    
+                }
+
+            }
+
+        }
+
+        stage("Build And Push Image") {
+            steps {
+                dir('docker'){
+                    container("kaniko") {
+                        sh """
+                            pwd
+                            ls
+                            sed -i 's/<hbase_client_version>/${hbase_client_version}/g' Dockerfile
+                            cat Dockerfile
+                        """
+                        kaniko(
+                            credential: "hbase-harbor",
+                            // args: same with https://github.com/GoogleContainerTools/kaniko#additional-flags 
+                            args: "--context `pwd` --dockerfile Dockerfile --destination harbor.shopeemobile.com/di-hbase/hbase_workload:latest"
+                        )
+                    }
+                }
+
+            }
+        }
+
+
+    }
+} 

@@ -1,0 +1,470 @@
+def build_container
+def mr_comment
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: maven-jdk-8
+                    image: "harbor.shopeemobile.com/di-basic-service/di-maven:3.6.3-openjdk-8"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  - name: maven-jdk-17
+                    image: "harbor.shopeemobile.com/di-cicd-base-image/di-maven:3.6.3-openjdk-17"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  - name: python
+                    image: "python:2.7.18"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                  volumes:
+                  - hostPath:
+                      path: "/data/jenkins/maven-cache/hbase/.m2"
+                    name: "hbase-mave"
+            """
+        }
+    }
+    environment {
+        RDM = "${Math.abs(new Random().nextInt(1008611))}"
+        VOTE = "/home/jenkins/agent/vote-${RDM}"
+        DIFF = "/home/jenkins/agent/patch-${RDM}"
+        T_JVC = "/home/jenkins/agent/trunk-javac-warnings-${RDM}"
+        M_JVC = "/home/jenkins/agent/mr-javac-warnings-${RDM}"
+        T_CKS = "/home/jenkins/agent/trunk-checkstyle-${RDM}.xml"
+        M_CKS = "/home/jenkins/agent/mr-checkstyle-${RDM}.xml"
+        M_HDP = "/home/jenkins/agent/mr-javac-with-hadoop-2.10.0-${RDM}"
+        MAVEN_OPTS = "-Xmx8g"
+    }
+    stages{
+        stage('JDK Version'){
+            steps{
+                sshagent(credentials: ['jenkins-gitlab-credential']) { 
+                    sh """
+                        [ -d ~/.ssh ] || mkdir ~/.ssh && chmod 0700 ~/.ssh
+                        ssh-keyscan -t rsa,dsa git.garena.com >> ~/.ssh/known_hosts
+                    """
+                    addGitLabMRComment comment: "Console for this build: ${BUILD_URL}console"
+                }
+                script{
+                    if (gitlabTargetBranch =~ ".*zgc.*") {
+                        env.MVN_OPTS = "-DcompileSource=17 -P jdk15"
+                        build_container = "maven-jdk-17"
+                    } else if (gitlabTargetBranch =~ ".*jdk15.*") {
+                        env.MVN_OPTS = "-DcompileSource=17 -P jdk15"
+                        build_container = "maven-jdk-17"
+                    } else {
+                        build_container = "maven-jdk-8"
+                    }
+                    echo "build_container is ${build_container}"
+                }
+                container(build_container) {
+                    script {
+                        env.GEM_PATH = sh(
+                            returnStdout: true,
+                            script: "gem environment gemdir",
+                        ).trim()
+                    }
+                    sh 'gem install rake'
+                    sh 'gem install test-unit'
+                    sh 'gem list'
+                    sh 'java -version'
+                    sh 'echo $JAVA_HOME'
+                    sh 'mvn -version'
+                }
+                echo 'Environment variables are:'
+                sh "printenv"
+            }
+        }
+        stage('Pre-build') {
+            steps {
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "${gitlabTargetBranch}"], [name: "${gitlabSourceBranch}"]],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential',
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase.git'
+                            ]
+                        ]
+                    ]
+                )
+
+                script {
+                    sh "git checkout ${gitlabTargetBranch}"
+                    def target_head_commit_id = sh(
+                        returnStdout: true,
+                        script: "git rev-parse ${gitlabTargetBranch}"
+                    ).trim()
+                    
+                    sh "git checkout ${gitlabSourceBranch}"
+                    def local_base_commit_id = sh(
+                        returnStdout: true,
+                        script: "git merge-base ${gitlabTargetBranch} ${gitlabSourceBranch}"
+                    ).trim()
+                    sh "echo $target_head_commit_id $local_base_commit_id"
+                    if (target_head_commit_id != local_base_commit_id) {
+                        error('commit id not match')
+                    }
+                    
+                    sh "git diff ${gitlabTargetBranch} ${gitlabSourceBranch} > ${DIFF}"
+                    sh "cat ${DIFF}"
+    
+                }
+            }
+            post {
+                always {
+                    script {
+                        env.OV = -3
+                        sh '''
+                            echo "| vote | stage | comment |" > ${VOTE}
+                            echo "| ------ | ------ | ------ |" >> ${VOTE}
+                            echo "| -3 | Overall | Build URL: ${BUILD_URL} |" >> ${VOTE}
+                        '''
+                    }
+                }
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | pre-build | The merge-request is based on the latest. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo '| $`\\textcolor{red}{\\text{-1}}`$ | pre-build | Please rebase your merge-request on the latest targe branch. |' >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Author Check') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                      set +e
+                      author_tags=`grep -c @author ${DIFF}`
+                      if [[ "${author_tags}" -ne 0 ]]; then
+                        exit -1
+                      fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | author | The merge-request does not contain any @author tags. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo '| $`\\textcolor{red}{\\text{-1}}`$ | author | The merge-request appears to contain @author tags. |' >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Tests Existed Check') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                      set +e
+                      test_ref=`grep -c -i /test ${DIFF}`
+                      if [[ "$test_ref" -eq 0 ]] ; then
+                        exit -1
+                      fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | tests included | The merge-request appears to include new or modified tests. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    sh '''
+                        echo '| $`\\textcolor{black}{\\text{-0}}`$ | tests included | The merge-request doesnt appear to include any new or modified tests. |' >> ${VOTE}
+                    '''
+                }
+            }
+        }
+        stage('Interface Audience Check') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                      set +e
+                      if [[ ${build_container} == "maven-jdk-15" ]]; then
+                        warnings=`grep -c 'import org.apache.hadoop.[hbase\\.]*classification' ${DIFF}`
+                      else
+                        warnings=`grep -c "import org.apache.hadoop.classification" ${DIFF}`
+                      fi
+                      
+                      if [ "${warnings}" -ne 0 ]; then
+                        exit -1
+                      fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | interface audience | The merge-request does not contain any InterfaceAudience warnings. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo '| $`\\textcolor{red}{\\text{-1}}`$ | interface audience | The merge-request appears to use wrong InterfaceAudience (1.4.12-zgc should use yetus, 1.4.12 should use hbase). |' >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('License Check') {
+            steps {
+                container(build_container){
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        sh 'mvn clean apache-rat:check'
+                    }
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | asf license | The merge-request does not contain any license warnings. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo '| $`\\textcolor{red}{\\text{-1}}`$ | asf license | The merge-request appears to have new file(s) without license header. |' >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Build with Hadoop 2.10.0') {
+            steps {
+                container(build_container){
+                    sh '''
+                        set +e
+                        mvn clean package -DskipTests -Dhadoop-two.version=2.10.0 -pl "!hbase-rest" ${MVN_OPTS} > ${M_HDP} 2>&1
+                        cat ${M_HDP}
+                        error=`grep -c "ERROR" ${M_HDP}`
+                        if [[ "${error}" -gt 0 ]] ; then
+                          errors=`grep "ERROR" ${M_HDP}`
+                          exit -1
+                        fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        #echo '| $`\\textcolor{green}{\\text{+1}}`$ | hadoop version | The merge-request compiles with supported version hadoop-2.10.0. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo "| \\\$\\`\\\\textcolor{red}{\\\\text{-1}}\\`\\\$ | hadoop version | The merge-request appears to cause mvn compile goal to fail hadoop-2.10.0. Please check: ${JOB_URL} |" >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Java Check') {
+            steps {
+                sh "git checkout ${gitlabTargetBranch}"
+                container(build_container){
+                    sh '''
+                        mvn clean package -DskipTests -pl "!hbase-rest" ${MVN_OPTS} > ${T_JVC} 2>&1
+                    '''
+                }
+                sh "git checkout ${gitlabSourceBranch}"
+                container(build_container){
+                    sh '''
+                        set +e
+                        mvn clean package -DskipTests -pl "!hbase-rest" ${MVN_OPTS} > ${M_JVC} 2>&1
+                        error=`grep -c "ERROR" ${M_JVC}`
+                        if [[ "${error}" -gt 0 ]] ; then
+                          errors=`grep "ERROR" ${M_JVC}`
+                          exit -1
+                        fi
+              
+                        ### Compare trunk and patch javac warning numbers
+                        if [[ -f ${M_JVC} ]]; then
+                          trunk-javac-warnings=`grep -c WARNING ${T_JVC}`
+                          mr-javac-warnings=`grep -c WARNING ${M_JVC}`
+                          if [[ $mr-javac-warnings != "" && $trunk-javac-warnings != "" ]] ; then
+                            if [[ $mr-javac-warnings -gt $trunk-javac-warnings ]] ; then
+                              exit 1
+                            fi
+                          fi
+                        fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | javac | The merge-request does not increase the total number of javac compiler warnings. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo '| $`\\textcolor{red}{\\text{-1}}`$ | javac | The merge-request generated new javac compiler warnings. |' >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Style Check') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    checkout(
+                        [
+                            $class: 'GitSCM',
+                            branches: [[name: "${gitlabTargetBranch}"]],
+                            userRemoteConfigs: [
+                                [
+                                    credentialsId: 'jenkins-gitlab-credential',
+                                    url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase.git'
+                                ]
+                            ]
+                        ]
+                    )
+                }
+                container(build_container){
+                    sh '''
+                        mvn clean package -DskipTests checkstyle:checkstyle-aggregate -pl "!hbase-rest" ${MVN_OPTS} > /dev/null 2>&1
+                        mv target/checkstyle-result.xml ${T_CKS}
+                    '''
+                }
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "${gitlabSourceBranch}"]],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential',
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase.git'
+                            ]
+                        ]
+                    ]
+                )
+                container(build_container){
+                    sh '''
+                        mvn clean package -DskipTests checkstyle:checkstyle-aggregate -pl "!hbase-rest" ${MVN_OPTS} > /dev/null 2>&1
+                        mv target/checkstyle-result.xml ${M_CKS}
+                    '''
+                }
+                container("python"){
+                    sh "python dev-support/checkstyle_report.py ${T_CKS} ${M_CKS}"
+                }
+            }
+            post {
+                success {
+                    sh '''
+                        echo '| $`\\textcolor{green}{\\text{+1}}`$ | checkstyle | The merge-request does not generate new checkstyle errors. |' >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo "| \\\$\\`\\\\textcolor{red}{\\\\text{-1}}\\`\\\$ | checkstyle | The merge-request generated new checkstyle errors. Please check: ${JOB_URL} |" >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+        stage('Unit Test') {
+            steps {
+                container(build_container) {
+                    sh '''
+                        set +e
+                        mvn -fn clean test -Dmaven.test.failure.ignore=true -Dsurefire.rerunFailingTestsCount=2 -Dsurefire.Xmx=8g -Dsurefire.timeout=1800 -Dsurefire.enableProcessChecker=native -P runAllTests -Dtest.exclude.pattern=**/TestTableMapReduceUtil.java -pl "!hbase-rest" ${MVN_OPTS}
+                        num_failed_tests=`find . -name 'TEST*.xml' | xargs grep -l -E "<failure|<error"`
+                        if [[ ${num_failed_tests} == "" ]]; then
+                          echo 'All Passed!'
+                        else
+                          ft=`find . -name 'TEST*.xml' | xargs grep -l -E "<failure|<error" | sed -e "s|.*target/surefire-reports/TEST-|                  |g" | sed -e "s|.xml||g"`
+                          exit -1
+                        fi
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, keepLongStdio: true, testResults: '**/target/surefire-reports/*.xml'
+                    archiveArtifacts allowEmptyArchive: true, artifacts: '**/target/surefire-reports/*.txt,**/target/surefire-reports/*.xml', followSymlinks: false
+                }
+                success {
+                    sh '''
+                        echo "| \\\$\\`\\\\textcolor{green}{\\\\text{+1}}\\`\\\$ | unit tests | The merge-request passed all unit tests. Report: ${BUILD_URL}testReport |" >> ${VOTE}
+                    '''
+                }
+                failure {
+                    script {
+                        env.OV=-1
+                        sh '''
+                            echo "| \\\$\\`\\\\textcolor{red}{\\\\text{-1}}\\`\\\$ | unit tests | The merge-request failed some unit tests. Report: ${BUILD_URL}testReport |" >> ${VOTE}
+                        '''
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                sh '''
+                  if [[ "${OV}" -eq -1 ]]; then
+                    sed -i 's/-3/$`\\\\textcolor{red}{\\\\text{-1}}`$/g' ${VOTE}
+                  elif [[ "${OV}" -eq -3 ]]; then
+                    sed -i 's/-3/$`\\\\textcolor{green}{\\\\text{+1}}`$/g' ${VOTE}
+                  fi
+                  cat ${VOTE}
+                '''
+                mr_comment = sh(returnStdout: true, script: "cat ${VOTE}")
+
+            }
+            sshagent(credentials: ['jenkins-gitlab-credential']) { 
+                addGitLabMRComment comment: "${mr_comment}"
+            }
+        }
+    }
+}

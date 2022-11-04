@@ -1,0 +1,82 @@
+def build_container
+
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: maven-jdk-15
+                    image: "harbor.shopeemobile.com/di-cicd-base-image/di-maven:3.6.3-openjdk-15"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  volumes:
+                  - hostPath:
+                      path: "/data/jenkins/maven-cache/hbase/.m2"
+                    name: "hbase-mave"
+            """
+        }
+    }
+    stages{
+        stage('Env Preparation') {
+            steps {
+                script{
+                    build_container = "maven-jdk-15"
+                }
+                script{
+                    echo 'Environment variables are:'
+                    sh 'printenv'
+                }
+            }
+        }
+        stage('Checkout Branch') {
+            steps {
+                git branch: 'java15', credentialsId: 'jenkins-gitlab-credential', url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase-thirdparty-jars.git'
+            }
+        }
+        stage('Tape Archive') {
+            steps {
+                container(build_container) {
+                    sh '''
+                        set +e
+                        tar -zcvf hbase-thirdparty-jars-java15.tar.gz ./*.jar
+                    '''
+                }
+            }
+        }
+        stage('Remote Copy') {
+            steps {
+                withCredentials(
+                    bindings: [sshUserPrivateKey(credentialsId: 'jenkins-gitlab-credential', keyFileVariable: 'SSH_KEY_FILE', passphraseVariable: '', usernameVariable: 'SSH_USER_NAME')]
+                ) {
+                    script {
+                        remote = [logLevel: "FINEST", allowAnyHosts: true, name: "10.130.21.73", host: "10.130.21.73", identityFile: "${SSH_KEY_FILE}", user: "${SSH_USER_NAME}" ]
+                        sshPut(remote: remote, from: 'hbase-thirdparty-jars-java15.tar.gz', into: '/home/hbase/hbaseCanary/')
+                        sshPut(remote: remote, from: 'hbase-thirdparty-jars-java15.tar.gz', into: '/home/hbase/pre-release_HBase/')
+                        sshCommand(remote: remote, command: "chown hbase /home/hbase/hbaseCanary/hbase-thirdparty-jars-java15.tar.gz")
+                        sshCommand(remote: remote, command: "chown hbase /home/hbase/pre-release_HBase/hbase-thirdparty-jars-java15.tar.gz")
+                    }
+                }
+            }
+        }
+        stage('Notification') {
+            steps {
+                sh '''
+                    curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "Third-party jars, locating at hbase-driver:/home/hbase/hbaseCanary and hbase-driver:/home/hbase/pre-release_HBase, are updated."}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+                '''
+            }
+        }
+    }
+}

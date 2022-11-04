@@ -1,0 +1,132 @@
+def build_container
+
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: maven-jdk-17
+                    image: "harbor.shopeemobile.com/di-cicd-base-image/di-maven:3.6.3-openjdk-17"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  volumes:
+                  - hostPath:
+                      path: "/data/jenkins/maven-cache/hbase/.m2"
+                    name: "hbase-mave"
+            """
+        }
+    }
+    stages{
+        stage('Pre-build') {
+            steps {
+                script{
+                    env.RESULT_CODE = '-2'
+                    build_container = "maven-jdk-17"
+                }
+                container(build_container) {
+                    script {
+                        env.GEM_PATH = sh(
+                            returnStdout: true,
+                            script: "gem environment gemdir",
+                        ).trim()
+                    }
+                    sh 'gem install rake'
+                    sh 'gem install test-unit'
+                    sh 'gem list'
+                    sh 'java -version'
+                    sh 'mvn -version'
+                }
+                script{
+                    echo 'Environment variables are:'
+                    sh 'printenv'
+                }
+            }
+        }
+        stage('Pre-compile') {
+            steps {
+                git branch: '$TARGET_BRANCH', credentialsId: 'jenkins-gitlab-credential', url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                container(build_container) {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        sh '''
+                            mvn -fn -U clean test -Dmaven.test.failure.ignore=true -Dsurefire.rerunFailingTestsCount=2 -Dsurefire.Xmx=8g -Dsurefire.timeout=1800 -Dsurefire.enableProcessChecker=native -P runAllTests -Dtest.exclude.pattern=**/TestTableMapReduceUtil.java -pl "!hbase-rest" -DcompileSource=17 -P jdk15 |& tee build-output.txt
+                            if grep -q "BUILD FAILURE" build-output.txt; then
+                                exit -1
+                            fi
+                        '''
+                    }
+                    
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, keepLongStdio: true, testResults: '**/target/surefire-reports/*.xml'
+                    archiveArtifacts allowEmptyArchive: true, artifacts: '**/target/surefire-reports/*.txt,**/target/surefire-reports/*.xml', followSymlinks: false
+                }
+            }
+        }
+        stage('Result Check') {
+            steps {
+                script {
+                    env.RESULT_CODE = sh(
+                        returnStdout: true,
+                        script:
+                        '''
+                        set +e
+                        if grep -q "BUILD FAILURE" build-output.txt; then
+                            echo "-1"
+                        elif grep -q "BUILD SUCCESS" build-output.txt; then
+                            grep -F '[WARNING] Flakes:' build-output.txt -A 1 > flakes.txt
+                            sed \'/--/d\' flakes.txt > filtered_flakes_1.txt
+                            sed \'/Flakes/d\' filtered_flakes_1.txt > filtered_flakes_2.txt
+    
+                            while read line; do
+                                flakes="${flakes}"$(awk -F' ' '{print $2}' <<< "$line")"\\n"
+                            done < filtered_flakes_2.txt
+    
+                            if test -z "$flakes"; then
+                                echo "+1"
+                            else
+                                echo "$flakes"
+                            fi
+                        fi
+                    '''
+                    ).trim()
+                }
+                
+            }
+        }
+        stage('Notification') {
+            steps {
+                sh '''
+                    echo $RESULT_CODE
+                    if [ "$RESULT_CODE" = "+1" ]; then
+                        curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "'$RESULT_CODE' for branch '$TARGET_BRANCH'\\nBUILD SUCCESS\\nReport: '$BUILD_URL'testReport"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+                    elif [ "$RESULT_CODE" = "-1" ]; then
+                        curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "'$RESULT_CODE' for branch '$TARGET_BRANCH'\\nBUILD FAILURE\\nReport: '$BUILD_URL'testReport"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+                    elif [ "$RESULT_CODE" = "-2" ] || [ "$RESULT_CODE" = "" ]; then
+                        curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "-2 for branch '$TARGET_BRANCH'\\nCANT FINISH A BUILD\\nReport: '$BUILD_URL'testReport"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+                    else
+                        curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "-0 for branch '$TARGET_BRANCH'\\nBUILD FLAKES '$RESULT_CODE'Report: '$BUILD_URL'testReport"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+                    fi
+                '''
+            }
+        }
+    }
+}

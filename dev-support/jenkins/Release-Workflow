@@ -1,0 +1,296 @@
+def sendSeatalk(message) {
+    sh """
+        curl -i -X POST -H 'Content-Type: application/json' -d '{ "tag": "text", "text": {"content": "$message"}}' https://openapi.seatalk.io/webhook/group/Vvt2ozXjRaWTl5zMnqegvw
+    """
+}
+
+pipeline {
+    agent {
+        kubernetes {
+            podRetention onFailure() // always(), never()
+            activeDeadlineSeconds 86400 // How long to wait (seconds) for pod to be in running state.
+            yaml """
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  containers:
+                  - name: maven-jdk-8
+                    image: "harbor.shopeemobile.com/di-basic-service/di-maven:3.6.3-openjdk-8"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  - name: maven-jdk-17
+                    image: "harbor.shopeemobile.com/di-cicd-base-image/di-maven:3.6.3-openjdk-17"
+                    imagePullPolicy: Always
+                    command: ["cat"]
+                    tty: true
+                    volumeMounts: # add volumes for .m2
+                    - mountPath: "/root/.m2"
+                      name: "hbase-mave"
+                      readOnly: false
+                    resources:
+                      requests:
+                        memory: 4Gi
+                      limits:
+                        memory: 32Gi
+                  volumes:
+                  - hostPath:
+                      path: "/data/jenkins/maven-cache/hbase/.m2"
+                    name: "hbase-mave"
+            """
+        }
+    }
+    environment {
+        PATTERN = 'refs/tags/([s|p|c]rel)/([0-9]+\\.[0-9]+\\.[0-9]+-sdi-[0-9]+\\.[0-9]+\\.[0-9]+)(-RC[0-9]$)*'
+        TAG = "${gitlabTargetBranch}"
+    }
+    stages{
+        stage('Check Tag') {
+            when { expression { return !("${TAG}" =~ "$PATTERN") } }
+            steps {
+                script {
+                    currentBuild.result = 'ABORTED'
+                    echo "${TAG}"
+                    error('Invalid tag for this workflow') 
+                }
+            }
+        }
+        stage('Parse Tag') {
+            steps {
+                script {
+                    env.Mode = sh (
+                            returnStdout: true,
+                            script: '''set +e
+                            [[ ${TAG} =~ $PATTERN ]]
+                            mode=${BASH_REMATCH[1]}
+                            echo $mode
+                            '''
+                        ).trim()
+                    echo "${env.Mode}"
+                    env.Version = sh (
+                            returnStdout: true,
+                            script: '''set +e
+                            [[ ${TAG} =~ $PATTERN ]]
+                            version=${BASH_REMATCH[2]}
+                            echo $version
+                            '''
+                        ).trim()
+                    echo "${env.Version}"
+                    env.Candidate = sh (
+                            returnStdout: true,
+                            script: '''set +e
+                            [[ ${TAG} =~ $PATTERN ]]
+                            candidate=${BASH_REMATCH[3]}
+                            echo $candidate
+                            '''
+                        ).trim()
+                    echo "${env.Candidate}"
+
+                    sh 'printenv'
+                }
+            }
+        }
+        stage('Checkout'){
+            steps {
+                checkout(
+                    [
+                        $class: 'GitSCM',
+                        branches: [[name: "${TAG}"]],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: 'jenkins-gitlab-credential',
+                                url: 'gitlab@git.garena.com:shopee/data-infra/hbase-group/hbase.git'
+                            ]
+                        ]
+                    ]
+                )
+            }
+        }
+        stage('Server Release') {
+            when {
+                allOf {
+                    expression { return "${env.Mode}" == "srel" }
+                    expression { return "${env.Candidate}" == "" }
+                }
+            }
+            stages {
+                stage('Compilation') {
+                    steps {
+                        sendSeatalk("Start running server release ${env.Version}")
+                        container("maven-jdk-17") {
+                            sh 'mvn clean package -DskipTests -DcompileSource=17 -P jdk15'
+                        }
+                    }
+                    post {
+                        success { sendSeatalk("+1 Compilation") }
+                        failure {
+                            sendSeatalk("-1 Compilation")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+                stage('Build Tarball') {
+                    steps {
+                        container("maven-jdk-17") {
+                            sh 'mvn clean package assembly:single -DskipTests -DcompileSource=17 -P jdk15'
+                        }
+                    }
+                    post {
+                        success { sendSeatalk("+1 Tarball built") }
+                        failure {
+                            sendSeatalk("-1 Tarball not built")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+                stage('Uploading to Nexus') {
+                    steps {
+                        withCredentials([usernamePassword(credentialsId: 'hbase-nexus-credentials', passwordVariable: 'password', usernameVariable: 'username')]) {
+                            sh """
+                                curl -v --user ${username}:${password} --upload-file \
+                                hbase-assembly/target/hbase-${env.Version}-bin.tar.gz \
+                                http://nexus-repo.datainfra.shopee.io:8081/repository/file_server/hbase_package/release/hbase-${env.Version}-bin.tar.gz
+                            """
+                        }
+                    }
+                    post {
+                        success { 
+                            sendSeatalk("+1 Uploaded tarball to Nexus: http://nexus-repo.datainfra.shopee.io:8081/#browse/browse:file_server:hbase_package%2Frelease")
+                            sendSeatalk("Done")
+                        }
+                        failure {
+                            sendSeatalk("-1 Failed to upload tarball")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+            }
+        }
+        stage('Client Release') {
+            when {
+                allOf {
+                    expression { return "${env.Mode}" == "crel" }
+                    expression { return "${env.Candidate}" == "" }
+                }
+            }
+            stages {
+                stage('Compilation') {
+                    steps {
+                        sendSeatalk("Start running client release ${env.Version}")
+                        container("maven-jdk-8") {
+                            sh 'mvn clean package -DskipTests -DcompileSource=1.8'
+                        }
+                    }
+                    post {
+                        success { sendSeatalk("+1 Compilation") }
+                        failure {
+                            sendSeatalk("-1 Compilation")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+                stage('Deploy') {
+                    steps {
+                        container("maven-jdk-8") {
+                            sh 'mvn deploy -DskipTests -DcompileSource=1.8'
+                        }
+                    }
+                    post {
+                        success { sendSeatalk("+1 Deployed packages on Nexus repo") }
+                        failure {
+                            sendSeatalk("-1 Failed to deploy packages")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+                stage('Build Tarball') {
+                    steps {
+                        container("maven-jdk-8") {
+                            sh 'mvn clean package assembly:single -DskipTests -DcompileSource=1.8'
+                        }
+                    }
+                    post {
+                        success { sendSeatalk("+1 Tarball built") }
+                        failure {
+                            sendSeatalk("-1 Tarball not built")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+                stage('Uploading to Nexus') {
+                    steps {
+                        withCredentials([usernamePassword(credentialsId: 'hbase-nexus-credentials', passwordVariable: 'password', usernameVariable: 'username')]) {
+                            sh """
+                                curl -v --user ${username}:${password} --upload-file \
+                                hbase-assembly/target/hbase-${env.Version}-bin.tar.gz \
+                                http://nexus-repo.datainfra.shopee.io:8081/repository/file_server/hbase_package/driver/hbase-${env.Version}-bin.tar.gz
+                            """
+                        }
+                    }
+                    post {
+                        success { 
+                            sendSeatalk("+1 Uploaded tarball to Nexus: http://nexus-repo.datainfra.shopee.io:8081/#browse/browse:file_server:hbase_package%2Fdriver")
+                            sendSeatalk("Done")
+                        }
+                        failure {
+                            sendSeatalk("-1 Failed to upload tarball")
+                            sendSeatalk("Failed")
+                        }
+                    }
+                }
+            }
+        }
+        stage('Pre Release') {
+            when {
+                allOf {
+                    expression { return "${env.Mode}" == "prel" }
+                    expression { return !("${env.Candidate}" == "") }
+                }
+            }
+            stages {
+                stage('Compilation') {
+                        steps {
+                            container("maven-jdk-17") {
+                                sh 'mvn clean package -DskipTests -DcompileSource=17 -P jdk15'
+                            }
+                        }
+                    }
+                stage('Build Tarball') {
+                    steps {
+                        container("maven-jdk-17") {
+                            sh 'mvn clean package assembly:single -DskipTests -DcompileSource=17 -P jdk15'
+                        }
+                    }
+                }
+                stage('Copy Tarball to hbase-driver') {
+                    steps {
+                        withCredentials(bindings: [sshUserPrivateKey( credentialsId: 'jenkins-gitlab-credential', keyFileVariable: 'SSH_KEY_FILE_VAR', passphraseVariable: '', usernameVariable: '')]) {
+                            sh "scp -o StrictHostKeyChecking=no -i $SSH_KEY_FILE_VAR hbase-assembly/target/hbase-${env.Version}-bin.tar.gz 10.130.21.73:/home/hbase/pre-release_HBase/"
+                            sh """
+                                ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE_VAR 10.130.21.73 "cd /home/hbase/pre-release_HBase;chown hbase hbase-${env.Version}-bin.tar.gz"
+                            """
+                        }
+                    }
+                }
+                stage('Restart DEV Cluster') {
+                    steps {
+                        withCredentials(bindings: [sshUserPrivateKey( credentialsId: 'jenkins-gitlab-credential', keyFileVariable: 'SSH_KEY_FILE_VAR', passphraseVariable: '', usernameVariable: '')]) {
+                            sh """
+                                ssh -o StrictHostKeyChecking=no -i $SSH_KEY_FILE_VAR 10.130.21.73 "su - hbase bash -c 'sh /home/hbase/pre-release_HBase/restart_dev_cluster.sh ${env.Version}'"
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
