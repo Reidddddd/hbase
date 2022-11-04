@@ -56,7 +56,7 @@ import org.junit.experimental.categories.Category;
  * Will split the table, and move region randomly when testing.
  */
 @Category({ LargeTests.class, ClientTests.class })
-public class TestAsyncGetMultiThread {
+public class TestAsyncTableGetMultiThreaded {
 
   private static final HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
 

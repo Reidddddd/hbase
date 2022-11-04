@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_END_ROW;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_START_ROW;
 
@@ -31,7 +32,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.ReflectionUtils;
 
 /**
  * Utility used by client connections.
@@ -409,4 +411,25 @@ public class ConnectionUtils {
 
   // Add a delta to avoid timeout immediately after a retry sleeping.
   static final long SLEEP_DELTA_NS = TimeUnit.MILLISECONDS.toNanos(1);
+
+  static Get toCheckExistenceOnly(Get get) {
+    if (get.isCheckExistenceOnly()) {
+      return get;
+    }
+    return ReflectionUtils.newInstance(get.getClass(), get).setCheckExistenceOnly(true);
+  }
+
+  static List<Get> toCheckExistenceOnly(List<Get> gets) {
+    return gets.stream().map(ConnectionUtils::toCheckExistenceOnly).collect(toList());
+  }
+
+  static List<CompletableFuture<Void>> voidBatch(AsyncTableBase table,
+                                                 List<? extends Row> actions) {
+    return table.<Object> batch(actions).stream().map(f -> f.<Void> thenApply(r -> null))
+            .collect(toList());
+  }
+
+  static CompletableFuture<Void> voidBatchAll(AsyncTableBase table, List<? extends Row> actions) {
+    return table.<Object> batchAll(actions).thenApply(r -> null);
+  }
 }

@@ -671,7 +671,7 @@ public final class RequestConverter {
    * @throws IOException
    */
   public static <R> RegionAction.Builder buildNoDataRegionAction(final byte[] regionName,
-      final List<Action<R>> actions, final List<CellScannable> cells,
+      final Iterable<Action<R>> actions, final List<CellScannable> cells,
       final RegionAction.Builder regionActionBuilder,
       final ClientProtos.Action.Builder actionBuilder,
       final MutationProto.Builder mutationBuilder) throws IOException {
