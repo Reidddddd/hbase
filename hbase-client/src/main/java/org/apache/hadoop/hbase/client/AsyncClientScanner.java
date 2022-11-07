@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.client;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_END_ROW;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_START_ROW;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.createScanResultCache;
-import static org.apache.hadoop.hbase.client.ConnectionUtils.isEmptyStartRow;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.getLocateType;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
@@ -69,10 +69,10 @@ class AsyncClientScanner {
   public AsyncClientScanner(Scan scan, RawScanResultConsumer consumer, TableName tableName,
                             AsyncConnectionImpl conn, long scanTimeoutNs, long rpcTimeoutNs) {
     if (scan.getStartRow() == null) {
-      scan.setStartRow(EMPTY_START_ROW);
+      scan.withStartRow(EMPTY_START_ROW, scan.includeStartRow());
     }
     if (scan.getStopRow() == null) {
-      scan.setStopRow(EMPTY_END_ROW);
+      scan.withStopRow(EMPTY_END_ROW, scan.includeStopRow());
     }
     this.scan = scan;
     this.consumer = consumer;
@@ -135,22 +135,22 @@ class AsyncClientScanner {
         .setScan(scan).consumer(consumer).resultCache(resultCache)
         .rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
         .scanTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS).start()
-        .whenComplete((locateType, error) -> {
+        .whenComplete((hasMore, error) -> {
           if (error != null) {
             consumer.onError(error);
             return;
           }
-          if (locateType == null) {
-            consumer.onComplete();
+          if (hasMore) {
+            openScanner();
           } else {
-            openScanner(locateType);
+            consumer.onComplete();
           }
         });
   }
 
-  private void openScanner(RegionLocateType locateType) {
+  private void openScanner() {
     conn.callerFactory.<OpenScannerResponse> single().table(tableName).row(scan.getStartRow())
-        .locateType(locateType).rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
+        .locateType(getLocateType(scan)).rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
         .operationTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS).action(this::callOpenScanner).call()
         .whenComplete((resp, error) -> {
           if (error != null) {
@@ -162,7 +162,6 @@ class AsyncClientScanner {
   }
 
   public void start() {
-    openScanner(scan.isReversed() && isEmptyStartRow(scan.getStartRow()) ? RegionLocateType.BEFORE
-            : RegionLocateType.CURRENT);
+    openScanner();
   }
 }

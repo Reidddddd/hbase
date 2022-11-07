@@ -372,7 +372,10 @@ public class ConnectionUtils {
 
   /**
    * Create the closest row before the specified row
+   * @deprecated in fact, we do not know the closest row before the given row, the result is only a
+   *             row very close to the current row. Avoid using this method in the future.
    */
+  @Deprecated
   static byte[] createClosestRowBefore(byte[] row) {
     if (row.length == 0) {
       return MAX_BYTE_ARRAY;
@@ -431,5 +434,17 @@ public class ConnectionUtils {
 
   static CompletableFuture<Void> voidBatchAll(AsyncTableBase table, List<? extends Row> actions) {
     return table.<Object> batchAll(actions).thenApply(r -> null);
+  }
+
+  static RegionLocateType getLocateType(Scan scan) {
+    if (scan.isReversed()) {
+      if (isEmptyStartRow(scan.getStartRow())) {
+        return RegionLocateType.BEFORE;
+      } else {
+        return scan.includeStartRow() ? RegionLocateType.CURRENT : RegionLocateType.BEFORE;
+      }
+    } else {
+      return scan.includeStartRow() ? RegionLocateType.CURRENT : RegionLocateType.AFTER;
+    }
   }
 }

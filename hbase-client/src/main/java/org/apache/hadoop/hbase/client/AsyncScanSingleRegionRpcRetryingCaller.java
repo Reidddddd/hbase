@@ -17,11 +17,9 @@
  */
 package org.apache.hadoop.hbase.client;
 
-import static org.apache.hadoop.hbase.client.ConnectionUtils.createClosestRowAfter;
-import static org.apache.hadoop.hbase.client.ConnectionUtils.createClosestRowBefore;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.getPauseTime;
-import static org.apache.hadoop.hbase.client.ConnectionUtils.isEmptyStartRow;
-import static org.apache.hadoop.hbase.client.ConnectionUtils.isEmptyStopRow;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.noMoreResultsForReverseScan;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.noMoreResultsForScan;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.resetController;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.translateException;
@@ -31,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
@@ -48,7 +45,6 @@ import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService.Int
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ScanRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ScanResponse;
 import org.apache.hadoop.hbase.regionserver.RegionServerStoppedException;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -87,11 +83,9 @@ class AsyncScanSingleRegionRpcRetryingCaller {
 
   private final int startLogErrorsCnt;
 
-  private final Supplier<byte[]> createNextStartRowWhenError;
-
   private final Runnable completeWhenNoMoreResultsInRegion;
 
-  private final CompletableFuture<RegionLocateType> future;
+  private final CompletableFuture<Boolean> future;
 
   private final HBaseRpcController controller;
 
@@ -126,10 +120,8 @@ class AsyncScanSingleRegionRpcRetryingCaller {
     this.rpcTimeoutNs = rpcTimeoutNs;
     this.startLogErrorsCnt = startLogErrorsCnt;
     if (scan.isReversed()) {
-      createNextStartRowWhenError = this::createReversedNextStartRowWhenError;
       completeWhenNoMoreResultsInRegion = this::completeReversedWhenNoMoreResultsInRegion;
     } else {
-      createNextStartRowWhenError = this::createNextStartRowWhenError;
       completeWhenNoMoreResultsInRegion = this::completeWhenNoMoreResultsInRegion;
     }
     this.future = new CompletableFuture<>();
@@ -162,23 +154,13 @@ class AsyncScanSingleRegionRpcRetryingCaller {
     future.completeExceptionally(new RetriesExhaustedException(tries - 1, exceptions));
   }
 
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "NP_NONNULL_PARAM_VIOLATION",
-      justification = "https://github.com/findbugsproject/findbugs/issues/79")
   private void completeNoMoreResults() {
-    future.complete(null);
+    future.complete(false);
   }
 
-  private void completeWithNextStartRow(byte[] nextStartRow) {
-    scan.setStartRow(nextStartRow);
-    future.complete(scan.isReversed() ? RegionLocateType.BEFORE : RegionLocateType.CURRENT);
-  }
-
-  private byte[] createNextStartRowWhenError() {
-    return createClosestRowAfter(nextStartRowWhenError);
-  }
-
-  private byte[] createReversedNextStartRowWhenError() {
-    return createClosestRowBefore(nextStartRowWhenError);
+  private void completeWithNextStartRow(byte[] row, boolean inclusive) {
+    scan.withStartRow(row, inclusive);
+    future.complete(true);
   }
 
   private void completeWhenError(boolean closeScanner) {
@@ -187,12 +169,9 @@ class AsyncScanSingleRegionRpcRetryingCaller {
       closeScanner();
     }
     if (nextStartRowWhenError != null) {
-      scan.setStartRow(
-        includeNextStartRowWhenError ? nextStartRowWhenError : createNextStartRowWhenError.get());
+      scan.withStartRow(nextStartRowWhenError, includeNextStartRowWhenError);
     }
-    future.complete(
-            scan.isReversed() && Bytes.equals(scan.getStartRow(), loc.getRegionInfo().getEndKey())
-                    ? RegionLocateType.BEFORE : RegionLocateType.CURRENT);
+    future.complete(true);
   }
 
   private void onError(Throwable error) {
@@ -249,29 +228,19 @@ class AsyncScanSingleRegionRpcRetryingCaller {
   }
 
   private void completeWhenNoMoreResultsInRegion() {
-    if (isEmptyStopRow(scan.getStopRow())) {
-      if (isEmptyStopRow(loc.getRegionInfo().getEndKey())) {
-        completeNoMoreResults();
-      }
+    if (noMoreResultsForScan(scan, loc.getRegionInfo())) {
+      completeNoMoreResults();
     } else {
-      if (Bytes.compareTo(loc.getRegionInfo().getEndKey(), scan.getStopRow()) >= 0) {
-        completeNoMoreResults();
-      }
+      completeWithNextStartRow(loc.getRegionInfo().getEndKey(), true);
     }
-    completeWithNextStartRow(loc.getRegionInfo().getEndKey());
   }
 
   private void completeReversedWhenNoMoreResultsInRegion() {
-    if (isEmptyStopRow(scan.getStopRow())) {
-      if (isEmptyStartRow(loc.getRegionInfo().getStartKey())) {
-        completeNoMoreResults();
-      }
+    if (noMoreResultsForReverseScan(scan, loc.getRegionInfo())) {
+      completeNoMoreResults();
     } else {
-      if (Bytes.compareTo(loc.getRegionInfo().getStartKey(), scan.getStopRow()) <= 0) {
-        completeNoMoreResults();
-      }
+      completeWithNextStartRow(loc.getRegionInfo().getStartKey(), false);
     }
-    completeWithNextStartRow(loc.getRegionInfo().getStartKey());
   }
 
   private void onComplete(ScanResponse resp) {
@@ -344,9 +313,9 @@ class AsyncScanSingleRegionRpcRetryingCaller {
   }
 
   /**
-   * @return return locate direction for next open scanner call, or null if we should stop.
+   * @return {@code true} if we should continue, otherwise {@code false}.
    */
-  public CompletableFuture<RegionLocateType> start() {
+  public CompletableFuture<Boolean> start() {
     next();
     return future;
   }
