@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.client;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
 
 import com.google.common.base.Preconditions;
 import io.netty.util.HashedWheelTimer;
@@ -49,7 +50,16 @@ class AsyncRpcRetryingCallerFactory {
     this.retryTimer = retryTimer;
   }
 
-  public class SingleRequestCallerBuilder<T> {
+  private abstract class BuilderBase {
+
+    protected long pauseNs = conn.connConf.getPauseNs();
+
+    protected int maxAttempts = retries2Attempts(conn.connConf.getMaxRetries());
+
+    protected int startLogErrorsCnt = conn.connConf.getStartLogErrorsCnt();
+  }
+
+  public class SingleRequestCallerBuilder<T> extends BuilderBase {
 
     private TableName tableName;
 
@@ -94,14 +104,29 @@ class AsyncRpcRetryingCallerFactory {
       return this;
     }
 
+    public SingleRequestCallerBuilder<T> pause(long pause, TimeUnit unit) {
+      this.pauseNs = unit.toNanos(pause);
+      return this;
+    }
+
+    public SingleRequestCallerBuilder<T> maxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
+      return this;
+    }
+
+    public SingleRequestCallerBuilder<T> startLogErrorsCnt(int startLogErrorsCnt) {
+      this.startLogErrorsCnt = startLogErrorsCnt;
+      return this;
+    }
+
     public AsyncSingleRequestRpcRetryingCaller<T> build() {
       return new AsyncSingleRequestRpcRetryingCaller<>(retryTimer, conn,
               checkNotNull(tableName, "tableName is null"),
               checkNotNull(row, "row is null"),
               checkNotNull(locateType, "locateType is null"),
               checkNotNull(callable, "action is null"),
-              conn.connConf.getPauseNs(), conn.connConf.getMaxRetries(), operationTimeoutNs,
-              rpcTimeoutNs, conn.connConf.getStartLogErrorsCnt());
+              pauseNs, maxAttempts, operationTimeoutNs,
+              rpcTimeoutNs, startLogErrorsCnt);
     }
 
     /**
@@ -119,7 +144,7 @@ class AsyncRpcRetryingCallerFactory {
     return new SingleRequestCallerBuilder<>();
   }
 
-  public class SmallScanCallerBuilder {
+  public class SmallScanCallerBuilder extends BuilderBase {
 
     private TableName tableName;
 
@@ -156,12 +181,27 @@ class AsyncRpcRetryingCallerFactory {
       return this;
     }
 
+    public SmallScanCallerBuilder pause(long pause, TimeUnit unit) {
+      this.pauseNs = unit.toNanos(pause);
+      return this;
+    }
+
+    public SmallScanCallerBuilder maxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
+      return this;
+    }
+
+    public SmallScanCallerBuilder startLogErrorsCnt(int startLogErrorsCnt) {
+      this.startLogErrorsCnt = startLogErrorsCnt;
+      return this;
+    }
+
     public AsyncSmallScanRpcRetryingCaller build() {
       TableName tableName = checkNotNull(this.tableName, "tableName is null");
       Scan scan = checkNotNull(this.scan, "scan is null");
       checkArgument(limit > 0, "invalid limit %d", limit);
-      return new AsyncSmallScanRpcRetryingCaller(conn, tableName, scan, limit, scanTimeoutNs,
-              rpcTimeoutNs);
+      return new AsyncSmallScanRpcRetryingCaller(conn, tableName, scan, limit,
+              pauseNs, maxAttempts, scanTimeoutNs, rpcTimeoutNs, startLogErrorsCnt);
     }
 
     /**
@@ -179,7 +219,7 @@ class AsyncRpcRetryingCallerFactory {
     return new SmallScanCallerBuilder();
   }
 
-  public class ScanSingleRegionCallerBuilder {
+  public class ScanSingleRegionCallerBuilder extends BuilderBase {
 
     private long scannerId = -1L;
 
@@ -237,15 +277,29 @@ class AsyncRpcRetryingCallerFactory {
       return this;
     }
 
+    public ScanSingleRegionCallerBuilder pause(long pause, TimeUnit unit) {
+      this.pauseNs = unit.toNanos(pause);
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder maxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
+      return this;
+    }
+
+    public ScanSingleRegionCallerBuilder startLogErrorsCnt(int startLogErrorsCnt) {
+      this.startLogErrorsCnt = startLogErrorsCnt;
+      return this;
+    }
+
     public AsyncScanSingleRegionRpcRetryingCaller build() {
       Preconditions.checkArgument(scannerId != -1L, "invalid scannerId %d", scannerId);
       return new AsyncScanSingleRegionRpcRetryingCaller(retryTimer, conn,
               checkNotNull(scan, "scan is null"), scannerId,
               checkNotNull(resultCache, "resultCache is null"),
               checkNotNull(consumer, "consumer is null"), checkNotNull(stub, "stub is null"),
-              checkNotNull(loc, "location is null"), conn.connConf.getPauseNs(),
-              conn.connConf.getMaxRetries(), scanTimeoutNs, rpcTimeoutNs,
-              conn.connConf.getStartLogErrorsCnt());
+              checkNotNull(loc, "location is null"), pauseNs, maxAttempts, scanTimeoutNs, rpcTimeoutNs,
+              startLogErrorsCnt);
     }
 
     /**
@@ -263,7 +317,7 @@ class AsyncRpcRetryingCallerFactory {
     return new ScanSingleRegionCallerBuilder();
   }
 
-  public class BatchCallerBuilder {
+  public class BatchCallerBuilder extends BuilderBase {
 
     private TableName tableName;
 
@@ -271,9 +325,7 @@ class AsyncRpcRetryingCallerFactory {
 
     private long operationTimeoutNs = -1L;
 
-    private long readRpcTimeoutNs = -1L;
-
-    private long writeRpcTimeoutNs = -1L;
+    private long rpcTimeoutNs = -1L;
 
     public BatchCallerBuilder table(TableName tableName) {
       this.tableName = tableName;
@@ -290,20 +342,29 @@ class AsyncRpcRetryingCallerFactory {
       return this;
     }
 
-    public BatchCallerBuilder readRpcTimeout(long rpcTimeout, TimeUnit unit) {
-      this.readRpcTimeoutNs = unit.toNanos(rpcTimeout);
+    public BatchCallerBuilder rpcTimeout(long rpcTimeout, TimeUnit unit) {
+      this.rpcTimeoutNs = unit.toNanos(rpcTimeout);
       return this;
     }
 
-    public BatchCallerBuilder writeRpcTimeout(long rpcTimeout, TimeUnit unit) {
-      this.writeRpcTimeoutNs = unit.toNanos(rpcTimeout);
+    public BatchCallerBuilder pause(long pause, TimeUnit unit) {
+      this.pauseNs = unit.toNanos(pause);
+      return this;
+    }
+
+    public BatchCallerBuilder maxAttempts(int maxAttempts) {
+      this.maxAttempts = maxAttempts;
+      return this;
+    }
+
+    public BatchCallerBuilder startLogErrorsCnt(int startLogErrorsCnt) {
+      this.startLogErrorsCnt = startLogErrorsCnt;
       return this;
     }
 
     public <T> AsyncBatchRpcRetryingCaller<T> build() {
       return new AsyncBatchRpcRetryingCaller<T>(retryTimer, conn, tableName, actions,
-              conn.connConf.getPauseNs(), conn.connConf.getMaxRetries(), operationTimeoutNs,
-              readRpcTimeoutNs, writeRpcTimeoutNs, conn.connConf.getStartLogErrorsCnt());
+              pauseNs, maxAttempts, operationTimeoutNs, rpcTimeoutNs, startLogErrorsCnt);
     }
 
     public <T> List<CompletableFuture<T>> call() {

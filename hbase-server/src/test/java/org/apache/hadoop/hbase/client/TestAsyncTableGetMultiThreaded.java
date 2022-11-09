@@ -18,8 +18,6 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.apache.hadoop.hbase.HConstants.HBASE_CLIENT_META_OPERATION_TIMEOUT;
-import static org.apache.hadoop.hbase.HConstants.HBASE_CLIENT_RETRIES_NUMBER;
-import static org.apache.hadoop.hbase.HConstants.HBASE_RPC_READ_TIMEOUT_KEY;
 import static org.apache.hadoop.hbase.master.balancer.BaseLoadBalancer.TABLES_ON_MASTER;
 import static org.junit.Assert.assertEquals;
 import java.io.IOException;
@@ -34,13 +32,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.master.LoadBalancer;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.testclassification.ClientTests;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
@@ -70,15 +71,16 @@ public class TestAsyncTableGetMultiThreaded {
 
   private static AsyncConnection CONN;
 
+  private static RawAsyncTable TABLE;
+
   private static byte[][] SPLIT_KEYS;
 
   @BeforeClass
   public static void setUp() throws Exception {
     TEST_UTIL.getConfiguration().set(TABLES_ON_MASTER, "none");
     TEST_UTIL.getConfiguration().setLong(HBASE_CLIENT_META_OPERATION_TIMEOUT, 60000L);
-    TEST_UTIL.getConfiguration().setLong(HBASE_RPC_READ_TIMEOUT_KEY, 1000L);
-    TEST_UTIL.getConfiguration().setInt(HBASE_CLIENT_RETRIES_NUMBER, 1000);
-    TEST_UTIL.startMiniCluster(3);
+
+    TEST_UTIL.startMiniCluster(5);
     SPLIT_KEYS = new byte[8][];
     for (int i = 111; i < 999; i += 111) {
       SPLIT_KEYS[i / 111 - 1] = Bytes.toBytes(String.format("%03d", i));
@@ -86,12 +88,12 @@ public class TestAsyncTableGetMultiThreaded {
     TEST_UTIL.createTable(TABLE_NAME, FAMILY);
     TEST_UTIL.waitTableAvailable(TABLE_NAME);
     CONN = ConnectionFactory.createAsyncConnection(TEST_UTIL.getConfiguration());
-    RawAsyncTable table = CONN.getRawTable(TABLE_NAME);
-    List<CompletableFuture<?>> futures = new ArrayList<>();
-    IntStream.range(0, COUNT)
-            .forEach(i -> futures.add(table.put(new Put(Bytes.toBytes(String.format("%03d", i)))
-                    .addColumn(FAMILY, QUALIFIER, Bytes.toBytes(i)))));
-    CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])).get();
+    TABLE = CONN.getRawTableBuilder(TABLE_NAME).setReadRpcTimeout(1, TimeUnit.SECONDS)
+            .setMaxRetries(1000).build();
+    TABLE.putAll(
+                    IntStream.range(0, COUNT).mapToObj(i -> new Put(Bytes.toBytes(String.format("%03d", i)))
+                            .addColumn(FAMILY, QUALIFIER, Bytes.toBytes(i))).collect(Collectors.toList()))
+            .get();
   }
 
   @AfterClass
@@ -102,11 +104,10 @@ public class TestAsyncTableGetMultiThreaded {
 
   private void run(AtomicBoolean stop) throws InterruptedException, ExecutionException {
     while (!stop.get()) {
-      int i = ThreadLocalRandom.current().nextInt(COUNT);
-      assertEquals(i,
-              Bytes.toInt(CONN.getRawTable(TABLE_NAME)
-                      .get(new Get(Bytes.toBytes(String.format("%03d", i)))).get()
-                              .getValue(FAMILY, QUALIFIER)));
+      for (int i = 0; i < COUNT; i++) {
+        assertEquals(i, Bytes.toInt(TABLE.get(new Get(Bytes.toBytes(String.format("%03d", i))))
+                .get().getValue(FAMILY, QUALIFIER)));
+      }
     }
   }
 

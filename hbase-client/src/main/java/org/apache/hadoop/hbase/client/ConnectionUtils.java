@@ -426,16 +426,6 @@ public class ConnectionUtils {
     return gets.stream().map(ConnectionUtils::toCheckExistenceOnly).collect(toList());
   }
 
-  static List<CompletableFuture<Void>> voidBatch(AsyncTableBase table,
-                                                 List<? extends Row> actions) {
-    return table.<Object> batch(actions).stream().map(f -> f.<Void> thenApply(r -> null))
-            .collect(toList());
-  }
-
-  static CompletableFuture<Void> voidBatchAll(AsyncTableBase table, List<? extends Row> actions) {
-    return table.<Object> batchAll(actions).thenApply(r -> null);
-  }
-
   static RegionLocateType getLocateType(Scan scan) {
     if (scan.isReversed()) {
       if (isEmptyStartRow(scan.getStartRow())) {
@@ -446,5 +436,10 @@ public class ConnectionUtils {
     } else {
       return scan.includeStartRow() ? RegionLocateType.CURRENT : RegionLocateType.AFTER;
     }
+  }
+
+  static <T> CompletableFuture<List<T>> allOf(List<CompletableFuture<T>> futures) {
+    return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+            .thenApply(v -> futures.stream().map(f -> f.getNow(null)).collect(toList()));
   }
 }
