@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
@@ -225,6 +226,8 @@ public class TestFIFOCompactionPolicy {
         break;
       }
     }
+    // Sleep longer to make sure filesCompacting is empty
+    Thread.sleep(TimeUnit.SECONDS.toMillis(10));
     Assert.assertEquals(1, store.getStorefilesCount());
     StoreFile sf = store.getStorefiles().iterator().next();
     Assert.assertNotNull(sf);
