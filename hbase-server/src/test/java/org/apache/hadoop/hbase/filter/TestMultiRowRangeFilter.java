@@ -418,7 +418,10 @@ public class TestMultiRowRangeFilter {
   @Test
   public void testMultiRowRangeFilterWithExclusive() throws IOException {
     tableName = Bytes.toBytes("testMultiRowRangeFilterWithExclusive");
+    TEST_UTIL.getConfiguration().setInt(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 6000000);
     HTable ht = TEST_UTIL.createTable(tableName, family, Integer.MAX_VALUE);
+    ht.setReadRpcTimeout(600000);
+    ht.setOperationTimeout(6000000);
     generateRows(numRows, ht, family, qf, value);
 
     Scan scan = new Scan();

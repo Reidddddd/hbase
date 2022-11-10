@@ -1191,6 +1191,11 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     }
   }
 
+  @VisibleForTesting
+  public int getScannersCount() {
+    return scanners.size();
+  }
+
   public
   RegionScanner getScanner(long scannerId) {
     String scannerIdString = Long.toString(scannerId);
