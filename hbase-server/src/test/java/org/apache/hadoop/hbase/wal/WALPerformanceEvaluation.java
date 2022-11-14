@@ -313,6 +313,14 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
         rootRegionDir = TEST_UTIL.getDataTestDirOnTestFS("WALPerformanceEvaluation");
       }
       rootRegionDir = rootRegionDir.makeQualified(fs);
+      Configuration conf = getConf();
+      try {
+        Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+        cleanRegionRootNamespace(namespace, "wals");
+      } catch (Throwable t) {
+        LOG.warn("Clear distributedlog namesapce failed with throwable: \n", t);
+      }
+
       cleanRegionRootDir(fs, rootRegionDir);
       FSUtils.setRootDir(getConf(), rootRegionDir);
       final WALFactory wals = new WALFactory(getConf(), null, "wals");
@@ -360,19 +368,19 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
               editCount += verify(wals, p, verbose);
             }
           } else {
-            Namespace namespace =
-              DistributedLogAccessor.getInstance(getConf()).getNamespace(wals.factoryId);
-            Iterator<String> logs = namespace.getLogs();
+            Namespace namespace = DistributedLogAccessor.getInstance(getConf()).getNamespace();
+            Iterator<String> logs = namespace.getLogs(wals.factoryId);
             while (logs.hasNext()) {
               String log = logs.next();
-              DistributedLogManager distributedLogManager = namespace.openLog(log);
+              String logName = WALUtils.getFullPathStringForDistributedLog(wals.factoryId, log);
+              DistributedLogManager distributedLogManager = namespace.openLog(logName);
               if (!distributedLogManager.isEndOfStreamMarked()) {
                 throw new IllegalStateException("Distributed log is not closed after finishing.");
               }
               if (distributedLogManager.getLastTxId() == 0) {
                 throw new IllegalStateException("Distributed log is empty.");
               }
-              editCount += verify(wals, new Path(wals.factoryId, log), verbose);
+              editCount += verify(wals, new Path(logName), verbose);
             }
           }
           long expected = numIterations * numThreads;
@@ -557,6 +565,11 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
     if (fs.exists(dir)) {
       fs.delete(dir, true);
     }
+  }
+
+  private void cleanRegionRootNamespace(final Namespace namespace, String root)
+    throws IOException {
+    namespace.deleteLog(root);
   }
 
   private Put setupPut(Random rand, byte[] key, byte[] value, final int numFamilies) {

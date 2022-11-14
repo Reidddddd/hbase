@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -140,8 +141,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
     conf.setClass("hbase.wal.provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
 
-    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace(
-      currentTest.getMethodName());
+    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
 
     FileStatus[] entries = fs.listStatus(new Path("/"));
     for (FileStatus dir : entries) {
@@ -442,6 +442,11 @@ public class TestDistributedLog extends TestDistributedLogBase {
    */
   @Test
   public void testConcurrentWrites() throws Exception {
+    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    Iterator<String> logs = namespace.getLogs("wals");
+    while (logs.hasNext()) {
+      namespace.deleteLog(logs.next());
+    }
     // Run the WPE tool with three threads writing 3000 edits each concurrently.
     // When done, verify that all edits were written.
     int errCode = WALPerformanceEvaluation.innerMain(

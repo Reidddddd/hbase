@@ -51,6 +51,7 @@ public class WALUtils {
   /** The hbase:meta region's WAL filename extension */
   public static final String DISTRIBUTED_LOG_NAMESPACE_DELIMITER = "/";
   public static final String DISTRIBUTED_LOG_DEFAULT_NAMESPACE = "default";
+  public static final String DISTRIBUTED_LOG_ARCHIVE_PREFIX = "archive";
 
   @VisibleForTesting
   public static final String META_WAL_PROVIDER_ID = ".meta";
@@ -445,6 +446,11 @@ public class WALUtils {
     return new Path(archiveDir, p.getName());
   }
 
+  public static String getWALArchivePathStr(String archiveRoot, String p) {
+    String[] layers = p.split(DISTRIBUTED_LOG_NAMESPACE_DELIMITER);
+    return String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, archiveRoot, layers[layers.length - 1]);
+  }
+
   /**
    * Checks if the given distributed logName is the one with 'recovered.edits'.
    * @return True if we recovered edits
@@ -466,5 +472,9 @@ public class WALUtils {
       throw new IllegalArgumentException("Unknown name of distributed log name: "
         + logNameWithNamespace);
     }
+  }
+
+  public static String getFullPathStringForDistributedLog(String parent, String logName) {
+    return String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, parent, logName);
   }
 }

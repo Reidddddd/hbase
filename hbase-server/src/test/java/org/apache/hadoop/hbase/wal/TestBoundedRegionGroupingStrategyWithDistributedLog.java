@@ -26,7 +26,6 @@ import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.logging.Log;
@@ -36,7 +35,6 @@ import org.apache.distributedlog.shaded.TestDistributedLogBase;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogWriter;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
@@ -76,14 +74,6 @@ public class TestBoundedRegionGroupingStrategyWithDistributedLog extends TestDis
     conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.set(REGION_GROUPING_STRATEGY, RegionGroupingProvider.Strategies.bounded.name());
     conf.setClass(DELEGATE_PROVIDER, DistributedLogWALProvider.class, WALProvider.class);
-
-    // In the WALPerformanceEvaluation, the used WALFactory id is "wals", so we need to clear
-    // the logs in each UT, otherwise, the UTs will fail.
-    this.namespace = DistributedLogAccessor.getInstance(conf).getNamespace("wals");
-    Iterator<String> logs = namespace.getLogs();
-    while (logs.hasNext()) {
-      namespace.deleteLog(logs.next());
-    }
   }
 
   /**

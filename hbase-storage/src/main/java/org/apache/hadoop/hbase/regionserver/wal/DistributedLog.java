@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.apache.hadoop.hbase.wal.WALUtils.DISTRIBUTED_LOG_ARCHIVE_PREFIX;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -49,19 +50,26 @@ public class DistributedLog extends AbstractLog {
   private static final String DISTRIBUTED_LOG_SYNC_PERIOD =
     "hbase.regionserver.wal.distributedlog.sync.period";
   private static final int DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD = 100;
-  private static final String ARCHIVE_LOG_SUFFIX = "-old";
   
   private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
+  private final Namespace distributedLogNamespace;
   private final String serverName;
 
   public DistributedLog(Configuration conf, List<WALActionsListener> listeners, final String prefix,
       final String suffix, String serverName) throws IOException {
     super(conf, listeners, prefix, suffix);
+    try {
+      distributedLogNamespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    } catch (Exception e) {
+      LOG.error("Failed accessing distributedlog with exception: \n", e);
+      throw new IOException(e);
+    }
     this.serverName = serverName;
     init();
-    ourLogs = new LogNameFilter(logNamePrefix, logNameSuffix);
+    ourLogs = new LogNameFilter(prefixLogStr, logNameSuffix);
     rollWriter();
     initDisruptor();
+
     forceScheduler.scheduleAtFixedRate(
       () -> {
         Exception lastException = null;
@@ -90,15 +98,16 @@ public class DistributedLog extends AbstractLog {
   protected void archiveLogUnities(List<String> logsToArchive) throws IOException {
     try {
       if (logsToArchive != null) {
-        Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace(serverName);
         for (String p : logsToArchive) {
-          DistributedLogManager distributedLogManager = namespace.openLog(p);
+          DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(p);
           long size = distributedLogManager.getLogRecordCount() == 0 ? 0 :
-            namespace.openLog(p).getLastTxId();
+            distributedLogNamespace.openLog(p).getLastTxId();
           distributedLogManager.close();
 
           this.totalLogSize.addAndGet(-size);
-          namespace.renameLog(p, p + ARCHIVE_LOG_SUFFIX);
+          String archivedLogName =
+            WALUtils.getFullPathStringForDistributedLog(DISTRIBUTED_LOG_ARCHIVE_PREFIX, p);
+          distributedLogNamespace.renameLog(p, archivedLogName);
           this.byWalRegionSequenceIds.remove(p);
         }
       }
@@ -113,7 +122,7 @@ public class DistributedLog extends AbstractLog {
     if (newWriterName == null) {
       throw new IOException("Cannot create writer with null name.");
     }
-    Writer writer = WALUtils.createWriter(conf, null, new Path(serverName, newWriterName), false);
+    Writer writer = WALUtils.createWriter(conf, null, new Path(newWriterName), false);
     if (! (writer instanceof DistributedLogWriter)) {
       throw new IllegalArgumentIOException("DistributedLog must create " +
         DistributedLogWriter.class.getName() + " but get: " + writer.getClass().getName());
@@ -127,10 +136,9 @@ public class DistributedLog extends AbstractLog {
     int oldNumEntries = this.numEntries.get();
     this.numEntries.set(0);
     try {
-      Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace(serverName);
       if (oldPathStr != null) {
         this.byWalRegionSequenceIds.put(oldPathStr, this.sequenceIdAccounting.resetHighest());
-        DistributedLogManager distributedLogManager = namespace.openLog(oldPathStr);
+        DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(oldPathStr);
         long oldFileLen = distributedLogManager.getLogRecordCount() == 0 ? 0 :
           distributedLogManager.getLastTxId();
         distributedLogManager.close();
@@ -173,7 +181,8 @@ public class DistributedLog extends AbstractLog {
   @Override
   protected void init() {
     logrollsize = this.conf.getLong(DISTRIBUTED_LOG_ROLL_SIZE, DEFAULT_DISTRIBUTED_LOG_ROLL_SIZE);
-    this.prefixLogStr = this.logNamePrefix + WALUtils.WAL_FILE_NAME_DELIMITER;
+    this.prefixLogStr = WALUtils.getFullPathStringForDistributedLog(this.serverName,
+      this.logNamePrefix + WALUtils.WAL_FILE_NAME_DELIMITER);
   }
 
   @Override
@@ -189,7 +198,7 @@ public class DistributedLog extends AbstractLog {
   @Override
   protected boolean checkExists(String logName) throws IOException {
     try {
-      return DistributedLogAccessor.getInstance(conf).getNamespace(serverName).logExists(logName);
+      return distributedLogNamespace.logExists(logName);
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -216,14 +225,14 @@ public class DistributedLog extends AbstractLog {
     shutdown();
     try {
       forceScheduler.shutdown();
-      Namespace distributedLogNamespace =
-        DistributedLogAccessor.getInstance(this.conf).getNamespace(serverName);
-      Iterator<String> logNames = distributedLogNamespace.getLogs();
+      // We only archive the logs under this server.
+      Iterator<String> logNames = distributedLogNamespace.getLogs(serverName);
       String logBaseURL = distributedLogNamespace.getNamespaceDriver().getUri().getPath();
       int numOfLogs = 0;
       while (logNames.hasNext()) {
         String logName = logNames.next();
-        String archiveLogName = logName + "-old";
+        String archiveLogName =
+          WALUtils.getWALArchivePathStr(DISTRIBUTED_LOG_ARCHIVE_PREFIX, logName);
         // Tell our listeners that a log is going to be archived.
         if (!this.listeners.isEmpty()) {
           for (WALActionsListener i : this.listeners) {
@@ -231,7 +240,7 @@ public class DistributedLog extends AbstractLog {
           }
         }
 
-        distributedLogNamespace.renameLog(logName, logName + "-old");
+        distributedLogNamespace.renameLog(logName, archiveLogName);
 
         // Tell our listeners that a log was archived.
         if (!this.listeners.isEmpty()) {

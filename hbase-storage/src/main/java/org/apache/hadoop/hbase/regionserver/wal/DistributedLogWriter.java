@@ -59,14 +59,10 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
-  private String namespaceStr;
 
   @Override
-  public void init(Configuration conf, String logNameWithNamespace)
-    throws URISyntaxException, IOException {
-    String[] nameArray = WALUtils.parseDistributedLogName(logNameWithNamespace);
-    this.namespaceStr = nameArray[0];
-    this.logName = nameArray[1];
+  public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
+    this.logName = logName;
     super.init(conf);
   }
 
@@ -80,7 +76,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     Namespace namespace;
     LOG.info("Init DistributedLog writer once. ");
     try {
-      namespace = DistributedLogAccessor.getInstance(this.conf).getNamespace(namespaceStr);
+      namespace = DistributedLogAccessor.getInstance(this.conf).getNamespace();
     } catch (Exception e) {
       LOG.error("Failed to get DistributedLog namespace.");
       throw new IOException(e);
@@ -91,7 +87,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     // Check if a log with same name is in splitting.
     if (namespace.logExists(logName + WALUtils.SPLITTING_EXT)) {
       throw new IOException("A log with name " + logName + " is under splitting, cannot create "
-        + "a new log with name: " + logName);
+        + "a new log with the same name: " + logName);
     }
     // Check if a log with same name is archived.
     if (namespace.logExists(logName + "-old")) {

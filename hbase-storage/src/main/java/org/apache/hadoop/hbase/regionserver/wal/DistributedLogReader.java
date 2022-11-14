@@ -47,7 +47,6 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
   private AppendOnlyStreamReader appendOnlyStreamReader;
   private DistributedLogManager distributedLogManager;
   private String logName;
-  private String namespaceStr;
 
   static {
     writerClsNames.add(DistributedLogWriter.class.getSimpleName());
@@ -141,15 +140,13 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
   }
 
   @Override
-  public void init(Configuration conf, String logNameWithNamespace)
+  public void init(Configuration conf, String logName)
     throws URISyntaxException, IOException {
-    String[] nameArray = WALUtils.parseDistributedLogName(logNameWithNamespace);
-    namespaceStr = nameArray[0];
-    logName = nameArray[1];
+    this.logName = logName;
 
     try {
       this.distributedLogManager =
-        DistributedLogAccessor.getInstance(conf).getNamespace(namespaceStr).openLog(logName);
+        DistributedLogAccessor.getInstance(conf).getNamespace().openLog(logName);
     } catch (Exception e) {
       LOG.warn("Failed to init distributed log reader. ");
       throw new IOException(e);
