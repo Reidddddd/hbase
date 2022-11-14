@@ -19,6 +19,11 @@
 
 package org.apache.hadoop.hbase.client.coprocessor;
 
+import static org.apache.hadoop.hbase.client.coprocessor.AggregationHelper.validateArgAndGetPB;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Message;
+import com.google.protobuf.RpcCallback;
+import com.google.protobuf.RpcController;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -29,15 +34,12 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Result;
@@ -52,11 +54,8 @@ import org.apache.hadoop.hbase.protobuf.generated.AggregateProtos.AggregateRespo
 import org.apache.hadoop.hbase.protobuf.generated.AggregateProtos.AggregateService;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
-
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Message;
-import com.google.protobuf.RpcCallback;
-import com.google.protobuf.RpcController;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * This client class is for invoking the aggregate functions deployed on the
@@ -80,6 +79,7 @@ import com.google.protobuf.RpcController;
  * <p>Call {@link #close()} when done.
  */
 @InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class AggregationClient implements Closeable {
   // TODO: This class is not used.  Move to examples?
   private static final Log log = LogFactory.getLog(AggregationClient.class);
@@ -222,25 +222,6 @@ public class AggregationClient implements Closeable {
           }
         }, aMaxCallBack);
     return aMaxCallBack.getMax();
-  }
-
-  /*
-   * @param scan
-   * @param canFamilyBeAbsent whether column family can be absent in familyMap of scan
-   */
-  private void validateParameters(Scan scan, boolean canFamilyBeAbsent) throws IOException {
-    if (scan == null
-        || (Bytes.equals(scan.getStartRow(), scan.getStopRow()) && !Bytes
-            .equals(scan.getStartRow(), HConstants.EMPTY_START_ROW))
-        || ((Bytes.compareTo(scan.getStartRow(), scan.getStopRow()) > 0) &&
-          !Bytes.equals(scan.getStopRow(), HConstants.EMPTY_END_ROW))) {
-      throw new IOException(
-          "Agg client Exception: Startrow should be smaller than Stoprow");
-    } else if (!canFamilyBeAbsent) {
-      if (scan.getFamilyMap().size() != 1) {
-        throw new IOException("There must be only one family.");
-      }
-    }
   }
 
   /**
@@ -841,22 +822,6 @@ public class AggregationClient implements Closeable {
       }
     }
     return null;
-  }
-
-  <R, S, P extends Message, Q extends Message, T extends Message> AggregateRequest
-  validateArgAndGetPB(Scan scan, ColumnInterpreter<R,S,P,Q,T> ci, boolean canFamilyBeAbsent)
-      throws IOException {
-    validateParameters(scan, canFamilyBeAbsent);
-    final AggregateRequest.Builder requestBuilder =
-        AggregateRequest.newBuilder();
-    requestBuilder.setInterpreterClassName(ci.getClass().getCanonicalName());
-    P columnInterpreterSpecificData = null;
-    if ((columnInterpreterSpecificData = ci.getRequestData())
-       != null) {
-      requestBuilder.setInterpreterSpecificBytes(columnInterpreterSpecificData.toByteString());
-    }
-    requestBuilder.setScan(ProtobufUtil.toScan(scan));
-    return requestBuilder.build();
   }
 
   byte[] getBytesFromResponse(ByteString response) {
