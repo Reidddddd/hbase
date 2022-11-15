@@ -277,6 +277,7 @@ class AsyncNonMetaRegionLocator {
           // TODO: use a better algorithm to send a request which is more likely to fetch a new
           // location.
           toSend = candidates[ThreadLocalRandom.current().nextInt(candidates.length)];
+          tableCache.send(toSend);
         }
       }
     }

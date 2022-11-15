@@ -164,10 +164,7 @@ public class TestAsyncNonMetaRegionLocator {
     return endKeys;
   }
 
-  @Test
-  public void testMultiRegionTable() throws IOException, InterruptedException {
-    createMultiRegionTable();
-    byte[][] startKeys = getStartKeys();
+  private ServerName[] getLocations(byte[][] startKeys) {
     ServerName[] serverNames = new ServerName[startKeys.length];
     TEST_UTIL.getHBaseCluster().getRegionServerThreads().stream().map(t -> t.getRegionServer())
             .forEach(rs -> {
@@ -176,6 +173,14 @@ public class TestAsyncNonMetaRegionLocator {
                         Bytes::compareTo)] = rs.getServerName();
               });
             });
+    return serverNames;
+  }
+
+  @Test
+  public void testMultiRegionTable() throws IOException, InterruptedException {
+    createMultiRegionTable();
+    byte[][] startKeys = getStartKeys();
+    ServerName[] serverNames = getLocations(startKeys);
     IntStream.range(0, 2).forEach(n -> IntStream.range(0, startKeys.length).forEach(i -> {
       try {
         assertLocEquals(startKeys[i], i == startKeys.length - 1 ? EMPTY_END_ROW : startKeys[i + 1],
