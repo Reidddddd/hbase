@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hbase.client;
 
-import static org.apache.hadoop.hbase.HConstants.CLUSTER_ID_DEFAULT;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.NO_NONCE_GENERATOR;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.getStubKey;
 import static org.apache.hadoop.hbase.client.NonceGenerator.CLIENT_NONCES_ENABLED_KEY;
@@ -25,7 +24,6 @@ import static org.apache.hadoop.hbase.client.NonceGenerator.CLIENT_NONCES_ENABLE
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.HashedWheelTimer;
 import java.io.IOException;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -68,8 +66,6 @@ class AsyncConnectionImpl implements AsyncConnection {
 
   final AsyncRegistry registry;
 
-  private final String clusterId;
-
   private final int rpcTimeout;
 
   private final RpcClient rpcClient;
@@ -86,17 +82,11 @@ class AsyncConnectionImpl implements AsyncConnection {
 
   private final ConcurrentMap<String, ClientService.Interface> rsStubs = new ConcurrentHashMap<>();
 
-  public AsyncConnectionImpl(Configuration conf, User user) throws IOException {
+  public AsyncConnectionImpl(Configuration conf, AsyncRegistry registry, String clusterId, User user) {
     this.conf = conf;
     this.user = user;
     this.connConf = new AsyncConnectionConfiguration(conf);
-    this.registry = AsyncRegistryFactory.getRegistry(conf);
-    this.clusterId = Optional.ofNullable(registry.getClusterId()).orElseGet(() -> {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("cluster id came back null, using default " + CLUSTER_ID_DEFAULT);
-      }
-      return CLUSTER_ID_DEFAULT;
-    });
+    this.registry = registry;
     this.rpcClient = RpcClientFactory.createClient(conf, clusterId);
     this.rpcControllerFactory = RpcControllerFactory.instantiate(conf);
     this.hostnameCanChange = conf.getBoolean(RESOLVE_HOSTNAME_ON_FAIL_KEY, true);
@@ -128,11 +118,13 @@ class AsyncConnectionImpl implements AsyncConnection {
   }
 
   // we will override this method for testing retry caller, so do not remove this method.
+  @VisibleForTesting
   AsyncRegionLocator getLocator() {
     return locator;
   }
 
   // ditto
+  @VisibleForTesting
   public NonceGenerator getNonceGenerator() {
     return nonceGenerator;
   }

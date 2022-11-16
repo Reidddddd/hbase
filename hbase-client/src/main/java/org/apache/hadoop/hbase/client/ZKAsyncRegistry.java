@@ -40,6 +40,7 @@ import org.apache.hadoop.hbase.ClusterId;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.RegionLocations;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.master.RegionState;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
@@ -51,8 +52,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.data.Stat;
 
 /**
- * Cache the cluster registry data in memory and use zk watcher to update. The only exception is
- * {@link #getClusterId()}, it will fetch the data from zk directly.
+ * Fetch the registry data from zookeeper.
  */
 @InterfaceAudience.Private
 class ZKAsyncRegistry implements AsyncRegistry {
@@ -79,19 +79,18 @@ class ZKAsyncRegistry implements AsyncRegistry {
     this.zk.start();
   }
 
-  @Override
-  public String getClusterId() {
-    try {
-      byte[] data = zk.getData().forPath(znodePaths.clusterIdZNode);
-      if (data == null || data.length == 0) {
-        return null;
-      }
-      data = removeMetaData(data);
-      return ClusterId.parseFrom(data).toString();
-    } catch (Exception e) {
-      LOG.warn("failed to get cluster id", e);
+  private static String getClusterId(CuratorEvent event) throws DeserializationException {
+    byte[] data = event.getData();
+    if (data == null || data.length == 0) {
       return null;
     }
+    data = removeMetaData(data);
+    return ClusterId.parseFrom(data).toString();
+  }
+
+  @Override
+  public CompletableFuture<String> getClusterId() {
+    return exec(zk.getData(), znodePaths.clusterIdZNode, ZKAsyncRegistry::getClusterId);
   }
 
   @Override

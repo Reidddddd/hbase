@@ -27,9 +27,6 @@ import org.apache.yetus.audience.InterfaceAudience;
  * Implementations hold cluster information such as this cluster's id, location of hbase:meta, etc..
  * All stuffs that may be related to zookeeper at client side are placed here.
  * <p>
- * Most methods are executed asynchronously except getClusterId. It will be executed synchronously
- * and should be called only once when initialization.
- * <p>
  * Internal use only.
  */
 @InterfaceAudience.Private
@@ -45,7 +42,7 @@ interface AsyncRegistry extends Closeable {
    * <p>
    * The upper layer should store this value somewhere as it will not be change any more.
    */
-  String getClusterId();
+  CompletableFuture<String> getClusterId();
 
   /**
    * Get the number of 'running' regionservers.

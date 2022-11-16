@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.client;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.yetus.audience.InterfaceAudience;
@@ -248,9 +249,9 @@ public class ConnectionFactory {
   /**
    * Call {@link #createAsyncConnection(Configuration)} using default HBaseConfiguration.
    * @see #createAsyncConnection(Configuration)
-   * @return AsyncConnection object
+   * @return AsyncConnection object wrapped by CompletableFuture
    */
-  public static AsyncConnection createAsyncConnection() throws IOException {
+  public static CompletableFuture<AsyncConnection> createAsyncConnection() throws IOException {
     return createAsyncConnection(HBaseConfiguration.create());
   }
 
@@ -259,12 +260,20 @@ public class ConnectionFactory {
    * User object created by {@link UserProvider}. The given {@code conf} will also be used to
    * initialize the {@link UserProvider}.
    * @param conf configuration
-   * @return AsyncConnection object
+   * @return AsyncConnection object wrapped by CompletableFuture
    * @see #createAsyncConnection(Configuration, User)
    * @see UserProvider
    */
-  public static AsyncConnection createAsyncConnection(Configuration conf) throws IOException {
-    return createAsyncConnection(conf, UserProvider.instantiate(conf).getCurrent());
+  public static CompletableFuture<AsyncConnection> createAsyncConnection(Configuration conf) {
+    User user;
+    try {
+      user = UserProvider.instantiate(conf).getCurrent();
+    } catch (IOException e) {
+      CompletableFuture<AsyncConnection> future = new CompletableFuture<>();
+      future.completeExceptionally(e);
+      return future;
+    }
+    return createAsyncConnection(conf, user);
   }
 
   /**
@@ -280,17 +289,29 @@ public class ConnectionFactory {
    * as it is thread safe.
    * @param conf configuration
    * @param user the user the asynchronous connection is for
-   * @return AsyncConnection object
+   * @return AsyncConnection object wrapped by CompletableFuture
    * @throws IOException when reflect failed.
    */
-  public static AsyncConnection createAsyncConnection(Configuration conf, User user)
-      throws IOException {
-    Class<? extends AsyncConnection> clazz = conf.getClass(HBASE_CLIENT_ASYNC_CONNECTION_IMPL,
-      AsyncConnectionImpl.class, AsyncConnection.class);
-    try {
-      return ReflectionUtils.newInstance(clazz, conf, user);
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
+  public static CompletableFuture<AsyncConnection> createAsyncConnection(Configuration conf, User user) {
+    CompletableFuture<AsyncConnection> future = new CompletableFuture<>();
+    AsyncRegistry registry = AsyncRegistryFactory.getRegistry(conf);
+    registry.getClusterId().whenComplete((clusterId, error) -> {
+      if (error != null) {
+        future.completeExceptionally(error);
+        return;
+      }
+      if (clusterId == null) {
+        future.completeExceptionally(new IOException("clusterid came back null"));
+        return;
+      }
+      Class<? extends AsyncConnection> clazz = conf.getClass(HBASE_CLIENT_ASYNC_CONNECTION_IMPL,
+              AsyncConnectionImpl.class, AsyncConnection.class);
+      try {
+        future.complete(ReflectionUtils.newInstance(clazz, conf, registry, clusterId, user));
+      } catch (Exception e) {
+        future.completeExceptionally(e);
+      }
+    });
+    return future;
   }
 }
