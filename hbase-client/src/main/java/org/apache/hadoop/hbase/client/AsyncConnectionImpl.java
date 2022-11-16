@@ -82,7 +82,8 @@ class AsyncConnectionImpl implements AsyncConnection {
 
   private final ConcurrentMap<String, ClientService.Interface> rsStubs = new ConcurrentHashMap<>();
 
-  public AsyncConnectionImpl(Configuration conf, AsyncRegistry registry, String clusterId, User user) {
+  public AsyncConnectionImpl(
+          Configuration conf, AsyncRegistry registry, String clusterId, User user) {
     this.conf = conf;
     this.user = user;
     this.connConf = new AsyncConnectionConfiguration(conf);

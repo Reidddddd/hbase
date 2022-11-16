@@ -292,7 +292,8 @@ public class ConnectionFactory {
    * @return AsyncConnection object wrapped by CompletableFuture
    * @throws IOException when reflect failed.
    */
-  public static CompletableFuture<AsyncConnection> createAsyncConnection(Configuration conf, User user) {
+  public static CompletableFuture<AsyncConnection> createAsyncConnection(
+          Configuration conf, User user) {
     CompletableFuture<AsyncConnection> future = new CompletableFuture<>();
     AsyncRegistry registry = AsyncRegistryFactory.getRegistry(conf);
     registry.getClusterId().whenComplete((clusterId, error) -> {
