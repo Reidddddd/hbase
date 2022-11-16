@@ -133,19 +133,19 @@ class RawAsyncTableImpl implements RawAsyncTable {
       rpcCall.call(stub, controller, reqConvert.convert(loc.getRegionInfo().getRegionName(), req),
               new RpcCallback<PRESP>() {
 
-                @Override
-                public void run(PRESP resp) {
-                  if (controller.failed()) {
-                    future.completeExceptionally(controller.getFailed());
-                  } else {
-                    try {
-                      future.complete(respConverter.convert(controller, resp));
-                    } catch (IOException e) {
-                      future.completeExceptionally(e);
-                    }
-                  }
-                }
-              });
+        @Override
+        public void run(PRESP resp) {
+          if (controller.failed()) {
+            future.completeExceptionally(controller.getFailed());
+          } else {
+            try {
+              future.complete(respConverter.convert(controller, resp));
+            } catch (IOException e) {
+              future.completeExceptionally(e);
+            }
+          }
+        }
+      });
     } catch (IOException e) {
       future.completeExceptionally(e);
     }
@@ -357,9 +357,8 @@ class RawAsyncTableImpl implements RawAsyncTable {
     scan(scan, new RawScanResultConsumer() {
 
       @Override
-      public boolean onNext(Result[] results) {
+      public void onNext(Result[] results, ScanController controller) {
         scanResults.addAll(Arrays.asList(results));
-        return true;
       }
 
       @Override
