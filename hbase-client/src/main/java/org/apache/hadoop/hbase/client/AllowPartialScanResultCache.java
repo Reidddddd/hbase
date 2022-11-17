@@ -80,10 +80,6 @@ class AllowPartialScanResultCache extends ScanResultCache {
     addResultArrayToCache(results, i, results.length);
   }
 
-  private Result filterCells(Result result) {
-    return lastCell == null ? result : ConnectionUtils.filterCells(result, lastCell);
-  }
-
   private void updateLastCell(Result result) {
     lastCell = result.rawCells()[result.rawCells().length - 1];
   }
@@ -91,24 +87,34 @@ class AllowPartialScanResultCache extends ScanResultCache {
   @Override
   public Result[] addAndGet(Result[] results, boolean isHeartbeatMessage) throws IOException {
     if (results.length == 0) {
+      if (!isHeartbeatMessage && lastResultPartial) {
+        // An empty non heartbeat result indicate that there must be a row change. So if the
+        // lastResultPartial is true then we need to increase numberOfCompleteRows.
+        numberOfCompleteRows++;
+      }
       return EMPTY_RESULT_ARRAY;
     }
-    Result first = filterCells(results[0]);
-    if (results.length == 1) {
-      if (first == null) {
-        // do not update last cell if we filter out all cells
-        return EMPTY_RESULT_ARRAY;
+    int i;
+    for (i = 0; i < results.length; i++) {
+      Result r = ConnectionUtils.filterCells(results[i], lastCell);
+      if (r != null) {
+        results[i] = r;
+        break;
       }
-      updateLastCell(results[0]);
-      results[0] = first;
-      return results;
+    }
+    if (i == results.length) {
+      return EMPTY_RESULT_ARRAY;
+    }
+    if (lastResultPartial && !CellUtil.matchingRow(lastCell, results[0].getRow())) {
+      // there is a row change, so increase numberOfCompleteRows
+      numberOfCompleteRows++;
     }
     updateLastCell(results[results.length - 1]);
-    if (first == null) {
-      return Arrays.copyOfRange(results, 1, results.length);
+    if (i > 0) {
+      return Arrays.copyOfRange(results, i, results.length);
+    } else {
+      return results;
     }
-    results[0] = first;
-    return results;
   }
 
   @Override
