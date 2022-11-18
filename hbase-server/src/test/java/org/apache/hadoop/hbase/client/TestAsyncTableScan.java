@@ -78,32 +78,16 @@ public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
     }
   }
 
-  @Parameter
+  @Parameter(0)
+  public String scanType;
+
+  @Parameter(1)
   public Supplier<Scan> scanCreater;
 
-  @Parameters
+  @Parameters(name = "{index}: scan={0}")
   public static List<Object[]> params() {
-    return Arrays.asList(new Supplier<?>[] { TestAsyncTableScan::createNormalScan },
-            new Supplier<?>[] { TestAsyncTableScan::createBatchScan },
-            new Supplier<?>[] { TestAsyncTableScan::createSmallResultSizeScan },
-            new Supplier<?>[] { TestAsyncTableScan::createBatchSmallResultSizeScan });
-  }
-
-  private static Scan createNormalScan() {
-    return new Scan();
-  }
-
-  private static Scan createBatchScan() {
-    return new Scan().setBatch(1);
-  }
-
-  // set a small result size for testing flow control
-  private static Scan createSmallResultSizeScan() {
-    return new Scan().setMaxResultSize(1);
-  }
-
-  private static Scan createBatchSmallResultSizeScan() {
-    return new Scan().setBatch(1).setMaxResultSize(1);
+    return getScanCreater().stream().map(p -> new Object[] { p.getFirst(), p.getSecond() })
+            .collect(Collectors.toList());
   }
 
   @Override

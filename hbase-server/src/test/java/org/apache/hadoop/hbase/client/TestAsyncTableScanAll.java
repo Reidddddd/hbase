@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hbase.client.Scan.ReadType;
 import org.apache.hadoop.hbase.testclassification.ClientTests;
@@ -59,63 +60,14 @@ public class TestAsyncTableScanAll extends AbstractTestAsyncTableScan {
     return ASYNC_CONN.getTable(TABLE_NAME, ForkJoinPool.commonPool());
   }
 
-  private static Scan createNormalScan() {
-    return new Scan();
-  }
-
-  // test if we can handle partial result when open scanner.
-  private static Scan createSmallResultSizeScan() {
-    return new Scan().setMaxResultSize(1);
-  }
-
   @Parameters(name = "{index}: table={0}, scan={2}")
   public static List<Object[]> params() {
     Supplier<AsyncTableBase> rawTable = TestAsyncTableScanAll::getRawTable;
     Supplier<AsyncTableBase> normalTable = TestAsyncTableScanAll::getTable;
-    Supplier<Scan> normalScan = TestAsyncTableScanAll::createNormalScan;
-    Supplier<Scan> smallResultSizeScan = TestAsyncTableScanAll::createSmallResultSizeScan;
-    return Arrays.asList(new Object[] { "raw", rawTable, "normal", normalScan },
-            new Object[] { "raw", rawTable, "smallResultSize", smallResultSizeScan },
-            new Object[] { "normal", normalTable, "normal", normalScan },
-            new Object[] { "normal", normalTable, "smallResultSize", smallResultSizeScan });
-  }
-
-  @Test
-  public void testScanWithLimit() throws InterruptedException, ExecutionException {
-    int start = 111;
-    int stop = 888;
-    int limit = 300;
-    List<Result> results = getTable.get()
-            .scanAll(scanCreator.get().withStartRow(Bytes.toBytes(String.format("%03d", start)))
-                    .withStopRow(Bytes.toBytes(String.format("%03d", stop))).setLimit(limit)
-                    .setReadType(ReadType.PREAD))
-            .get();
-    assertEquals(limit, results.size());
-    IntStream.range(0, limit).forEach(i -> {
-      Result result = results.get(i);
-      int actualIndex = start + i;
-      assertEquals(String.format("%03d", actualIndex), Bytes.toString(result.getRow()));
-      assertEquals(actualIndex, Bytes.toInt(result.getValue(FAMILY, CQ1)));
-    });
-  }
-
-  @Test
-  public void testReversedScanWithLimit() throws InterruptedException, ExecutionException {
-    int start = 888;
-    int stop = 111;
-    int limit = 300;
-    List<Result> results = getTable.get()
-            .scanAll(scanCreator.get().withStartRow(Bytes.toBytes(String.format("%03d", start)))
-                    .withStopRow(Bytes.toBytes(String.format("%03d", stop))).setLimit(limit)
-                    .setReadType(ReadType.PREAD).setReversed(true))
-            .get();
-    assertEquals(limit, results.size());
-    IntStream.range(0, limit).forEach(i -> {
-      Result result = results.get(i);
-      int actualIndex = start - i;
-      assertEquals(String.format("%03d", actualIndex), Bytes.toString(result.getRow()));
-      assertEquals(actualIndex, Bytes.toInt(result.getValue(FAMILY, CQ1)));
-    });
+    return getScanCreater().stream()
+            .flatMap(p -> Arrays.asList(new Object[] { "raw", rawTable, p.getFirst(), p.getSecond() },
+                    new Object[] { "normal", normalTable, p.getFirst(), p.getSecond() }).stream())
+            .collect(Collectors.toList());
   }
 
   @Override
@@ -125,6 +77,10 @@ public class TestAsyncTableScanAll extends AbstractTestAsyncTableScan {
 
   @Override
   protected List<Result> doScan(Scan scan) throws Exception {
-    return getTable.get().scanAll(scan).get();
+    List<Result> results = getTable.get().scanAll(scan).get();
+    if (scan.getBatch() > 0) {
+      results = convertFromBatchResult(results);
+    }
+    return results;
   }
 }
