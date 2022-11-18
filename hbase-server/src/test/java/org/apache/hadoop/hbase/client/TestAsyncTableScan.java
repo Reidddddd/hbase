@@ -39,45 +39,6 @@ import org.junit.runners.Parameterized.Parameters;
 @Category({ LargeTests.class, ClientTests.class })
 public class TestAsyncTableScan extends AbstractTestAsyncTableScan {
 
-  private static final class SimpleScanResultConsumer implements ScanResultConsumer {
-
-    private final List<Result> results = new ArrayList<>();
-
-    private boolean finished = false;
-
-    private Throwable error;
-
-    @Override
-    public synchronized boolean onNext(Result result) {
-      results.add(result);
-      return true;
-    }
-
-    @Override
-    public synchronized void onError(Throwable error) {
-      this.error = error;
-      finished = true;
-      notifyAll();
-    }
-
-    @Override
-    public synchronized void onComplete() {
-      finished = true;
-      notifyAll();
-    }
-
-    public synchronized List<Result> getAll() throws Exception {
-      while (!finished) {
-        wait();
-      }
-      if (error != null) {
-        Throwables.propagateIfPossible(error, Exception.class);
-        throw new Exception(error);
-      }
-      return results;
-    }
-  }
-
   @Parameter(0)
   public String scanType;
 

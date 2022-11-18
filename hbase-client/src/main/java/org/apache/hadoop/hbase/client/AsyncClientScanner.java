@@ -21,6 +21,11 @@ import static org.apache.hadoop.hbase.HConstants.EMPTY_END_ROW;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_START_ROW;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.createScanResultCache;
 import static org.apache.hadoop.hbase.client.ConnectionUtils.getLocateType;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.incRPCCallsMetrics;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.incRPCRetriesMetrics;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.incRegionCountMetrics;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.isRemote;
+
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +34,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.metrics.ScanMetrics;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ClientService;
@@ -52,6 +58,8 @@ class AsyncClientScanner {
   // We will use this scan object during the whole scan operation. The
   // AsyncScanSingleRegionRpcRetryingCaller will modify this scan object directly.
   private final Scan scan;
+
+  private final ScanMetrics scanMetrics;
 
   private final RawScanResultConsumer consumer;
 
@@ -92,6 +100,12 @@ class AsyncClientScanner {
     this.rpcTimeoutNs = rpcTimeoutNs;
     this.startLogErrorsCnt = startLogErrorsCnt;
     this.resultCache = createScanResultCache(scan, cache);
+    if (scan.isScanMetricsEnabled()) {
+      this.scanMetrics = new ScanMetrics();
+      consumer.onScanMetricsCreated(scanMetrics);
+    } else {
+      this.scanMetrics = null;
+    }
   }
 
   private static final class OpenScannerResponse {
@@ -101,6 +115,8 @@ class AsyncClientScanner {
     }
 
     private final HRegionLocation loc;
+
+    public final boolean isRegionServerRemote;
 
     public Interface getStub() {
       return stub;
@@ -112,17 +128,26 @@ class AsyncClientScanner {
 
     public final ScanResponse resp;
 
-    public OpenScannerResponse(HRegionLocation loc, Interface stub, HBaseRpcController controller,
-                               ScanResponse resp) {
+    public OpenScannerResponse(HRegionLocation loc, boolean isRegionServerRemote, Interface stub,
+                               HBaseRpcController controller, ScanResponse resp) {
       this.loc = loc;
+      this.isRegionServerRemote = isRegionServerRemote;
       this.stub = stub;
       this.controller = controller;
       this.resp = resp;
     }
   }
 
+  private int openScannerTries;
+
   private CompletableFuture<OpenScannerResponse> callOpenScanner(HBaseRpcController controller,
       HRegionLocation loc, ClientService.Interface stub) {
+    boolean isRegionServerRemote = isRemote(loc.getHostname());
+    incRPCCallsMetrics(scanMetrics, isRegionServerRemote);
+    if (openScannerTries > 1) {
+      incRPCRetriesMetrics(scanMetrics, isRegionServerRemote);
+    }
+    openScannerTries++;
     CompletableFuture<OpenScannerResponse> future = new CompletableFuture<>();
     try {
       ScanRequest request = RequestConverter.buildScanRequest(loc.getRegionInfo().getRegionName(),
@@ -132,7 +157,7 @@ class AsyncClientScanner {
           future.completeExceptionally(controller.getFailed());
           return;
         }
-        future.complete(new OpenScannerResponse(loc, stub, controller, resp));
+        future.complete(new OpenScannerResponse(loc, isRegionServerRemote, stub, controller, resp));
       });
     } catch (IOException e) {
       future.completeExceptionally(e);
@@ -142,8 +167,9 @@ class AsyncClientScanner {
 
   private void startScan(OpenScannerResponse resp) {
     conn.callerFactory.scanSingleRegion().id(resp.resp.getScannerId()).location(resp.getLoc())
+        .remote(resp.isRegionServerRemote)
         .scannerLeaseTimeoutPeriod(resp.resp.getTtl(), TimeUnit.MILLISECONDS).stub(resp.getStub())
-        .setScan(scan).consumer(consumer).resultCache(resultCache)
+        .setScan(scan).metrics(scanMetrics).consumer(consumer).resultCache(resultCache)
         .rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
         .scanTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS).pause(pauseNs, TimeUnit.NANOSECONDS)
         .maxAttempts(maxAttempts).startLogErrorsCnt(startLogErrorsCnt)
@@ -162,6 +188,8 @@ class AsyncClientScanner {
   }
 
   private void openScanner() {
+    incRegionCountMetrics(scanMetrics);
+    openScannerTries = 1;
     conn.callerFactory.<OpenScannerResponse> single().table(tableName).row(scan.getStartRow())
         .locateType(getLocateType(scan)).rpcTimeout(rpcTimeoutNs, TimeUnit.NANOSECONDS)
         .operationTimeout(scanTimeoutNs, TimeUnit.NANOSECONDS).pause(pauseNs, TimeUnit.NANOSECONDS)

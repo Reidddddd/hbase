@@ -18,9 +18,6 @@
  */
 package org.apache.hadoop.hbase.client;
 
-import static org.apache.hadoop.hbase.client.ConnectionUtils.createCloseRowBefore;
-import static org.apache.hadoop.hbase.client.ConnectionUtils.isEmptyStartRow;
-
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -35,6 +32,8 @@ import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.metrics.ScanMetrics;
 import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
 import org.apache.hadoop.hbase.util.Bytes;
+
+import static org.apache.hadoop.hbase.client.ConnectionUtils.*;
 
 
 /**
@@ -115,11 +114,8 @@ public class ReversedScannerCallable extends ScannerCallable {
     // check how often we retry.
     // HConnectionManager will call instantiateServer with reload==true
     // if and only if for retries.
-    if (reload && this.scanMetrics != null) {
-      this.scanMetrics.countOfRPCRetries.incrementAndGet();
-      if (isRegionServerRemote) {
-        this.scanMetrics.countOfRemoteRPCRetries.incrementAndGet();
-      }
+    if (reload) {
+      incRPCRetriesMetrics(scanMetrics, isRegionServerRemote);
     }
   }
 

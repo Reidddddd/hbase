@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import org.apache.hadoop.hbase.client.metrics.ScanMetrics;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 
@@ -44,4 +45,13 @@ public interface ScanResultConsumer {
    * Indicate that the scan operation is completed normally.
    */
   void onComplete();
+
+  /**
+   * If {@code scan.isScanMetricsEnabled()} returns true, then this method will be called prior to
+   * all other methods in this interface to give you the {@link ScanMetrics} instance for this scan
+   * operation. The {@link ScanMetrics} instance will be updated on-the-fly during the scan, you can
+   * store it somewhere to get the metrics at any time if you want.
+   */
+  default void onScanMetricsCreated(ScanMetrics scanMetrics) {
+  }
 }

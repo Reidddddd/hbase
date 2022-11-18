@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.apache.hadoop.hbase.client.ConnectionUtils.createScanResultCache;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.incRegionCountMetrics;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -254,9 +255,7 @@ public abstract class ClientScanner extends AbstractClientScanner {
         new ScannerCallableWithReplicas(getTable(), getConnection(), createScannerCallable(), pool,
             primaryOperationTimeout, scan, getRetries(), scannerTimeout, caching, conf, caller);
     this.callable.setCaching(this.caching);
-    if (this.scanMetrics != null) {
-      this.scanMetrics.countOfRegions.incrementAndGet();
-    }
+    incRegionCountMetrics(scanMetrics);
     return true;
   }
 
