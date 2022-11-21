@@ -47,6 +47,7 @@ public final class SecretAdmin {
   private final String columnFamily;
   private final String passwordQualifier;
   private final String fallbackQualifier;
+  private final Table secretTable;
 
   private SecretAdmin(Connection connection, String tableName, String columnFamily,
       String passwordQualifier, String fallbackQualifier) throws IOException {
@@ -57,6 +58,7 @@ public final class SecretAdmin {
     this.fallbackQualifier = fallbackQualifier;
     this.secretCryptor = new SecretCryptor();
     this.admin = this.connection.getAdmin();
+    this.secretTable = this.connection.getTable(TableName.valueOf(tableName));
     initCryptor();
   }
 
@@ -66,7 +68,6 @@ public final class SecretAdmin {
    */
   public void setAccountPassword(String account, String password) throws IOException {
     checkSecretCryptor();
-    Table secretTable = this.connection.getTable(TableName.valueOf(tableName));
     byte[] hashedAccount = Bytes.toBytes(Hex.encodeHexString(Encryption.hash256(account)));
     byte[] secret = this.secretCryptor.encryptSecret(Bytes.toBytes(password));
 
@@ -81,7 +82,6 @@ public final class SecretAdmin {
    */
   public void removeAccount(String account) throws IOException {
     checkSecretCryptor();
-    Table secretTable = this.connection.getTable(TableName.valueOf(tableName));
     byte[] hashedAccount = Bytes.toBytes(Hex.encodeHexString(Encryption.hash256(account)));
 
     Delete delete = new Delete(hashedAccount);
@@ -109,7 +109,6 @@ public final class SecretAdmin {
   private void updateAccountAllowFallback(String account, boolean allowFallback)
     throws IOException {
     checkSecretCryptor();
-    Table secretTable = this.connection.getTable(TableName.valueOf(tableName));
     byte[] hashedAccount = Bytes.toBytes(Hex.encodeHexString(Encryption.hash256(account)));
     byte[] fallback = Bytes.toBytes(allowFallback);
 
@@ -138,9 +137,16 @@ public final class SecretAdmin {
       throw new HBaseIOException("Try to initialize cryptor the cluster is not initialized with "
         + "secret key.");
     }
-    Table secretTable = this.connection.getTable(TableName.valueOf(tableName));
     if (!this.secretCryptor.isInitialized()) {
       this.secretCryptor.initCryptos(secretTable, columnFamily, passwordQualifier);
     }
+  }
+
+  /**
+   * Release the HTable explicitly.
+   */
+  public void close() throws IOException {
+    this.admin.close();
+    this.secretTable.close();
   }
 }
