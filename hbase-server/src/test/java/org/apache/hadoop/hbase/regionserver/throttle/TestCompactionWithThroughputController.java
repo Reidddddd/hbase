@@ -41,20 +41,19 @@ import org.apache.hadoop.hbase.regionserver.DefaultStoreEngine;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.HStore;
 import org.apache.hadoop.hbase.regionserver.Region;
+import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.Store;
 import org.apache.hadoop.hbase.regionserver.StoreEngine;
 import org.apache.hadoop.hbase.regionserver.StripeStoreConfig;
 import org.apache.hadoop.hbase.regionserver.StripeStoreEngine;
 import org.apache.hadoop.hbase.regionserver.compactions.CompactionConfiguration;
-import org.apache.hadoop.hbase.regionserver.throttle.CompactionThroughputControllerFactory;
-import org.apache.hadoop.hbase.regionserver.throttle.NoLimitThroughputController;
-import org.apache.hadoop.hbase.regionserver.throttle.PressureAwareCompactionThroughputController;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.testclassification.RegionServerTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.JVMClusterUtil;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.mockito.Mockito;
 
 @Category({ RegionServerTests.class, MediumTests.class })
 public class TestCompactionWithThroughputController {
@@ -180,7 +179,6 @@ public class TestCompactionWithThroughputController {
   @Test
   public void testThroughputTuning() throws Exception {
     Configuration conf = TEST_UTIL.getConfiguration();
-    conf.set(StoreEngine.STORE_ENGINE_CLASS_KEY, DefaultStoreEngine.class.getName());
     conf.setLong(
       PressureAwareCompactionThroughputController
         .HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_HIGHER_BOUND,
@@ -189,57 +187,28 @@ public class TestCompactionWithThroughputController {
       PressureAwareCompactionThroughputController
         .HBASE_HSTORE_COMPACTION_MAX_THROUGHPUT_LOWER_BOUND,
       10L * 1024 * 1024);
-    conf.setInt(CompactionConfiguration.HBASE_HSTORE_COMPACTION_MIN_KEY, 4);
-    conf.setInt(HStore.BLOCKING_STOREFILES_KEY, 6);
-    conf.set(CompactionThroughputControllerFactory.HBASE_THROUGHPUT_CONTROLLER_KEY,
-      PressureAwareCompactionThroughputController.class.getName());
     conf.setInt(
       PressureAwareCompactionThroughputController.HBASE_HSTORE_COMPACTION_THROUGHPUT_TUNE_PERIOD,
       1000);
-    TEST_UTIL.startMiniCluster(1);
-    Connection conn = ConnectionFactory.createConnection(conf);
-    try {
-      HTableDescriptor htd = new HTableDescriptor(tableName);
-      htd.addFamily(new HColumnDescriptor(family));
-      htd.setCompactionEnabled(false);
-      TEST_UTIL.getHBaseAdmin().createTable(htd);
-      TEST_UTIL.waitTableAvailable(tableName);
-      HRegionServer regionServer = TEST_UTIL.getRSForFirstRegionInTable(tableName);
-      PressureAwareCompactionThroughputController throughputController =
-          (PressureAwareCompactionThroughputController) regionServer.compactSplitThread
-              .getCompactionThroughputController();
-      assertEquals(10L * 1024 * 1024, throughputController.getMaxThroughput(), EPSILON);
-      Table table = conn.getTable(tableName);
-      for (int i = 0; i < 5; i++) {
-        byte[] value = new byte[0];
-        table.put(new Put(Bytes.toBytes(i)).addColumn(family, qualifier, value));
-        TEST_UTIL.flush(tableName);
-      }
-      Thread.sleep(2000);
-      assertEquals(15L * 1024 * 1024, throughputController.getMaxThroughput(), EPSILON);
+    conf.setLong(CompactionConfiguration.HBASE_HSTORE_OFFPEAK_START_HOUR, -1);
+    conf.setLong(CompactionConfiguration.HBASE_HSTORE_OFFPEAK_END_HOUR, -1);
 
-      byte[] value1 = new byte[0];
-      table.put(new Put(Bytes.toBytes(5)).addColumn(family, qualifier, value1));
-      TEST_UTIL.flush(tableName);
-      Thread.sleep(2000);
-      assertEquals(20L * 1024 * 1024, throughputController.getMaxThroughput(), EPSILON);
+    PressureAwareCompactionThroughputController controller = new PressureAwareCompactionThroughputController();
+    controller.setConf(conf);
+    assertEquals(10L * 1024 * 1024, controller.getMaxThroughput(), EPSILON);
 
-      byte[] value = new byte[0];
-      table.put(new Put(Bytes.toBytes(6)).addColumn(family, qualifier, value));
-      TEST_UTIL.flush(tableName);
-      Thread.sleep(2000);
-      assertEquals(Double.MAX_VALUE, throughputController.getMaxThroughput(), EPSILON);
+    RegionServerServices services = Mockito.mock(RegionServerServices.class);
+    Mockito.when(services.getCompactionPressure()).thenReturn(0.5d);
+    controller.tune(services.getCompactionPressure());
+    assertEquals(15L * 1024 * 1024, controller.getMaxThroughput(), EPSILON);
 
-      conf.set(CompactionThroughputControllerFactory.HBASE_THROUGHPUT_CONTROLLER_KEY,
-        NoLimitThroughputController.class.getName());
-      regionServer.compactSplitThread.onConfigurationChange(conf);
-      assertTrue(throughputController.isStopped());
-      assertTrue(regionServer.compactSplitThread.getCompactionThroughputController()
-        instanceof NoLimitThroughputController);
-    } finally {
-      conn.close();
-      TEST_UTIL.shutdownMiniCluster();
-    }
+    Mockito.when(services.getCompactionPressure()).thenReturn(1.0d);
+    controller.tune(services.getCompactionPressure());
+    assertEquals(20L * 1024 * 1024, controller.getMaxThroughput(), EPSILON);
+
+    Mockito.when(services.getCompactionPressure()).thenReturn(1.1d);
+    controller.tune(services.getCompactionPressure());
+    assertEquals(Double.MAX_VALUE, controller.getMaxThroughput(), EPSILON);
   }
 
   /**

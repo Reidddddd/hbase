@@ -107,7 +107,7 @@ public class PressureAwareCompactionThroughputController extends PressureAwareTh
 
   }
 
-  private void tune(double compactionPressure) {
+  void tune(double compactionPressure) {
     double maxThroughputToSet;
     if (compactionPressure > 1.0) {
       // set to unlimited if some stores already reach the blocking store file count
