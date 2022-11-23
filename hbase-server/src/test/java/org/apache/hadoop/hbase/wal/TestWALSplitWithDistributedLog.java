@@ -242,6 +242,7 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
           }
           LOG.debug(ls);
           LOG.info("Splitting WALs out from under zombie. Expecting " + numWriters + " files.");
+          // In the following split process, the log stream will be marked EOS.
           DistributedLogWALSplitter.split(WALDIR, OLDLOGDIR, conf2, wals, namespace);
           LOG.info("Finished splitting out from under zombie.");
           Path[] logPaths = getLogForRegion(TABLE_NAME, region);

@@ -193,6 +193,7 @@ import org.apache.hadoop.hbase.wal.MutationReplay;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALSplitterUtil;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.htrace.Trace;
@@ -216,6 +217,8 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
   public static final int DEFAULT_MAX_CELL_SIZE = 10485760;
 
   public static final String HREGION_WAL_REPLAYER_CLASS = "hbase.hregion.wal.replayer.class";
+  public static final Class<? extends WALReplayer> DEFAULT_HREGION_WAL_REPLAYER_CLASS =
+    FSWALReplayer.class;
 
   /**
    * Longest time we'll wait on a sequenceid.
@@ -832,10 +835,14 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
 
     this.maxCellSize = conf.getLong(HBASE_MAX_CELL_SIZE_KEY, DEFAULT_MAX_CELL_SIZE);
     Class<? extends WALReplayer> replayerClass = conf.getClass(HREGION_WAL_REPLAYER_CLASS,
-      FSWALReplayer.class, WALReplayer.class);
-
-    this.walReplayer = new FSWALReplayer(conf, getFilesystem(), getRegionInfo(), maxSeqIdInStores,
-      this);
+      DEFAULT_HREGION_WAL_REPLAYER_CLASS, WALReplayer.class);
+    if (replayerClass.equals(FSWALReplayer.class)) {
+      this.walReplayer =
+        new FSWALReplayer(conf, getFilesystem(), getRegionInfo(), maxSeqIdInStores, this);
+    } else {
+      this.walReplayer =
+        new DistributedLogWALReplayer(conf, getRegionInfo(), maxSeqIdInStores, this);
+    }
   }
 
   void setHTableSpecificConf() {

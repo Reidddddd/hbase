@@ -30,6 +30,7 @@ import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;
@@ -164,7 +165,8 @@ public class ZKSplitLog {
 
   public static boolean isCorruptedDistributedLog(Path walRoot, String logName,
       Namespace namespace) throws IOException {
-    String log = new Path(getSplitLogDir(walRoot, logName), "corrupt").toString();
+    String log = WALUtils.pathToDistributedLogName(new Path(getSplitLogDir(walRoot, logName),
+      "corrupt"));
     return namespace.logExists(log);
   }
 

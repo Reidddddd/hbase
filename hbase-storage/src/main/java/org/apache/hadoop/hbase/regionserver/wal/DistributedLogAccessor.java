@@ -67,7 +67,6 @@ public class DistributedLogAccessor implements Closeable {
     distributedLogConfiguration = new DistributedLogConfiguration();
     distributedLogConfiguration.setCreateStreamIfNotExists(true);
     distributedLogConfiguration.setUnpartitionedStreamName(streamName);
-    distributedLogConfiguration.setImmediateFlushEnabled(true);
     namespaceBuilder = NamespaceBuilder.newBuilder();
     namespaceBuilder.conf(distributedLogConfiguration);
     ensureZNodeExists(zkRoot);

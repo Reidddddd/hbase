@@ -30,9 +30,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
+import org.apache.distributedlog.shaded.api.LogWriter;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.distributedlog.shaded.exceptions.LogEmptyException;
 import org.apache.distributedlog.shaded.exceptions.LogNotFoundException;
@@ -148,9 +150,8 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
         return false;
       }
       try {
-        if (!dlm.isEndOfStreamMarked()) {
-          dlm.getAppendOnlyStreamWriter().markEndOfStream();
-        }
+        markLogEndOfStream(dlm);
+        dlm.close();
         in = getReader(logNameWithParent, logLength, skipErrors, reporter);
       } catch (CorruptedLogFileException | LogEmptyException e) {
         LOG.warn("Could not get reader, corrupted log file " + logNameWithParent, e);
@@ -264,6 +265,14 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
       }
     }
     return !progressFailed;
+  }
+
+  private void markLogEndOfStream(DistributedLogManager distributedLogManager) throws IOException {
+    if (!distributedLogManager.isEndOfStreamMarked()) {
+      LogWriter writer = distributedLogManager.openLogWriter();
+      writer.markEndOfStream();
+      writer.close();
+    }
   }
 
   private void markCorruptedLog(String logNameWithParent, Exception e) {
@@ -419,20 +428,32 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     // this method can get restarted or called multiple times for archiving
     // the same log files.
     for (Path corrupted : corruptedLogs) {
-      Path p = new Path(corruptDir, corrupted.getName());
+      Path newPath = new Path(corruptDir, corrupted.getName());
       String logName = WALUtils.pathToDistributedLogName(corrupted);
       if (walNamespace.logExists(logName)) {
-        walNamespace.renameLog(logName, WALUtils.pathToDistributedLogName(p));
-        LOG.warn("Moved corrupted log " + corrupted + " to " + p);
+        try {
+          WALUtils.checkEndOfStream(walNamespace, logName);
+          walNamespace.renameLog(logName, WALUtils.pathToDistributedLogName(newPath)).get();
+          LOG.warn("Moved corrupted log " + corrupted + " to " + newPath);
+        } catch (Exception e) {
+          LOG.warn("Failed to move corrupted log " + logName + " to " + newPath
+            + " with exception:\n", e);
+        }
       }
     }
 
-    for (Path p : processedLogs) {
-      Path newPath = WALUtils.getWALArchivePath(oldLogDir, p);
-      String logName = WALUtils.pathToDistributedLogName(p);
+    for (Path path : processedLogs) {
+      Path newPath = WALUtils.getWALArchivePath(oldLogDir, path);
+      String logName = WALUtils.pathToDistributedLogName(path);
       if (walNamespace.logExists(logName)) {
-        walNamespace.renameLog(logName, WALUtils.pathToDistributedLogName(newPath));
-        LOG.info("Archived processed log " + p + " to " + newPath);
+        try {
+          WALUtils.checkEndOfStream(walNamespace, logName);
+          walNamespace.renameLog(logName, WALUtils.pathToDistributedLogName(newPath)).get();
+          LOG.info("Archived processed log " + logName + " to " + newPath);
+        } catch (Exception e) {
+          LOG.warn("Failed to archived processed log " + logName + " to " + newPath
+            + " with exception:\n", e);
+        }
       }
     }
   }

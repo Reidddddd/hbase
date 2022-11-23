@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -401,7 +402,12 @@ public class TestDistributedLog extends TestDistributedLogBase {
     String logName = log.computeLogName(logNum);
     log.createWriterInstance(logName);
     String newLogName = logName + "-splitting";
-    namespace.renameLog(logName, newLogName);
+    try {
+      WALUtils.checkEndOfStream(namespace, logName);
+      namespace.renameLog(logName, newLogName).get();
+    } catch (ExecutionException | InterruptedException e) {
+      throw new IOException(e);
+    }
     log.createWriterInstance(logName);
     fail("It should fail to create the new WAL");
   }

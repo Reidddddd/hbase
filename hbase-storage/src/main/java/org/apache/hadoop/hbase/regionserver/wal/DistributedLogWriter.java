@@ -181,17 +181,23 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
       if (appendOnlyStreamWriter != null) {
         forceWriter();
         appendOnlyStreamWriter.markEndOfStream();
-        appendOnlyStreamWriter.close();
         if (distributedLogManager.getLogRecordCount() != recordCount.get()) {
           throw new IOException(
             "We wrote " + recordCount.get() + " records to log: " + logName + " but only " +
               distributedLogManager.getLogRecordCount() + " were received by DistributedLog.");
         }
-        appendOnlyStreamWriter = null;
-        distributedLogManager.close();
       }
     } catch (Exception e) {
       throw new IOException(e);
+    } finally {
+      if (appendOnlyStreamWriter != null) {
+        appendOnlyStreamWriter.close();
+        appendOnlyStreamWriter = null;
+      }
+      if (distributedLogManager != null) {
+        distributedLogManager.close();
+        distributedLogManager = null;
+      }
     }
   }
 

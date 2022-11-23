@@ -102,12 +102,14 @@ public class DistributedLog extends AbstractLog {
           DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(p);
           long size = distributedLogManager.getLogRecordCount() == 0 ? 0 :
             distributedLogNamespace.openLog(p).getLastTxId();
-          distributedLogManager.close();
 
           this.totalLogSize.addAndGet(-size);
           String archivedLogName =
             WALUtils.getFullPathStringForDistributedLog(DISTRIBUTED_LOG_ARCHIVE_PREFIX, p);
-          distributedLogNamespace.renameLog(p, archivedLogName);
+          // Make sure there will no more write
+          WALUtils.checkEndOfStream(distributedLogManager);
+          distributedLogManager.close();
+          distributedLogNamespace.renameLog(p, archivedLogName).get();
           this.byWalRegionSequenceIds.remove(p);
         }
       }
@@ -231,8 +233,12 @@ public class DistributedLog extends AbstractLog {
       int numOfLogs = 0;
       while (logNames.hasNext()) {
         String logName = logNames.next();
+        if (!ourLogs.accept(logName)) {
+          continue;
+        }
         String archiveLogName =
           WALUtils.getWALArchivePathStr(DISTRIBUTED_LOG_ARCHIVE_PREFIX, logName);
+        String logNameWithParent = WALUtils.getFullPathStringForDistributedLog(serverName, logName);
         // Tell our listeners that a log is going to be archived.
         if (!this.listeners.isEmpty()) {
           for (WALActionsListener i : this.listeners) {
@@ -240,7 +246,8 @@ public class DistributedLog extends AbstractLog {
           }
         }
 
-        distributedLogNamespace.renameLog(logName, archiveLogName);
+        WALUtils.checkEndOfStream(distributedLogNamespace, logNameWithParent);
+        distributedLogNamespace.renameLog(logNameWithParent, archiveLogName).get();
 
         // Tell our listeners that a log was archived.
         if (!this.listeners.isEmpty()) {

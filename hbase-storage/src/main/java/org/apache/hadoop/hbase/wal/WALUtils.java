@@ -22,11 +22,16 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.distributedlog.shaded.api.DistributedLogManager;
+import org.apache.distributedlog.shaded.api.LogWriter;
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
+import org.apache.distributedlog.shaded.exceptions.AlreadyClosedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -53,7 +58,7 @@ public class WALUtils {
   /** The hbase:meta region's WAL filename extension */
   public static final String DISTRIBUTED_LOG_NAMESPACE_DELIMITER = "/";
   public static final String DISTRIBUTED_LOG_DEFAULT_NAMESPACE = "default";
-  public static final String DISTRIBUTED_LOG_ARCHIVE_PREFIX = "archive";
+  public static final String DISTRIBUTED_LOG_ARCHIVE_PREFIX = "oldWALs";
 
   @VisibleForTesting
   public static final String META_WAL_PROVIDER_ID = ".meta";
@@ -480,5 +485,53 @@ public class WALUtils {
 
   public static String getFullPathStringForDistributedLog(String parent, String logName) {
     return String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, parent, logName);
+  }
+
+  public static List<String> listLogsUnderPath(String pathStr, Namespace namespace)
+    throws IOException {
+    Iterator<String> iterator = namespace.getLogs(pathStr);
+    List<String> logs = new ArrayList<>();
+    while (iterator.hasNext()) {
+      logs.add(iterator.next());
+    }
+    return logs;
+  }
+
+  public static List<String> listLogsUnderPath(Path path, Namespace namespace) throws IOException {
+    return listLogsUnderPath(pathToDistributedLogName(path), namespace);
+  }
+
+  public static void checkEndOfStream(Namespace namespace, String logName) {
+    try {
+      if (namespace.logExists(logName)) {
+        DistributedLogManager dlm = namespace.openLog(logName);
+        checkEndOfStream(dlm);
+        dlm.close();
+      }
+    } catch (IOException ioe) {
+      // If the communication with DistributedLog is broken, the IOE should be raised also
+      // by other parts and be handled.
+      // We do not throw or handle the exception here.
+      LOG.warn(ioe);
+    }
+  }
+
+  public static void checkEndOfStream(DistributedLogManager dlm)  {
+    try {
+      if (!dlm.isEndOfStreamMarked()) {
+        LogWriter writer = dlm.openLogWriter();
+        writer.markEndOfStream();
+        writer.close();
+      }
+    } catch (AlreadyClosedException e) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Try to close an already closed stream, ignored. " + dlm);
+      }
+    } catch (IOException ioe) {
+      // If the communication with DistributedLog is broken, the IOE should be raised also
+      // by other parts and be handled.
+      // We do not throw or handle the exception here.
+      LOG.warn("Close stream met exception: \n", ioe);
+    }
   }
 }

@@ -21,9 +21,12 @@ package org.apache.hadoop.hbase.wal;
 import static org.apache.hadoop.hbase.HConstants.RECOVERED_EDITS_DIR;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NavigableSet;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
@@ -202,6 +205,31 @@ public final class WALSplitterUtil {
     return filesSorted;
   }
 
+  public static NavigableSet<Path> getSplitEditLogsSorted(Namespace namespace,
+      final Path regionDir) throws IOException {
+    NavigableSet<Path> logsSorted = new TreeSet<Path>();
+    Path editsDir = getRegionDirRecoveredEditsDir(regionDir);
+    if (namespace.logExists(editsDir.toString())) {
+      return logsSorted;
+    }
+    Iterator<String> logIterator = namespace.getLogs(editsDir.toString());
+    while (logIterator.hasNext()) {
+      String logName = logIterator.next();
+      Matcher m = EDITFILES_NAME_PATTERN.matcher(logName);
+      boolean result = m.matches();
+      if (logName.endsWith(RECOVERED_LOG_TMPFILE_SUFFIX)) {
+        result = false;
+      }
+      if (isSequenceIdFile(new Path(logName))) {
+        result = false;
+      }
+      if (result) {
+        logsSorted.add(new Path(editsDir, logName));
+      }
+    }
+    return logsSorted;
+  }
+
   /**
    * Returns sorted set of edit logs made by splitter, excluding log name
    * with '.temp' suffix.
@@ -252,6 +280,27 @@ public final class WALSplitterUtil {
       + System.currentTimeMillis());
     if (!walFS.rename(edits, moveAsideName)) {
       LOG.warn("Rename failed from " + edits + " to " + moveAsideName);
+    }
+    return moveAsideName;
+  }
+
+  /**
+   * Move aside a bad edits log.
+   *
+   * @param walNamespace {@link Namespace} to use for WAL operations
+   * @param edits Edits log to move aside.
+   * @return The name of the moved aside file.
+   */
+  public static Path moveAsideBadEditsLog(final Namespace walNamespace, final Path edits)
+    throws IOException {
+    Path moveAsideName = new Path(edits.getParent(), edits.getName() + "."
+      + System.currentTimeMillis());
+    String logStr = WALUtils.pathToDistributedLogName(edits);
+    try {
+      WALUtils.checkEndOfStream(walNamespace, logStr);
+      walNamespace.renameLog(logStr, WALUtils.pathToDistributedLogName(moveAsideName)).get();
+    } catch (ExecutionException | InterruptedException e) {
+      throw new IOException(e);
     }
     return moveAsideName;
   }
@@ -328,6 +377,63 @@ public final class WALSplitterUtil {
           continue;
         }
         walFS.delete(status.getPath(), false);
+      }
+    }
+    return newSeqId;
+  }
+
+  public static long writeRegionSequenceIdLog(final Namespace namespace, final Path regionDir,
+    long newSeqId, long saftyBumper) throws IOException {
+    Path editsdir = getRegionDirRecoveredEditsDir(regionDir);
+    long maxSeqId = 0;
+    List<Path> logs = new ArrayList<>();
+
+    if (namespace.logExists(editsdir.toString())) {
+      Iterator<String> logsIter = namespace.getLogs(editsdir.toString());
+      while (logsIter.hasNext()) {
+        String log = logsIter.next();
+        if (isSequenceIdFile(new Path(log))) {
+          logs.add(new Path(editsdir, log));
+        }
+      }
+      if (logs.size() != 0) {
+        for (Path log : logs) {
+          String fileName = log.getName();
+          try {
+            Long tmpSeqId = Long.parseLong(fileName.substring(0, fileName.length()
+              - SEQUENCE_ID_FILE_SUFFIX_LENGTH));
+            maxSeqId = Math.max(tmpSeqId, maxSeqId);
+          } catch (NumberFormatException ex) {
+            LOG.warn("Invalid SeqId File Name=" + fileName);
+          }
+        }
+      }
+    }
+    if (maxSeqId > newSeqId) {
+      newSeqId = maxSeqId;
+    }
+    newSeqId += saftyBumper; // bump up SeqId
+
+    // write a new seqId file
+    Path newSeqIdFile = new Path(editsdir, newSeqId + SEQUENCE_ID_FILE_SUFFIX);
+    if (newSeqId != maxSeqId) {
+      try {
+        namespace.createLog(newSeqIdFile.toString());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Wrote region seqId=" + newSeqIdFile + " to file, newSeqId=" + newSeqId
+            + ", maxSeqId=" + maxSeqId);
+        }
+      } catch (FileAlreadyExistsException ignored) {
+        // latest hdfs throws this exception. it's all right if newSeqIdFile already exists
+      }
+    }
+    // remove old ones
+    if (logs.size() != 0) {
+      for (Path log : logs) {
+        if (newSeqIdFile.equals(log)) {
+          continue;
+        }
+        namespace.deleteLog(log.toString());
       }
     }
     return newSeqId;

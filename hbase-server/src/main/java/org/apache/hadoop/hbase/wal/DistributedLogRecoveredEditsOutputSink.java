@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
@@ -90,21 +91,27 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
 
     Path dst = WALSplitterUtil.getCompletedRecoveredEditsFilePath(wap.p,
       regionMaximumEditLogSeqNum.get(encodedRegionName));
-
+    String oldLogName = WALUtils.pathToDistributedLogName(wap.p);
+    String newLogName = WALUtils.pathToDistributedLogName(dst);
     try {
-      if (!dst.equals(wap.p) && namespace.logExists(dst.toString())) {
+      if (!dst.equals(wap.p) && namespace.logExists(newLogName)) {
         deleteOneWithFewerEntries(wap, dst);
       }
       // Skip the unit tests which create a splitter that reads and
       // writes the data without touching disk.
       // TestHLogSplit#testThreading is an example.
-      if (namespace.logExists(wap.p.toString())) {
-        namespace.renameLog(wap.p.toString(), dst.toString());
+      if (namespace.logExists(oldLogName)) {
+        WALUtils.checkEndOfStream(namespace, oldLogName);
+        namespace.renameLog(oldLogName, newLogName).get();
         LOG.info("Rename " + wap.p + " to " + dst);
       }
-    } catch (IOException ioe) {
-      LOG.error("Couldn't rename " + wap.p + " to " + dst, ioe);
-      thrown.add(ioe);
+    } catch (IOException | ExecutionException | InterruptedException e) {
+      LOG.error("Couldn't rename " + wap.p + " to " + dst, e);
+      if (e instanceof IOException) {
+        thrown.add((IOException) e);
+      } else {
+        thrown.add(new IOException(e));
+      }
       return null;
     }
     return dst;

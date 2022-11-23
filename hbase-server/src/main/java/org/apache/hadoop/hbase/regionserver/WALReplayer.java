@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.monitoring.MonitoredTask;
@@ -38,17 +37,15 @@ public abstract class WALReplayer {
   protected final HRegionInfo regionInfo;
   protected final Map<byte[], Long> maxSeqIdInStores;
   protected final HRegion hRegion;
-  protected final FileSystem rootFS;
 
   protected Path regionWALDir;
 
-  protected WALReplayer(Configuration conf, HRegionInfo regionInfo, FileSystem rootFS,
+  protected WALReplayer(Configuration conf, HRegionInfo regionInfo,
     Map<byte[], Long> maxSeqIdInStores, HRegion hRegion) throws IOException {
     this.conf = conf;
     this.regionInfo = regionInfo;
     this.maxSeqIdInStores = maxSeqIdInStores;
     this.hRegion = hRegion;
-    this.rootFS = rootFS;
     initRegionWALDir();
   }
 
