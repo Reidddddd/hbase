@@ -30,6 +30,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.AppendOnlyStreamWriter;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
+import org.apache.distributedlog.shaded.exceptions.LogExistsException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
@@ -56,6 +57,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
 
   private volatile long highestUnsyncedSequenceId = 0;
 
+  private Namespace walNamespace;
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
@@ -63,7 +65,16 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     this.logName = logName;
+    LOG.info("Init DistributedLog writer once. ");
+    try {
+      walNamespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    } catch (Exception e) {
+      LOG.error("Failed to get DistributedLog namespace.");
+      throw new IOException(e);
+    }
     super.init(conf);
+    // Force the wal header.
+    this.appendOnlyStreamWriter.force(false);
   }
 
   @Override
@@ -73,29 +84,25 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
 
   @Override
   protected void initOutput() throws IOException {
-    Namespace namespace;
-    LOG.info("Init DistributedLog writer once. ");
-    try {
-      namespace = DistributedLogAccessor.getInstance(this.conf).getNamespace();
-    } catch (Exception e) {
-      LOG.error("Failed to get DistributedLog namespace.");
-      throw new IOException(e);
-    }
-    if (namespace.logExists(logName)) {
-      throw new IOException("Should not create multi writers to an existing DistributedLog. ");
-    }
     // Check if a log with same name is in splitting.
-    if (namespace.logExists(logName + WALUtils.SPLITTING_EXT)) {
+    if (walNamespace.logExists(logName + WALUtils.SPLITTING_EXT)) {
       throw new IOException("A log with name " + logName + " is under splitting, cannot create "
         + "a new log with the same name: " + logName);
     }
     // Check if a log with same name is archived.
-    if (namespace.logExists(logName + "-old")) {
+    if (walNamespace.logExists(logName + "-old")) {
       throw new IOException("A log with name " + logName + " is already archived, cannot create "
         + "a new log with name: " + logName);
     }
 
-    distributedLogManager = namespace.openLog(logName);
+    try {
+      walNamespace.createLog(logName);
+    } catch (LogExistsException e) {
+      // If log exist, it could be created by other thread or process.
+      // We log here and just open it.
+      LOG.warn("Parallel creation of log: " + logName);
+    }
+    distributedLogManager = walNamespace.openLog(logName);
     if (distributedLogManager == null) {
       throw new IllegalStateException("Failed to access DistributedLog. ");
     }
@@ -134,14 +141,15 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
 
   @VisibleForTesting
   public void forceWriter() throws IOException {
-    if (appendOnlyStreamWriter != null &&
-        highestUnsyncedSequenceId > actualHighestSequenceId.get()) {
+    long syncedHighestSequenceId = actualHighestSequenceId.get();
+    long unsyncedHighestSequenceId = highestUnsyncedSequenceId;
+    if (appendOnlyStreamWriter != null && unsyncedHighestSequenceId > syncedHighestSequenceId) {
       this.appendOnlyStreamWriter.force(false);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Forced writer from sequenceId: " + actualHighestSequenceId.get() + " to: "
-          + highestUnsyncedSequenceId);
+        LOG.debug("Forced writer from sequenceId: " + syncedHighestSequenceId + " to: "
+          + unsyncedHighestSequenceId);
       }
-      actualHighestSequenceId.updateAndGet(self -> Math.max(self, highestUnsyncedSequenceId));
+      actualHighestSequenceId.updateAndGet(self -> Math.max(self, unsyncedHighestSequenceId));
     }
   }
 
@@ -163,16 +171,21 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void close() throws IOException {
     super.close();
-    if (appendOnlyStreamWriter != null) {
-      forceWriter();
-      appendOnlyStreamWriter.markEndOfStream();
-      appendOnlyStreamWriter.close();
-      if (distributedLogManager.getLogRecordCount() != recordCount.get()) {
-        throw new IOException("We wrote " + recordCount.get() + " records to log: " + logName
-          + " but only " + distributedLogManager.getLogRecordCount()
-          + " were received by DistributedLog.");
+    try {
+      if (appendOnlyStreamWriter != null) {
+        forceWriter();
+        appendOnlyStreamWriter.markEndOfStream();
+        appendOnlyStreamWriter.close();
+        if (distributedLogManager.getLogRecordCount() != recordCount.get()) {
+          throw new IOException(
+            "We wrote " + recordCount.get() + " records to log: " + logName + " but only " +
+              distributedLogManager.getLogRecordCount() + " were received by DistributedLog.");
+        }
+        appendOnlyStreamWriter = null;
+        distributedLogManager.close();
       }
-      appendOnlyStreamWriter = null;
+    } catch (Exception e) {
+      throw new IOException(e);
     }
   }
 

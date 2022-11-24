@@ -53,7 +53,6 @@ import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
 import org.apache.hadoop.hbase.regionserver.LastSequenceId;
 // imports for things that haven't moved from regionserver.wal yet.
-import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.FSUtils;
@@ -398,7 +397,7 @@ public class WALSplitter extends AbstractWALSplitter {
     }
 
     for (Path p : processedLogs) {
-      Path newPath = FSHLog.getWALArchivePath(oldLogDir, p);
+      Path newPath = WALUtils.getWALArchivePath(oldLogDir, p);
       if (walFS.exists(p)) {
         if (!FSUtils.renameAndSetModifyTime(walFS, p, newPath)) {
           LOG.warn("Unable to move  " + p + " to " + newPath);

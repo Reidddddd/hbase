@@ -22,6 +22,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.AppendOnlyStreamReader;
@@ -140,10 +141,8 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
   }
 
   @Override
-  public void init(Configuration conf, String logName)
-    throws URISyntaxException, IOException {
+  public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     this.logName = logName;
-
     try {
       this.distributedLogManager =
         DistributedLogAccessor.getInstance(conf).getNamespace().openLog(logName);
@@ -152,6 +151,12 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
       throw new IOException(e);
     }
     reset();
+    byte[] magic = new byte[PB_WAL_MAGIC.length];
+    boolean isPbWal = (appendOnlyStreamReader.read(magic) == magic.length)
+      && Arrays.equals(magic, PB_WAL_MAGIC);
+    if (!isPbWal) {
+      throw new IOException(logName + " is not a protobuf wal log.");
+    }
     this.logLength = distributedLogManager.getLastTxId();
     super.init(conf, appendOnlyStreamReader);
   }

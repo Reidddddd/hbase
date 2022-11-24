@@ -18,14 +18,17 @@
  */
 package org.apache.hadoop.hbase.wal;
 
+import static org.apache.hadoop.hbase.HConstants.RECOVERED_EDITS_DIR;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
@@ -95,7 +98,7 @@ public final class WALSplitterUtil {
       if (!walFS.exists(tmp)) {
         walFS.mkdirs(tmp);
       }
-      tmp = new Path(tmp, HConstants.RECOVERED_EDITS_DIR + "_" + encodedRegionName);
+      tmp = new Path(tmp, RECOVERED_EDITS_DIR + "_" + encodedRegionName);
       LOG.warn("Found existing old file: " + dir + ". It could be some "
         + "leftover of an old installation. It should be a folder instead. "
         + "So moving it to " + tmp);
@@ -120,6 +123,21 @@ public final class WALSplitterUtil {
     return new Path(dir, fileName);
   }
 
+  static Path getRegionSplitEditsPath4DistributedLog(final Entry logEntry,
+      String fileNameBeingSplit) {
+    TableName tableName = logEntry.getKey().getTablename();
+    String encodedRegionName = Bytes.toString(logEntry.getKey().getEncodedRegionName());
+
+    Path regionPath = new Path(tableName.getNamespaceAsString(), tableName.getQualifierAsString());
+    regionPath = new Path(regionPath, new Path(encodedRegionName, RECOVERED_EDITS_DIR));
+
+    String logEntity = new Path(fileNameBeingSplit).getName();
+    String logName =
+      WALSplitterUtil.formatRecoveredEditsFileName(logEntry.getKey().getLogSeqNum());
+    logName = getTmpRecoveredEditsFileName(logName + "-" + logEntity);
+    return new Path(regionPath, logName);
+  }
+
   /**
    * @param regionDir
    *          This regions directory in the filesystem.
@@ -127,7 +145,7 @@ public final class WALSplitterUtil {
    *         <code>regionDir</code>
    */
   public static Path getRegionDirRecoveredEditsDir(final Path regionDir) {
-    return new Path(regionDir, HConstants.RECOVERED_EDITS_DIR);
+    return new Path(regionDir, RECOVERED_EDITS_DIR);
   }
 
   private static String getTmpRecoveredEditsFileName(String fileName) {
@@ -185,6 +203,42 @@ public final class WALSplitterUtil {
   }
 
   /**
+   * Returns sorted set of edit logs made by splitter, excluding log name
+   * with '.temp' suffix.
+   *
+   * @param walNamespace Namespace to use for reading Recovered edits.
+   * @param regionPath Log path where Recovered edits should reside
+   * @return Files in passed <code>regionDir</code> as a sorted set.
+   */
+  public static NavigableSet<Path> getSplitEditFilesSorted4DistributedLog(
+      final Namespace walNamespace, final Path regionPath) throws IOException {
+    NavigableSet<Path> logsSorted = new TreeSet<Path>();
+    Path editsPath = getRegionDirRecoveredEditsDir(regionPath);
+    String editsPathStr = WALUtils.pathToDistributedLogName(editsPath);
+    if (!walNamespace.logExists(editsPathStr)) {
+      return logsSorted;
+    }
+
+    Iterator<String> iterator = walNamespace.getLogs(editsPathStr);
+    while (iterator.hasNext()) {
+      String logName = iterator.next();
+      Matcher m = EDITFILES_NAME_PATTERN.matcher(logName);
+      boolean result = m.matches();
+      if (logName.endsWith(RECOVERED_LOG_TMPFILE_SUFFIX)) {
+        result = false;
+      }
+      // Skip SeqId Files
+      if (isSequenceIdFile(logName)) {
+        result = false;
+      }
+      if (result) {
+        logsSorted.add(new Path(editsPath, logName));
+      }
+    }
+    return logsSorted;
+  }
+
+  /**
    * Move aside a bad edits file.
    *
    * @param walFS FileSystem to use for WAL operations
@@ -207,8 +261,12 @@ public final class WALSplitterUtil {
    */
   @VisibleForTesting
   public static boolean isSequenceIdFile(final Path file) {
-    return file.getName().endsWith(SEQUENCE_ID_FILE_SUFFIX)
-      || file.getName().endsWith(OLD_SEQUENCE_ID_FILE_SUFFIX);
+    return isSequenceIdFile(file.getName());
+  }
+
+  public static boolean isSequenceIdFile(final String file) {
+    return file.endsWith(SEQUENCE_ID_FILE_SUFFIX)
+      || file.endsWith(OLD_SEQUENCE_ID_FILE_SUFFIX);
   }
 
   /**

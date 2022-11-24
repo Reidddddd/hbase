@@ -21,31 +21,28 @@ package org.apache.hadoop.hbase.wal;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.coordination.BaseCoordinatedStateManager;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
-class LogReplayOutputSink extends AbstractLogReplayOutputSink {
-  private final FileSystem walFS;
-  private final WALSplitter walSplitter;
+public class DistributedLogReplayOutputSink extends AbstractLogReplayOutputSink {
+  private final DistributedLogWALSplitter walSplitter;
 
-  public LogReplayOutputSink(PipelineController controller, EntryBuffers entryBuffers,
+  public DistributedLogReplayOutputSink(PipelineController controller, EntryBuffers entryBuffers,
       int numWriters, Configuration conf, Set<TableName> disablingOrDisabledTables,
       Map<String, Long> lastFlushedSequenceIds, BaseCoordinatedStateManager csm,
       Map<String, Map<byte[], Long>> regionMaxSeqIdInStores, String failedServerName,
-      FileSystem walFS, WALSplitter walSplitter) {
+      DistributedLogWALSplitter walSplitter) {
     super(controller, entryBuffers, numWriters, conf, disablingOrDisabledTables,
       lastFlushedSequenceIds, csm, regionMaxSeqIdInStores, failedServerName);
-    this.walFS = walFS;
     this.walSplitter = walSplitter;
   }
 
   @Override
   protected OutputSink createLegacyOutputSink(PipelineController controller,
       EntryBuffers entryBuffers, int numWriters) {
-    return new LogRecoveredEditsOutputSink(controller, entryBuffers, numWriters, walFS, conf,
-      walSplitter, regionMaxSeqIdInStores);
+    return new DistributedLogRecoveredEditsOutputSink(controller, entryBuffers, numWriters, conf,
+      regionMaxSeqIdInStores, walSplitter);
   }
 }

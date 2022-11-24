@@ -61,6 +61,7 @@ public abstract class AbstractWALSplitter {
   private static final Log LOG = LogFactory.getLog(AbstractWALSplitter.class);
 
   /** By default we retry errors in splitting, rather than skipping. */
+  public static final String SPLIT_SKIP_ERRORS = "hbase.hlog.split.skip.errors";
   public static final boolean SPLIT_SKIP_ERRORS_DEFAULT = false;
   public final static String SPLIT_WRITER_CREATION_BOUNDED = "hbase.split.writer.creation.bounded";
 

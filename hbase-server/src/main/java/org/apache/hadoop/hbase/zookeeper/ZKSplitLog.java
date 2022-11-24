@@ -26,6 +26,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
@@ -143,12 +144,28 @@ public class ZKSplitLog {
     }
   }
 
+  public static void markCorruptedDistributedLog(Path rootPath, String logName,
+      Namespace namespace) {
+    String log = new Path(getSplitLogDir(rootPath, logName), "corrupt").toString();
+    try {
+      namespace.createLog(log);
+    } catch (IOException e) {
+      LOG.warn("Could not flag a log file as corrupted. Failed to create " + log, e);
+    }
+  }
+
   public static boolean isCorrupted(Path rootdir, String logFileName,
       FileSystem fs) throws IOException {
     Path file = new Path(getSplitLogDir(rootdir, logFileName), "corrupt");
     boolean isCorrupt;
     isCorrupt = fs.exists(file);
     return isCorrupt;
+  }
+
+  public static boolean isCorruptedDistributedLog(Path walRoot, String logName,
+      Namespace namespace) throws IOException {
+    String log = new Path(getSplitLogDir(walRoot, logName), "corrupt").toString();
+    return namespace.logExists(log);
   }
 
   /*

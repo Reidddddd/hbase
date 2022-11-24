@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +41,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -52,6 +54,7 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.SplitLogCounters;
 import org.apache.hadoop.hbase.Stoppable;
+import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.coordination.BaseCoordinatedStateManager;
@@ -63,7 +66,6 @@ import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.R
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WALFactory;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -197,6 +199,26 @@ public class SplitLogManager {
     }
     FileStatus[] a = new FileStatus[fileStatus.size()];
     return fileStatus.toArray(a);
+  }
+
+  public static Path[] getLogList(final Configuration conf, final List<Path> logRoots)
+    throws IOException {
+    Namespace namespace;
+    List<Path> logs = new ArrayList<>();
+    try {
+      namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+      for (Path root : logRoots) {
+        Iterator<String> it = namespace.getLogs(root.toString());
+        while (it.hasNext()) {
+          logs.add(new Path(root, it.next()));
+        }
+      }
+    } catch (Exception e) {
+      LOG.warn("Exception met when get log list: \n", e);
+      throw new IOException(e);
+    }
+    Path[] result = new Path[logs.size()];
+    return logs.toArray(result);
   }
 
   /**

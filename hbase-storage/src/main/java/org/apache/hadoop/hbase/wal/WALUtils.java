@@ -20,7 +20,9 @@ package org.apache.hadoop.hbase.wal;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
@@ -460,18 +462,20 @@ public class WALUtils {
   }
 
   /**
-   * Parse namespace from a string for distributed log.
+   * Change a given String in the form "/aaa/bbb/ccc.xxx" to the form "aaa/bbb/ccc.xxx
+   * This is used for convert {@link Path#toString()} to a legal log name for DistributedLog.
    */
-  public static String[] parseDistributedLogName(String logNameWithNamespace) {
-    String[] nameArray = logNameWithNamespace.split(DISTRIBUTED_LOG_NAMESPACE_DELIMITER);
-    if (nameArray.length == 1) {
-      return new String[] {DISTRIBUTED_LOG_DEFAULT_NAMESPACE, nameArray[0]};
-    } else if (nameArray.length == 2) {
-      return nameArray;
-    } else {
-      throw new IllegalArgumentException("Unknown name of distributed log name: "
-        + logNameWithNamespace);
+  public static String pathToDistributedLogName(Path logPath) {
+    String pathStr = logPath.toString();
+    String[] nameArray = pathStr.split(DISTRIBUTED_LOG_NAMESPACE_DELIMITER);
+    List<String> nonEmpty = new ArrayList<>();
+    for (String part : nameArray) {
+      if (part != null && part.length() > 0) {
+        nonEmpty.add(part);
+      }
     }
+    String result = String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, nonEmpty);
+    return result.length() == 0 ? DISTRIBUTED_LOG_NAMESPACE_DELIMITER : result;
   }
 
   public static String getFullPathStringForDistributedLog(String parent, String logName) {

@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.coordination;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -87,6 +88,13 @@ public interface SplitLogWorkerCoordination {
    * @param fs file system
    */
   void markCorrupted(Path rootDir, String name, FileSystem fs);
+
+  /**
+   * marks log file as corrupted
+   * @param rootDir where to find the log
+   * @param name of the log
+   */
+  void markCorruptedDistributedLog(Path rootDir, String name, Namespace namespace);
 
   /**
    * Check whether the log splitter is ready to supply tasks

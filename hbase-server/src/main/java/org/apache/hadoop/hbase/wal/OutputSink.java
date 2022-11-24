@@ -153,6 +153,9 @@ public abstract class OutputSink {
     return (!progress_failed);
   }
 
+  /**
+   * @return null if failed to report progress
+   */
   public abstract List<Path> finishWritingAndClose() throws IOException;
 
   /**

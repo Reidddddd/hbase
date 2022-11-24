@@ -362,16 +362,8 @@ public class FSHLog extends AbstractLog {
     }
   }
 
-  /*
-   * only public so WALSplitter can use.
-   * @return archived location of a WAL file with the given path p
-   */
-  public static Path getWALArchivePath(Path archiveDir, Path p) {
-    return new Path(archiveDir, p.getName());
-  }
-
   private void archiveLogFile(final Path p) throws IOException {
-    Path newPath = getWALArchivePath(this.fullPathArchiveDir, p);
+    Path newPath = WALUtils.getWALArchivePath(this.fullPathArchiveDir, p);
     // Tell our listeners that a log is going to be archived.
     if (!this.listeners.isEmpty()) {
       for (WALActionsListener i : this.listeners) {
@@ -427,7 +419,7 @@ public class FSHLog extends AbstractLog {
     final FileStatus[] files = getFiles();
     if (null != files && 0 != files.length) {
       for (FileStatus file : files) {
-        Path p = getWALArchivePath(this.fullPathArchiveDir, file.getPath());
+        Path p = WALUtils.getWALArchivePath(this.fullPathArchiveDir, file.getPath());
         // Tell our listeners that a log is going to be archived.
         if (!this.listeners.isEmpty()) {
           for (WALActionsListener i : this.listeners) {
