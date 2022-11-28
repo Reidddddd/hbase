@@ -26,15 +26,18 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.DLMTestUtil;
@@ -44,6 +47,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -54,7 +58,9 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.Waiter;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.coprocessor.SampleRegionWALObserver;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
@@ -62,6 +68,8 @@ import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.Region;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.EnvironmentEdge;
+import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.DistributedLogWALProvider;
 import org.apache.hadoop.hbase.wal.Entry;
@@ -406,7 +414,76 @@ public class TestDistributedLog extends TestDistributedLogBase {
    */
   @Test
   public void testFlushSequenceIdIsGreaterThanAllEditsInLog() throws IOException {
-    // TODO: This UT need a new implementation of WALProvider. Should be complete in the future.
+    String testName = "testFlushSequenceIdIsGreaterThanAllEditsInLog";
+    final TableName tableName = TableName.valueOf(testName);
+    final HRegionInfo hri = new HRegionInfo(tableName);
+    final byte[] rowName = tableName.getName();
+    final HTableDescriptor htd = new HTableDescriptor(tableName);
+    htd.addFamily(new HColumnDescriptor("f"));
+    HRegion r = HRegion.createHRegion(hri, rootDir,
+      TEST_UTIL.getConfiguration(), htd);
+    HRegion.closeHRegion(r);
+    final int countPerFamily = 10;
+    final MutableBoolean goslow = new MutableBoolean(false);
+    // subclass and doctor a method.
+    DistributedLog wal = new DistributedLog(conf, null, null, null, testName) {
+      @Override
+      void atHeadOfRingBufferEventHandlerAppend() {
+        if (goslow.isTrue()) {
+          Threads.sleep(100);
+          LOG.debug("Sleeping before appending 100ms");
+        }
+        super.atHeadOfRingBufferEventHandlerAppend();
+      }
+    };
+    HRegion region = HRegion.openHRegion(TEST_UTIL.getConfiguration(),
+      TEST_UTIL.getTestFileSystem(), rootDir, hri, htd, wal);
+    EnvironmentEdge ee = EnvironmentEdgeManager.getDelegate();
+    try {
+      List<Put> puts = null;
+      for (HColumnDescriptor hcd: htd.getFamilies()) {
+        puts =
+          TestWALReplay.addRegionEdits(rowName, hcd.getName(), countPerFamily, ee, region, "x");
+      }
+
+      // Now assert edits made it in.
+      final Get g = new Get(rowName);
+      Result result = region.get(g);
+      assertEquals(countPerFamily * htd.getFamilies().size(), result.size());
+
+      // Construct a WALEdit and add it a few times to the WAL.
+      WALEdit edits = new WALEdit();
+      for (Put p: puts) {
+        CellScanner cs = p.cellScanner();
+        while (cs.advance()) {
+          edits.add(cs.current());
+        }
+      }
+      // Add any old cluster id.
+      List<UUID> clusterIds = new ArrayList<UUID>();
+      clusterIds.add(UUID.randomUUID());
+      // Now make appends run slow.
+      goslow.setValue(true);
+      for (int i = 0; i < countPerFamily; i++) {
+        final HRegionInfo info = region.getRegionInfo();
+        final WALKey logkey = new WALKey(info.getEncodedNameAsBytes(), tableName,
+          System.currentTimeMillis(), clusterIds, -1, -1, region.getMVCC());
+        wal.append(htd, info, logkey, edits, true);
+        region.getMVCC().completeAndWait(logkey.getWriteEntry());
+      }
+      region.flush(true);
+      // FlushResult.flushSequenceId is not visible here so go get the current sequence id.
+      long currentSequenceId = region.getSequenceId();
+      // Now release the appends
+      goslow.setValue(false);
+      synchronized (goslow) {
+        goslow.notifyAll();
+      }
+      assertTrue(currentSequenceId >= region.getSequenceId());
+    } finally {
+      region.close(true);
+      wal.close();
+    }
   }
 
   @Test
