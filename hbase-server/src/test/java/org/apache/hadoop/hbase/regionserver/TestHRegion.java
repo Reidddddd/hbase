@@ -700,7 +700,8 @@ public class TestHRegion {
       for (Store store : region.getStores()) {
         maxSeqIdInStores.put(store.getColumnFamilyName().getBytes(), minSeqId - 1);
       }
-      long seqId = region.replayRecoveredEditsIfAny(maxSeqIdInStores, null, status);
+      long seqId =
+        region.getWalReplayer().replayRecoveredEditsIfAny(maxSeqIdInStores, null, status);
       assertEquals(maxSeqId, seqId);
       region.getMVCC().advanceTo(seqId);
       Get get = new Get(row);
@@ -754,7 +755,8 @@ public class TestHRegion {
       for (Store store : region.getStores()) {
         maxSeqIdInStores.put(store.getColumnFamilyName().getBytes(), recoverSeqId - 1);
       }
-      long seqId = region.replayRecoveredEditsIfAny(maxSeqIdInStores, null, status);
+      long seqId =
+        region.getWalReplayer().replayRecoveredEditsIfAny(maxSeqIdInStores, null, status);
       assertEquals(maxSeqId, seqId);
       region.getMVCC().advanceTo(seqId);
       Get get = new Get(row);
@@ -798,7 +800,7 @@ public class TestHRegion {
     for (Store store : region.getStores()) {
       maxSeqIdInStores.put(store.getColumnFamilyName().getBytes(), minSeqId);
     }
-    long seqId = region.replayRecoveredEditsIfAny(maxSeqIdInStores, null, null);
+    long seqId = region.getWalReplayer().replayRecoveredEditsIfAny(maxSeqIdInStores, null, null);
     assertEquals(minSeqId, seqId);
   }
 
@@ -854,7 +856,8 @@ public class TestHRegion {
       for (Store store : region.getStores()) {
         maxSeqIdInStores.put(store.getColumnFamilyName().getBytes(), recoverSeqId - 1);
       }
-      long seqId = region.replayRecoveredEditsIfAny(maxSeqIdInStores, null, status);
+      long seqId =
+        region.getWalReplayer().replayRecoveredEditsIfAny(maxSeqIdInStores, null, status);
       assertEquals(maxSeqId, seqId);
 
       // assert that the files are flushed
@@ -5838,7 +5841,7 @@ public class TestHRegion {
   static class HRegionWithSeqId extends HRegion {
     public HRegionWithSeqId(final Path tableDir, final WAL wal, final FileSystem fs,
         final Configuration confParam, final HRegionInfo regionInfo,
-        final HTableDescriptor htd, final RegionServerServices rsServices) {
+        final HTableDescriptor htd, final RegionServerServices rsServices) throws IOException {
       super(tableDir, wal, fs, confParam, regionInfo, htd, rsServices);
     }
     @Override

@@ -221,7 +221,7 @@ public class TestRegionObserverScannerOpenHook {
     @SuppressWarnings("deprecation")
     public CompactionCompletionNotifyingRegion(Path tableDir, WAL log,
         FileSystem fs, Configuration confParam, HRegionInfo info,
-        HTableDescriptor htd, RegionServerServices rsServices) {
+        HTableDescriptor htd, RegionServerServices rsServices) throws IOException {
       super(tableDir, log, fs, confParam, info, htd, rsServices);
     }
 

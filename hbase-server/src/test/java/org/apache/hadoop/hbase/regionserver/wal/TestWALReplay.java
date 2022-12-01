@@ -274,9 +274,7 @@ public class TestWALReplay {
   }
 
   /**
-   * Tests for hbase-2727.
-   * @throws Exception
-   * @see https://issues.apache.org/jira/browse/HBASE-2727
+   * Tests for hbase-2727.{@see https://issues.apache.org/jira/browse/HBASE-2727}
    */
   @Test
   public void test2727() throws Exception {
@@ -947,8 +945,9 @@ public class TestWALReplay {
     final byte[] rowName = tableName.getName();
     final int countPerFamily = 10;
     final HTableDescriptor htd = createBasic1FamilyHTD(tableName);
-    HRegion region1 = HBaseTestingUtility.createRegionAndWAL(hri, hbaseRootDir, this.hbaseWALRootDir, this.conf, htd);
-    Path regionDir = region1.getWALRegionDir();
+    HRegion region1 = HBaseTestingUtility.createRegionAndWAL(hri, hbaseRootDir,
+      this.hbaseWALRootDir, this.conf, htd);
+    Path regionDir = region1.getWalReplayer().getWALRegionDir();
     HBaseTestingUtility.closeRegionAndWAL(region1);
 
     WAL wal = createWAL(this.conf);
@@ -1070,6 +1069,7 @@ public class TestWALReplay {
     WAL wal = createWAL(this.conf);
     region = HRegion.openHRegion(conf, this.fs, hbaseRootDir, hri, htd, wal);
     assertTrue(region.getOpenSeqNum() > mvcc.getWritePoint());
+    int x = region.get(new Get(rowName)).size();
     assertEquals(2, region.get(new Get(rowName)).size());
   }
 

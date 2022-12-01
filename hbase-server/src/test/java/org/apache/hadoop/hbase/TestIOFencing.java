@@ -97,7 +97,7 @@ public class TestIOFencing {
     @SuppressWarnings("deprecation")
     public CompactionBlockerRegion(Path tableDir, WAL log,
         FileSystem fs, Configuration confParam, HRegionInfo info,
-        HTableDescriptor htd, RegionServerServices rsServices) {
+        HTableDescriptor htd, RegionServerServices rsServices) throws IOException {
       super(tableDir, log, fs, confParam, info, htd, rsServices);
     }
 
@@ -157,7 +157,7 @@ public class TestIOFencing {
 
     public BlockCompactionsInPrepRegion(Path tableDir, WAL log,
         FileSystem fs, Configuration confParam, HRegionInfo info,
-        HTableDescriptor htd, RegionServerServices rsServices) {
+        HTableDescriptor htd, RegionServerServices rsServices) throws IOException {
       super(tableDir, log, fs, confParam, info, htd, rsServices);
     }
     @Override
@@ -180,7 +180,7 @@ public class TestIOFencing {
   public static class BlockCompactionsInCompletionRegion extends CompactionBlockerRegion {
     public BlockCompactionsInCompletionRegion(Path tableDir, WAL log,
         FileSystem fs, Configuration confParam, HRegionInfo info,
-        HTableDescriptor htd, RegionServerServices rsServices) {
+        HTableDescriptor htd, RegionServerServices rsServices) throws IOException {
       super(tableDir, log, fs, confParam, info, htd, rsServices);
     }
     @Override

@@ -449,12 +449,13 @@ public class TestScannerHeartbeatMessages {
     private static volatile boolean sleepBetweenColumnFamilies = false;
 
     public HeartbeatHRegion(Path tableDir, WAL wal, FileSystem fs, Configuration confParam,
-        HRegionInfo regionInfo, HTableDescriptor htd, RegionServerServices rsServices) {
+        HRegionInfo regionInfo, HTableDescriptor htd, RegionServerServices rsServices)
+      throws IOException {
       super(tableDir, wal, fs, confParam, regionInfo, htd, rsServices);
     }
 
     public HeartbeatHRegion(HRegionFileSystem fs, WAL wal, Configuration confParam,
-        HTableDescriptor htd, RegionServerServices rsServices) {
+        HTableDescriptor htd, RegionServerServices rsServices) throws IOException {
       super(fs, wal, confParam, htd, rsServices);
     }
 

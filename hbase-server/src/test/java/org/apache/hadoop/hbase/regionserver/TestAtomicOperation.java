@@ -658,7 +658,8 @@ public class TestAtomicOperation {
   public static class MockHRegion extends HRegion {
 
     public MockHRegion(Path tableDir, WAL log, FileSystem fs, Configuration conf,
-        final HRegionInfo regionInfo, final HTableDescriptor htd, RegionServerServices rsServices) {
+        final HRegionInfo regionInfo, final HTableDescriptor htd, RegionServerServices rsServices)
+      throws IOException {
       super(tableDir, log, fs, conf, regionInfo, htd, rsServices);
     }
 

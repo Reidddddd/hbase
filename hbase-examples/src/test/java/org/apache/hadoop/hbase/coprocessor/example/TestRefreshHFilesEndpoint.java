@@ -141,8 +141,8 @@ public class TestRefreshHFilesEndpoint {
     HStoreWithFaultyRefreshHFilesAPI store;
 
     public HRegionForRefreshHFilesEP(final Path tableDir, final WAL wal, final FileSystem fs,
-                                     final Configuration confParam, final HRegionInfo regionInfo,
-                                     final HTableDescriptor htd, final RegionServerServices rsServices) {
+        final Configuration confParam, final HRegionInfo regionInfo, final HTableDescriptor htd,
+        final RegionServerServices rsServices) throws IOException {
       super(tableDir, wal, fs, confParam, regionInfo, htd, rsServices);
     }
 
