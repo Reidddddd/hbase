@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +28,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.AppendOnlyStreamReader;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
+import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.distributedlog.shaded.exceptions.EndOfStreamException;
 import org.apache.distributedlog.shaded.exceptions.LogEmptyException;
 import org.apache.hadoop.conf.Configuration;
@@ -47,6 +49,7 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
 
   private AppendOnlyStreamReader appendOnlyStreamReader;
   private DistributedLogManager distributedLogManager;
+  private Namespace walNamespace;
   private String logName;
 
   static {
@@ -142,14 +145,20 @@ public class DistributedLogReader extends AbstractProtobufLogReader implements S
 
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
-    this.logName = logName;
     try {
-      this.distributedLogManager =
-        DistributedLogAccessor.getInstance(conf).getNamespace().openLog(logName);
+      init(conf, logName, DistributedLogAccessor.getInstance(conf).getNamespace());
     } catch (Exception e) {
-      LOG.warn("Failed to init distributed log reader. ");
+      LOG.warn("Failed to init distributed log reader for: " + logName);
       throw new IOException(e);
     }
+  }
+
+  @VisibleForTesting
+  public void init(Configuration conf, String logName, Namespace walNamespace)
+    throws IOException {
+    this.logName = logName;
+    this.walNamespace = walNamespace;
+    this.distributedLogManager = walNamespace.openLog(logName);
     reset();
     byte[] magic = new byte[PB_WAL_MAGIC.length];
     boolean isPbWal = (appendOnlyStreamReader.read(magic) == magic.length)

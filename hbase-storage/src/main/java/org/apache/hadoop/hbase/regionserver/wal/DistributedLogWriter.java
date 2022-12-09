@@ -64,14 +64,20 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
 
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
-    this.logName = logName;
-    LOG.info("Init DistributedLog writer once. ");
     try {
-      walNamespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+      init(conf, logName, DistributedLogAccessor.getInstance(conf).getNamespace());
     } catch (Exception e) {
-      LOG.error("Failed to get DistributedLog namespace.");
+      LOG.error("Failed to init writer for log: " + logName);
       throw new IOException(e);
     }
+  }
+
+  // We need to spy the namespace object in UTs.
+  @VisibleForTesting
+  public void init(Configuration conf, String logName, Namespace walNamespace) throws IOException {
+    LOG.info("Init DistributedLog writer " + logName);
+    this.logName = logName;
+    this.walNamespace = walNamespace;
     super.init(conf);
     // Force the wal header.
     this.appendOnlyStreamWriter.force(false);
