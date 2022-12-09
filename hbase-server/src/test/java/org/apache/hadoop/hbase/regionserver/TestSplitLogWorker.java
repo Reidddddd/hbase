@@ -25,10 +25,11 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -68,11 +69,14 @@ public class TestSplitLogWorker {
   private static final Log LOG = LogFactory.getLog(TestSplitLogWorker.class);
   private static final int WAIT_TIME = 15000;
   private final ServerName MANAGER = ServerName.valueOf("manager,1,1");
+
   static {
     Logger.getLogger("org.apache.hadoop.hbase").setLevel(Level.DEBUG);
   }
-  private final static HBaseTestingUtility TEST_UTIL =
+
+  protected final static HBaseTestingUtility TEST_UTIL =
     new HBaseTestingUtility();
+
   private DummyServer ds;
   private ZooKeeperWatcher zkw;
   private SplitLogWorker slw;
@@ -240,7 +244,8 @@ public class TestSplitLogWorker {
         CreateMode.PERSISTENT);
 
     SplitLogWorker slw =
-        new SplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
+      getSplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
+
     slw.start();
     try {
       waitForCounter(SplitLogCounters.tot_wkr_task_acquired, 0, 1, WAIT_TIME);
@@ -250,6 +255,23 @@ public class TestSplitLogWorker {
     } finally {
      stopSplitLogWorker(slw);
     }
+  }
+
+  private SplitLogWorker getSplitLogWorker(final Server server, Configuration conf,
+      RegionServerServices regionServerServices, SplitLogWorker.TaskExecutor taskExecutor)
+    throws IOException {
+    SplitLogWorker slw = null;
+    Class<? extends SplitLogWorker> workerClass = conf.getClass("hbase.split.log.worker.class",
+      SplitLogWorker.class, SplitLogWorker.class);
+    try {
+      Constructor<? extends SplitLogWorker> constructor = workerClass.getConstructor(Server.class,
+        Configuration.class, RegionServerServices.class, SplitLogWorker.TaskExecutor.class);
+      slw = constructor.newInstance(server, conf, regionServerServices, taskExecutor);
+    } catch (NoSuchMethodException | InvocationTargetException | InstantiationException
+      | IllegalAccessException e) {
+      throw new IOException(e);
+    }
+    return slw;
   }
 
   private void stopSplitLogWorker(final SplitLogWorker slw)
@@ -276,9 +298,9 @@ public class TestSplitLogWorker {
     RegionServerServices mockedRS1 = getRegionServer(SVR1);
     RegionServerServices mockedRS2 = getRegionServer(SVR2);
     SplitLogWorker slw1 =
-        new SplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS1, neverEndingTask);
+      getSplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS1, neverEndingTask);
     SplitLogWorker slw2 =
-        new SplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS2, neverEndingTask);
+      getSplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS2, neverEndingTask);
     slw1.start();
     slw2.start();
     try {
@@ -305,7 +327,7 @@ public class TestSplitLogWorker {
     final String PATH = ZKSplitLog.getEncodedNodeName(zkw, "tpt_task");
     RegionServerServices mockedRS = getRegionServer(SRV);
     SplitLogWorker slw =
-        new SplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
+      getSplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
     slw.start();
     try {
       Thread.yield(); // let the worker start
@@ -338,7 +360,7 @@ public class TestSplitLogWorker {
     final String PATH1 = ZKSplitLog.getEncodedNodeName(zkw, "tmt_task");
     RegionServerServices mockedRS = getRegionServer(SRV);
     SplitLogWorker slw =
-        new SplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
+      getSplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
     slw.start();
     try {
       Thread.yield(); // let the worker start
@@ -380,7 +402,7 @@ public class TestSplitLogWorker {
     SplitLogCounters.resetCounters();
     final ServerName SRV = ServerName.valueOf("svr,1,1");
     RegionServerServices mockedRS = getRegionServer(SRV);
-    slw = new SplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
+    slw = getSplitLogWorker(ds, TEST_UTIL.getConfiguration(), mockedRS, neverEndingTask);
     slw.start();
     Thread.yield(); // let the worker start
     Thread.sleep(100);
@@ -442,7 +464,7 @@ public class TestSplitLogWorker {
           Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
-    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    SplitLogWorker slw = getSplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
     slw.start();
     try {
       waitForCounter(SplitLogCounters.tot_wkr_task_acquired, 0, maxTasks, WAIT_TIME);
@@ -497,7 +519,7 @@ public class TestSplitLogWorker {
     }
 
     // mockedRS won't take tasks because it is not in the same DC as the failed server which is in DC2.
-    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    SplitLogWorker slw = getSplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
     slw.start();
     Thread.sleep(1000);
     try {
@@ -535,7 +557,7 @@ public class TestSplitLogWorker {
     }
 
     // mockedRS will take all tasks because it is in the same DC as the failed server.
-    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    SplitLogWorker slw = getSplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
     slw.start();
     Thread.sleep(1000);
     try {
@@ -576,8 +598,8 @@ public class TestSplitLogWorker {
     }
 
     // slw1 and slw2 will take all tasks because fallback to default mode
-    SplitLogWorker slw1 = new SplitLogWorker(ds, testConf, mockedRS1, neverEndingTask);
-    SplitLogWorker slw2 = new SplitLogWorker(ds, testConf, mockedRS2, neverEndingTask);
+    SplitLogWorker slw1 = getSplitLogWorker(ds, testConf, mockedRS1, neverEndingTask);
+    SplitLogWorker slw2 = getSplitLogWorker(ds, testConf, mockedRS2, neverEndingTask);
     slw1.start();
     slw2.start();
     Thread.sleep(1000);
@@ -615,7 +637,7 @@ public class TestSplitLogWorker {
     }
 
     // mockedRS will take all tasks because WALs from DC3 is unresolvable and fall back to default mode
-    SplitLogWorker slw = new SplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
+    SplitLogWorker slw = getSplitLogWorker(ds, testConf, mockedRS, neverEndingTask);
     slw.start();
     Thread.sleep(1000);
     try {

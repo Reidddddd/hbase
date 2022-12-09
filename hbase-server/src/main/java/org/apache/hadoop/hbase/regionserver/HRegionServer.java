@@ -34,6 +34,7 @@ import java.io.InterruptedIOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.management.MemoryUsage;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -86,6 +87,7 @@ import org.apache.hadoop.hbase.MetaTableAccessor;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.RemoteExceptionHandler;
 import org.apache.hadoop.hbase.ScheduledChore;
+import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.TableDescriptors;
@@ -1854,7 +1856,16 @@ public class HRegionServer extends HasThread implements
     sinkConf.setInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
       conf.getInt("hbase.log.replay.rpc.timeout", 30000)); // default 30 seconds
     sinkConf.setInt("hbase.client.serverside.retries.multiplier", 1);
-    this.splitLogWorker = new SplitLogWorker(this, sinkConf, this, this, walFactory);
+    Class<? extends SplitLogWorker> workerClass = conf.getClass("hbase.split.log.worker.class",
+      SplitLogWorker.class, SplitLogWorker.class);
+    try {
+      Constructor<? extends SplitLogWorker> constructor = workerClass.getConstructor(Server.class,
+        Configuration.class, RegionServerServices.class, LastSequenceId.class, WALFactory.class);
+      this.splitLogWorker = constructor.newInstance(this, sinkConf, this, this, walFactory);
+    } catch (NoSuchMethodException | InvocationTargetException | InstantiationException
+      | IllegalAccessException e) {
+      throw new IOException(e);
+    }
     splitLogWorker.start();
   }
 
