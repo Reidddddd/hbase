@@ -21,20 +21,18 @@
 package org.apache.hadoop.hbase.rsgroup;
 
 import com.google.common.collect.Sets;
-
 import java.util.Collection;
 import java.util.NavigableSet;
 import java.util.Set;
-
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.net.Address;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
-import org.apache.hadoop.hbase.net.Address;
 
 /**
  * Stores the group information of region server groups.
  */
-@InterfaceAudience.Public
+@InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class RSGroupInfo {
 
