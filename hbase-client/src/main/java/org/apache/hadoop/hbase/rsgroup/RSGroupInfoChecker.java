@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.rsgroup;
 
 import com.google.protobuf.ServiceException;
+import java.io.Closeable;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,7 +33,7 @@ import org.apache.yetus.audience.InterfaceStability;
 
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class RSGroupInfoChecker {
+public class RSGroupInfoChecker implements Closeable {
   private static final Log LOG = LogFactory.getLog(RSGroupInfoChecker.class);
 
   private final Admin admin;
@@ -59,6 +60,7 @@ public class RSGroupInfoChecker {
     }
   }
 
+  @Override
   public void close() throws IOException {
     admin.close();
   }
