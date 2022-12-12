@@ -203,14 +203,22 @@ public class SplitLogManager {
 
   public static Path[] getLogList(final Configuration conf, final List<Path> logRoots)
     throws IOException {
+    return getLogList(conf, logRoots, null);
+  }
+
+  public static Path[] getLogList(final Configuration conf, final List<Path> logRoots,
+      final PathFilter pathFilter) throws IOException {
     Namespace namespace;
     List<Path> logs = new ArrayList<>();
     try {
       namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
       for (Path root : logRoots) {
-        Iterator<String> it = namespace.getLogs(root.toString());
+        Iterator<String> it = namespace.getLogs(WALUtils.pathToDistributedLogName(root));
         while (it.hasNext()) {
-          logs.add(new Path(root, it.next()));
+          Path targetPath = new Path(root, it.next());
+          if (pathFilter == null || pathFilter.accept(targetPath)) {
+            logs.add(targetPath);
+          }
         }
       }
     } catch (Exception e) {
@@ -273,27 +281,13 @@ public class SplitLogManager {
       PathFilter filter) throws IOException {
     MonitoredTask status = TaskMonitor.get().createStatus("Doing distributed log split in " +
       logDirs + " for serverName=" + serverNames);
-    FileStatus[] logfiles = getFileList(logDirs, filter);
     status.setStatus("Checking directory contents...");
     SplitLogCounters.tot_mgr_log_split_batch_start.incrementAndGet();
-    LOG.info("Started splitting " + logfiles.length + " logs in " + logDirs +
-      " for " + serverNames);
     long t = EnvironmentEdgeManager.currentTime();
-    long totalSize = 0;
     TaskBatch batch = new TaskBatch();
     Boolean isMetaRecovery = (filter == null) ? null : false;
-    for (FileStatus lf : logfiles) {
-      // TODO If the log file is still being written to - which is most likely
-      // the case for the last log file - then its length will show up here
-      // as zero. The size of such a file can only be retrieved after
-      // recover-lease is done. totalSize will be under in most cases and the
-      // metrics that it drives will also be under-reported.
-      totalSize += lf.getLen();
-      String pathToLog = FSUtils.removeWALRootPath(lf.getPath(), conf);
-      if (!enqueueSplitTask(pathToLog, batch)) {
-        throw new IOException("duplicate log split scheduled for " + lf.getPath());
-      }
-    }
+    long totalSize = preQueueSplitTask(serverNames, logDirs, filter, batch);
+
     waitForSplittingCompletion(batch, status);
     // remove recovering regions
     if (filter == MasterFileSystem.META_FILTER /* reference comparison */) {
@@ -312,6 +306,39 @@ public class SplitLogManager {
       status.abort(msg);
       throw new IOException(msg);
     }
+
+    cleanupLogs(logDirs, status);
+    String msg =
+        "finished splitting (more than or equal to) " + totalSize + " bytes in " + batch.installed
+            + " log files in " + logDirs + " in "
+            + (EnvironmentEdgeManager.currentTime() - t) + "ms";
+    status.markComplete(msg);
+    LOG.info(msg);
+    return totalSize;
+  }
+
+  protected long preQueueSplitTask(final Set<ServerName> serverNames, final List<Path> logDirs,
+    PathFilter filter, TaskBatch batch) throws IOException {
+    long totalSize = 0;
+    FileStatus[] logfiles = getFileList(logDirs, filter);
+    LOG.info("Started splitting " + logfiles.length + " logs in " + logDirs +
+      " for " + serverNames);
+    for (FileStatus lf : logfiles) {
+      // TODO If the log file is still being written to - which is most likely
+      // the case for the last log file - then its length will show up here
+      // as zero. The size of such a file can only be retrieved after
+      // recover-lease is done. totalSize will be under in most cases and the
+      // metrics that it drives will also be under-reported.
+      totalSize += lf.getLen();
+      String pathToLog = FSUtils.removeWALRootPath(lf.getPath(), conf);
+      if (!enqueueSplitTask(pathToLog, batch)) {
+        throw new IOException("duplicate log split scheduled for " + lf.getPath());
+      }
+    }
+    return totalSize;
+  }
+
+  protected void cleanupLogs(final List<Path> logDirs, MonitoredTask status) throws IOException {
     for (Path logDir : logDirs) {
       status.setStatus("Cleaning up log directory...");
       final FileSystem fs = logDir.getFileSystem(conf);
@@ -323,21 +350,14 @@ public class SplitLogManager {
         FileStatus[] files = fs.listStatus(logDir);
         if (files != null && files.length > 0) {
           LOG.warn("Returning success without actually splitting and "
-              + "deleting all the log files in path " + logDir + ": "
-              + Arrays.toString(files), ioe);
+            + "deleting all the log files in path " + logDir + ": "
+            + Arrays.toString(files), ioe);
         } else {
           LOG.warn("Unable to delete log src dir. Ignoring. " + logDir, ioe);
         }
       }
       SplitLogCounters.tot_mgr_log_split_batch_success.incrementAndGet();
     }
-    String msg =
-        "finished splitting (more than or equal to) " + totalSize + " bytes in " + batch.installed
-            + " log files in " + logDirs + " in "
-            + (EnvironmentEdgeManager.currentTime() - t) + "ms";
-    status.markComplete(msg);
-    LOG.info(msg);
-    return totalSize;
   }
 
   /**
