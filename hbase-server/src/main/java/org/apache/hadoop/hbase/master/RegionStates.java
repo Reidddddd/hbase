@@ -411,8 +411,8 @@ public class RegionStates {
           oldAssignments.put(encodedName, lastHost);
         }
       }
+      updateMetrics(regionState.getState(), false);
     }
-    updateMetrics(regionState.getState(), false);
     return regionState;
   }
 
