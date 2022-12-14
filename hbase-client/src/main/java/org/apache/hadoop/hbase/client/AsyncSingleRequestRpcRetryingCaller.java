@@ -123,6 +123,10 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
   private void onError(Throwable error, Supplier<String> errMsg,
                        Consumer<Throwable> updateCachedLocation) {
     error = translateException(error);
+    if (error instanceof DoNotRetryIOException) {
+      future.completeExceptionally(error);
+      return;
+    }
     if (tries > startLogErrorsCnt) {
       LOG.warn(errMsg.get(), error);
     }
@@ -130,7 +134,7 @@ class AsyncSingleRequestRpcRetryingCaller<T> {
             new RetriesExhaustedException.ThrowableWithExtraContext(error,
                     EnvironmentEdgeManager.currentTime(), "");
     exceptions.add(qt);
-    if (error instanceof DoNotRetryIOException || tries >= maxAttempts) {
+    if (tries >= maxAttempts) {
       completeExceptionally();
       return;
     }
