@@ -32,6 +32,7 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.crypto.Encryption;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -45,6 +46,9 @@ public class CredentialCache {
 
   private static final String CREDENTIAL_REFRESH_PERIOD = "hbase.secret.refresh.period";
   private static final int CREDENTIAL_REFRESH_PERIOD_DEFAULT = 600000;  // In milliseconds
+
+  private static final String FALLBACK_MARK_REFRESH_PERIOD = "hbase.fallback.mark.refresh.period";
+  private static final int FALLBACK_MARK_REFRESH_PERIOD_DEFAULT = 600000; // In milliseconds
 
   private SecretCryptor decryptor = new SecretCryptor();
   private final ThreadLocal<Table> authTable = new ThreadLocal<>();
@@ -71,11 +75,25 @@ public class CredentialCache {
         }
       }
     };
+    ScheduledChore fallbackUpdateTask = new ScheduledChore("CredentialRefresher", server,
+        conf.getInt(FALLBACK_MARK_REFRESH_PERIOD, FALLBACK_MARK_REFRESH_PERIOD_DEFAULT),
+        conf.getLong(FALLBACK_MARK_REFRESH_PERIOD, FALLBACK_MARK_REFRESH_PERIOD_DEFAULT)) {
+      @Override
+      protected void chore() {
+        try {
+          refreshFallbackMark();
+        } catch (Exception e) {
+          LOG.warn("Refresh fallback mark failed with exception. ", e);
+        }
+      }
+    };
+
     if (server.isAborted() || server.isStopped()) {
-      throw new
-        IllegalStateException("Try to initial credential cache but region server is not running");
+      throw new IllegalStateException("Try to initial credential cache but region server: " + server
+        + "is not running");
     }
     server.getChoreService().scheduleChore(task);
+    server.getChoreService().scheduleChore(fallbackUpdateTask);
 
     initializeDecryptor();
   }
@@ -128,7 +146,7 @@ public class CredentialCache {
 
   private void refreshCredential() throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Start refresh credential. ");
+      LOG.debug("Start refreshing credential. ");
     }
     ClusterConnection conn = this.server.getConnection();
     if (conn == null || conn.isAborted() || conn.isClosed()) {
@@ -139,14 +157,37 @@ public class CredentialCache {
     Map<String, CredentialEntry> tmpMap = new HashMap<>(credentialMap.size());
 
     for (String account : credentialMap.keySet()) {
+      if (isLoginUser(account)) {
+        continue;
+      }
       updateAccountCredential(account, tmpMap);
     }
 
     credentialMap.putAll(tmpMap);
   }
 
+  private void refreshFallbackMark() throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Start refreshing fallback mark. ");
+    }
+
+    for (String account : credentialMap.keySet()) {
+      updateFallbackMark(account, credentialMap);
+    }
+  }
+
   private boolean isLoginUser(String account) {
     return account.equals(loginUser);
+  }
+
+  private void updateFallbackMark(String account, Map<String, CredentialEntry> map)
+    throws IOException {
+    boolean mark = SecretTableAccessor.allowFallback(Bytes.toBytes(getHashedUsername(account)),
+      getAuthTable());
+    CredentialEntry entry = map.get(account);
+    if (entry != null) {
+      entry.setAllowFallback(mark);
+    }
   }
 
   private void updateAccountCredential(String account, Map<String, CredentialEntry> map)
@@ -162,10 +203,11 @@ public class CredentialCache {
       LOG.debug("Start update credential of " + account);
     }
 
-    Table table = getAuthTable();
-    entry = SecretTableAccessor.getAccountCredential(getHashedUsername(account), table);
+    entry = SecretTableAccessor.getAccountCredential(getHashedUsername(account), getAuthTable());
     if (entry.getPassword() != null) {
       entry.setPassword(decryptor.decryptSecret(entry.getPassword()));
+    } else {
+      map.remove(account);
     }
 
     // If the account is rs user, just update allowFallback mark directly on credentialMap

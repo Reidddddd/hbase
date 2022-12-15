@@ -124,6 +124,7 @@ public class TestSystemTableBasedSecretManager {
     TEST_UTIL.getConfiguration().set(User.HBASE_SECURITY_CONF_KEY, "digest");
     TEST_UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, VALID_CREDENTIAL);
     TEST_UTIL.getConfiguration().setLong("hbase.secret.refresh.period", 1000);
+    TEST_UTIL.getConfiguration().setLong("hbase.fallback.mark.refresh.period", 1000);
 
     TEST_UTIL.startMiniCluster();
     SystemTableBasedSecretManager secretManager =
@@ -161,6 +162,7 @@ public class TestSystemTableBasedSecretManager {
     TEST_UTIL.getConfiguration().set(User.HBASE_SECURITY_CONF_KEY, "digest");
     TEST_UTIL.getConfiguration().set(User.DIGEST_PASSWORD_KEY, VALID_CREDENTIAL);
     TEST_UTIL.getConfiguration().setLong("hbase.secret.refresh.period", 1000);
+    TEST_UTIL.getConfiguration().setLong("hbase.fallback.mark.refresh.period", 1000);
     TEST_UTIL.startMiniCluster();
 
     // We disable secret table here to simulate secret table not online.

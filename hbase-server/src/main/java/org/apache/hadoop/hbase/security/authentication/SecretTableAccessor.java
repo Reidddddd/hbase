@@ -70,13 +70,13 @@ public final class SecretTableAccessor {
   public static byte[] getUserPassword(byte[] username, Table table)
       throws IOException {
     sanityCheck(table);
-    Result res = table.get(new Get(username));
+    Result res = table.get(new Get(username).addColumn(Bytes.toBytes(SECRET_FAMILY_KEY),
+      Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY)));
     if (res.isEmpty()) {
       return null;
     }
 
-    return res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
-        Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY));
+    return res.value();
   }
 
   /**
@@ -95,13 +95,13 @@ public final class SecretTableAccessor {
   public static boolean allowFallback(byte[] username, Table table) throws IOException {
     sanityCheck(table);
 
-    Result res = table.get(new Get(username));
+    Result res = table.get(new Get(username).addColumn(Bytes.toBytes(SECRET_FAMILY_KEY),
+      Bytes.toBytes(SECRET_COLUMN_ALLOW_FALLBACK_KEY)));
     if (res.isEmpty()) {
       return true;
     }
 
-    byte[] resValue = res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
-        Bytes.toBytes(SECRET_COLUMN_ALLOW_FALLBACK_KEY));
+    byte[] resValue = res.value();
     if (resValue == null || resValue.length == 0) {
       return true;
     }
