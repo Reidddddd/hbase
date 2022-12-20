@@ -89,6 +89,8 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD;
+import static org.apache.hadoop.hbase.HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD;
 import static org.apache.hadoop.hbase.thrift2.ThriftUtilities.getFromThrift;
 import static org.apache.hadoop.hbase.thrift2.ThriftUtilities.putFromThrift;
 import static org.apache.hadoop.hbase.thrift2.ThriftUtilities.scanFromThrift;
@@ -1484,6 +1486,31 @@ public class TestThriftHBaseServiceHandler {
       } catch (InterruptedException ie) {
         throw new InterruptedIOException("Interrupted while sleeping");
       }
+    }
+  }
+
+  @Test
+  public void testExpiredScanner() throws Exception {
+    Configuration conf = UTIL.getConfiguration();
+    conf.setLong(HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 1000);
+    ThriftHBaseServiceHandler handler =
+      new ThriftHBaseServiceHandler(conf, UserProvider.instantiate(conf));
+
+    TScan scan = new TScan();
+    ByteBuffer table = wrap(tableAname);
+
+    int scannerId = handler.openScanner(table, scan);
+    handler.getScannerRows(scannerId, 1);
+    Thread.sleep(1000);
+
+    try {
+      handler.getScannerRows(scannerId, 1);
+      fail("The scanner should be expired and have an TIllegalArgument exception here.");
+    } catch (TIllegalArgument e) {
+      assertEquals("Invalid scanner Id", e.getMessage());
+    } finally {
+      conf.setLong(HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
+        DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
     }
   }
 }

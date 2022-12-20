@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hbase.thrift2;
 
+import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD;
+import static org.apache.hadoop.hbase.HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_READONLY_ENABLED;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_READONLY_ENABLED_DEFAULT;
 import static org.apache.hadoop.hbase.thrift2.ThriftUtilities.appendFromThrift;
@@ -49,10 +51,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -105,23 +110,22 @@ import org.apache.thrift.TException;
  * defined in the Table interface.
  */
 @InterfaceAudience.Private
-@SuppressWarnings("deprecation")
+@SuppressWarnings("UnstableApiUsage")
 public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements THBaseService.Iface {
 
-  // TODO: Size of pool configuraple
+  // TODO: Size of pool configurable
   private static final Log LOG = LogFactory.getLog(ThriftHBaseServiceHandler.class);
 
   // nextScannerId and scannerMap are used to manage scanner state
-  // TODO: Cleanup thread for Scanners, Scanner id wrap
   private final AtomicInteger nextScannerId = new AtomicInteger(0);
-  private final Map<Integer, ResultScanner> scannerMap = new ConcurrentHashMap<>();
+  private final Cache<Integer, ResultScanner> scannerMap;
 
   private static final IOException ioe
       = new DoNotRetryIOException("Thrift Server is in Read-only mode.");
-  private boolean isReadOnly;
+  private final boolean isReadOnly;
 
   private static class TIOErrorWithCause extends TIOError {
-    private Throwable cause;
+    private final Throwable cause;
 
     public TIOErrorWithCause(Throwable cause) {
       super();
@@ -139,7 +143,7 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
           other instanceof TIOErrorWithCause) {
         Throwable otherCause = ((TIOErrorWithCause) other).getCause();
         if (this.getCause() != null) {
-          return otherCause != null && this.getCause().equals(otherCause);
+          return this.getCause().equals(otherCause);
         } else {
           return otherCause == null;
         }
@@ -158,7 +162,14 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
   public ThriftHBaseServiceHandler(final Configuration conf,
       final UserProvider userProvider) throws IOException {
     super(conf, userProvider);
+    long cacheTimeout = conf.getLong(HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
+      DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
     isReadOnly = conf.getBoolean(THRIFT_READONLY_ENABLED, THRIFT_READONLY_ENABLED_DEFAULT);
+    scannerMap = CacheBuilder.newBuilder()
+      .expireAfterAccess(cacheTimeout, TimeUnit.MILLISECONDS)
+      .removalListener((RemovalListener<Integer, ResultScanner>) removalNotification ->
+        removalNotification.getValue().close())
+      .build();
   }
 
   @Override
@@ -218,16 +229,15 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
    * @return a Scanner, or null if the Id is invalid
    */
   private ResultScanner getScanner(int id) {
-    return scannerMap.get(id);
+    return scannerMap.getIfPresent(id);
   }
 
   /**
    * Removes the scanner associated with the specified ID from the internal HashMap.
    * @param id of the Scanner to remove
-   * @return the removed Scanner, or <code>null</code> if the Id is invalid
    */
-  protected ResultScanner removeScanner(int id) {
-    return scannerMap.remove(id);
+  protected void removeScanner(int id) {
+    scannerMap.invalidate(id);
   }
 
   @Override
@@ -491,11 +501,10 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
     LOG.debug("scannerClose: id=" + scannerId);
     ResultScanner scanner = getScanner(scannerId);
     if (scanner == null) {
-      String message = "scanner ID is invalid";
-      LOG.warn(message);
-      TIllegalArgument ex = new TIllegalArgument();
-      ex.setMessage("Invalid scanner Id");
-      throw ex;
+      LOG.warn("scanner ID: " + scannerId + "is invalid");
+      // While the scanner could be already expired,
+      // we should not throw exception here. Just log and return.
+      return;
     }
     scanner.close();
     removeScanner(scannerId);
