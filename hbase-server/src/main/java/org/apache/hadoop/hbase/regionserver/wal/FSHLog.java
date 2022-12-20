@@ -34,7 +34,8 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -48,6 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.lmax.disruptor.*;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.logging.Log;
@@ -342,6 +344,9 @@ public class FSHLog implements WAL {
   private final int closeErrorsTolerated;
 
   private final AtomicInteger closeErrorCount = new AtomicInteger();
+
+  private final ExecutorService closeExecutor = Executors.newCachedThreadPool(
+    new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Close-WAL-Writer-%d").build());
 
   // Last time to check low replication on hlog's pipeline
   private volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
@@ -841,6 +846,7 @@ public class FSHLog implements WAL {
     }
     afterCreatingZigZagLatch();
     TraceScope scope = Trace.startSpan("FSHFile.replaceWriter");
+    CompletableFuture<Void> closeFuture = null;
     try {
       // Wait on the safe point to be achieved.  Send in a sync in case nothing has hit the
       // ring buffer between the above notification of writer that we want it to go to
@@ -863,24 +869,8 @@ public class FSHLog implements WAL {
       }
 
       // It is at the safe point.  Swap out writer from under the blocked writer thread.
-      // TODO: This is close is inline with critical section.  Should happen in background?
-      try {
-        if (this.writer != null) {
-          Trace.addTimelineAnnotation("closing writer");
-          this.writer.close();
-          Trace.addTimelineAnnotation("writer closed");
-        }
-        this.closeErrorCount.set(0);
-      } catch (IOException ioe) {
-        int errors = closeErrorCount.incrementAndGet();
-        if (!isUnflushedEntries() && (errors <= this.closeErrorsTolerated)) {
-          LOG.warn("Riding over failed WAL close of " + oldPath + ", cause=\"" +
-            ioe.getMessage() + "\", errors=" + errors +
-            "; THIS FILE WAS NOT CLOSED BUT ALL EDITS SYNCED SO SHOULD BE OK");
-        } else {
-          throw ioe;
-        }
-      }
+      Writer localWriter = this.writer;
+      closeFuture = asyncCloseWriter(localWriter, oldPath);
       this.writer = nextWriter;
       this.hdfs_out = nextHdfsOut;
       int oldNumEntries = this.numEntries.get();
@@ -923,10 +913,48 @@ public class FSHLog implements WAL {
           }
         }
       } finally {
+        if (closeFuture != null) {
+          try {
+            closeFuture.join();
+          } catch (CompletionException e) {
+            if (e.getCause() instanceof IOException) {
+              throw (IOException) e.getCause();
+            }
+            throw e;
+          }
+        }
         scope.close();
       }
     }
     return newPath;
+  }
+
+  private CompletableFuture<Void> asyncCloseWriter(Writer writer, Path oldPath) {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+
+    closeExecutor.execute(() -> {
+      try {
+        if (writer != null) {
+          Trace.addTimelineAnnotation("closing writer");
+          writer.close();
+          Trace.addTimelineAnnotation("writer closed");
+        }
+        this.closeErrorCount.set(0);
+        future.complete(null);
+      } catch (IOException ioe) {
+        int errors = closeErrorCount.incrementAndGet();
+        if (!isUnflushedEntries() && (errors <= this.closeErrorsTolerated)) {
+          LOG.warn("Riding over failed WAL close of " + oldPath + ", cause=\"" + ioe.getMessage()
+            + "\", errors=" + errors
+            + "; THIS FILE WAS NOT CLOSED BUT ALL EDITS SYNCED SO SHOULD BE OK");
+          future.complete(null);
+        } else {
+          future.completeExceptionally(ioe);
+        }
+      }
+    });
+
+    return future;
   }
 
   long getUnflushedEntriesCount() {
