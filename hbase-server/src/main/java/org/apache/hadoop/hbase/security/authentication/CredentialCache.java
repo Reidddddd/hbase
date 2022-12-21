@@ -18,11 +18,10 @@
 package org.apache.hadoop.hbase.security.authentication;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -41,6 +40,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  * secret table. This class will periodically refresh the cache from secret table.
  */
 @InterfaceAudience.Private
+@SuppressWarnings("UnstableApiUsage")
 public class CredentialCache {
   private static final Log LOG = LogFactory.getLog(CredentialCache.class);
 
@@ -48,20 +48,28 @@ public class CredentialCache {
   private static final int CREDENTIAL_REFRESH_PERIOD_DEFAULT = 600000;  // In milliseconds
 
   private static final String FALLBACK_MARK_REFRESH_PERIOD = "hbase.fallback.mark.refresh.period";
-  private static final int FALLBACK_MARK_REFRESH_PERIOD_DEFAULT = 600000; // In milliseconds
+  private static final int FALLBACK_MARK_REFRESH_PERIOD_DEFAULT = 600000;  // In milliseconds
 
-  private SecretCryptor decryptor = new SecretCryptor();
+  private static final String CREDENTIAL_EXPIRE_TIME = "hbase.secret.expire.time";
+  private static final int CREDENTIAL_EXPIRE_TIME_DEFAULT = 600000;  // In milliseconds
+
   private final ThreadLocal<Table> authTable = new ThreadLocal<>();
-
-  private final ConcurrentMap<String, CredentialEntry> credentialMap = new ConcurrentHashMap<>();
+  private final Cache<String, CredentialEntry> credentialMap;
+  private final CredentialEntry loginCredential = new CredentialEntry();
   private final Server server;
   private final String loginUser;
+
+  private SecretCryptor decryptor = new SecretCryptor();
 
   public CredentialCache(final Server server, final String loginUser) {
     this.server = server;
     this.loginUser = loginUser;
-
     Configuration conf = server.getConfiguration();
+
+    credentialMap = CacheBuilder.newBuilder()
+      .expireAfterAccess(conf.getInt(CREDENTIAL_EXPIRE_TIME, CREDENTIAL_EXPIRE_TIME_DEFAULT),
+        TimeUnit.MILLISECONDS)
+      .build();
     // Refresh the cache every 10 minutes in default.
     ScheduledChore task = new ScheduledChore("CredentialRefresher", server,
         conf.getInt(CREDENTIAL_REFRESH_PERIOD, CREDENTIAL_REFRESH_PERIOD_DEFAULT),
@@ -153,17 +161,12 @@ public class CredentialCache {
       throw new IllegalStateException("The internal cluster connection is not open. ");
     }
 
-    // batch update credentials.
-    Map<String, CredentialEntry> tmpMap = new HashMap<>(credentialMap.size());
-
-    for (String account : credentialMap.keySet()) {
+    for (String account : credentialMap.asMap().keySet()) {
       if (isLoginUser(account)) {
         continue;
       }
-      updateAccountCredential(account, tmpMap);
+      updateAccountCredential(account, credentialMap);
     }
-
-    credentialMap.putAll(tmpMap);
   }
 
   private void refreshFallbackMark() throws IOException {
@@ -171,32 +174,36 @@ public class CredentialCache {
       LOG.debug("Start refreshing fallback mark. ");
     }
 
-    for (String account : credentialMap.keySet()) {
+    for (String account : credentialMap.asMap().keySet()) {
       updateFallbackMark(account, credentialMap);
     }
+    // Update loginUser independently.
+    boolean mark = SecretTableAccessor.allowFallback(Bytes.toBytes(getHashedUsername(loginUser)),
+      getAuthTable());
+    loginCredential.setAllowFallback(mark);
   }
 
   private boolean isLoginUser(String account) {
     return account.equals(loginUser);
   }
 
-  private void updateFallbackMark(String account, Map<String, CredentialEntry> map)
+  private void updateFallbackMark(String account, Cache<String, CredentialEntry> map)
     throws IOException {
     boolean mark = SecretTableAccessor.allowFallback(Bytes.toBytes(getHashedUsername(account)),
       getAuthTable());
-    CredentialEntry entry = map.get(account);
+    CredentialEntry entry = map.getIfPresent(account);
     if (entry != null) {
       entry.setAllowFallback(mark);
     }
   }
 
-  private void updateAccountCredential(String account, Map<String, CredentialEntry> map)
-    throws IOException {
+  private CredentialEntry updateAccountCredential(String account, Cache<String,
+      CredentialEntry> map) throws IOException {
     if (!decryptor.isInitialized()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Decryptor is not initialized. Skip update credential for account " + account);
       }
-      return;
+      return null;
     }
     CredentialEntry entry;
     if (LOG.isDebugEnabled()) {
@@ -207,22 +214,17 @@ public class CredentialCache {
     if (entry.getPassword() != null) {
       entry.setPassword(decryptor.decryptSecret(entry.getPassword()));
     } else {
-      map.remove(account);
+      map.invalidate(account);
     }
 
-    // If the account is rs user, just update allowFallback mark directly on credentialMap
-    // Otherwise, we may have problem when password of login user is changed.
-    if (isLoginUser(account)) {
-      credentialMap.get(account).setAllowFallback(entry.allowFallback);
+    if (entry.password == null) {
+      // There is no such an account in our database.
+      // Should remove this account if it exists in our cache.
+      map.invalidate(account);
     } else {
-      if (entry.password == null) {
-        // There is no such an account in our database.
-        // Should remove this account if it exists in our cache.
-        map.remove(account);
-      } else {
-        map.put(account, entry);
-      }
+      map.put(account, entry);
     }
+    return entry;
   }
 
   private String getHashedUsername(String username) {
@@ -237,20 +239,23 @@ public class CredentialCache {
     if (account == null) {
       return new byte[0];
     }
-    CredentialEntry entry = credentialMap.get(account);
+    if (loginUser.equals(account)) {
+      return loginCredential.getPassword();
+    }
+    CredentialEntry entry = credentialMap.getIfPresent(account);
     if (entry == null || entry.getPassword() == null) {
       try {
-        updateAccountCredential(account, credentialMap);
+        entry = updateAccountCredential(account, credentialMap);
       } catch (IOException e) {
         LOG.warn("Get password of account " + account +
           " from secret table. But encountered error:" + "\n", e);
       }
-      if (!credentialMap.containsKey(account)) {
+      if (entry == null) {
         // Update failed.
         return new byte[0];
       }
     }
-    return credentialMap.get(account).getPassword();
+    return entry.getPassword();
   }
 
   /**
@@ -261,15 +266,18 @@ public class CredentialCache {
     if (account == null) {
       throw new IllegalArgumentException("An account must not be null. ");
     }
-    CredentialEntry entry = credentialMap.get(account);
+    if (loginUser.equals(account)) {
+      return loginCredential.isAllowFallback();
+    }
+    CredentialEntry entry = credentialMap.getIfPresent(account);
     if (entry == null) {
       try {
-        updateAccountCredential(account, credentialMap);
+        entry = updateAccountCredential(account, credentialMap);
       } catch (IOException e) {
         LOG.warn("Check allowFallback mark of account " + account +
           " from secret table. But encountered error:"+ "\n", e);
       }
-      if (!credentialMap.containsKey(account)) {
+      if (entry == null) {
         // If credential map does not contain this account,
         // there is no such a valid account in secret table.
         // But to guarantee some "illegal" account can access our service, we return true here.
@@ -277,7 +285,7 @@ public class CredentialCache {
         return true;
       }
     }
-    return credentialMap.get(account).isAllowFallback();
+    return credentialMap.getIfPresent(account).isAllowFallback();
   }
 
   /**
@@ -285,17 +293,19 @@ public class CredentialCache {
    *  initialization.
    */
   public void insertLocalCredential(String key, byte[] password, boolean allowFallback) {
-    CredentialEntry entry = credentialMap.get(key);
-    if (entry == null) {
-      entry = new CredentialEntry();
-      credentialMap.putIfAbsent(key, entry);
+    if (loginUser.equals(key)) {
+      loginCredential.setPassword(password);
+      loginCredential.setAllowFallback(allowFallback);
     }
-    entry.setPassword(password);
-    entry.setAllowFallback(allowFallback);
   }
 
   @VisibleForTesting
   void setDecryptor(SecretCryptor decryptor) {
     this.decryptor = decryptor;
+  }
+
+  @VisibleForTesting
+  boolean isValid(String account) {
+    return credentialMap.getIfPresent(account) != null;
   }
 }

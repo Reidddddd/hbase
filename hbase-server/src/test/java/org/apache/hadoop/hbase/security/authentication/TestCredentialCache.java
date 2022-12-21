@@ -18,7 +18,8 @@
 package org.apache.hadoop.hbase.security.authentication;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -61,7 +62,7 @@ public class TestCredentialCache {
     conf.set(User.HBASE_SECURITY_CONF_KEY, "digest");
     conf.set(User.DIGEST_PASSWORD_KEY, LOCAL_CREDENTIAL);
     conf.setInt("hbase.secret.refresh.period", 5000); // 5 seconds.
-
+    conf.setInt("hbase.secret.expire.time", 1000);
     TEST_UTIL.startMiniCluster();
   }
 
@@ -117,6 +118,29 @@ public class TestCredentialCache {
     Thread.sleep(10000);
     byte[] superPassword = cc.getPassword(SUPER_USERNAME);
     assertEquals(0, Bytes.compareTo(superPassword, Bytes.toBytes(SUPER_PASSWORD)));
+  }
+
+  @Test
+  public void testExpiration() throws IOException, InterruptedException {
+    HRegionServer rs = TEST_UTIL.getMiniHBaseCluster().getRegionServer(0);
+    CredentialCache cc = new CredentialCache(rs, SUPER_USERNAME);
+
+    DummyCryptor decryptor = new DummyCryptor();
+    decryptor.setInitialized(true);
+    cc.setDecryptor(decryptor);
+
+    Table secretTable = rs.getConnection().getTable(SecretTableAccessor.getSecretTableName());
+    Put firstPut = new Put(getHashedUsername(VALID_USERNAME));
+    firstPut.addColumn(Bytes.toBytes("i"), Bytes.toBytes("p"), Bytes.toBytes(FIRST_PASSWORD));
+    secretTable.put(firstPut);
+
+    assertFalse(cc.isValid(VALID_USERNAME));
+
+    cc.getPassword(VALID_USERNAME);
+    assertTrue(cc.isValid(VALID_USERNAME));
+
+    Thread.sleep(2000);
+    assertFalse(cc.isValid(VALID_USERNAME));
   }
 
   @Test
