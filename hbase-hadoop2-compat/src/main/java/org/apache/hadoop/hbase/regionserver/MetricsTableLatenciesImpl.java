@@ -16,8 +16,10 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
-import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.metrics.BaseSourceImpl;
@@ -35,7 +37,10 @@ import com.google.common.annotations.VisibleForTesting;
 @InterfaceAudience.Private
 public class MetricsTableLatenciesImpl extends BaseSourceImpl implements MetricsTableLatencies {
 
-  private final HashMap<TableName,TableHistograms> histogramsByTable = new HashMap<>();
+  private final Cache<TableName, TableHistograms> histogramsByTable =
+      CacheBuilder.newBuilder()
+                  .expireAfterAccess(7, TimeUnit.DAYS)
+                  .build();
 
   @VisibleForTesting
   public static class TableHistograms {
@@ -126,9 +131,8 @@ public class MetricsTableLatenciesImpl extends BaseSourceImpl implements Metrics
 
   @VisibleForTesting
   public TableHistograms getOrCreateTableHistogram(String tableName) {
-    // TODO Java8's ConcurrentHashMap#computeIfAbsent would be stellar instead
     final TableName tn = TableName.valueOf(tableName);
-    TableHistograms latency = histogramsByTable.get(tn);
+    TableHistograms latency = histogramsByTable.getIfPresent(tn);
     if (latency == null) {
       latency = new TableHistograms(getMetricsRegistry(), tn);
       histogramsByTable.put(tn, latency);
