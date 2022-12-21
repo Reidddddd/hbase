@@ -23,7 +23,7 @@
     <parent>
         <artifactId>hbase</artifactId>
         <groupId>org.apache.hbase</groupId>
-        <version>1.4.12-sdi-1.1.3</version>
+        <version>1.4.12-sdi-1.2.0</version>
         <relativePath>..</relativePath>
     </parent>
 
