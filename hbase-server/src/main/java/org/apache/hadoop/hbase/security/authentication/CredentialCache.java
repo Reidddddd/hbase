@@ -213,16 +213,14 @@ public class CredentialCache {
     entry = SecretTableAccessor.getAccountCredential(getHashedUsername(account), getAuthTable());
     if (entry.getPassword() != null) {
       entry.setPassword(decryptor.decryptSecret(entry.getPassword()));
+      map.put(account, entry);
     } else {
-      map.invalidate(account);
-    }
-
-    if (entry.password == null) {
       // There is no such an account in our database.
       // Should remove this account if it exists in our cache.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("An invalid account detected: " + account + " when update credential.");
+      }
       map.invalidate(account);
-    } else {
-      map.put(account, entry);
     }
     return entry;
   }
@@ -246,9 +244,10 @@ public class CredentialCache {
     if (entry == null || entry.getPassword() == null) {
       try {
         entry = updateAccountCredential(account, credentialMap);
-      } catch (IOException e) {
+      } catch (Throwable t) {
         LOG.warn("Get password of account " + account +
-          " from secret table. But encountered error:" + "\n", e);
+          " from secret table. But encountered error:" + "\n", t);
+        return new byte[0];
       }
       if (entry == null) {
         // Update failed.
@@ -272,20 +271,21 @@ public class CredentialCache {
     CredentialEntry entry = credentialMap.getIfPresent(account);
     if (entry == null) {
       try {
+        // The entry should not be null here.
         entry = updateAccountCredential(account, credentialMap);
-      } catch (IOException e) {
+      } catch (Throwable t) {
         LOG.warn("Check allowFallback mark of account " + account +
-          " from secret table. But encountered error:"+ "\n", e);
+          " from secret table. But encountered error:"+ "\n", t);
+        // We let it go when the secret table is inaccessible.
+        return true;
       }
       if (entry == null) {
-        // If credential map does not contain this account,
-        // there is no such a valid account in secret table.
-        // But to guarantee some "illegal" account can access our service, we return true here.
+        // The entry is null only when the decryptor is not initialised.
         // TODO: Change this to return false when all illegal accounts are replaced.
         return true;
       }
     }
-    return credentialMap.getIfPresent(account).isAllowFallback();
+    return entry.isAllowFallback();
   }
 
   /**

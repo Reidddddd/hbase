@@ -119,8 +119,9 @@ public final class SecretTableAccessor {
     Result res = table.get(new Get(Bytes.toBytes(account)));
     CredentialEntry entry = new CredentialEntry();
 
-    entry.setPassword(res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
-      Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY)));
+    byte[] passwordBytes = res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
+      Bytes.toBytes(SECRET_COLUMN_PASSWORD_KEY));
+    entry.setPassword(passwordBytes == null ? new byte[0] : passwordBytes);
 
     byte[] allowFallback = res.getValue(Bytes.toBytes(SECRET_FAMILY_KEY),
       Bytes.toBytes(SECRET_COLUMN_ALLOW_FALLBACK_KEY));

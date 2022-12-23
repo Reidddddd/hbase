@@ -19,6 +19,8 @@ package org.apache.hadoop.hbase.security.authentication;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
@@ -53,6 +55,7 @@ public class TestCredentialCache {
   private static final String VALID_USERNAME = "testuser1";
   private static final String FIRST_PASSWORD = "password1";
   private static final String SECOND_PASSWORD = "password2";
+  private static final String FAKE_USER = "fakeuser";
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -143,8 +146,30 @@ public class TestCredentialCache {
     assertFalse(cc.isValid(VALID_USERNAME));
   }
 
+
   @Test
-  public void testUninitializedDecryptor() {
+  public void testInvalidUserAccess() throws IOException {
+    HRegionServer rs = TEST_UTIL.getMiniHBaseCluster().getRegionServer(0);
+    CredentialCache cc = new CredentialCache(rs, SUPER_USERNAME);
+
+    DummyCryptor decryptor = new DummyCryptor();
+    decryptor.setInitialized(true);
+    cc.setDecryptor(decryptor);
+
+    Table secretTable = rs.getConnection().getTable(SecretTableAccessor.getSecretTableName());
+    Put firstPut = new Put(getHashedUsername(VALID_USERNAME));
+    firstPut.addColumn(Bytes.toBytes("i"), Bytes.toBytes("p"), Bytes.toBytes(FIRST_PASSWORD));
+    firstPut.addColumn(Bytes.toBytes("i"), Bytes.toBytes("a"), Bytes.toBytes(false));
+    secretTable.put(firstPut);
+
+    byte[] validPassword = cc.getPassword(VALID_USERNAME);
+    assertNotEquals(0, validPassword.length);
+    assertFalse(cc.getAllowFallback(VALID_USERNAME));
+
+    byte[] invalidPassword = cc.getPassword(FAKE_USER);
+    assertNotNull(invalidPassword);
+    assertEquals(0, invalidPassword.length);
+    assertTrue(cc.getAllowFallback(FAKE_USER));
 
   }
 
