@@ -211,7 +211,7 @@ public class CredentialCache {
     }
 
     entry = SecretTableAccessor.getAccountCredential(getHashedUsername(account), getAuthTable());
-    if (entry.getPassword() != null) {
+    if (entry.getPassword() != null && entry.getPassword().length > 0) {
       entry.setPassword(decryptor.decryptSecret(entry.getPassword()));
       map.put(account, entry);
     } else {
@@ -246,7 +246,7 @@ public class CredentialCache {
         entry = updateAccountCredential(account, credentialMap);
       } catch (Throwable t) {
         LOG.warn("Get password of account " + account +
-          " from secret table. But encountered error:" + "\n", t);
+          " from secret table. But encountered error:", t);
         return new byte[0];
       }
       if (entry == null) {
@@ -275,7 +275,7 @@ public class CredentialCache {
         entry = updateAccountCredential(account, credentialMap);
       } catch (Throwable t) {
         LOG.warn("Check allowFallback mark of account " + account +
-          " from secret table. But encountered error:"+ "\n", t);
+          " from secret table. But encountered error:", t);
         // We let it go when the secret table is inaccessible.
         return true;
       }
