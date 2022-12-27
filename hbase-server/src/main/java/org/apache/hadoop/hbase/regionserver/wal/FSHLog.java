@@ -870,22 +870,9 @@ public class FSHLog implements WAL {
 
       // It is at the safe point.  Swap out writer from under the blocked writer thread.
       Writer localWriter = this.writer;
-      closeFuture = asyncCloseWriter(localWriter, oldPath);
+      closeFuture = asyncCloseWriter(localWriter, oldPath, newPath);
       this.writer = nextWriter;
       this.hdfs_out = nextHdfsOut;
-      int oldNumEntries = this.numEntries.get();
-      this.numEntries.set(0);
-      final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
-      if (oldPath != null) {
-        this.byWalRegionSequenceIds.put(oldPath, this.sequenceIdAccounting.resetHighest());
-        long oldFileLen = this.fs.getFileStatus(oldPath).getLen();
-        this.totalLogSize.addAndGet(oldFileLen);
-        LOG.info("Rolled WAL " + FSUtils.getPath(oldPath) + " with entries=" + oldNumEntries +
-          ", filesize=" + StringUtils.byteDesc(oldFileLen) + "; new WAL " +
-          newPathString);
-      } else {
-        LOG.info("New WAL " + newPathString);
-      }
     } catch (InterruptedException ie) {
       // Perpetuate the interrupt
       Thread.currentThread().interrupt();
@@ -929,7 +916,7 @@ public class FSHLog implements WAL {
     return newPath;
   }
 
-  private CompletableFuture<Void> asyncCloseWriter(Writer writer, Path oldPath) {
+  private CompletableFuture<Void> asyncCloseWriter(Writer writer, Path oldPath, Path newPath) {
     CompletableFuture<Void> future = new CompletableFuture<>();
 
     closeExecutor.execute(() -> {
@@ -940,6 +927,19 @@ public class FSHLog implements WAL {
           Trace.addTimelineAnnotation("writer closed");
         }
         this.closeErrorCount.set(0);
+        int oldNumEntries = this.numEntries.get();
+        this.numEntries.set(0);
+        final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
+        if (oldPath != null) {
+          this.byWalRegionSequenceIds.put(oldPath, this.sequenceIdAccounting.resetHighest());
+          long oldFileLen = this.fs.getFileStatus(oldPath).getLen();
+          this.totalLogSize.addAndGet(oldFileLen);
+          LOG.info("Rolled WAL " + FSUtils.getPath(oldPath) + " with entries=" + oldNumEntries +
+            ", filesize=" + StringUtils.byteDesc(oldFileLen) + "; new WAL " +
+            newPathString);
+        } else {
+          LOG.info("New WAL " + newPathString);
+        }
         future.complete(null);
       } catch (IOException ioe) {
         int errors = closeErrorCount.incrementAndGet();
