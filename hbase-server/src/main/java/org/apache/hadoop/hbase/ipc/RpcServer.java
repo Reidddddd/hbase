@@ -982,8 +982,12 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       } catch (InterruptedException ieo) {
         throw ieo;
       } catch (Exception e) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(getName() + ": Caught exception while reading:", e);
+        if (e instanceof RuntimeException) {
+          LOG.warn(getName() + ": Caught exception while reading:", e);
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(getName() + ": Caught exception while reading:", e);
+          }
         }
         count = -1; //so that the (count < 0) block is executed
       }
