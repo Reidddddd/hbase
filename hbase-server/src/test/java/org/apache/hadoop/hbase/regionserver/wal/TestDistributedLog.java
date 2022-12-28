@@ -135,6 +135,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
 
   @Before
   public void setUp() throws Exception {
+    super.setup();
     this.uri = DLMTestUtil.createDLMURI(zkPort, "");
     ensureURICreated(this.uri);
 

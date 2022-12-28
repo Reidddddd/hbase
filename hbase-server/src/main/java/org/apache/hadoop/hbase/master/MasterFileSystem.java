@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.master;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -74,6 +76,10 @@ public class MasterFileSystem {
   /** Parameter name for HBase WAL directory permission*/
   public static final String HBASE_WAL_DIR_PERMS = "hbase.wal.dir.perms";
 
+  public static final String SPLIT_LOG_MANAGER_CLASS = "hbase.split.log.manager.class";
+  public static final Class<? extends SplitLogManager> DEFAULT_SPLIT_LOG_MANAGER_CLASS =
+    SplitLogManager.class;
+
   // HBase configuration
   Configuration conf;
   // master status
@@ -115,8 +121,7 @@ public class MasterFileSystem {
     }
   };
 
-  public MasterFileSystem(Server master, MasterServices services)
-  throws IOException {
+  public MasterFileSystem(Server master, MasterServices services) throws IOException {
     this.conf = master.getConfiguration();
     this.master = master;
     this.services = services;
@@ -140,9 +145,29 @@ public class MasterFileSystem {
     // set up the archived logs path
     this.oldLogDir = createInitialFileSystemLayout();
     HFileSystem.addLocationsOrderInterceptor(conf);
-    this.splitLogManager =
-        new SplitLogManager(master, master.getConfiguration(), master, services,
-            master.getServerName());
+
+    Constructor<? extends SplitLogManager> constructor = null;
+    try {
+      Class<? extends SplitLogManager> clazz =
+        conf.getClass(SPLIT_LOG_MANAGER_CLASS, DEFAULT_SPLIT_LOG_MANAGER_CLASS,
+          SplitLogManager.class);
+
+      constructor = clazz.getConstructor(Server.class, Configuration.class, Stoppable.class,
+        MasterServices.class, ServerName.class);
+      constructor.setAccessible(true);
+
+      this.splitLogManager =
+        constructor.newInstance(master, master.getConfiguration(), master, services,
+          master.getServerName());
+    } catch (Exception e) {
+      LOG.error("Failed initializing SplitLogManager. \n", e);
+      throw new IOException(e);
+    } finally {
+      if (constructor != null) {
+        constructor.setAccessible(false);
+      }
+    }
+
     this.distributedLogReplay = this.splitLogManager.isLogReplaying();
   }
 

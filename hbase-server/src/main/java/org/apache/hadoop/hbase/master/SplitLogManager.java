@@ -106,7 +106,6 @@ public class SplitLogManager {
   private Server server;
 
   private final Stoppable stopper;
-  private final Configuration conf;
   private final ChoreService choreService;
 
   public static final int DEFAULT_UNASSIGNED_TIMEOUT = (3 * 60 * 1000); // 3 min
@@ -122,6 +121,7 @@ public class SplitLogManager {
    * operation. So the lock is used to guard such cases.
    */
   protected final ReentrantLock recoveringRegionLock = new ReentrantLock();
+  protected final Configuration conf;
 
   private final ConcurrentMap<String, Task> tasks = new ConcurrentHashMap<String, Task>();
   private TimeoutMonitor timeoutMonitor;
