@@ -19,25 +19,10 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.WAL_FILE_NAME_DELIMITER;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.TimeoutException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -155,18 +140,10 @@ public class FSHLog extends AbstractLog {
 
   private final int lowReplicationRollLimit;
 
-  private final AtomicInteger closeErrorCount = new AtomicInteger();
-
-  private final ExecutorService closeExecutor = Executors.newCachedThreadPool(
-    new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Close-WAL-Writer-%d").build());
-
   // Last time to check low replication on hlog's pipeline
   private volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
 
   private long hdfsBlockSize;
-
-  // Last time to check low replication on hlog's pipeline
-  protected volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
 
   /**
    * Constructor.
