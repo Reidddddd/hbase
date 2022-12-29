@@ -18,23 +18,19 @@
  */
 package org.apache.hadoop.hbase.master;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
@@ -53,13 +49,10 @@ import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.fs.HFileSystem;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
 import org.apache.hadoop.hbase.regionserver.HRegion;
-import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSTableDescriptors;
 import org.apache.hadoop.hbase.util.FSUtils;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * This class abstracts a bunch of operations the HMaster needs to interact with
@@ -80,6 +73,10 @@ public class MasterFileSystem {
   public static final Class<? extends SplitLogManager> DEFAULT_SPLIT_LOG_MANAGER_CLASS =
     SplitLogManager.class;
 
+  public static final String HBASE_SPLIT_LOG_HELPER_CLASS = "hbase.split.log.helper.class";
+  public static final Class<? extends AbstractSplitLogHelper>
+    DEFAULT_HBASE_SPLIT_LOG_HELPER_CLASS = SplitLogHelper.class;
+
   // HBase configuration
   Configuration conf;
   // master status
@@ -90,22 +87,20 @@ public class MasterFileSystem {
   private ClusterId clusterId;
   // Keep around for convenience.
   private final FileSystem fs;
-  private final FileSystem walFs;
   // root WAL directory
   private final Path walRootDir;
-  // Is the fileystem ok?
-  private volatile boolean walFsOk = true;
   // The Path to the old logs dir
   private final Path oldLogDir;
   // root hbase directory on the FS
   private final Path rootdir;
   // hbase temp directory used for table construction and deletion
   private final Path tempdir;
-  // create the split log lock
-  final Lock splitLogLock = new ReentrantLock();
+
+  private final AbstractSplitLogHelper splitLogHelper;
+
   final boolean distributedLogReplay;
   final SplitLogManager splitLogManager;
-  private final MasterServices services;
+  final MasterServices services;
 
   final static PathFilter META_FILTER = new PathFilter() {
     @Override
@@ -135,12 +130,23 @@ public class MasterFileSystem {
     // We're supposed to run on 0.20 and 0.21 anyways.
     this.fs = this.rootdir.getFileSystem(conf);
     this.walRootDir = FSUtils.getWALRootDir(conf);
-    this.walFs = FSUtils.getWALFileSystem(conf);
-    FSUtils.setFsDefault(conf, new Path(this.walFs.getUri()));
-    walFs.setConf(conf);
     FSUtils.setFsDefault(conf, new Path(this.fs.getUri()));
     // make sure the fs has the same conf
     fs.setConf(conf);
+    try {
+      Class<? extends AbstractSplitLogHelper> helperClass =
+        conf.getClass(HBASE_SPLIT_LOG_HELPER_CLASS, DEFAULT_HBASE_SPLIT_LOG_HELPER_CLASS,
+          AbstractSplitLogHelper.class);
+      Constructor<? extends AbstractSplitLogHelper> helperConstructor =
+        helperClass.getConstructor(MasterFileSystem.class);
+
+      helperConstructor.setAccessible(true);
+      this.splitLogHelper = helperConstructor.newInstance(this);
+      helperConstructor.setAccessible(false);
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+
     // setup the filesystem variable
     // set up the archived logs path
     this.oldLogDir = createInitialFileSystemLayout();
@@ -187,24 +193,11 @@ public class MasterFileSystem {
    * Idempotent.
    */
   private Path createInitialFileSystemLayout() throws IOException {
-
     checkRootDir(this.rootdir, conf, this.fs, HConstants.HBASE_DIR, HBASE_DIR_PERMS);
-    // if the log directory is different from root, check if it exists
-    if (!this.walRootDir.equals(this.rootdir)) {
-      checkRootDir(this.walRootDir, conf, this.walFs, HFileSystem.HBASE_WAL_DIR, HBASE_WAL_DIR_PERMS);
-    }
 
     // check if temp directory exists and clean it
     checkTempDir(this.tempdir, conf, this.fs);
-
-    Path oldLogDir = new Path(this.walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
-
-    // Make sure the region servers can archive their old logs
-    if(!this.walFs.exists(oldLogDir)) {
-      this.walFs.mkdirs(oldLogDir);
-    }
-
-    return oldLogDir;
+    return this.splitLogHelper.createInitialFileSystemLayout();
   }
 
   public FileSystem getFileSystem() {
@@ -217,28 +210,6 @@ public class MasterFileSystem {
    */
   public Path getOldLogDir() {
     return this.oldLogDir;
-  }
-
-  /**
-   * Checks to see if the file system is still accessible.
-   * If not, sets closed
-   * @return false if file system is not available
-   */
-  public boolean checkFileSystem() {
-    if (this.walFsOk) {
-      try {
-        FSUtils.checkFileSystemAvailable(this.walFs);
-        FSUtils.checkDfsSafeMode(this.conf);
-      } catch (IOException e) {
-        master.abort("Shutting down HBase cluster: file system not available", e);
-        this.walFsOk = false;
-      }
-    }
-    return this.walFsOk;
-  }
-
-  public FileSystem getWALFileSystem() {
-    return this.walFs;
   }
 
   public Configuration getConfiguration() {
@@ -276,70 +247,7 @@ public class MasterFileSystem {
    * @return A set of ServerNames which aren't running but still have WAL files left in file system
    */
   Set<ServerName> getFailedServersFromLogFolders() {
-    boolean retrySplitting = !conf.getBoolean("hbase.hlog.split.skip.errors",
-        WALSplitter.SPLIT_SKIP_ERRORS_DEFAULT);
-
-    Set<ServerName> serverNames = new HashSet<ServerName>();
-    Path logsDirPath = new Path(this.walRootDir, HConstants.HREGION_LOGDIR_NAME);
-
-    do {
-      if (master.isStopped()) {
-        LOG.warn("Master stopped while trying to get failed servers.");
-        break;
-      }
-      try {
-        if (!this.walFs.exists(logsDirPath)) return serverNames;
-        FileStatus[] logFolders = FSUtils.listStatus(this.walFs, logsDirPath, null);
-        // Get online servers after getting log folders to avoid log folder deletion of newly
-        // checked in region servers . see HBASE-5916
-        Set<ServerName> onlineServers = ((HMaster) master).getServerManager().getOnlineServers()
-            .keySet();
-
-        if (logFolders == null || logFolders.length == 0) {
-          LOG.debug("No log files to split, proceeding...");
-          return serverNames;
-        }
-        for (FileStatus status : logFolders) {
-          FileStatus[] curLogFiles = FSUtils.listStatus(this.walFs, status.getPath(), null);
-          if (curLogFiles == null || curLogFiles.length == 0) {
-            // Empty log folder. No recovery needed
-            continue;
-          }
-          final ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(
-              status.getPath());
-          if (null == serverName) {
-            LOG.warn("Log folder " + status.getPath() + " doesn't look like its name includes a " +
-                "region server name; leaving in place. If you see later errors about missing " +
-                "write ahead logs they may be saved in this location.");
-          } else if (!onlineServers.contains(serverName)) {
-            LOG.info("Log folder " + status.getPath() + " doesn't belong "
-                + "to a known region server, splitting");
-            serverNames.add(serverName);
-          } else {
-            LOG.info("Log folder " + status.getPath() + " belongs to an existing region server");
-          }
-        }
-        retrySplitting = false;
-      } catch (IOException ioe) {
-        LOG.warn("Failed getting failed servers to be recovered.", ioe);
-        if (!checkFileSystem()) {
-          LOG.warn("Bad Filesystem, exiting");
-          Runtime.getRuntime().halt(1);
-        }
-        try {
-          if (retrySplitting) {
-            Thread.sleep(conf.getInt("hbase.hlog.split.failure.retry.interval", 30 * 1000));
-          }
-        } catch (InterruptedException e) {
-          LOG.warn("Interrupted, aborting since cannot return w/o splitting");
-          Thread.currentThread().interrupt();
-          retrySplitting = false;
-          Runtime.getRuntime().halt(1);
-        }
-      }
-    } while (retrySplitting);
-
-    return serverNames;
+    return this.splitLogHelper.getFailedServersFromLogFolders();
   }
 
   public void splitLog(final ServerName serverName) throws IOException {
@@ -372,42 +280,7 @@ public class MasterFileSystem {
       "We only release this lock when we set it. Updates to code that uses it should verify use " +
       "of the guard boolean.")
   private List<Path> getLogDirs(final Set<ServerName> serverNames) throws IOException {
-    List<Path> logDirs = new ArrayList<Path>();
-    boolean needReleaseLock = false;
-    if (!this.services.isInitialized()) {
-      // during master initialization, we could have multiple places splitting a same wal
-      this.splitLogLock.lock();
-      needReleaseLock = true;
-    }
-    try {
-      for (ServerName serverName : serverNames) {
-        Path logDir = new Path(this.walRootDir,
-          WALUtils.getWALDirectoryName(serverName.toString()));
-        Path splitDir = logDir.suffix(WALUtils.SPLITTING_EXT);
-        // Rename the directory so a rogue RS doesn't create more WALs
-        if (walFs.exists(logDir)) {
-          if (!this.walFs.rename(logDir, splitDir)) {
-            throw new IOException("Failed fs.rename for log split: " + logDir);
-          }
-          logDir = splitDir;
-          LOG.debug("Renamed region directory: " + splitDir);
-        } else if (!walFs.exists(splitDir)) {
-          LOG.info("Log dir for server " + serverName + " does not exist");
-          continue;
-        }
-        logDirs.add(splitDir);
-      }
-    } catch (IOException ioe) {
-      if (!checkFileSystem()) {
-        this.services.abort("Aborting due to filesystem unavailable", ioe);
-        throw ioe;
-      }
-    } finally {
-      if (needReleaseLock) {
-        this.splitLogLock.unlock();
-      }
-    }
-    return logDirs;
+    return this.splitLogHelper.getLogDirs(serverNames);
   }
 
   /**
@@ -477,7 +350,7 @@ public class MasterFileSystem {
    * @throws IOException
    */
   @SuppressWarnings("deprecation")
-  private Path checkRootDir(final Path rd, final Configuration c,
+  Path checkRootDir(final Path rd, final Configuration c,
     final FileSystem fs, final String dirConfKey, final String dirPermsConfName)
   throws IOException {
     // If FS is in safe mode wait till out of it.
@@ -687,31 +560,6 @@ public class MasterFileSystem {
    * @param serverName the server to archive meta log
    */
   public void archiveMetaLog(final ServerName serverName) {
-    try {
-      Path logDir = new Path(this.rootdir,
-        WALUtils.getWALDirectoryName(serverName.toString()));
-      Path splitDir = logDir.suffix(WALUtils.SPLITTING_EXT);
-      if (fs.exists(splitDir)) {
-        FileStatus[] logfiles = FSUtils.listStatus(fs, splitDir, META_FILTER);
-        if (logfiles != null) {
-          for (FileStatus status : logfiles) {
-            if (!status.isDir()) {
-              Path newPath = WALUtils.getWALArchivePath(this.oldLogDir,
-                  status.getPath());
-              if (!FSUtils.renameAndSetModifyTime(fs, status.getPath(), newPath)) {
-                LOG.warn("Unable to move  " + status.getPath() + " to " + newPath);
-              } else {
-                LOG.debug("Archived meta log " + status.getPath() + " to " + newPath);
-              }
-            }
-          }
-        }
-        if (!fs.delete(splitDir, false)) {
-          LOG.warn("Unable to delete log dir. Ignoring. " + splitDir);
-        }
-      }
-    } catch (IOException ie) {
-      LOG.warn("Failed archiving meta log for server " + serverName, ie);
-    }
+    this.splitLogHelper.archiveMetaLog(serverName);
   }
 }
