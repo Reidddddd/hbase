@@ -51,7 +51,11 @@ import org.apache.hadoop.hbase.master.SplitLogManager.ResubmitDirective;
 import org.apache.hadoop.hbase.master.SplitLogManager.Task;
 import org.apache.hadoop.hbase.master.SplitLogManager.TerminationStatus;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos.SplitLogTask.RecoveryMode;
+import org.apache.hadoop.hbase.regionserver.DistributedLogSplitWorker;
+import org.apache.hadoop.hbase.regionserver.SplitLogWorker;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.hadoop.hbase.wal.AbstractWALSplitter;
+import org.apache.hadoop.hbase.wal.DistributedLogWALSplitter;
 import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.ZKSplitLog;
@@ -114,7 +118,16 @@ public class ZKSplitLogManagerCoordination extends ZooKeeperListener implements
       @Override
       public Status finish(ServerName workerName, String logfile) {
         try {
-          WALSplitter.finishSplitLogFile(logfile, manager.getServer().getConfiguration());
+          Configuration conf = manager.getServer().getConfiguration();
+          // Here we use the split worker class to invoke different splitter's finish method.
+          Class<? extends SplitLogWorker> workerClass =
+            conf.getClass("hbase.split.log.worker.class", SplitLogWorker.class,
+              SplitLogWorker.class);
+          if (workerClass == DistributedLogSplitWorker.class) {
+            DistributedLogWALSplitter.finishSplitLogs(logfile, conf);
+          } else {
+            WALSplitter.finishSplitLogFile(logfile, conf);
+          }
         } catch (IOException e) {
           LOG.warn("Could not finish splitting of log file " + logfile, e);
           return Status.ERR;

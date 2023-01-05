@@ -50,6 +50,7 @@ import org.apache.hadoop.hbase.protobuf.generated.ClusterStatusProtos;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
 import org.apache.hadoop.hbase.regionserver.LastSequenceId;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
+import org.apache.hadoop.hbase.security.authentication.SecretTableAccessor;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.zookeeper.ZKSplitLog;
@@ -389,6 +390,18 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     }
     walNamespace.deleteLog(WALUtils.pathToDistributedLogName(logPath));
     return splits;
+  }
+
+  public static void finishSplitLogs(String logName, Configuration conf) throws IOException {
+    Namespace walNamespace = null;
+    Path walRoot = new Path("/");
+    Path oldLogDir = new Path(HConstants.HREGION_OLDLOGDIR_NAME);
+    try {
+      walNamespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+    finishSplitLogs(walNamespace, walRoot, oldLogDir, new Path(logName), conf);
   }
 
   private static void finishSplitLogs(final Namespace walNamespace, Path walRoot, Path oldLogDir,
