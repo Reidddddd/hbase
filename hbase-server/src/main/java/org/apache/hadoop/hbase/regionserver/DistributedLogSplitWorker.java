@@ -55,6 +55,7 @@ public class DistributedLogSplitWorker extends SplitLogWorker {
       public Status exec(String logName, ZooKeeperProtos.SplitLogTask.RecoveryMode mode,
         CancelableProgressable p) {
         try {
+          LOG.info("Start splitting file: " + logName);
           if (!DistributedLogWALSplitter.splitLog(logName, conf, p, sequenceIdChecker,
               rsServices.getCoordinatedStateManager(), mode, factory)) {
             return Status.PREEMPTED;

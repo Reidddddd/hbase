@@ -30,11 +30,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.ExecutionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.distributedlog.shaded.api.DistributedLogManager;
-import org.apache.distributedlog.shaded.api.LogWriter;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.distributedlog.shaded.exceptions.LogEmptyException;
 import org.apache.distributedlog.shaded.exceptions.LogNotFoundException;
@@ -141,6 +139,7 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     }
     try {
       DistributedLogManager dlm = walNamespace.openLog(logNameWithParent);
+      WALUtils.checkEndOfStream(dlm);
       logLength = dlm.getLogRecordCount() < 1 ? -1 : dlm.getLastTxId();
       LOG.info("Splitting wal: " + logNameWithParent + ", length=" + logLength);
       LOG.info("DistributedLogReplay = " + this.distributedLogReplay);
@@ -150,7 +149,6 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
         return false;
       }
       try {
-        markLogEndOfStream(dlm);
         dlm.close();
         in = getReader(logNameWithParent, logLength, skipErrors, reporter);
       } catch (CorruptedLogFileException | LogEmptyException e) {
@@ -267,14 +265,6 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     return !progressFailed;
   }
 
-  private void markLogEndOfStream(DistributedLogManager distributedLogManager) throws IOException {
-    if (!distributedLogManager.isEndOfStreamMarked()) {
-      LogWriter writer = distributedLogManager.openLogWriter();
-      writer.markEndOfStream();
-      writer.close();
-    }
-  }
-
   private void markCorruptedLog(String logNameWithParent, Exception e) {
     LOG.warn("Could not parse, corrupted log file " + logNameWithParent, e);
     Path logPath = new Path(logNameWithParent);
@@ -382,7 +372,8 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
   // which uses this method to do log splitting.
   public static List<Path> split(Path logPath, Path oldLogRoot, Configuration conf,
       final WALFactory factory, Namespace walNamespace) throws IOException {
-    final Path[] logs = SplitLogManager.getLogList(conf, Collections.singletonList(logPath));
+    final Path[] logs = SplitLogManager.getLogList(conf, Collections.singletonList(logPath),
+      walNamespace);
     List<Path> splits = new ArrayList<>();
     if (logs.length > 0) {
       for (Path log: logs) {

@@ -87,7 +87,7 @@ public class TestDistributedLogSplitManager extends TestSplitLogManager {
 
     Path emptyLogDirPath = new Path("testEmptyLogDir", UUID.randomUUID().toString());
     walNamespace.createLog(WALUtils.pathToDistributedLogName(emptyLogDirPath));
-    slm.splitLogDistributed(emptyLogDirPath);
+    slm.splitLogDistributed(new Path("testEmptyLogDir"));
     assertFalse(walNamespace.logExists(WALUtils.pathToDistributedLogName(emptyLogDirPath)));
   }
 

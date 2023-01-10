@@ -21,7 +21,6 @@ package org.apache.hadoop.hbase.wal;
 import static org.apache.hadoop.hbase.HConstants.RECOVERED_EDITS_DIR;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableSet;
@@ -207,14 +206,11 @@ public final class WALSplitterUtil {
 
   public static NavigableSet<Path> getSplitEditLogsSorted(Namespace namespace,
       final Path regionDir) throws IOException {
-    NavigableSet<Path> logsSorted = new TreeSet<Path>();
+    NavigableSet<Path> logsSorted = new TreeSet<>();
     Path editsDir = getRegionDirRecoveredEditsDir(regionDir);
-    if (namespace.logExists(editsDir.toString())) {
-      return logsSorted;
-    }
-    Iterator<String> logIterator = namespace.getLogs(editsDir.toString());
-    while (logIterator.hasNext()) {
-      String logName = logIterator.next();
+
+    List<String> regionLogs = WALUtils.listLogsUnderPath(editsDir, namespace);
+    for (String logName : regionLogs) {
       Matcher m = EDITFILES_NAME_PATTERN.matcher(logName);
       boolean result = m.matches();
       if (logName.endsWith(RECOVERED_LOG_TMPFILE_SUFFIX)) {
@@ -224,6 +220,7 @@ public final class WALSplitterUtil {
         result = false;
       }
       if (result) {
+        LOG.info("Find log to replay: " + logName);
         logsSorted.add(new Path(editsDir, logName));
       }
     }
@@ -384,28 +381,20 @@ public final class WALSplitterUtil {
 
   public static long writeRegionSequenceIdLog(final Namespace namespace, final Path regionDir,
     long newSeqId, long saftyBumper) throws IOException {
-    Path editsdir = getRegionDirRecoveredEditsDir(regionDir);
+    Path editsDir = getRegionDirRecoveredEditsDir(regionDir);
     long maxSeqId = 0;
-    List<Path> logs = new ArrayList<>();
 
-    if (namespace.logExists(editsdir.toString())) {
-      Iterator<String> logsIter = namespace.getLogs(editsdir.toString());
-      while (logsIter.hasNext()) {
-        String log = logsIter.next();
-        if (isSequenceIdFile(new Path(log))) {
-          logs.add(new Path(editsdir, log));
-        }
-      }
-      if (logs.size() != 0) {
-        for (Path log : logs) {
-          String fileName = log.getName();
-          try {
-            Long tmpSeqId = Long.parseLong(fileName.substring(0, fileName.length()
-              - SEQUENCE_ID_FILE_SUFFIX_LENGTH));
-            maxSeqId = Math.max(tmpSeqId, maxSeqId);
-          } catch (NumberFormatException ex) {
-            LOG.warn("Invalid SeqId File Name=" + fileName);
-          }
+    List<Path> logs = WALUtils.listLogPaths(namespace, editsDir, WALSplitterUtil::isSequenceIdFile);
+
+    if (!logs.isEmpty()) {
+      for (Path log : logs) {
+        String fileName = log.getName();
+        try {
+          long tmpSeqId = Long.parseLong(fileName.substring(0, fileName.length()
+            - SEQUENCE_ID_FILE_SUFFIX_LENGTH));
+          maxSeqId = Math.max(tmpSeqId, maxSeqId);
+        } catch (NumberFormatException ex) {
+          LOG.warn("Invalid SeqId File Name=" + fileName);
         }
       }
     }
@@ -415,10 +404,10 @@ public final class WALSplitterUtil {
     newSeqId += saftyBumper; // bump up SeqId
 
     // write a new seqId file
-    Path newSeqIdFile = new Path(editsdir, newSeqId + SEQUENCE_ID_FILE_SUFFIX);
+    Path newSeqIdFile = new Path(editsDir, newSeqId + SEQUENCE_ID_FILE_SUFFIX);
     if (newSeqId != maxSeqId) {
       try {
-        namespace.createLog(newSeqIdFile.toString());
+        namespace.createLog(WALUtils.pathToDistributedLogName(newSeqIdFile));
         if (LOG.isDebugEnabled()) {
           LOG.debug("Wrote region seqId=" + newSeqIdFile + " to file, newSeqId=" + newSeqId
             + ", maxSeqId=" + maxSeqId);
@@ -433,7 +422,7 @@ public final class WALSplitterUtil {
         if (newSeqIdFile.equals(log)) {
           continue;
         }
-        namespace.deleteLog(log.toString());
+        namespace.deleteLog(WALUtils.pathToDistributedLogName(log));
       }
     }
     return newSeqId;

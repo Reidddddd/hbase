@@ -88,6 +88,11 @@ public class DistributedLogWALReplayer extends WALReplayer {
     long seqId = minSeqIdForTheRegion;
 
     NavigableSet<Path> logs = WALSplitterUtil.getSplitEditLogsSorted(walNamespace, regionWALDir);
+
+    LOG.info("Starting get replaying logs for region " + regionWALDir);
+    for (Path log : logs) {
+      LOG.info("Get logs sorted with region " + regionWALDir + " log name: " + log);
+    }
     seqId = Math.max(seqId, replayRecoveredEditsForPaths(minSeqIdForTheRegion, logs, reporter));
     if (seqId > minSeqIdForTheRegion) {
       // Then we added some edits to memory. Flush and cleanup split edit files.
@@ -116,6 +121,9 @@ public class DistributedLogWALReplayer extends WALReplayer {
   private long replayRecoveredEditsForPaths(long minSeqIdForTheRegion,
       final NavigableSet<Path> files, final CancelableProgressable reporter)
     throws IOException {
+    for (Path file : files) {
+      LOG.info("Recover file: " + file);
+    }
     long seqid = minSeqIdForTheRegion;
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found " + (files == null ? 0 : files.size()) +
@@ -293,6 +301,7 @@ public class DistributedLogWALReplayer extends WALReplayer {
           }
           postWALRestore(regionInfo, key, val);
         }
+        LOG.info("Replay flushing with edits count: " + editsCount);
         postReplayWALs(regionInfo, edits);
       } catch (EOFException eof) {
         Path p = WALSplitterUtil.moveAsideBadEditsLog(walNamespace, edits);

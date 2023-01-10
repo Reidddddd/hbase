@@ -1858,13 +1858,19 @@ public class HRegionServer extends HasThread implements
     sinkConf.setInt("hbase.client.serverside.retries.multiplier", 1);
     Class<? extends SplitLogWorker> workerClass = conf.getClass("hbase.split.log.worker.class",
       SplitLogWorker.class, SplitLogWorker.class);
+    Constructor<? extends SplitLogWorker> constructor = null;
     try {
-      Constructor<? extends SplitLogWorker> constructor = workerClass.getConstructor(Server.class,
+      constructor = workerClass.getConstructor(Server.class,
         Configuration.class, RegionServerServices.class, LastSequenceId.class, WALFactory.class);
+      constructor.setAccessible(true);
       this.splitLogWorker = constructor.newInstance(this, sinkConf, this, this, walFactory);
     } catch (NoSuchMethodException | InvocationTargetException | InstantiationException
       | IllegalAccessException e) {
       throw new IOException(e);
+    } finally {
+      if (constructor != null) {
+        constructor.setAccessible(false);
+      }
     }
     splitLogWorker.start();
   }

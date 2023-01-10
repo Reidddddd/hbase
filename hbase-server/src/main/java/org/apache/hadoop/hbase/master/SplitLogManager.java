@@ -54,7 +54,6 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.SplitLogCounters;
 import org.apache.hadoop.hbase.Stoppable;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.coordination.BaseCoordinatedStateManager;
@@ -201,23 +200,26 @@ public class SplitLogManager {
     return fileStatus.toArray(a);
   }
 
-  public static Path[] getLogList(final Configuration conf, final List<Path> logRoots)
-    throws IOException {
-    return getLogList(conf, logRoots, null);
+  public static Path[] getLogList(final Configuration conf, final List<Path> logRoots,
+      Namespace namespace) throws IOException {
+    return getLogList(conf, logRoots, null, namespace);
   }
 
   public static Path[] getLogList(final Configuration conf, final List<Path> logRoots,
-      final PathFilter pathFilter) throws IOException {
-    Namespace namespace;
+      final PathFilter pathFilter, Namespace namespace) throws IOException {
     List<Path> logs = new ArrayList<>();
     try {
-      namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
       for (Path root : logRoots) {
         Iterator<String> it = namespace.getLogs(WALUtils.pathToDistributedLogName(root));
         while (it.hasNext()) {
           Path targetPath = new Path(root, it.next());
           if (pathFilter == null || pathFilter.accept(targetPath)) {
             logs.add(targetPath);
+          } else {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Filtered log name: " + targetPath + " with filter class: "
+                + pathFilter.getClass());
+            }
           }
         }
       }
@@ -343,6 +345,15 @@ public class SplitLogManager {
       status.setStatus("Cleaning up log directory...");
       final FileSystem fs = logDir.getFileSystem(conf);
       try {
+        for (Path path : logDirs) {
+          LOG.info("Clean up " + path);
+        }
+        if (fs.exists(logDir)) {
+          FileStatus[] files = fs.listStatus(logDir);
+          for (FileStatus file : files) {
+            LOG.info("Going to clean up the log: " + file.getPath());
+          }
+        }
         if (fs.exists(logDir) && !fs.delete(logDir, false)) {
           LOG.warn("Unable to delete log src dir. Ignoring. " + logDir);
         }
@@ -542,7 +553,8 @@ public class SplitLogManager {
         }
         if (oldtask.status != DELETED) {
           // caused by https://issues.apache.org/jira/browse/SUREFIRE-1815
-          // so here make the log msg at trace level temporarily that it won't be print in UTs to make CI all +1s
+          // so here make the log msg at trace level temporarily that
+          // it won't be print in UTs to make CI all +1s
           if (LOG.isTraceEnabled()) {
             LOG.warn("Failure because previously failed task"
               + " state still present. Waiting for znode delete callback" + " path=" + path);

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
@@ -36,6 +37,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
@@ -516,7 +518,7 @@ public class WALUtils {
     }
   }
 
-  public static void checkEndOfStream(DistributedLogManager dlm)  {
+  public static void checkEndOfStream(DistributedLogManager dlm) {
     try {
       if (!dlm.isEndOfStreamMarked()) {
         LogWriter writer = dlm.openLogWriter();
@@ -533,5 +535,73 @@ public class WALUtils {
       // We do not throw or handle the exception here.
       LOG.warn("Close stream met exception: \n", ioe);
     }
+  }
+
+  public static List<String> listLogs(Namespace namespace, Path root, PathFilter filter)
+    throws IOException {
+    Iterator<String> iterator = namespace.getLogs(pathToDistributedLogName(root));
+    List<String> result = new ArrayList<>();
+    while (iterator.hasNext()) {
+      String logName = iterator.next();
+      Path actualPath = new Path(root, logName);
+      if (filter == null || filter.accept(actualPath)) {
+        result.add(pathToDistributedLogName(actualPath));
+      }
+    }
+    return result;
+  }
+
+  public static List<Path> listLogPaths(Namespace namespace, Path root, PathFilter filter)
+    throws IOException {
+    Iterator<String> iterator = namespace.getLogs(pathToDistributedLogName(root));
+    List<Path> result = new ArrayList<>();
+    while (iterator.hasNext()) {
+      String logName = iterator.next();
+      Path actualPath = new Path(root, logName);
+      if (filter == null || filter.accept(actualPath)) {
+        result.add(actualPath);
+      }
+    }
+    return result;
+  }
+
+  public static String getSplittingName(String logNameWithParent) {
+    Path logPath = new Path(logNameWithParent);
+    if (logPath.getParent().getName().contains(SPLITTING_EXT)) {
+      // It is already a splitting log.
+      return logNameWithParent;
+    } else {
+      return pathToDistributedLogName(new Path(logPath.getParent().getName() + SPLITTING_EXT,
+        logPath.getName()));
+    }
+  }
+
+  public static String getArchivedLogName(String logNameWithParent) {
+    Path logPath = new Path(logNameWithParent);
+    return pathToDistributedLogName(new Path(DISTRIBUTED_LOG_ARCHIVE_PREFIX, logPath.getName()));
+  }
+
+  public static void renameDistributedLogsPath(Namespace namespace, Path origin, Path target)
+    throws IOException {
+    Iterator<String> iterator = namespace.getLogs(pathToDistributedLogName(origin));
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+    while (iterator.hasNext()) {
+      String log = iterator.next();
+      checkEndOfStream(namespace, pathToDistributedLogName(new Path(origin, log)));
+      futures.add(namespace.renameLog(
+        pathToDistributedLogName(new Path(origin, log)),
+        pathToDistributedLogName(new Path(target, log))
+      ));
+    }
+    for (CompletableFuture<Void> future : futures) {
+      try {
+        future.join();
+      } catch (Exception e) {
+        LOG.warn("Failed to rename logs from root " + origin + " to " + target, e);
+        throw new IOException(e);
+      }
+    }
+    // After renaming finished, remove the origin path.
+    namespace.deleteLog(pathToDistributedLogName(origin));
   }
 }

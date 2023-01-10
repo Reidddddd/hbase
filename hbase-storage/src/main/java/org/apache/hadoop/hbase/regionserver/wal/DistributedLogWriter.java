@@ -91,12 +91,12 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   protected void initOutput() throws IOException {
     // Check if a log with same name is in splitting.
-    if (walNamespace.logExists(logName + WALUtils.SPLITTING_EXT)) {
+    if (walNamespace.logExists(WALUtils.getSplittingName(logName))) {
       throw new IOException("A log with name " + logName + " is under splitting, cannot create "
         + "a new log with the same name: " + logName);
     }
     // Check if a log with same name is archived.
-    if (walNamespace.logExists(logName + "-old")) {
+    if (walNamespace.logExists(WALUtils.getArchivedLogName(logName))) {
       throw new IOException("A log with name " + logName + " is already archived, cannot create "
         + "a new log with name: " + logName);
     }

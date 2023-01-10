@@ -20,7 +20,6 @@ package org.apache.hadoop.hbase.master;
 
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.logging.Log;
@@ -70,7 +69,7 @@ public class DistributedLogSplitManager extends SplitLogManager {
   protected long preQueueSplitTask(final Set<ServerName> serverNames, final List<Path> logDirs,
       PathFilter filter, TaskBatch batch) throws IOException {
     long totalSize = 0;
-    Path[] logs = getLogList(conf, logDirs, filter);
+    Path[] logs = getLogList(conf, logDirs, filter, walNamespace);
     LOG.info("Started splitting " + logs.length + " logs in " + logDirs +
       " for " + serverNames);
     DistributedLogManager dlm = null;
@@ -81,21 +80,24 @@ public class DistributedLogSplitManager extends SplitLogManager {
       // recover-lease is done. totalSize will be under in most cases and the
       // metrics that it drives will also be under-reported.
       String logStr = WALUtils.pathToDistributedLogName(log);
-      // Check empty log.
       if (!walNamespace.logExists(logStr)) {
+        // Ignore non-exist logs.
         continue;
       }
+      // Check empty log.
       dlm = walNamespace.openLog(logStr);
+      WALUtils.checkEndOfStream(dlm);
       if (dlm.getLogRecordCount() < 1) {
         // Remove the empty log.
         walNamespace.deleteLog(logStr);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Remove empty log: " + logStr);
+        }
         continue;
       }
-      if (!dlm.isEndOfStreamMarked()) {
-        dlm.openLogWriter().markEndOfStream();
-      }
       totalSize += dlm.getLastTxId();
-
+      dlm.close();
+      LOG.info("Start enqueue split task for log: " + logStr);
       if (!enqueueSplitTask(logStr, batch)) {
         throw new IOException("duplicate log split scheduled for " + logStr);
       }
@@ -109,12 +111,12 @@ public class DistributedLogSplitManager extends SplitLogManager {
       status.setStatus("Cleaning up log directory...");
       try {
         String logDirStr = WALUtils.pathToDistributedLogName(logDir);
-        if (walNamespace.logExists(logDirStr)) {
-          for (Iterator<String> it = walNamespace.getLogs(logDirStr); it.hasNext(); ) {
-            walNamespace.deleteLog(WALUtils.pathToDistributedLogName(new Path(logDir, it.next())));
-          }
+        List<String> logs = WALUtils.listLogs(walNamespace, logDir, null);
+        if (logs.isEmpty()) {
+          walNamespace.deleteLog(logDirStr);
+        } else {
+          LOG.warn("The cleaned up path is not empty. Ignoring delete it");
         }
-        walNamespace.deleteLog(logDirStr);
       } catch (IOException ioe) {
         LOG.warn("Unable to delete log src dir. Ignoring. " + logDir, ioe);
       }

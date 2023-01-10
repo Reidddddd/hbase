@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.distributedlog.shaded.api.DistributedLogManager;
 import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.distributedlog.shaded.exceptions.DLException;
 import org.apache.hadoop.conf.Configuration;
@@ -137,23 +138,31 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
       throw new IOException("Failed to access distributedlog with exception: \n", e);
     }
     if (wap.minLogSeqNum < dstMinLogSeqNum) {
+      String dstStr = WALUtils.pathToDistributedLogName(dst);
+      DistributedLogManager dlm = namespace.openLog(dstStr);
       LOG.warn("Found existing old edits file. It could be the result of a previous failed"
         + " split attempt or we have duplicated wal entries. Deleting " + dst + ", length="
-        + namespace.openLog(dst.toString()).getLastTxId());
+        + dlm.getLastTxId());
       try {
-        namespace.deleteLog(dst.toString());
+        namespace.deleteLog(dstStr);
       } catch (DLException e) {
         LOG.warn("Failed deleting of old " + dst);
         throw new IOException("Failed deleting of old " + dst + " with exception: \n", e);
+      } finally {
+        dlm.close();
       }
     } else {
+      String pathStr = WALUtils.pathToDistributedLogName(wap.p);
+      DistributedLogManager dlm = namespace.openLog(pathStr);
       LOG.warn("Found existing old edits file and we have less entries. Deleting " + wap.p
-        + ", length=" + namespace.openLog(wap.p.toString()).getLastTxId());
+        + ", length=" + dlm.getLastTxId());
       try {
         namespace.deleteLog(wap.p.toString());
       } catch (DLException e) {
         LOG.warn("Failed deleting of " + wap.p);
         throw new IOException("Failed deleting of old " + wap.p + " with exception: \n", e);
+      } finally {
+        dlm.close();
       }
     }
   }
@@ -214,19 +223,25 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
     String regionEditsStr = WALUtils.pathToDistributedLogName(regionEdits);
 
     if (namespace.logExists(regionEditsStr)) {
+      DistributedLogManager dlm = namespace.openLog(regionEditsStr);
       LOG.warn("Found old edits log. It could be the "
         + "result of a previous failed split attempt. Deleting " + regionEditsStr + ", length="
-        + namespace.openLog(regionEditsStr).getLastTxId());
+        + dlm.getLastTxId());
       try {
+        LOG.info("Delete existing log: " + regionEditsStr);
+        WALUtils.checkEndOfStream(dlm);
         namespace.deleteLog(regionEditsStr);
       } catch (DLException e) {
         LOG.warn("Failed delete of old " + regionEditsStr);
+      } finally {
+        dlm.close();
       }
     }
     Writer w = this.walSplitter.createWriter(regionEdits);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Creating writer path=" + regionEditsStr);
     }
+    LOG.info("Created writer for edits log: " + regionEdits);
     return new WriterAndPath(regionEdits, w, entry.getKey().getLogSeqNum());
   }
 
