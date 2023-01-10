@@ -540,9 +540,9 @@ public class TestCellBasedImportExport2 {
 
   /**
    * Count the number of keyvalues in the specified table for the given timerange
-   * @param table
-   * @return
-   * @throws IOException
+   * @param table target table
+   * @return count
+   * @throws IOException if something goes wrong.
    */
   private int getCount(Table table, Filter filter) throws IOException {
     Scan scan = new Scan();

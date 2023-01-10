@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -43,7 +43,9 @@ import org.apache.yetus.audience.InterfaceAudience;
  * host few or none. This class does a pass over the return from the super-class to better spread
  * the load. See the below helpful Flipkart blog post for a description and from where the base of
  * this code comes from (with permission).
- * @see https://tech.flipkart.com/is-data-locality-always-out-of-the-box-in-hadoop-not-really-2ae9c95163cb
+ * @see <a href="
+ * https://tech.flipkart.com/is-data-locality-always-out-of-the-box-in-hadoop-not-really-2ae9c95163cb
+ * ">Flipkart blog post</a>
  */
 @InterfaceAudience.Public
 public class RoundRobinTableInputFormat extends TableInputFormat {
