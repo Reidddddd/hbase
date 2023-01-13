@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.logging.Log;
@@ -33,7 +32,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.hbase.ScheduledChore;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.ipc.RemoteException;
@@ -49,7 +47,7 @@ import com.google.common.collect.Lists;
  * @param <T> Cleaner delegate class that is dynamically loaded from configuration
  */
 @InterfaceAudience.Private
-public abstract class CleanerChore<T extends FileCleanerDelegate> extends ScheduledChore {
+public abstract class CleanerChore<T extends FileCleanerDelegate> extends AbstractCleanerChore {
 
   private static final Log LOG = LogFactory.getLog(CleanerChore.class.getName());
   private static final int AVAIL_PROCESSORS = Runtime.getRuntime().availableProcessors();
@@ -69,7 +67,6 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
   private final Configuration conf;
   protected List<T> cleanersChain;
   protected Map<String, Object> params;
-  private AtomicBoolean enabled = new AtomicBoolean(true);
 
   public CleanerChore(String name, final int sleepPeriod, final Stoppable s, Configuration conf,
     FileSystem fs, Path oldFileDir, String confKey, DirScanPool pool) {
@@ -315,17 +312,6 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
     return pool.getSize();
   }
 
-  /**
-   * @param enabled
-   */
-  public boolean setEnabled(final boolean enabled) {
-    return this.enabled.getAndSet(enabled);
-  }
-
-  public boolean getEnabled() {
-    return this.enabled.get();
-  }
-
   private interface Action<T> {
     T act() throws IOException;
   }
@@ -496,5 +482,10 @@ public abstract class CleanerChore<T extends FileCleanerDelegate> extends Schedu
       LOG.trace("Finish deleting " + type + " under " + dir + ", deleted=" + deleted);
     }
     return deleted;
+  }
+
+  @Override
+  public void onConfigurationChange(Configuration conf) {
+    // Do nothing here. For subclass implementation.
   }
 }

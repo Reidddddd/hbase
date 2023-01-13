@@ -562,4 +562,8 @@ public class MasterFileSystem {
   public void archiveMetaLog(final ServerName serverName) {
     this.splitLogHelper.archiveMetaLog(serverName);
   }
+
+  public boolean isDistributedLogEnabled() {
+    return this.splitLogManager instanceof DistributedLogSplitManager;
+  }
 }

@@ -82,9 +82,6 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownRegionException;
-import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
-import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.MetaScanner;
 import org.apache.hadoop.hbase.client.MetaScanner.MetaScannerVisitor;
@@ -104,7 +101,9 @@ import org.apache.hadoop.hbase.master.balancer.BalancerChore;
 import org.apache.hadoop.hbase.master.balancer.BaseLoadBalancer;
 import org.apache.hadoop.hbase.master.balancer.ClusterStatusChore;
 import org.apache.hadoop.hbase.master.balancer.LoadBalancerFactory;
+import org.apache.hadoop.hbase.master.cleaner.AbstractCleanerChore;
 import org.apache.hadoop.hbase.master.cleaner.DirScanPool;
+import org.apache.hadoop.hbase.master.cleaner.DistributedLogCleaner;
 import org.apache.hadoop.hbase.master.cleaner.HFileCleaner;
 import org.apache.hadoop.hbase.master.cleaner.LogCleaner;
 import org.apache.hadoop.hbase.master.cleaner.ReplicationZKLockCleanerChore;
@@ -159,6 +158,7 @@ import org.apache.hadoop.hbase.replication.master.TableCFsUpdater;
 import org.apache.hadoop.hbase.replication.regionserver.Replication;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
 import org.apache.hadoop.hbase.util.Addressing;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CompressionTest;
@@ -171,7 +171,6 @@ import org.apache.hadoop.hbase.util.ModifyRegionUtils;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.util.VersionInfo;
-import org.apache.zookeeper.KeeperException;
 import org.apache.hadoop.hbase.zookeeper.DrainingServerTracker;
 import org.apache.hadoop.hbase.zookeeper.LoadBalancerTracker;
 import org.apache.hadoop.hbase.zookeeper.MasterAddressTracker;
@@ -184,6 +183,9 @@ import org.apache.hadoop.hbase.zookeeper.ZKChildrenCountMXBeanImpl;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
+import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.KeeperException;
 import org.mortbay.jetty.Connector;
 import org.mortbay.jetty.nio.SelectChannelConnector;
 import org.mortbay.jetty.servlet.Context;
@@ -334,7 +336,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
   private DirScanPool cleanerPool;
   private ReplicationZKLockCleanerChore replicationZKLockCleanerChore;
   private ReplicationZKNodeCleanerChore replicationZKNodeCleanerChore;
-  private LogCleaner logCleaner;
+  private AbstractCleanerChore logCleaner;
   private HFileCleaner hfileCleaner;
 
   MasterCoprocessorHost cpHost;
@@ -1264,11 +1266,16 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     cleanerPool = new DirScanPool(conf);
     // Start log cleaner thread
     int cleanerInterval = conf.getInt("hbase.master.cleaner.interval", 600 * 1000);
-    this.logCleaner = new LogCleaner(cleanerInterval, this, conf,
-      getMasterFileSystem().getOldLogDir().getFileSystem(conf),
-      getMasterFileSystem().getOldLogDir(), cleanerPool);
+
+    this.logCleaner = getMasterFileSystem().isDistributedLogEnabled() ?
+      new DistributedLogCleaner(cleanerInterval, this, conf,
+        getMasterFileSystem().getOldLogDir()) :
+      new LogCleaner(cleanerInterval, this, conf,
+        getMasterFileSystem().getOldLogDir().getFileSystem(conf),
+        getMasterFileSystem().getOldLogDir(), cleanerPool);
+
     getChoreService().scheduleChore(logCleaner);
-   //start the hfile archive cleaner thread
+    //start the hfile archive cleaner thread
     Path archiveDir = HFileArchiveUtil.getArchivePath(conf);
     Map<String, Object> params = new HashMap<String, Object>();
     params.put(MASTER, this);
@@ -2874,7 +2881,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     return this.hfileCleaner;
   }
 
-  public LogCleaner getLogCleaner() {
+  public AbstractCleanerChore getLogCleaner() {
     return this.logCleaner;
   }
 

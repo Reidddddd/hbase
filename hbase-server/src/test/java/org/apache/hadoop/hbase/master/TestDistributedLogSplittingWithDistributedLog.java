@@ -179,6 +179,7 @@ public class TestDistributedLogSplittingWithDistributedLog extends TestDistribut
     conf.setFloat(HConstants.LOAD_BALANCER_SLOP_KEY, (float) 100.0); // no load balancing
     conf.setInt("hbase.regionserver.wal.max.splitters", 3);
     conf.setInt(HConstants.REGION_SERVER_HIGH_PRIORITY_HANDLER_COUNT, 10);
+    conf.setInt("hbase.master.cleaner.interval", 1000); // 1 second.
     TEST_UTIL.shutdownMiniHBaseCluster();
     TEST_UTIL = new HBaseTestingUtility(conf);
     TEST_UTIL.setDFSCluster(dfsCluster);
@@ -243,6 +244,10 @@ public class TestDistributedLogSplittingWithDistributedLog extends TestDistribut
 
       // Waiting for the regions online.
       assertEquals(NUM_REGIONS_TO_CREATE * NUM_ROWS_PER_REGION, TEST_UTIL.countRows(ht));
+      // Wait for log cleanup.
+      Threads.sleep(3000);
+      List<String> logs = WALUtils.listLogsUnderPath(new Path("oldWALs"), namespace);
+      assertTrue(logs.isEmpty());
     } finally {
       if (ht != null) {
         ht.close();
