@@ -19,14 +19,14 @@ package org.apache.hadoop.hbase.regionserver;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import dlshade.org.apache.distributedlog.DLMTestUtil;
+import dlshade.org.apache.distributedlog.TestDistributedLogBase;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.DLMTestUtil;
-import org.apache.distributedlog.shaded.TestDistributedLogBase;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;

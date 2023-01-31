@@ -18,13 +18,13 @@
 package org.apache.hadoop.hbase.master;
 
 import static org.junit.Assert.assertFalse;
+import dlshade.org.apache.distributedlog.DLMTestUtil;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.DLMTestUtil;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.SplitLogTask;

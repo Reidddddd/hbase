@@ -18,6 +18,8 @@
 package org.apache.hadoop.hbase.regionserver;
 
 import static org.apache.hadoop.hbase.regionserver.HRegion.rowIsInRange;
+import dlshade.org.apache.distributedlog.api.DistributedLogManager;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.EOFException;
 import java.io.IOException;
 import java.text.ParseException;
@@ -25,8 +27,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.api.DistributedLogManager;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;

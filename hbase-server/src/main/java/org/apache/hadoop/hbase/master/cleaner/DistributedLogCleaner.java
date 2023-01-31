@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.hbase.master.cleaner;
 
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Stoppable;

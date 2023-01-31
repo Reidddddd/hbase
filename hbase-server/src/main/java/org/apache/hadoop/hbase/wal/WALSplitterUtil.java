@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.wal;
 
 import static org.apache.hadoop.hbase.HConstants.RECOVERED_EDITS_DIR;
 import com.google.common.annotations.VisibleForTesting;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -30,7 +31,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;

@@ -18,14 +18,14 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
+import dlshade.org.apache.distributedlog.exceptions.DLException;
+import dlshade.org.apache.distributedlog.exceptions.LogNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.exceptions.DLException;
-import org.apache.distributedlog.shaded.exceptions.LogNotFoundException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.Server;

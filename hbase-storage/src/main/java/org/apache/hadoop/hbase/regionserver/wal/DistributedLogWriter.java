@@ -20,6 +20,10 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import com.google.common.annotations.VisibleForTesting;
+import dlshade.org.apache.distributedlog.AppendOnlyStreamWriter;
+import dlshade.org.apache.distributedlog.api.DistributedLogManager;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.LogExistsException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -27,10 +31,6 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.AppendOnlyStreamWriter;
-import org.apache.distributedlog.shaded.api.DistributedLogManager;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
-import org.apache.distributedlog.shaded.exceptions.LogExistsException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;

@@ -17,10 +17,10 @@
   * limitations under the License.
   */
 package org.apache.hadoop.hbase.coordination;
+
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

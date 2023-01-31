@@ -19,6 +19,9 @@
 package org.apache.hadoop.hbase.wal;
 
 import com.google.common.collect.Lists;
+import dlshade.org.apache.distributedlog.api.DistributedLogManager;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.DLException;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -27,9 +30,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.api.DistributedLogManager;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
-import org.apache.distributedlog.shaded.exceptions.DLException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;

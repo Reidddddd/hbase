@@ -1398,7 +1398,7 @@
     <!-- Location of test resources -->
     <test.build.classes>${project.build.directory}/test-classes</test.build.classes>
     <shell-executable>bash</shell-executable>
-    <distributedlog.version>1.0.1</distributedlog.version>
+    <distributedlog.version>1.0.2</distributedlog.version>
   </properties>
   <!-- Sorted by groups of dependencies then groupId and artifactId -->
   <dependencyManagement>

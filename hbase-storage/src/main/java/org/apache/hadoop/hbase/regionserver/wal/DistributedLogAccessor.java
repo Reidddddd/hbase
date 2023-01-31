@@ -20,14 +20,14 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
+import dlshade.org.apache.distributedlog.DistributedLogConfiguration;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.api.namespace.NamespaceBuilder;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.DistributedLogConfiguration;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
-import org.apache.distributedlog.shaded.api.namespace.NamespaceBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.CreateMode;
@@ -67,6 +67,8 @@ public class DistributedLogAccessor implements Closeable {
     distributedLogConfiguration = new DistributedLogConfiguration();
     distributedLogConfiguration.setCreateStreamIfNotExists(true);
     distributedLogConfiguration.setUnpartitionedStreamName(streamName);
+    distributedLogConfiguration.addProperty("bkc.allowShadedLedgerManagerFactoryClass", true);
+
     namespaceBuilder = NamespaceBuilder.newBuilder();
     namespaceBuilder.conf(distributedLogConfiguration);
     ensureZNodeExists(zkRoot);

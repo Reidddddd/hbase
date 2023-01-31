@@ -18,6 +18,10 @@
  */
 package org.apache.hadoop.hbase.wal;
 
+import dlshade.org.apache.distributedlog.api.DistributedLogManager;
+import dlshade.org.apache.distributedlog.api.LogWriter;
+import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.AlreadyClosedException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -29,10 +33,6 @@ import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.distributedlog.shaded.api.DistributedLogManager;
-import org.apache.distributedlog.shaded.api.LogWriter;
-import org.apache.distributedlog.shaded.api.namespace.Namespace;
-import org.apache.distributedlog.shaded.exceptions.AlreadyClosedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
