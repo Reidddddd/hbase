@@ -23,6 +23,8 @@ import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -96,26 +98,45 @@ public class DistributedLog extends AbstractLog {
 
   @Override
   protected void archiveLogUnities(List<String> logsToArchive) throws IOException {
-    try {
-      if (logsToArchive != null) {
-        for (String p : logsToArchive) {
-          DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(p);
-          long size = distributedLogManager.getLogRecordCount() == 0 ? 0 :
-            distributedLogNamespace.openLog(p).getLastTxId();
-
-          this.totalLogSize.addAndGet(-size);
-          String archivedLogName =
-            WALUtils.getFullPathStringForDistributedLog(DISTRIBUTED_LOG_ARCHIVE_PREFIX, p);
-          // Make sure there will no more write
-          WALUtils.checkEndOfStream(distributedLogManager);
-          distributedLogManager.close();
-          distributedLogNamespace.renameLog(p, archivedLogName).get();
-          this.byWalRegionSequenceIds.remove(p);
-        }
+    if (logsToArchive != null) {
+      for (String p : logsToArchive) {
+        archiveLogEntity(p);
+        this.byWalRegionSequenceIds.remove(p);
       }
-    } catch (Exception e) {
-      LOG.warn("Met problem when archive log unity. ");
-      throw new IOException(e);
+    }
+  }
+
+  private void archiveLogEntity(String log) throws IOException {
+    String archivedLogName =
+      WALUtils.getFullPathStringForDistributedLog(DISTRIBUTED_LOG_ARCHIVE_PREFIX, log);
+    Path oldPath = new Path(log);
+    Path newPath = new Path(archivedLogName);
+    // Tell our listeners that a log is going to be archived.
+    if (!this.listeners.isEmpty()) {
+      for (WALActionsListener i : this.listeners) {
+        i.preLogArchive(oldPath, newPath);
+      }
+    }
+    LOG.info("Archiving " + log + " to " + archivedLogName);
+    DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(log);
+    long size = distributedLogManager.getLogRecordCount() == 0 ? 0 :
+      distributedLogNamespace.openLog(log).getLastTxId();
+    this.totalLogSize.addAndGet(-size);
+
+    // Make sure there will be no more write
+    WALUtils.checkEndOfStream(distributedLogManager);
+    distributedLogManager.close();
+    try {
+      distributedLogNamespace.renameLog(log, archivedLogName).get();
+    } catch (ExecutionException | InterruptedException | CancellationException e) {
+      throw new IOException("Unable to rename " + log + " to " + newPath, e);
+    }
+
+    // Tell our listeners that a log has been archived.
+    if (!this.listeners.isEmpty()) {
+      for (WALActionsListener i : this.listeners) {
+        i.postLogArchive(oldPath, newPath);
+      }
     }
   }
 

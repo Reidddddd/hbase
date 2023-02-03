@@ -176,6 +176,42 @@ public class TestDistributedLog extends TestDistributedLogBase {
     }
   }
 
+  @Test
+  public void testWALListenerOnLogArchive() throws Exception {
+    final boolean[] triggeredPreArchive = { false };
+    final boolean[] triggeredPostArchive = { false };
+
+    WALActionsListener listener = new WALActionsListener.Base() {
+      @Override
+      public void preLogArchive(Path oldPath, Path newPath) throws IOException {
+        triggeredPreArchive[0] = true;
+      }
+
+      @Override
+      public void postLogArchive(Path oldPath, Path newPath) throws IOException {
+        triggeredPostArchive[0] = true;
+      }
+    };
+
+    List<WALActionsListener> listeners = new ArrayList<>(1);
+    listeners.add(listener);
+
+    DistributedLog log = null;
+    try {
+      log = new DistributedLog(conf, listeners, null, null, currentTest.getMethodName());
+      List<String> archiveLogs = new ArrayList<>();
+      archiveLogs.add("log2Archive");
+      namespace.createLog("log2Archive");
+
+      log.archiveLogUnities(archiveLogs);
+      assertTrue(triggeredPreArchive[0]);
+      assertTrue(triggeredPostArchive[0]);
+    } finally {
+      if (log != null) {
+        log.close();
+      }
+    }
+  }
   /**
    * Test for WAL stall due to sync future overwrites. See HBASE-25984.
    */
