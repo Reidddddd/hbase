@@ -113,6 +113,7 @@ public class CredentialCache {
     Thread decrytorInitThread = new Thread(new Runnable() {
       @Override
       public void run() {
+        int errorTimes = 0;
         while (!decryptor.isInitialized()) {
           String msg = "Secret decryptor initialization failed with exception:\n ";
           try {
@@ -130,7 +131,12 @@ public class CredentialCache {
             decryptor.initCryptos(getAuthTable(), SecretTableAccessor.getSecretTableColumnFamily(),
               SecretTableAccessor.getSecretTablePasswordQualifier());
           } catch (Throwable t) {
-            LOG.warn(msg, t);
+            if (errorTimes < 10) {
+              // To avoiding overwhelming of essential logs when RS confronts issues,
+              // we only log the periodic exception 10 times in logs.
+              LOG.warn(msg, t);
+              errorTimes++;
+            }
           }
         }
       }
