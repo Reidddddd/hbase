@@ -604,4 +604,8 @@ public class WALUtils {
     // After renaming finished, remove the origin path.
     namespace.deleteLog(pathToDistributedLogName(origin));
   }
+
+  public static String getDistributedLogRegionPath(String ns, String tableName, String regionName) {
+    return String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, ns, tableName, regionName);
+  }
 }

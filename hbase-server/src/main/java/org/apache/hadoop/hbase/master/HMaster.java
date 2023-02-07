@@ -211,6 +211,10 @@ import org.mortbay.jetty.servlet.ServletHolder;
 public class HMaster extends HRegionServer implements MasterServices, Server {
   private static final Log LOG = LogFactory.getLog(HMaster.class.getName());
 
+  private static final String CATALOG_JANITOR_CLASS_KEY = "hbase.master.catalog.janitor.class";
+  private static final Class<? extends CatalogJanitor> DEFAULT_CATALOG_JANITOR_CLASS =
+    CatalogJanitor.class;
+
   /**
    * Protection against zombie master. Started once Master accepts active responsibility and
    * starts taking over responsibilities. Allows a finite time window before giving up ownership.
@@ -889,7 +893,24 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     getChoreService().scheduleChore(balancerChore);
     this.normalizerChore = new RegionNormalizerChore(this);
     getChoreService().scheduleChore(normalizerChore);
-    this.catalogJanitorChore = new CatalogJanitor(this, this);
+
+    Class<? extends CatalogJanitor> janitorClass = null;
+    Constructor<? extends CatalogJanitor> janitorConstructor = null;
+
+    try {
+      janitorClass = conf.getClass(CATALOG_JANITOR_CLASS_KEY, DEFAULT_CATALOG_JANITOR_CLASS,
+        CatalogJanitor.class);
+      janitorConstructor = janitorClass.getDeclaredConstructor(Server.class, MasterServices.class);
+      janitorConstructor.setAccessible(true);
+
+      this.catalogJanitorChore = janitorConstructor.newInstance(this, this);
+    } catch (Exception e) {
+      abort("Failed to create CatalogJanitor instance with exception: ", e);
+    } finally {
+      if (janitorConstructor != null) {
+        janitorConstructor.setAccessible(false);
+      }
+    }
     getChoreService().scheduleChore(catalogJanitorChore);
 
     // Do Metrics periodically
