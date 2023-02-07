@@ -722,6 +722,9 @@ class ConnectionManager {
                 }, conf, listenerClass);
           }
         }
+        if (User.isHBaseDigestAuthEnabled(conf)) {
+          LOG.info("Created Connection to cluster " + clusterId + " with user: " + user);
+        }
       } catch (Throwable e) {
         // avoid leaks: registry, rpcClient, ...
         LOG.debug("connection construction failed", e);
