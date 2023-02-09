@@ -23,7 +23,7 @@
   <parent>
     <artifactId>hbase-build-configuration</artifactId>
     <groupId>org.apache.hbase</groupId>
-    <version>1.4.12-sdi-1.2.0</version>
+    <version>1.4.12-sdi-1.2.1</version>
     <relativePath>../hbase-build-configuration</relativePath>
   </parent>
 
