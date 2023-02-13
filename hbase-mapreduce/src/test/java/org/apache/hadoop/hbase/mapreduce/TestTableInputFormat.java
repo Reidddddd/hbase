@@ -20,7 +20,7 @@ package org.apache.hadoop.hbase.mapreduce;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -226,7 +226,7 @@ public class TestTableInputFormat {
     };
 
     Table htable = spy(createTable(name));
-    doAnswer(a).when(htable).getScanner((Scan) anyObject());
+    doAnswer(a).when(htable).getScanner(any(Scan.class));
     return htable;
   }
 
@@ -264,7 +264,7 @@ public class TestTableInputFormat {
     };
 
     Table htable = spy(createTable(name));
-    doAnswer(a).when(htable).getScanner((Scan) anyObject());
+    doAnswer(a).when(htable).getScanner(any(Scan.class));
     return htable;
   }
 

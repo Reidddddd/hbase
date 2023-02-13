@@ -26,7 +26,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
@@ -183,7 +183,7 @@ public abstract class AbstractTestIPC {
     RpcServer rpcServer = createRpcServer(null, "testRpcServer",
         Lists.newArrayList(new RpcServer.BlockingServiceAndInterface(
             SERVICE, null)), new InetSocketAddress("localhost", 0), CONF, scheduler);
-    verify(scheduler).init((RpcScheduler.Context) anyObject());
+    verify(scheduler).init((RpcScheduler.Context) any());
     try (AbstractRpcClient<?> client = createRpcClient(CONF)) {
       rpcServer.start();
       verify(scheduler).start();
@@ -192,7 +192,7 @@ public abstract class AbstractTestIPC {
       for (int i = 0; i < 10; i++) {
         stub.echo(null, param);
       }
-      verify(scheduler, times(10)).dispatch((CallRunner) anyObject());
+      verify(scheduler, times(10)).dispatch((CallRunner) any());
     } finally {
       rpcServer.stop();
       verify(scheduler).stop();
