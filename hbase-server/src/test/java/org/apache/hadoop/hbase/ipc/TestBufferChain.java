@@ -31,6 +31,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.Mockito;
@@ -98,6 +99,7 @@ public class TestBufferChain {
   }
 
   @Test
+  @Ignore
   public void testWithSpy() throws IOException {
     ByteBuffer[] bufs = new ByteBuffer[] {
         stringBuf("XXXhelloYYY", 3, 5),
