@@ -36,7 +36,6 @@ public abstract class AbstractSplitLogHelper {
 
   protected final MasterFileSystem masterFileSystem;
   protected final Configuration conf;
-  protected final Path oldLogDir;
   protected final Path walRootDir;
 
   // create the split log lock
@@ -45,7 +44,6 @@ public abstract class AbstractSplitLogHelper {
   protected AbstractSplitLogHelper(MasterFileSystem masterFileSystem) {
     this.masterFileSystem = masterFileSystem;
     this.conf = masterFileSystem.getConfiguration();
-    this.oldLogDir = masterFileSystem.getOldLogDir();
     this.walRootDir = masterFileSystem.getWALRootDir();
   }
 

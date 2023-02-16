@@ -176,7 +176,8 @@ public class DistributedLogSplitHelper extends AbstractSplitLogHelper {
 
       if (logEntries.size() > 0) {
         for (String entry : logEntries) {
-          Path newPath = WALUtils.getWALArchivePath(this.oldLogDir, new Path(entry));
+          Path newPath = WALUtils.getWALArchivePath(this.masterFileSystem.getOldLogDir(),
+            new Path(entry));
           WALUtils.checkEndOfStream(walNamespace, entry);
           CompletableFuture<Void> renameFuture =
             walNamespace.renameLog(entry, WALUtils.pathToDistributedLogName(newPath));

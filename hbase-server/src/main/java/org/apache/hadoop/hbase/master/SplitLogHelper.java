@@ -187,7 +187,8 @@ public class SplitLogHelper extends AbstractSplitLogHelper {
         if (logfiles != null) {
           for (FileStatus status : logfiles) {
             if (!status.isDir()) {
-              Path newPath = WALUtils.getWALArchivePath(this.oldLogDir, status.getPath());
+              Path newPath = WALUtils.getWALArchivePath(this.masterFileSystem.getOldLogDir(),
+                status.getPath());
               if (!FSUtils.renameAndSetModifyTime(walFS, status.getPath(), newPath)) {
                 LOG.warn("Unable to move  " + status.getPath() + " to " + newPath);
               } else {
