@@ -45,7 +45,7 @@ public abstract class TestReplicationKillRS extends TestReplicationBase {
     int rsToKill1 = util.getHBaseCluster().getServerWithMeta() == 0 ? 1 : 0;
 
     // Takes about 20 secs to run the full loading, kill around the middle
-    Thread killer = killARegionServer(util, 5000, rsToKill1);
+    Thread killer = killARegionServer(util, 10000, rsToKill1);
     Result[] res;
     int initialCount;
     try (Connection conn = ConnectionFactory.createConnection(CONF1)) {
@@ -53,7 +53,7 @@ public abstract class TestReplicationKillRS extends TestReplicationBase {
         LOG.info("Start loading table");
         initialCount = UTIL1.loadTable(table, famName);
         LOG.info("Done loading table");
-        killer.join(5000);
+        killer.join(10000);
         LOG.info("Done waiting for threads");
 
         while (true) {
@@ -64,6 +64,7 @@ public abstract class TestReplicationKillRS extends TestReplicationBase {
             LOG.info("Cluster wasn't ready yet, restarting scanner");
           }
         }
+        LOG.info("Done scan master cluster table, res.length = " + res.length);
       }
     }
     // Test we actually have all the rows, we may miss some because we
