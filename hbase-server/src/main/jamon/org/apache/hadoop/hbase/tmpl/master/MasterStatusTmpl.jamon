@@ -41,6 +41,7 @@ org.apache.hadoop.hbase.HBaseConfiguration;
 org.apache.hadoop.hbase.HConstants;
 org.apache.hadoop.hbase.HTableDescriptor;
 org.apache.hadoop.hbase.NamespaceDescriptor;
+org.apache.hadoop.hbase.RSGroupTableAccessor;
 org.apache.hadoop.hbase.ServerName;
 org.apache.hadoop.hbase.TableName;
 org.apache.hadoop.hbase.client.Admin;
@@ -53,6 +54,7 @@ org.apache.hadoop.hbase.master.RegionState;
 org.apache.hadoop.hbase.master.ServerManager;
 org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 org.apache.hadoop.hbase.quotas.QuotaUtil;
+org.apache.hadoop.hbase.rsgroup.RSGroupInfo;
 org.apache.hadoop.hbase.security.access.PermissionStorage;
 org.apache.hadoop.hbase.security.visibility.VisibilityConstants;
 org.apache.hadoop.hbase.shaded.protobuf.generated.SnapshotProtos.SnapshotDescription;
@@ -595,6 +597,18 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
 <%java>
    List<TableDescriptor> tables = new ArrayList<TableDescriptor>();
    String errorMessage = getUserTables(master, tables);
+
+   String rsGroupName = "default";
+   List<RSGroupInfo> groups;
+   Map<TableName, RSGroupInfo> table2GroupMap = new HashMap<>();
+   if (!master.isInMaintenanceMode() && master.getMasterCoprocessorHost() != null
+     && master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null
+     && master.getServerManager().getOnlineServersList().size() > 0) {
+       groups = RSGroupTableAccessor.getAllRSGroupInfo(master.getConnection());
+       groups.forEach(group -> {
+         group.getTables().forEach(table -> table2GroupMap.put(table, group));
+       });
+   }
 </%java>
 <%if (tables.size() == 0 && errorMessage != null)%>
 <p> <% errorMessage %> </p>
@@ -604,6 +618,12 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
 <table id="userTables" class="tablesorter table table-striped">
 <thead>
     <tr>
+        <%if !master.isInMaintenanceMode() && master.getMasterCoprocessorHost() != null %>
+          <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null &&
+            master.getServerManager().getOnlineServersList().size() > 0 %>
+            <th style="vertical-align: middle;" rowspan="2">RSGroup</th>
+          </%if>
+        </%if>
         <th style="vertical-align: middle;" rowspan="2">Namespace</th>
         <th style="vertical-align: middle;" rowspan="2">Name</th>
         <%if (frags != null) %>
@@ -628,6 +648,7 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
     <%java>
       HTableDescriptor htDesc = new HTableDescriptor(desc);
       TableName tableName = htDesc.getTableName();
+      rsGroupName = table2GroupMap.get(tableName).getName();
       TableState tableState = master.getTableStateManager().getTableState(tableName);
       Map<RegionState.State, List<RegionInfo>> tableRegions =
           master.getAssignmentManager().getRegionStates()
@@ -650,6 +671,12 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
     String encodedTableName = URLEncoder.encode(tableName.getNameAsString());
     </%java>
     <tr>
+        <%if !master.isInMaintenanceMode() && master.getMasterCoprocessorHost() != null %>
+          <%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null &&
+            master.getServerManager().getOnlineServersList().size() > 0 %>
+            <td><% rsGroupName %></td>
+          </%if>
+        </%if>
         <td><% tableName.getNamespaceAsString() %></td>
         <td><a href=table.jsp?name=<% encodedTableName %>><% URLEncoder.encode(tableName.getQualifierAsString()) %></a> </td>
         <%if (frags != null) %>
