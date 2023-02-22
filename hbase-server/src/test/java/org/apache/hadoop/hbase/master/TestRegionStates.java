@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
@@ -70,6 +71,62 @@ public class TestRegionStates {
     for (Map<ServerName, List<HRegionInfo>> map : result.values()) {
       assertFalse(map.keySet().contains(three));
     }
+  }
+
+  @Test
+  public void testRegionStateMetrics() {
+    MasterServices server = mock(MasterServices.class);
+    when(server.getServerName()).thenReturn(ServerName.valueOf("master,1,1"));
+    Configuration configuration = mock(Configuration.class);
+    when(server.getConfiguration()).thenReturn(configuration);
+    TableStateManager tsm = mock(TableStateManager.class);
+    ServerManager sm = mock(ServerManager.class);
+    when(sm.isServerOnline(isA(ServerName.class))).thenReturn(true);
+
+    RegionStateStore rss = mock(RegionStateStore.class);
+    RegionStates regionStates = new RegionStates(server, tsm, sm, rss);
+
+    ServerName one = mockServer("one", 1);
+    ServerName two = mockServer("two", 1);
+    ServerName three = mockServer("three", 1);
+
+    HRegionInfo region1 = createFakeRegion();
+    HRegionInfo region2 = createFakeRegion();
+    HRegionInfo region3 = createFakeRegion();
+
+    regionStates.regionOnline(region1, one);
+    assertEquals(1, regionStates.getOnlineRegionCount());
+
+    regionStates.regionOnline(region2, two);
+    assertEquals(2, regionStates.getOnlineRegionCount());
+
+    regionStates.regionOnline(region3, three);
+    assertEquals(3, regionStates.getOnlineRegionCount());
+
+    regionStates.regionOffline(region1);
+    assertEquals(1, regionStates.getOfflineRegionCount());
+    assertEquals(2, regionStates.getOnlineRegionCount());
+
+    regionStates.regionOnline(region1, one);
+    assertEquals(0, regionStates.getOfflineRegionCount());
+    assertEquals(3, regionStates.getOnlineRegionCount());
+
+    regionStates.deleteRegion(region2);
+    assertEquals(2, regionStates.getOnlineRegionCount());
+    assertEquals(0, regionStates.getOfflineRegionCount());
+
+    regionStates.regionOffline(region3);
+    regionStates.deleteRegion(region3);
+    assertEquals(1, regionStates.getOnlineRegionCount());
+    assertEquals(0, regionStates.getOfflineRegionCount());
+
+    regionStates.updateRegionState(region1, RegionState.State.SPLIT);
+    assertEquals(1, regionStates.getSplitRegionCount());
+    assertEquals(0, regionStates.getOnlineRegionCount());
+
+    regionStates.updateRegionState(region1, RegionState.State.FAILED_OPEN);
+    assertEquals(0, regionStates.getSplitRegionCount());
+    assertEquals(1, regionStates.getFailedRegionCount());
   }
 
   private HRegionInfo createFakeRegion() {
