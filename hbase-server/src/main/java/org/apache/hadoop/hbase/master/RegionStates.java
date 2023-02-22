@@ -942,7 +942,10 @@ public class RegionStates {
   public synchronized void deleteRegion(final HRegionInfo hri) {
     String encodedName = hri.getEncodedName();
     regionsInTransition.remove(encodedName);
-    regionStates.remove(encodedName);
+    RegionState oldState = regionStates.remove(encodedName);
+    if (oldState != null) {
+      updateMetrics(oldState.getState(), true);
+    }
     TableName table = hri.getTable();
     Map<String, RegionState> indexMap = regionStatesTableIndex.get(table);
     indexMap.remove(encodedName);
