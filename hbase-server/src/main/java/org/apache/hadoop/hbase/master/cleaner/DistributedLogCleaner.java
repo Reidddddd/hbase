@@ -19,7 +19,6 @@ package org.apache.hadoop.hbase.master.cleaner;
 
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.io.IOException;
-import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -77,18 +76,10 @@ public class DistributedLogCleaner extends AbstractCleanerChore {
   @Override
   public boolean runCleaner() {
     try {
-      List<String> logs = WALUtils.listLogsUnderPath(this.oldLogDir, walNamespace);
-      for (String log : logs) {
-        String logName = WALUtils.pathToDistributedLogName(new Path(this.oldLogDir, log));
-        try {
-          walNamespace.deleteLog(logName);
-        } catch (Exception e) {
-          LOG.warn("Failed to clean the old log: " + logName + " skip it for now.", e);
-          return false;
-        }
-      }
+      WALUtils.deleteLogsUnderPath(walNamespace, WALUtils.pathToDistributedLogName(this.oldLogDir),
+        DistributedLogAccessor.getDistributedLogStreamName(conf), false);
     } catch (IOException e) {
-      LOG.warn("Failed to clean old wals at path: " + this.oldLogDir, e);
+      LOG.warn("Failed to clean the old logs: skip it for now.", e);
       return false;
     }
     return true;

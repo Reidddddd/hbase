@@ -100,7 +100,8 @@ public class DistributedLogWALReplayer extends WALReplayer {
     }
 
     for (Path log : logs) {
-      walNamespace.deleteLog(WALUtils.pathToDistributedLogName(log));
+      WALUtils.deleteLogsUnderPath(walNamespace, WALUtils.pathToDistributedLogName(log),
+        DistributedLogAccessor.getDistributedLogStreamName(conf), true);
     }
     return seqId;
   }

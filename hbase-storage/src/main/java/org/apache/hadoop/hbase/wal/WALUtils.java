@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import com.google.common.annotations.VisibleForTesting;
+import dlshade.org.apache.distributedlog.exceptions.InvalidStreamNameException;
+import dlshade.org.apache.distributedlog.exceptions.LogNotFoundException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -494,7 +496,7 @@ public class WALUtils {
     Iterator<String> iterator = namespace.getLogs(pathStr);
     List<String> logs = new ArrayList<>();
     while (iterator.hasNext()) {
-      logs.add(iterator.next());
+      logs.add(String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, pathStr, iterator.next()));
     }
     return logs;
   }
@@ -607,5 +609,38 @@ public class WALUtils {
 
   public static String getDistributedLogRegionPath(String ns, String tableName, String regionName) {
     return String.join(DISTRIBUTED_LOG_NAMESPACE_DELIMITER, ns, tableName, regionName);
+  }
+
+  /**
+   * This will delete all the logs under a given path recursively.
+   * The log zk path is like: aaa/bbb/.../zzz/"streamIdentifier"
+   * To delete a specific log we need to invoke deleteLog#Namespace with path: aaa/bbb/.../zzz
+   * When we search to streamIdentifier, that means we have searched to the actual log.
+   */
+  public static void deleteLogsUnderPath(Namespace walNamespace, String parent,
+      String streamIdentifier, boolean deleteParent) throws IOException {
+    // If we search to the stream identifier, we need to stop the recursion.
+    if (parent.endsWith(streamIdentifier)) {
+      return;
+    }
+    List<String> subLogs = null;
+
+    subLogs = listLogsUnderPath(parent, walNamespace);
+
+    for (String subLog : subLogs) {
+      deleteLogsUnderPath(walNamespace, subLog, streamIdentifier, true);
+    }
+
+    if (deleteParent) {
+      // This will remove the ZK node of the parent path.
+      try {
+        walNamespace.deleteLog(parent);
+      } catch (InvalidStreamNameException | LogNotFoundException e) {
+        // These two exception means there is no such a log, ignore it.
+      } catch (IOException e) {
+        LOG.warn("Failed delete log under path: " + parent);
+        throw e;
+      }
+    }
   }
 }

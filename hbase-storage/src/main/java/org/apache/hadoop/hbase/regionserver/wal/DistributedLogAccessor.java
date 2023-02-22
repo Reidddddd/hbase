@@ -141,4 +141,8 @@ public class DistributedLogAccessor implements Closeable {
   public Namespace getNamespace() {
     return this.namespace;
   }
+
+  public static String getDistributedLogStreamName(Configuration conf) {
+    return conf.get(DISTRIBUTED_LOG_STREAM_NAME, DEFAULT_DISTRIBUTED_LOG_STREAM_NAME);
+  }
 }

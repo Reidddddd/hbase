@@ -387,7 +387,8 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
         }
       }
     }
-    walNamespace.deleteLog(WALUtils.pathToDistributedLogName(logPath));
+    WALUtils.deleteLogsUnderPath(walNamespace, WALUtils.pathToDistributedLogName(logPath),
+      DistributedLogAccessor.getDistributedLogStreamName(conf), true);
     return splits;
   }
 
@@ -415,7 +416,8 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     }
     archiveLogs(corruptedLogs, processedLogs, oldLogDir, walNamespace, conf);
     Path stagingDir = ZKSplitLog.getSplitLogDir(walRoot, logPath.getName());
-    walNamespace.deleteLog(stagingDir.toString());
+    WALUtils.deleteLogsUnderPath(walNamespace, WALUtils.pathToDistributedLogName(stagingDir),
+      DistributedLogAccessor.getDistributedLogStreamName(conf), true);
   }
 
   /**

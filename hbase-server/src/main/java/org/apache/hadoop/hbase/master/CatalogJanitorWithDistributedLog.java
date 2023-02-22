@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableName;
@@ -38,12 +39,14 @@ public class CatalogJanitorWithDistributedLog extends CatalogJanitor {
   private static final Log LOG = LogFactory.getLog(CatalogJanitorWithDistributedLog.class);
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final Configuration conf;
   private Namespace walNamespace;
 
   CatalogJanitorWithDistributedLog(Server server, MasterServices services) {
     super(server, services);
+    this.conf = server.getConfiguration();
     try {
-      walNamespace = DistributedLogAccessor.getInstance(server.getConfiguration()).getNamespace();
+      walNamespace = DistributedLogAccessor.getInstance(this.conf).getNamespace();
     } catch (Exception e) {
       String msg = "Failed initializing CatalogJanitor for DistributedLog, aborting. ";
       server.abort(msg, e);
@@ -76,7 +79,8 @@ public class CatalogJanitorWithDistributedLog extends CatalogJanitor {
       String logPath = WALUtils.getDistributedLogRegionPath(tableName.getNamespaceAsString(),
         tableName.getNameAsString(), regionInfo.getRegionNameAsString());
       try {
-        walNamespace.deleteLog(logPath);
+        WALUtils.deleteLogsUnderPath(walNamespace, logPath,
+          DistributedLogAccessor.getDistributedLogStreamName(this.conf), true);
       } catch (LogNotFoundException e) {
         // Do nothing
       } catch (IOException ioe) {

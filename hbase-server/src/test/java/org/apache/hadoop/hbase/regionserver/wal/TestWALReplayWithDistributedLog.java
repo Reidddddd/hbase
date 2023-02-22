@@ -881,7 +881,7 @@ public class TestWALReplayWithDistributedLog extends TestDistributedLogBase {
 
     List<String> logs = WALUtils.listLogsUnderPath(logName, namespace);
     assertTrue(logs.size() > 0);
-    String logPathStr = WALUtils.pathToDistributedLogName(new Path(logName, logs.get(0)));
+    String logPathStr = WALUtils.pathToDistributedLogName(new Path(logs.get(0)));
     DistributedLogWALSplitter.splitLog(logPathStr, this.conf, null, null, null, mode, wals);
 
     Path tableDir = new Path(tableName.getNamespaceAsString(), tableName.getQualifierAsString());
@@ -893,7 +893,7 @@ public class TestWALReplayWithDistributedLog extends TestDistributedLogBase {
 
     int editCount = 0;
     for (String recoveredEdit : recoveredEdits) {
-      editCount = Integer.parseInt(recoveredEdit);
+      editCount = Integer.parseInt(new Path(recoveredEdit).getName());
     }
     // The sequence number should be same
     assertEquals(

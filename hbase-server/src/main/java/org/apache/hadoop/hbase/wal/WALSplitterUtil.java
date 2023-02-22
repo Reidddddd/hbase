@@ -211,17 +211,18 @@ public final class WALSplitterUtil {
 
     List<String> regionLogs = WALUtils.listLogsUnderPath(editsDir, namespace);
     for (String logName : regionLogs) {
-      Matcher m = EDITFILES_NAME_PATTERN.matcher(logName);
+      Path logPath = new Path(logName);
+      Matcher m = EDITFILES_NAME_PATTERN.matcher(logPath.getName());
       boolean result = m.matches();
       if (logName.endsWith(RECOVERED_LOG_TMPFILE_SUFFIX)) {
         result = false;
       }
-      if (isSequenceIdFile(new Path(logName))) {
+      if (isSequenceIdFile(logPath)) {
         result = false;
       }
       if (result) {
         LOG.info("Find log to replay: " + logName);
-        logsSorted.add(new Path(editsDir, logName));
+        logsSorted.add(logPath);
       }
     }
     return logsSorted;

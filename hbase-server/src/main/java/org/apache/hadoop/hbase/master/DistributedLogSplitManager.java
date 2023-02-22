@@ -89,7 +89,7 @@ public class DistributedLogSplitManager extends SplitLogManager {
       WALUtils.checkEndOfStream(dlm);
       if (dlm.getLogRecordCount() < 1) {
         // Remove the empty log.
-        walNamespace.deleteLog(logStr);
+        dlm.delete();
         if (LOG.isDebugEnabled()) {
           LOG.debug("Remove empty log: " + logStr);
         }
@@ -113,7 +113,8 @@ public class DistributedLogSplitManager extends SplitLogManager {
         String logDirStr = WALUtils.pathToDistributedLogName(logDir);
         List<String> logs = WALUtils.listLogs(walNamespace, logDir, null);
         if (logs.isEmpty()) {
-          walNamespace.deleteLog(logDirStr);
+          WALUtils.deleteLogsUnderPath(walNamespace, logDirStr,
+            DistributedLogAccessor.getDistributedLogStreamName(conf), true);
         } else {
           LOG.warn("The cleaned up path is not empty. Ignoring delete it");
         }

@@ -81,7 +81,8 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
       String logName = wap.p.toString();
       if (namespace.logExists(logName)) {
         try {
-          namespace.deleteLog(logName);
+          WALUtils.deleteLogsUnderPath(namespace, logName,
+            DistributedLogAccessor.getDistributedLogStreamName(conf), true);
         } catch (DLException e){
           LOG.warn("Failed deleting empty " + wap.p);
           throw new IOException("Failed deleting empty " + wap.p + " with exception: \n", e);
@@ -144,7 +145,8 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
         + " split attempt or we have duplicated wal entries. Deleting " + dst + ", length="
         + dlm.getLastTxId());
       try {
-        namespace.deleteLog(dstStr);
+        WALUtils.deleteLogsUnderPath(namespace, dstStr,
+          DistributedLogAccessor.getDistributedLogStreamName(conf), true);
       } catch (DLException e) {
         LOG.warn("Failed deleting of old " + dst);
         throw new IOException("Failed deleting of old " + dst + " with exception: \n", e);
@@ -230,7 +232,8 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
       try {
         LOG.info("Delete existing log: " + regionEditsStr);
         WALUtils.checkEndOfStream(dlm);
-        namespace.deleteLog(regionEditsStr);
+        WALUtils.deleteLogsUnderPath(namespace, regionEditsStr,
+          DistributedLogAccessor.getDistributedLogStreamName(conf), true);
       } catch (DLException e) {
         LOG.warn("Failed delete of old " + regionEditsStr);
       } finally {

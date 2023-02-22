@@ -190,7 +190,13 @@ public class DistributedLogSplitHelper extends AbstractSplitLogHelper {
         }
       }
       try {
-        walNamespace.deleteLog(WALUtils.pathToDistributedLogName(splitDir));
+        List<String> splittingLogs = WALUtils.listLogsUnderPath(splitDir, walNamespace);
+        if (splittingLogs.isEmpty()) {
+          WALUtils.deleteLogsUnderPath(walNamespace, WALUtils.pathToDistributedLogName(splitDir),
+            DistributedLogAccessor.getDistributedLogStreamName(conf), true);
+        } else {
+          LOG.warn("The log path: " + splitDir + " is not empty. Not delete it");
+        }
       } catch (IOException ioe) {
         LOG.warn("Unable to delete log dir. Ignoring. " + splitDir, ioe);
       }
