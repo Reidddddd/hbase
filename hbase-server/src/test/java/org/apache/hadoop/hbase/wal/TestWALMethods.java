@@ -71,6 +71,23 @@ public class TestWALMethods {
     assertNull(name);
   }
 
+  @Test
+  public void testServerNameFromDistributedLog() {
+    Path walPath = new Path("regionserver-2.example.com,22101,1487767381290",
+      "regionserver-2.example.com%2C22101%2C1487767381290.null0.1487785392316");
+    Path walDir = new Path("regionserver-2.example.com,22101,1487767381290");
+    ServerName name = ServerName.valueOf("regionserver-2.example.com", 22101, 1487767381290L);
+    assertEquals(name, WALUtils.getServerNameFromWALDirectoryName(walPath));
+    assertEquals(name, WALUtils.getServerNameFromWALDirectoryName(walDir));
+  }
+
+  @Test
+  public void testServerNameFromTestDistributedLog() throws Exception {
+    Path walPath = new Path("TestWALRecordReader");
+    ServerName name = WALUtils.getServerNameFromWALDirectoryName(walPath);
+    assertNull(name);
+  }
+
   /**
    * Assert that getSplitEditFilesSorted returns files in expected order and
    * that it skips moved-aside files.

@@ -407,7 +407,7 @@ public class WALUtils {
   public static ServerName getServerNameFromWALDirectoryName(Path logFile) {
     String logDirName = logFile.getParent().getName();
     // We were passed the directory and not a file in it.
-    if (logDirName.equals(HConstants.HREGION_LOGDIR_NAME)) {
+    if (logDirName.equals(HConstants.HREGION_LOGDIR_NAME) || logDirName.equals("")) {
       logDirName = logFile.getName();
     }
     ServerName serverName = null;
