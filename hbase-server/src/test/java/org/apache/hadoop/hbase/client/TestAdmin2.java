@@ -106,7 +106,11 @@ public class TestAdmin2 extends TestAdminBase {
           } catch (TableExistsException e) {
             failures.incrementAndGet();
           } catch (IOException e) {
-            throw new RuntimeException("Failed threaded create" + getName(), e);
+            if (e.getMessage().contains("Failed acquire lock for table")) {
+              failures.incrementAndGet();
+            } else {
+              throw new RuntimeException("Failed threaded create" + getName(), e);
+            }
           }
         }
       };

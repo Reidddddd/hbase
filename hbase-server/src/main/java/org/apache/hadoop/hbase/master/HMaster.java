@@ -267,6 +267,8 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     }
   }
 
+  private final MasterProcedureSubmitter procedureSubmitter = new MasterProcedureSubmitter();
+
   // MASTER is name of the webapp and the attribute name used stuffing this
   //instance into web context.
   public static final String MASTER = "master";
@@ -1815,7 +1817,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     checkInitialized();
     sanityCheckTableDescriptor(hTableDescriptor);
 
-    return MasterProcedureUtil.submitProcedure(
+    return procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -1823,8 +1825,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
         LOG.info(getClientIdAuditPrefix() + " create " + hTableDescriptor);
 
-        // TODO: We can handle/merge duplicate requests, and differentiate the case of
-        //       TableExistsException by saying if the schema is the same or not.
+        // Duplicate request is handled in procedureSubmitter.
         ProcedurePrepareLatch latch = ProcedurePrepareLatch.createLatch();
         submitProcedure(new CreateTableProcedure(
           procedureExecutor.getEnvironment(), hTableDescriptor, newRegions, latch));
@@ -1837,7 +1838,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "CreateTableProcedure";
       }
-    });
+    }, hTableDescriptor.getTableName());
   }
 
   @Override
@@ -2184,7 +2185,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       final long nonce) throws IOException {
     checkInitialized();
 
-    return MasterProcedureUtil.submitProcedure(
+    return procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -2192,7 +2193,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
         LOG.info(getClientIdAuditPrefix() + " delete " + tableName);
 
-        // TODO: We can handle/merge duplicate request
+        // Duplicate request is handled in procedureSubmitter.
         ProcedurePrepareLatch latch = ProcedurePrepareLatch.createLatch();
         submitProcedure(new DeleteTableProcedure(procedureExecutor.getEnvironment(),
             tableName, latch));
@@ -2208,7 +2209,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "DeleteTableProcedure";
       }
-    });
+    }, tableName);
   }
 
   @Override
@@ -2219,7 +2220,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       final long nonce) throws IOException {
     checkInitialized();
 
-    MasterProcedureUtil.submitProcedure(
+    procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -2241,7 +2242,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "TruncateTableProcedure";
       }
-    });
+    }, tableName);
   }
 
   @Override
@@ -2256,7 +2257,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     checkEncryption(conf, columnDescriptor);
     checkReplicationScope(columnDescriptor);
 
-    MasterProcedureUtil.submitProcedure(
+    procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -2276,7 +2277,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "AddColumnFamilyProcedure";
       }
-    });
+    }, tableName);
   }
 
   @Override
@@ -2291,7 +2292,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     checkEncryption(conf, descriptor);
     checkReplicationScope(descriptor);
 
-    MasterProcedureUtil.submitProcedure(
+    procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
         @Override
         protected void run() throws IOException {
@@ -2314,7 +2315,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
         protected String getDescription() {
           return "ModifyColumnFamilyProcedure";
         }
-      });
+      }, tableName);
   }
 
   @Override
@@ -2326,7 +2327,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       throws IOException {
     checkInitialized();
 
-    MasterProcedureUtil.submitProcedure(
+    procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -2349,7 +2350,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "DeleteColumnFamilyProcedure";
       }
-    });
+    }, tableName);
   }
 
   @Override
@@ -2357,7 +2358,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       throws IOException {
     checkInitialized();
 
-    return MasterProcedureUtil.submitProcedure(
+    return procedureSubmitter.submitProcedure(
         new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -2382,7 +2383,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "EnableTableProcedure";
       }
-    });
+    }, tableName);
   }
 
   @Override
@@ -2390,7 +2391,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       throws IOException {
     checkInitialized();
 
-    return MasterProcedureUtil.submitProcedure(
+    return procedureSubmitter.submitProcedure(
         new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
       @Override
       protected void run() throws IOException {
@@ -2415,7 +2416,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       protected String getDescription() {
         return "DisableTableProcedure";
       }
-    });
+    }, tableName);
   }
 
   /**
@@ -2464,7 +2465,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     checkInitialized();
     sanityCheckTableDescriptor(descriptor);
 
-    MasterProcedureUtil.submitProcedure(
+    procedureSubmitter.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
         @Override
         protected void run() throws IOException {
@@ -2484,7 +2485,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
         protected String getDescription() {
           return "ModifyTableProcedure";
         }
-      });
+      }, tableName);
   }
 
   @Override
