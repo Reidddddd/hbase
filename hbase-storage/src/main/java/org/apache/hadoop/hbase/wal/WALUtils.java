@@ -405,11 +405,21 @@ public class WALUtils {
    * @return null if the passed in logFile isn't a valid WAL file path
    */
   public static ServerName getServerNameFromWALDirectoryName(Path logFile) {
-    String logDirName = logFile.getParent().getName();
-    // We were passed the directory and not a file in it.
-    if (logDirName.equals(HConstants.HREGION_LOGDIR_NAME) || logDirName.equals("")) {
+    return getServerNameFromWALDirectoryName(logFile, true);
+  }
+
+  public static ServerName getServerNameFromWALDirectoryName(Path logFile, boolean withPathParent) {
+    String logDirName = null;
+    if (withPathParent) {
+      logDirName = logFile.getParent().getName();
+      // We were passed the directory and not a file in it.
+      if (logDirName.equals(HConstants.HREGION_LOGDIR_NAME)) {
+        logDirName = logFile.getName();
+      }
+    } else {
       logDirName = logFile.getName();
     }
+
     ServerName serverName = null;
     if (logDirName.endsWith(SPLITTING_EXT)) {
       logDirName = logDirName.substring(0, logDirName.length() - SPLITTING_EXT.length());

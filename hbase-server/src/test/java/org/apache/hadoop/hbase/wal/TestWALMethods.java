@@ -77,14 +77,14 @@ public class TestWALMethods {
       "regionserver-2.example.com%2C22101%2C1487767381290.null0.1487785392316");
     Path walDir = new Path("regionserver-2.example.com,22101,1487767381290");
     ServerName name = ServerName.valueOf("regionserver-2.example.com", 22101, 1487767381290L);
-    assertEquals(name, WALUtils.getServerNameFromWALDirectoryName(walPath));
-    assertEquals(name, WALUtils.getServerNameFromWALDirectoryName(walDir));
+    assertEquals(name, WALUtils.getServerNameFromWALDirectoryName(walPath, walPath.depth() > 1));
+    assertEquals(name, WALUtils.getServerNameFromWALDirectoryName(walDir, walDir.depth() > 1));
   }
 
   @Test
   public void testServerNameFromTestDistributedLog() throws Exception {
     Path walPath = new Path("TestWALRecordReader");
-    ServerName name = WALUtils.getServerNameFromWALDirectoryName(walPath);
+    ServerName name = WALUtils.getServerNameFromWALDirectoryName(walPath, walPath.depth() > 1);
     assertNull(name);
   }
 

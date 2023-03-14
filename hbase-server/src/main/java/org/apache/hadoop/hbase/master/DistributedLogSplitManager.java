@@ -141,7 +141,8 @@ public class DistributedLogSplitManager extends SplitLogManager {
     Set<ServerName> serverNames = new HashSet<ServerName>();
     for (Path logDir : logDirs) {
       try {
-        ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(logDir);
+        ServerName serverName =
+          WALUtils.getServerNameFromWALDirectoryName(logDir, logDir.depth() > 1);
         if (serverName != null) {
           serverNames.add(serverName);
         }

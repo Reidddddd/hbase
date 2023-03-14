@@ -176,8 +176,9 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
       outputSinkStarted = true;
       Entry entry;
       Long lastFlushedSequenceId = -1L;
+      Path logPath = new Path(logNameWithParent);
       ServerName serverName =
-        WALUtils.getServerNameFromWALDirectoryName(new Path(logNameWithParent));
+        WALUtils.getServerNameFromWALDirectoryName(logPath, logPath.depth() > 1);
       failedServerName = (serverName == null) ? "" : serverName.getServerName();
       while ((entry = getNextLogLine(in, logNameWithParent, skipErrors)) != null) {
         byte[] region = entry.getKey().getEncodedRegionName();

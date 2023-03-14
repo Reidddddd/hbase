@@ -102,8 +102,9 @@ public class DistributedLogSplitHelper extends AbstractSplitLogHelper {
             continue;
           }
 
-          final ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(
-            new Path(logRoot));
+          Path logRootPath = new Path(logRoot);
+          final ServerName serverName = WALUtils.getServerNameFromWALDirectoryName(logRootPath,
+            logRootPath.depth() > 1);
           if (null == serverName) {
             LOG.warn("Log path " + logRoot + " doesn't look like its name includes a " +
               "region server name; leaving in place. If you see later errors about missing " +
