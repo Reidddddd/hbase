@@ -77,7 +77,7 @@ public class CatalogJanitorWithDistributedLog extends CatalogJanitor {
     executor.submit(() -> {
       TableName tableName = regionInfo.getTable();
       String logPath = WALUtils.getDistributedLogRegionPath(tableName.getNamespaceAsString(),
-        tableName.getNameAsString(), regionInfo.getRegionNameAsString());
+        tableName.getNameAsString(), regionInfo.getEncodedName());
       try {
         WALUtils.deleteLogsUnderPath(walNamespace, logPath,
           DistributedLogAccessor.getDistributedLogStreamName(this.conf), true);
