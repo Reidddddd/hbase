@@ -8273,7 +8273,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     // pre-get CP hook
     if (withCoprocessor && (coprocessorHost != null)) {
       if (coprocessorHost.preGet(get, results)) {
-        metricsUpdateForGet(results, before);
+        metricsUpdateForGet();
         return results;
       }
     }
@@ -8298,14 +8298,14 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       coprocessorHost.postGet(get, results);
     }
 
-    metricsUpdateForGet(results, before);
+    metricsUpdateForGet();
 
     return results;
   }
 
-  void metricsUpdateForGet(List<Cell> results, long before) {
+  void metricsUpdateForGet() {
     if (this.metricsRegion != null) {
-      this.metricsRegion.updateGet(EnvironmentEdgeManager.currentTime() - before);
+      this.metricsRegion.updateGet();
     }
     if (rsServices != null && this.rsServices.getMetrics() != null) {
       rsServices.getMetrics().updateReadQueryMeter(getTableDescriptor().getTableName(), 1);

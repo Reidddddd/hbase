@@ -2644,7 +2644,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     // pre-get CP hook
     if (region.getCoprocessorHost() != null) {
       if (region.getCoprocessorHost().preGet(get, results)) {
-        region.metricsUpdateForGet(results, before);
+        region.metricsUpdateForGet();
         return Result
             .create(results, get.isCheckExistenceOnly() ? !results.isEmpty() : null, stale);
       }
@@ -2679,7 +2679,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     if (region.getCoprocessorHost() != null) {
       region.getCoprocessorHost().postGet(get, results);
     }
-    region.metricsUpdateForGet(results, before);
+    region.metricsUpdateForGet();
 
     return Result.create(results, get.isCheckExistenceOnly() ? !results.isEmpty() : null, stale);
   }
@@ -3467,7 +3467,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
       // Update serverside metrics, even on error.
       long end = EnvironmentEdgeManager.currentTime();
       long responseCellSize = context != null ? context.getResponseCellSize() : 0;
-      region.getMetrics().updateScanTime(end - before);
+      region.getMetrics().updateScanCount();
       final MetricsRegionServer metricsRegionServer = regionServer.getMetrics();
       if (metricsRegionServer != null) {
         metricsRegionServer.updateScanSize(
