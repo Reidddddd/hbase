@@ -722,8 +722,7 @@ public abstract class AbstractLog implements WAL {
       // It is at the safe point.  Swap out writer from under the blocked writer thread.
       Writer localWriter = this.writer;
       this.writer = nextWriter;
-      closeFuture = asyncCloseWriter(localWriter, oldPathStr);
-      afterReplaceWriter(newPathStr, oldPathStr, nextWriter);
+      closeFuture = asyncCloseWriter(localWriter, oldPathStr, newPathStr, nextWriter);
     } catch (InterruptedException ie) {
       // Perpetuate the interrupt
       Thread.currentThread().interrupt();
@@ -770,7 +769,8 @@ public abstract class AbstractLog implements WAL {
     return newPathStr;
   }
 
-  private CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath) {
+  private CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
+      Writer nextWriter) {
     CompletableFuture<Void> future = new CompletableFuture<>();
 
     closeExecutor.execute(() -> {
@@ -781,6 +781,7 @@ public abstract class AbstractLog implements WAL {
           Trace.addTimelineAnnotation("writer closed");
         }
         this.closeErrorCount.set(0);
+        afterReplaceWriter(newPath, oldPath, nextWriter);
         future.complete(null);
       } catch (IOException ioe) {
         int errors = closeErrorCount.incrementAndGet();
