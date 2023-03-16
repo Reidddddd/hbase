@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -292,10 +293,16 @@ public class FSHLog extends AbstractLog {
   }
 
   @Override
-  protected void afterReplaceWriter(String newPathStr, String oldPathStr, Writer nextWriter)
-    throws IOException {
+  protected CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
+    Writer nextWriter) {
     this.hdfs_out = nextWriter instanceof ProtobufLogWriter ?
       ((ProtobufLogWriter) nextWriter).getStream() : null;
+    return super.asyncCloseWriter(writer, oldPath, newPath, nextWriter);
+  }
+
+  @Override
+  protected void afterReplaceWriter(String newPathStr, String oldPathStr, Writer nextWriter)
+    throws IOException {
     int oldNumEntries = this.numEntries.get();
     this.numEntries.set(0);
     Path newPath = newPathStr == null ? null : new Path(newPathStr);

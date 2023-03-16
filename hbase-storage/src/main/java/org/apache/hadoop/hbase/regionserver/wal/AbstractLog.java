@@ -769,7 +769,7 @@ public abstract class AbstractLog implements WAL {
     return newPathStr;
   }
 
-  private CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
+  protected CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
       Writer nextWriter) {
     CompletableFuture<Void> future = new CompletableFuture<>();
 
