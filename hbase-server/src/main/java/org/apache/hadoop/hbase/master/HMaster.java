@@ -391,7 +391,8 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
     /**
      * @param infoServer that we're trying to send all requests to
-     * @param hostname may be null. if given, will be used for redirects instead of host from client.
+     * @param hostname may be null. if given,
+     *                 will be used for redirects instead of host from client.
      */
     public RedirectServlet(InfoServer infoServer, String hostname) {
        regionServerInfoPort = infoServer.getPort();
@@ -405,19 +406,22 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       if(redirectHost == null) {
         redirectHost = request.getServerName();
         if(!Addressing.isLocalAddress(InetAddress.getByName(redirectHost))) {
-          LOG.warn("Couldn't resolve '" + redirectHost + "' as an address local to this node and '" +
-              MASTER_HOSTNAME_KEY + "' is not set; client will get a HTTP 400 response. If " +
-              "your HBase deployment relies on client accessible names that the region server process " +
-              "can't resolve locally, then you should set the previously mentioned configuration variable " +
-              "to an appropriate hostname.");
-          // no sending client provided input back to the client, so the goal host is just in the logs.
-          response.sendError(400, "Request was to a host that I can't resolve for any of the network interfaces on " +
-              "this node. If this is due to an intermediary such as an HTTP load balancer or other proxy, your HBase " +
-              "administrator can set '" + MASTER_HOSTNAME_KEY + "' to point to the correct hostname.");
+          LOG.warn("Couldn't resolve '" + redirectHost + "' as an address local to this node "
+            + "and '" + MASTER_HOSTNAME_KEY + "' is not set; client will get a HTTP 400 response. "
+            + "If your HBase deployment relies on client accessible names that the region server "
+            + "process can't resolve locally, then you should set the previously mentioned "
+            + "configuration variable to an appropriate hostname.");
+          // no sending client provided input back to the client,
+          // so the goal host is just in the logs.
+          response.sendError(400, "Request was to a host that I can't resolve for any of the "
+            + "network interfaces on this node. If this is due to an intermediary such as an HTTP "
+            + "load balancer or other proxy, your HBase administrator can set '"
+            + MASTER_HOSTNAME_KEY + "' to point to the correct hostname.");
           return;
         }
       }
-      // TODO this scheme should come from looking at the scheme registered in the infoserver's http server for the
+      // TODO: this scheme should come from looking at the scheme registered in the infoserver's
+      // http server for the
       // host and port we're using, but it's buried way too deep to do that ATM.
       String redirectUrl = request.getScheme() + "://"
         + redirectHost + ":" + regionServerInfoPort
@@ -1720,9 +1724,10 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
     HRegionInfo hri = regionState.getRegion();
     ServerName dest;
-    List<ServerName> exclude = hri.isSystemTable() ? assignmentManager.getExcludedServersForSystemTable()
-        : new ArrayList<ServerName>(1);
-    if (destServerName != null && exclude.contains(ServerName.valueOf(Bytes.toString(destServerName)))) {
+    List<ServerName> exclude = hri.isSystemTable() ?
+      assignmentManager.getExcludedServersForSystemTable() : new ArrayList<ServerName>(1);
+    if (destServerName != null &&
+      exclude.contains(ServerName.valueOf(Bytes.toString(destServerName)))) {
       LOG.info(
           Bytes.toString(encodedRegionName) + " can not move to " + Bytes.toString(destServerName)
               + " because the server is in exclude list");
@@ -2193,6 +2198,9 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
             tableName, latch));
         latch.await();
 
+        if (logCleaner instanceof DistributedLogCleaner) {
+          ((DistributedLogCleaner) logCleaner).cleanDeletedTable(tableName);
+        }
         getMaster().getMasterCoprocessorHost().postDeleteTable(tableName);
       }
 
@@ -2223,6 +2231,9 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
             tableName, preserveSplits));
         ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
 
+        if (logCleaner instanceof DistributedLogCleaner) {
+          ((DistributedLogCleaner) logCleaner).cleanDeletedTable(tableName);
+        }
         getMaster().getMasterCoprocessorHost().postTruncateTable(tableName);
       }
 
@@ -2282,27 +2293,28 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
     MasterProcedureUtil.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
-      @Override
-      protected void run() throws IOException {
-        if (getMaster().getMasterCoprocessorHost().preModifyColumn(tableName, descriptor)) {
-          return;
+        @Override
+        protected void run() throws IOException {
+          if (getMaster().getMasterCoprocessorHost().preModifyColumn(tableName, descriptor)) {
+            return;
+          }
+
+          LOG.info(getClientIdAuditPrefix() + " modify " + descriptor);
+
+          // Execute the operation synchronously -
+          // wait for the operation to complete before continuing.
+          long procId = submitProcedure(new ModifyColumnFamilyProcedure(
+            procedureExecutor.getEnvironment(), tableName, descriptor));
+          ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
+
+          getMaster().getMasterCoprocessorHost().postModifyColumn(tableName, descriptor);
         }
 
-        LOG.info(getClientIdAuditPrefix() + " modify " + descriptor);
-
-        // Execute the operation synchronously - wait for the operation to complete before continuing.
-        long procId = submitProcedure(new ModifyColumnFamilyProcedure(
-          procedureExecutor.getEnvironment(), tableName, descriptor));
-        ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
-
-        getMaster().getMasterCoprocessorHost().postModifyColumn(tableName, descriptor);
-      }
-
-      @Override
-      protected String getDescription() {
-        return "ModifyColumnFamilyProcedure";
-      }
-    });
+        @Override
+        protected String getDescription() {
+          return "ModifyColumnFamilyProcedure";
+        }
+      });
   }
 
   @Override
@@ -2454,25 +2466,25 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
     MasterProcedureUtil.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
-      @Override
-      protected void run() throws IOException {
-        getMaster().getMasterCoprocessorHost().preModifyTable(tableName, descriptor);
+        @Override
+        protected void run() throws IOException {
+          getMaster().getMasterCoprocessorHost().preModifyTable(tableName, descriptor);
 
-        LOG.info(getClientIdAuditPrefix() + " modify " + tableName);
+          LOG.info(getClientIdAuditPrefix() + " modify " + tableName);
 
-        // Execute the operation synchronously - wait for the operation completes before continuing.
-        long procId = submitProcedure(new ModifyTableProcedure(
-          procedureExecutor.getEnvironment(), descriptor));
-        ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
+          // Execute the operation synchronously -
+          // wait for the operation completes before continuing.
+          long procId = submitProcedure(new ModifyTableProcedure(
+            procedureExecutor.getEnvironment(), descriptor));
+          ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
+          getMaster().getMasterCoprocessorHost().postModifyTable(tableName, descriptor);
+        }
 
-        getMaster().getMasterCoprocessorHost().postModifyTable(tableName, descriptor);
-      }
-
-      @Override
-      protected String getDescription() {
-        return "ModifyTableProcedure";
-      }
-    });
+        @Override
+        protected String getDescription() {
+          return "ModifyTableProcedure";
+        }
+      });
   }
 
   @Override
@@ -2941,28 +2953,28 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       final boolean executeCoprocessor) throws IOException {
     MasterProcedureUtil.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
-      @Override
-      protected void run() throws IOException {
-        if (executeCoprocessor &&
+        @Override
+        protected void run() throws IOException {
+          if (executeCoprocessor &&
             getMaster().getMasterCoprocessorHost().preCreateNamespace(descriptor)) {
-          return;
+            return;
+          }
+          LOG.info(getClientIdAuditPrefix() + " creating " + descriptor);
+          // Execute the operation synchronously - wait for the operation to complete before
+          // continuing.
+          long procId = submitProcedure(new CreateNamespaceProcedure(
+            procedureExecutor.getEnvironment(), descriptor));
+          ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
+          if (executeCoprocessor) {
+            getMaster().getMasterCoprocessorHost().postCreateNamespace(descriptor);
+          }
         }
-        LOG.info(getClientIdAuditPrefix() + " creating " + descriptor);
-        // Execute the operation synchronously - wait for the operation to complete before
-        // continuing.
-        long procId = submitProcedure(new CreateNamespaceProcedure(
-          procedureExecutor.getEnvironment(), descriptor));
-        ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
-        if (executeCoprocessor) {
-          getMaster().getMasterCoprocessorHost().postCreateNamespace(descriptor);
-        }
-      }
 
-      @Override
-      protected String getDescription() {
-        return "CreateNamespaceProcedure";
-      }
-    });
+        @Override
+        protected String getDescription() {
+          return "CreateNamespaceProcedure";
+        }
+      });
   }
 
   @Override
@@ -2975,25 +2987,25 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
     MasterProcedureUtil.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
-      @Override
-      protected void run() throws IOException {
-        if (getMaster().getMasterCoprocessorHost().preModifyNamespace(descriptor)) {
-          return;
+        @Override
+        protected void run() throws IOException {
+          if (getMaster().getMasterCoprocessorHost().preModifyNamespace(descriptor)) {
+            return;
+          }
+          LOG.info(getClientIdAuditPrefix() + " modify " + descriptor);
+          // Execute the operation synchronously - wait for the operation to complete before
+          // continuing.
+          long procId = submitProcedure(new ModifyNamespaceProcedure(
+            procedureExecutor.getEnvironment(), descriptor));
+          ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
+          getMaster().getMasterCoprocessorHost().postModifyNamespace(descriptor);
         }
-        LOG.info(getClientIdAuditPrefix() + " modify " + descriptor);
-        // Execute the operation synchronously - wait for the operation to complete before
-        // continuing.
-        long procId = submitProcedure(new ModifyNamespaceProcedure(
-          procedureExecutor.getEnvironment(), descriptor));
-        ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
-        getMaster().getMasterCoprocessorHost().postModifyNamespace(descriptor);
-    }
 
-    @Override
-    protected String getDescription() {
-      return "ModifyNamespace";
-    }
-  });
+        @Override
+        protected String getDescription() {
+          return "ModifyNamespace";
+        }
+      });
   }
 
   @Override
@@ -3005,25 +3017,25 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
     MasterProcedureUtil.submitProcedure(
       new MasterProcedureUtil.NonceProcedureRunnable(this, nonceGroup, nonce) {
-      @Override
-      protected void run() throws IOException {
-        if (getMaster().getMasterCoprocessorHost().preDeleteNamespace(name)) {
-          return;
+        @Override
+        protected void run() throws IOException {
+          if (getMaster().getMasterCoprocessorHost().preDeleteNamespace(name)) {
+            return;
+          }
+          LOG.info(getClientIdAuditPrefix() + " delete " + name);
+          // Execute the operation synchronously - wait for the operation to complete before
+          // continuing.
+          long procId = submitProcedure(new DeleteNamespaceProcedure(
+            procedureExecutor.getEnvironment(), name));
+          ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
+          getMaster().getMasterCoprocessorHost().postDeleteNamespace(name);
         }
-        LOG.info(getClientIdAuditPrefix() + " delete " + name);
-        // Execute the operation synchronously - wait for the operation to complete before
-        // continuing.
-        long procId = submitProcedure(new DeleteNamespaceProcedure(
-          procedureExecutor.getEnvironment(), name));
-        ProcedureSyncWait.waitForProcedureToComplete(procedureExecutor, procId);
-        getMaster().getMasterCoprocessorHost().postDeleteNamespace(name);
-      }
 
-      @Override
-      protected String getDescription() {
-        return "DeleteNamespaceProcedure";
-      }
-    });
+        @Override
+        protected String getDescription() {
+          return "DeleteNamespaceProcedure";
+        }
+      });
   }
 
   /**

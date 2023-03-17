@@ -24,6 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Stoppable;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -83,5 +84,18 @@ public class DistributedLogCleaner extends AbstractCleanerChore {
       return false;
     }
     return true;
+  }
+
+  // This method should be only invoked after a table is already deleted.
+  public void cleanDeletedTable(TableName tableName) {
+    String tablePath = String.join("/", tableName.getNamespaceAsString(),
+      tableName.getNameAsString());
+    try {
+      WALUtils.deleteLogsUnderPath(walNamespace, tablePath,
+        DistributedLogAccessor.getDistributedLogStreamName(conf), true);
+    } catch (IOException e) {
+      LOG.warn("Failed delete distributedlog of table: " + tableName + " skip for now, "
+        + "the table should be already removed the distributedlog need to removed manually.");
+    }
   }
 }

@@ -23,7 +23,9 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import dlshade.org.apache.distributedlog.DLMTestUtil;
 import dlshade.org.apache.distributedlog.DistributedLogConfiguration;
+import dlshade.org.apache.distributedlog.LogRecord;
 import dlshade.org.apache.distributedlog.TestDistributedLogBase;
+import dlshade.org.apache.distributedlog.api.LogWriter;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import dlshade.org.apache.distributedlog.api.namespace.NamespaceBuilder;
 import java.io.IOException;
@@ -33,7 +35,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -97,5 +101,29 @@ public class TestDistributedLogCleaner extends TestDistributedLogBase {
     // Sleep 6 seconds to wait for log deletion.
     assertTrue(namespace.logExists(fakeLogName));
 
+  }
+
+  @Test
+  public void testCleanupTablePathAfterDeletion() throws Exception {
+    Configuration conf = UTIL.getConfiguration();
+    conf.setInt("hbase.cleaner.scan.dir.concurrent.size", 1);
+    conf.set("distributedlog.znode.parent", "/messaging/distributedlog");
+    conf.set("distributedlog.zk.quorum", zkServers);
+
+    TableName tableName = TableName.valueOf("testCleanupTablePathAfterDeletion");
+    String logName = String.join("/", tableName.getNamespaceAsString(),
+      tableName.getNameAsString());
+
+    namespace.createLog(logName);
+    LogWriter writer = namespace.openLog(logName).openLogWriter();
+    writer.write(new LogRecord(0, Bytes.toBytes("test data")));
+    writer.commit();
+
+    DistributedLogCleaner cleaner = new DistributedLogCleaner(1000,
+      null, conf, new Path("oldWALs"), namespace);
+
+    assertTrue(namespace.logExists(logName));
+    cleaner.cleanDeletedTable(tableName);
+    assertFalse(namespace.logExists(logName));
   }
 }

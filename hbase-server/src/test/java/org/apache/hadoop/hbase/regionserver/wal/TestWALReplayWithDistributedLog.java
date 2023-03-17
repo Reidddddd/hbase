@@ -158,7 +158,7 @@ public class TestWALReplayWithDistributedLog extends TestDistributedLogBase {
     FSUtils.setRootDir(conf, hbaseRootDir);
     FSUtils.setWALRootDir(conf, hbaseWALRootDir);
 
-    setupCluster(numBookies);
+    setupCluster();
   }
 
   @Before
