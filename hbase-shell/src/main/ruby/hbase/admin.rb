@@ -925,10 +925,15 @@ module Hbase
          @admin.snapshot(snapshot_name.to_java_bytes, table.to_java_bytes)
       else
          args.each do |arg|
+            ttl = arg[TTL]
+            ttl = ttl ? ttl.to_java(:long) : -1
+            snapshot_props = java.util.HashMap.new
+            snapshot_props.put("TTL", ttl)
             if arg[SKIP_FLUSH] == true
-              @admin.snapshot(snapshot_name.to_java_bytes, table.to_java_bytes, SnapshotDescription::Type::SKIPFLUSH)
+              @admin.snapshot(snapshot_name.to_java_bytes, table.to_java_bytes,
+                SnapshotDescription::Type::SKIPFLUSH, snapshot_props)
             else
-               @admin.snapshot(snapshot_name.to_java_bytes, table.to_java_bytes)
+               @admin.snapshot(snapshot_name.to_java_bytes, table.to_java_bytes, snapshot_props)
             end
          end
       end
