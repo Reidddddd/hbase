@@ -66,9 +66,15 @@ public final class ClientSnapshotDescriptionUtils {
     if (snapshot == null) {
       return null;
     }
-
-    return "{ ss=" + snapshot.getName() +
-           " table=" + (snapshot.hasTable() ? TableName.valueOf(snapshot.getTable()) : "") +
-           " type=" + snapshot.getType() + " }";
+    return new StringBuilder("{ Snapshot=")
+            .append(snapshot.getName())
+            .append(" table=")
+            .append(snapshot.hasTable() ? TableName.valueOf(snapshot.getTable()) : "")
+            .append(" type=")
+            .append(snapshot.getType())
+            .append(" ttl=")
+            .append(snapshot.getTtl())
+            .append(" }")
+            .toString();
   }
 }

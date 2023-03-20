@@ -107,6 +107,7 @@ import org.apache.hadoop.hbase.master.cleaner.LogCleaner;
 import org.apache.hadoop.hbase.master.cleaner.ReplicationZKLockCleanerChore;
 import org.apache.hadoop.hbase.master.cleaner.ReplicationZKNodeCleaner;
 import org.apache.hadoop.hbase.master.cleaner.ReplicationZKNodeCleanerChore;
+import org.apache.hadoop.hbase.master.cleaner.SnapshotCleanerChore;
 import org.apache.hadoop.hbase.master.handler.DispatchMergingRegionHandler;
 import org.apache.hadoop.hbase.master.normalizer.RegionNormalizer;
 import org.apache.hadoop.hbase.master.normalizer.RegionNormalizerChore;
@@ -334,6 +335,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
   private ClusterStatusChore clusterStatusChore;
   private ClusterStatusPublisher clusterStatusPublisherChore = null;
   private PeriodicDoMetrics periodicDoMetricsChore = null;
+  private SnapshotCleanerChore snapshotCleanerChore = null;
 
   CatalogJanitor catalogJanitorChore;
   private DirScanPool cleanerPool;
@@ -1280,6 +1282,16 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     this.hfileCleaner = new HFileCleaner(cleanerInterval, this, conf,
       getMasterFileSystem().getFileSystem(), archiveDir, cleanerPool, params);
     getChoreService().scheduleChore(hfileCleaner);
+
+    final boolean isSnapshotChoreDisabled = conf.getBoolean(HConstants.SNAPSHOT_CLEANER_DISABLE,
+            false);
+    if (isSnapshotChoreDisabled) {
+      LOG.info("Snapshot Cleaner Chore is disabled. Not starting up the chore..");
+    } else {
+      this.snapshotCleanerChore = new SnapshotCleanerChore(this, conf, getSnapshotManager());
+      getChoreService().scheduleChore(this.snapshotCleanerChore);
+    }
+
     serviceStarted = true;
     if (LOG.isTraceEnabled()) {
       LOG.trace("Started service threads");
@@ -1398,6 +1410,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       choreService.cancelChore(this.hfileCleaner);
       choreService.cancelChore(this.replicationZKLockCleanerChore);
       choreService.cancelChore(this.replicationZKNodeCleanerChore);
+      choreService.cancelChore(this.snapshotCleanerChore);
     }
   }
 
