@@ -45,9 +45,9 @@ import org.junit.experimental.categories.Category;
  */
 @Category(MediumTests.class)
 public class TestLogRollPeriod {
-  private static final Log LOG = LogFactory.getLog(TestLogRolling.class);
+  private static final Log LOG = LogFactory.getLog(AbstractTestLogRolling.class);
 
-  private final static HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
+  protected final static HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
 
   private final static long LOG_ROLL_PERIOD = 4000;
 

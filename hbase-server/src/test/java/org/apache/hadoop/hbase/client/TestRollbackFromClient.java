@@ -348,5 +348,8 @@ public class TestRollbackFromClient {
       return delegation.getEarliestMemstoreSeqNum(encodedRegionName, familyName);
     }
 
+    @Override
+    public void logRollerExited() {
+    }
   }
 }

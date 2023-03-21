@@ -29,6 +29,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractFSWAL;
+import org.apache.hadoop.hbase.wal.AbstractFSWALProvider;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -664,14 +666,14 @@ public class MasterFileSystem {
   public void archiveMetaLog(final ServerName serverName) {
     try {
       Path logDir = new Path(this.rootdir,
-          DefaultWALProvider.getWALDirectoryName(serverName.toString()));
-      Path splitDir = logDir.suffix(DefaultWALProvider.SPLITTING_EXT);
+              AbstractFSWALProvider.getWALDirectoryName(serverName.toString()));
+      Path splitDir = logDir.suffix(AbstractFSWALProvider.SPLITTING_EXT);
       if (fs.exists(splitDir)) {
         FileStatus[] logfiles = FSUtils.listStatus(fs, splitDir, META_FILTER);
         if (logfiles != null) {
           for (FileStatus status : logfiles) {
             if (!status.isDir()) {
-              Path newPath = DefaultWALProvider.getWALArchivePath(this.oldLogDir,
+              Path newPath = AbstractFSWAL.getWALArchivePath(this.oldLogDir,
                   status.getPath());
               if (!FSUtils.renameAndSetModifyTime(fs, status.getPath(), newPath)) {
                 LOG.warn("Unable to move  " + status.getPath() + " to " + newPath);

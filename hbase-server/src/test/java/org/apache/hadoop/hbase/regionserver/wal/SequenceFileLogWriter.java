@@ -26,6 +26,9 @@ import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.io.util.LRUDictionary;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -52,13 +55,15 @@ import org.apache.hadoop.io.compress.DefaultCodec;
  * Hadoop serialization).
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.CONFIG)
-public class SequenceFileLogWriter extends WriterBase {
+public class SequenceFileLogWriter implements DefaultWALProvider.Writer {
   private static final Log LOG = LogFactory.getLog(SequenceFileLogWriter.class);
   // The sequence file we delegate to.
   private SequenceFile.Writer writer;
   // This is the FSDataOutputStream instance that is the 'out' instance
   // in the SequenceFile.Writer 'writer' instance above.
   private FSDataOutputStream writer_out;
+
+  private CompressionContext compressionContext;
 
   // Legacy stuff from pre-PB WAL metadata.
   private static final Text WAL_VERSION_KEY = new Text("version");
@@ -89,10 +94,23 @@ public class SequenceFileLogWriter extends WriterBase {
     return new Metadata(metaMap);
   }
 
+  private boolean initializeCompressionContext(Configuration conf, Path path) throws IOException {
+    boolean doCompress = conf.getBoolean(HConstants.ENABLE_WAL_COMPRESSION, false);
+    if (doCompress) {
+      try {
+        this.compressionContext = new CompressionContext(LRUDictionary.class,
+                FSUtils.isRecoveredEdits(path), conf.getBoolean(
+                CompressionContext.ENABLE_WAL_TAGS_COMPRESSION, true));
+      } catch (Exception e) {
+        throw new IOException("Failed to initiate CompressionContext", e);
+      }
+    }
+    return doCompress;
+  }
+
   @Override
   public void init(FileSystem fs, Path path, Configuration conf, boolean overwritable)
   throws IOException {
-    super.init(fs, path, conf, overwritable);
     boolean compress = initializeCompressionContext(conf, path);
     // Create a SF.Writer instance.
     try {

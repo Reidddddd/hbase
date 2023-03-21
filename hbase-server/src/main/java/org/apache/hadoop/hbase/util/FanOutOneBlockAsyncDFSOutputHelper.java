@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
 import org.apache.hadoop.hdfs.DFSClient;
@@ -565,6 +566,18 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
     return futureList;
   }
 
+  /**
+   * Exception other than RemoteException thrown when calling create on namenode
+   */
+  public static class NameNodeException extends IOException {
+
+    private static final long serialVersionUID = 3143237406477095390L;
+
+    public NameNodeException(Throwable cause) {
+      super(cause);
+    }
+  }
+
   private static FanOutOneBlockAsyncDFSOutput createOutput(DistributedFileSystem dfs, String src,
       boolean overwrite, boolean createParent, short replication, long blockSize,
       EventLoop eventLoop) throws IOException {
@@ -573,11 +586,20 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
     DFSClient client = dfs.getClient();
     String clientName = client.getClientName();
     ClientProtocol namenode = client.getNamenode();
-    HdfsFileStatus stat = FILE_CREATER.create(namenode, src,
-      FsPermission.getFileDefault().applyUMask(FsPermission.getUMask(conf)), clientName,
-      new EnumSetWritable<CreateFlag>(
-          overwrite ? EnumSet.of(CREATE, OVERWRITE) : EnumSet.of(CREATE)),
-      createParent, replication, blockSize);
+    HdfsFileStatus stat;
+    try {
+      stat = FILE_CREATER.create(namenode, src,
+              FsPermission.getFileDefault().applyUMask(FsPermission.getUMask(conf)), clientName,
+              new EnumSetWritable<CreateFlag>(
+                      overwrite ? EnumSet.of(CREATE, OVERWRITE) : EnumSet.of(CREATE)),
+              createParent, replication, blockSize);
+    } catch (Exception e) {
+      if (e instanceof RemoteException) {
+        throw (RemoteException) e;
+      } else {
+        throw new NameNodeException(e);
+      }
+    }
     beginFileLease(client, src, stat.getFileId());
     boolean succ = false;
     LocatedBlock locatedBlock = null;
@@ -628,6 +650,13 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
         throw new UnsupportedOperationException();
       }
     }.resolve(dfs, f);
+  }
+
+  public static boolean shouldRetryCreate(RemoteException e) {
+    // RetryStartFileException is introduced in HDFS 2.6+, so here we can only use the class name.
+    // For exceptions other than this, we just throw it out. This is same with
+    // DFSOutputStream.newStreamForCreate.
+    return e.getClassName().endsWith("RetryStartFileException");
   }
 
   static void completeFile(DFSClient client, ClientProtocol namenode, String src, String clientName,

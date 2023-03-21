@@ -55,17 +55,17 @@ class SyncFuture {
   private static final long NOT_DONE = 0;
 
   /**
-   * The sequence at which we were added to the ring buffer.
+   * The transaction id of this operation, monotonically increases.
    */
-  private long ringBufferSequence;
+  private long txid;
 
   /**
-   * The sequence that was set in here when we were marked done. Should be equal
-   * or > ringBufferSequence.  Put this data member into the NOT_DONE state while this
-   * class is in use.  But for the first position on construction, let it be -1 so we can
-   * immediately call {@link #reset(long, Span)} below and it will work.
+   * The transaction id that was set in here when we were marked done. Should be equal or > txnId.
+   * Put this data member into the NOT_DONE state while this class is in use. But for the first
+   * position on construction, let it be -1 so we can immediately call {@link #reset(long, Span)}
+   * below and it will work.
    */
-  private long doneSequence = -1;
+  private long doneTxid = -1;
 
   /**
    * If error, the associated throwable. Set when the future is 'done'.
@@ -80,31 +80,34 @@ class SyncFuture {
   private Span span;
 
   /**
-   * Call this method to clear old usage and get it ready for new deploy. Call
-   * this method even if it is being used for the first time.
-   *
-   * @param sequence sequenceId from this Future's position in the RingBuffer
+   * Call this method to clear old usage and get it ready for new deploy. Call this method even if
+   * it is being used for the first time.
+   * @param txnId the new transaction id
    * @return this
    */
-  synchronized SyncFuture reset(final long sequence) {
-    return reset(sequence, null);
+  synchronized SyncFuture reset(final long txnId) {
+    return reset(txnId, null);
   }
 
   /**
    * Call this method to clear old usage and get it ready for new deploy. Call
    * this method even if it is being used for the first time.
    *
-   * @param sequence sequenceId from this Future's position in the RingBuffer
+   * @param txnId sequenceId from this Future's position in the RingBuffer
    * @param span curren span, detached from caller. Don't forget to attach it when
    *             resuming after a call to {@link #get()}.
    * @return this
    */
-  synchronized SyncFuture reset(final long sequence, Span span) {
-    if (t != null && t != Thread.currentThread()) throw new IllegalStateException();
+  synchronized SyncFuture reset(final long txnId, Span span) {
+    if (t != null && t != Thread.currentThread()) {
+      throw new IllegalStateException();
+    }
     t = Thread.currentThread();
-    if (!isDone()) throw new IllegalStateException("" + sequence + " " + Thread.currentThread());
-    this.doneSequence = NOT_DONE;
-    this.ringBufferSequence = sequence;
+    if (!isDone()) {
+      throw new IllegalStateException("" + txnId + " " + Thread.currentThread());
+    }
+    this.doneTxid = NOT_DONE;
+    this.txid = txnId;
     this.span = span;
     this.throwable = null;
     return this;
@@ -112,12 +115,12 @@ class SyncFuture {
 
   @Override
   public synchronized String toString() {
-    return "done=" + isDone() + ", ringBufferSequence=" + this.ringBufferSequence +
+    return "done=" + isDone() + ", txid=" + this.txid +
       " threadID=" + t.getId() + " threadName=" + t.getName();
   }
 
-  synchronized long getRingBufferSequence() {
-    return this.ringBufferSequence;
+  synchronized long getTxid() {
+    return this.txid;
   }
 
   /**
@@ -139,23 +142,23 @@ class SyncFuture {
   }
 
   /**
-   * @param sequence Sync sequence at which this future 'completed'.
+   * @param txid Sync sequence at which this future 'completed'.
    * @param t Can be null.  Set if we are 'completing' on error (and this 't' is the error).
    * @return True if we successfully marked this outstanding future as completed/done.
    * Returns false if this future is already 'done' when this method called.
    */
-  synchronized boolean done(final long sequence, final Throwable t) {
+  synchronized boolean done(final long txid, final Throwable t) {
     if (isDone()) return false;
     this.throwable = t;
-    if (sequence < this.ringBufferSequence) {
+    if (txid < this.txid) {
       // Something badly wrong.
       if (throwable == null) {
-        this.throwable = new IllegalStateException("sequence=" + sequence +
-          ", ringBufferSequence=" + this.ringBufferSequence);
+        this.throwable = new IllegalStateException("sequence=" + txid +
+          ", ringBufferSequence=" + this.txid);
       }
     }
     // Mark done.
-    this.doneSequence = sequence;
+    this.doneTxid = txid;
     // Wake up waiting threads.
     notify();
     return true;
@@ -172,12 +175,12 @@ class SyncFuture {
       wait(1000);
       if (EnvironmentEdgeManager.currentTime() >= done) {
         throw new TimeoutIOException("Failed to get sync result after "
-            + timeout + " ms for ringBufferSequence=" + this.ringBufferSequence
+            + timeout + " ms for txid=" + this.txid
             + ", WAL system stuck?");
       }
     }
     if (this.throwable != null) throw new ExecutionException(this.throwable);
-    return this.doneSequence;
+    return this.doneTxid;
   }
 
   /**
@@ -199,7 +202,7 @@ class SyncFuture {
   }
 
   synchronized boolean isDone() {
-    return this.doneSequence != NOT_DONE;
+    return this.doneTxid != NOT_DONE;
   }
 
   synchronized boolean isThrowable() {
