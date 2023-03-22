@@ -21,6 +21,7 @@ package org.apache.hadoop.hbase.wal;
 import static org.apache.hadoop.hbase.HConstants.RECOVERED_EDITS_DIR;
 import com.google.common.annotations.VisibleForTesting;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.LogExistsException;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -404,7 +405,7 @@ public final class WALSplitterUtil {
     }
     newSeqId += saftyBumper; // bump up SeqId
 
-    // write a new seqId file
+    // write a new seqId log
     Path newSeqIdFile = new Path(editsDir, newSeqId + SEQUENCE_ID_FILE_SUFFIX);
     if (newSeqId != maxSeqId) {
       try {
@@ -413,8 +414,8 @@ public final class WALSplitterUtil {
           LOG.debug("Wrote region seqId=" + newSeqIdFile + " to file, newSeqId=" + newSeqId
             + ", maxSeqId=" + maxSeqId);
         }
-      } catch (FileAlreadyExistsException ignored) {
-        // latest hdfs throws this exception. it's all right if newSeqIdFile already exists
+      } catch (LogExistsException ignored) {
+        // Distributedlog throws this exception. it's all right if newSeqIdFile already exists
       }
     }
     // remove old ones

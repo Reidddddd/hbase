@@ -91,6 +91,9 @@ public class DistributedLogCleaner extends AbstractCleanerChore {
     String tablePath = String.join("/", tableName.getNamespaceAsString(),
       tableName.getNameAsString());
     try {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Deleting logs under path: " + tablePath);
+      }
       WALUtils.deleteLogsUnderPath(walNamespace, tablePath,
         DistributedLogAccessor.getDistributedLogStreamName(conf), true);
     } catch (IOException e) {

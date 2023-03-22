@@ -24,11 +24,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import dlshade.org.apache.distributedlog.AppendOnlyStreamWriter;
 import dlshade.org.apache.distributedlog.DLMTestUtil;
 import dlshade.org.apache.distributedlog.TestDistributedLogBase;
 import dlshade.org.apache.distributedlog.api.DistributedLogManager;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.LogExistsException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
@@ -89,6 +92,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.mockito.Mockito;
 
 @Category({ LargeTests.class})
 public class TestDistributedLogSplittingWithDistributedLog extends TestDistributedLogBase {
@@ -351,6 +355,19 @@ public class TestDistributedLogSplittingWithDistributedLog extends TestDistribut
         ht.close();
       }
       zkw.close();
+    }
+  }
+
+  @Test
+  public void testLogExistsExceptionHandleWhenWriteSeqIdLog() throws IOException {
+    Namespace spyNamespace = Mockito.spy(namespace);
+    doThrow(new LogExistsException("testing exception")).when(spyNamespace)
+      .createLog(any(String.class));
+    try {
+      Path regionDir = new Path("testPath");
+      WALSplitterUtil.writeRegionSequenceIdLog(spyNamespace, regionDir, 3L, 1000L);
+    } catch (LogExistsException e) {
+      fail("LogExistsException should be handled.");
     }
   }
 
