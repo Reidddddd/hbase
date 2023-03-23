@@ -2382,7 +2382,7 @@ public class AccessController extends BaseMasterAndRegionObserver
           continue;
         }
         requirePermission("getTableDescriptors", tableName, null, null,
-            Action.ADMIN, Action.CREATE);
+            Action.ADMIN, Action.CREATE, Action.READ);
       }
     }
   }
@@ -2403,7 +2403,7 @@ public class AccessController extends BaseMasterAndRegionObserver
       HTableDescriptor htd = itr.next();
       try {
         requirePermission("getTableDescriptors", htd.getTableName(), null, null,
-            Action.ADMIN, Action.CREATE);
+            Action.ADMIN, Action.CREATE, Action.READ);
       } catch (AccessDeniedException e) {
         itr.remove();
       }
