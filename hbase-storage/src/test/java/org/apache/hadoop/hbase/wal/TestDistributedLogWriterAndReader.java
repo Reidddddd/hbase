@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.wal;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import dlshade.org.apache.distributedlog.DLMTestUtil;
 import dlshade.org.apache.distributedlog.DistributedLogConfiguration;
 import dlshade.org.apache.distributedlog.TestDistributedLogBase;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.DistributedLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
@@ -221,6 +223,64 @@ public class TestDistributedLogWriterAndReader extends TestDistributedLogBase {
     for (int i = 0; i < writeCells.size(); i++) {
       assertTrue(CellComparator.equals(writeCells.get(i), readCells.get(i)));
     }
+  }
+
+  @Test
+  public void testIllegalWriterCreation() throws Exception {
+    Configuration conf = HBaseConfiguration.create();
+    // The following two DistributedLog related parameters are initialized by the super class.
+    // We just copy them to our hbase configuration.
+    conf.set("distributedlog.znode.parent", "/messaging/distributedlog");
+    conf.set("distributedlog.zk.quorum", zkServers);
+    conf.setClass("hbase.regionserver.hlog.writer.impl", DistributedLogWriter.class,
+      Writer.class);
+    conf.setClass("hbase.regionserver.hlog.reader.impl", DistributedLogReader.class,
+      Reader.class);
+
+    String logName = "server/logName";
+    String archivedName = "oldWALs/logName";
+    String splittingName = "server-splitting/logName";
+
+    Namespace walNamespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+    // Test duplicate creation
+    walNamespace.createLog(logName);
+    assertTrue(walNamespace.logExists(logName));
+
+    try {
+      WALUtils.createWriter(conf, null, new Path(logName), false);
+      fail("Should throw exception here.");
+    } catch (IOException e) {
+      assertEquals(e.getMessage(), "cannot get log writer");
+      assertTrue(e.getCause().getMessage().contains("already exists"));
+    }
+
+    // Test creation when there is an archived log with same name
+    walNamespace.deleteLog(logName);
+    walNamespace.createLog(archivedName);
+    assertTrue(walNamespace.logExists(archivedName));
+
+    try {
+      WALUtils.createWriter(conf, null, new Path(logName), false);
+      fail("Should throw exception here.");
+    } catch (IOException e) {
+      assertEquals(e.getMessage(), "cannot get log writer");
+      assertTrue(e.getCause().getMessage().contains("already archived"));
+    }
+
+    walNamespace.deleteLog(archivedName);
+    walNamespace.createLog(splittingName);
+    assertTrue(walNamespace.logExists(splittingName));
+
+    // Creation failed when there is splitting
+    try {
+      WALUtils.createWriter(conf, null, new Path(logName), false);
+      fail("Should throw exception here.");
+    } catch (IOException e) {
+      assertEquals(e.getMessage(), "cannot get log writer");
+      assertTrue(e.getCause().getMessage().contains("under splitting"));
+    }
+
+    walNamespace.deleteLog(splittingName);
   }
 
   private List<Cell> getRandomCells(int num) {

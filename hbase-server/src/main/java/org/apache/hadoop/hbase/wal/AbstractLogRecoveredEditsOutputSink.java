@@ -206,7 +206,7 @@ public abstract class AbstractLogRecoveredEditsOutputSink extends OutputSink {
    * long as multiple threads are always acting on different regions.
    * @return null if this region shouldn't output any logs
    */
-  WriterAndPath getWriterAndPath(Entry entry, boolean reusable) throws IOException {
+  synchronized WriterAndPath getWriterAndPath(Entry entry, boolean reusable) throws IOException {
     byte[] region = entry.getKey().getEncodedRegionName();
     String regionName = Bytes.toString(region);
     WriterAndPath ret = (WriterAndPath) writers.get(regionName);

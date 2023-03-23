@@ -101,12 +101,15 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
         + "a new log with name: " + logName);
     }
 
+    if (walNamespace.logExists(logName)) {
+      throw new LogExistsException("The log :" + logName + " already exists");
+    }
+
     try {
       walNamespace.createLog(logName);
-    } catch (LogExistsException e) {
-      // If log exist, it could be created by other thread or process.
-      // We log here and just open it.
-      LOG.warn("Parallel creation of log: " + logName);
+    } catch (IOException e) {
+      LOG.error("Failed create log writer", e);
+      throw e;
     }
     distributedLogManager = walNamespace.openLog(logName);
     if (distributedLogManager == null) {

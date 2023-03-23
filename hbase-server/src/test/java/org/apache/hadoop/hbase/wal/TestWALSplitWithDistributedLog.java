@@ -203,7 +203,8 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
   public void tearDown() throws Exception {
     Iterator<String> s = namespace.getLogs();
     while (s.hasNext()) {
-      namespace.deleteLog(s.next());
+      WALUtils.deleteLogsUnderPath(namespace, s.next(),
+        DistributedLogAccessor.getDistributedLogStreamName(conf), true);
     }
   }
 
