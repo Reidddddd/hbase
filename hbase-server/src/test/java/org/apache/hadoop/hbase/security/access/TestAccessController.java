@@ -2226,14 +2226,12 @@ public class TestAccessController extends SecureTestUtil {
       };
 
       verifyAllowed(listTablesAction, SUPERUSER, USER_ADMIN, USER_CREATE, USER_OWNER, TABLE_ADMIN,
-        USER_GROUP_CREATE, USER_GROUP_ADMIN);
-      verifyIfEmptyList(listTablesAction, USER_RW, USER_RO, USER_NONE, USER_GROUP_READ,
-        USER_GROUP_WRITE);
+        USER_GROUP_CREATE, USER_GROUP_ADMIN, USER_GROUP_READ);
+      verifyIfEmptyList(listTablesAction, USER_RW, USER_RO, USER_NONE, USER_GROUP_WRITE);
 
       verifyAllowed(getTableDescAction, SUPERUSER, USER_ADMIN, USER_CREATE, USER_OWNER,
-        TABLE_ADMIN, USER_GROUP_CREATE, USER_GROUP_ADMIN);
-      verifyDenied(getTableDescAction, USER_RW, USER_RO, USER_NONE, USER_GROUP_READ,
-        USER_GROUP_WRITE);
+        TABLE_ADMIN, USER_GROUP_CREATE, USER_GROUP_ADMIN, USER_GROUP_READ);
+      verifyDenied(getTableDescAction, USER_RW, USER_RO, USER_NONE, USER_GROUP_WRITE);
     } finally {
       // Cleanup, revoke TABLE ADMIN privs
       revokeFromTable(TEST_UTIL, TABLE_ADMIN.getShortName(), TEST_TABLE, null, null,
