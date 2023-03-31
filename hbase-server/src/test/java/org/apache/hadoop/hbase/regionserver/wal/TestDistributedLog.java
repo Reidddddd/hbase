@@ -668,6 +668,18 @@ public class TestDistributedLog extends TestDistributedLogBase {
     }
   }
 
+  @Test
+  public void testArchivePathCorrectness() throws IOException {
+    List<String> archiveLogs = new ArrayList<>();
+    archiveLogs.add("server/log2Archive4Correctness");
+    namespace.createLog("server/log2Archive4Correctness");
+
+    DistributedLog log = new DistributedLog(conf, null, null, null, currentTest.getMethodName());
+    log.archiveLogUnities(archiveLogs);
+
+    assertTrue(namespace.logExists("oldWALs/log2Archive4Correctness"));
+  }
+
   /**
    * helper method to simulate region flush for a WAL.
    */

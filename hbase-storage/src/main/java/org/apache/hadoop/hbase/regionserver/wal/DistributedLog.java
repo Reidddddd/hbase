@@ -106,28 +106,29 @@ public class DistributedLog extends AbstractLog {
     }
   }
 
+
+  // The log path is ServerName/logName
+  // The archived path is oldWALs/logName
   private void archiveLogEntity(String log) throws IOException {
-    String archivedLogName =
-      WALUtils.getFullPathStringForDistributedLog(DISTRIBUTED_LOG_ARCHIVE_PREFIX, log);
     Path oldPath = new Path(log);
-    Path newPath = new Path(archivedLogName);
+    Path newPath = new Path(DISTRIBUTED_LOG_ARCHIVE_PREFIX, oldPath.getName());
     // Tell our listeners that a log is going to be archived.
     if (!this.listeners.isEmpty()) {
       for (WALActionsListener i : this.listeners) {
         i.preLogArchive(oldPath, newPath);
       }
     }
-    LOG.info("Archiving " + log + " to " + archivedLogName);
+    LOG.info("Archiving " + oldPath + " to " + newPath);
     DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(log);
     long size = distributedLogManager.getLogRecordCount() == 0 ? 0 :
-      distributedLogNamespace.openLog(log).getLastTxId();
+      distributedLogManager.getLastTxId();
     this.totalLogSize.addAndGet(-size);
 
     // Make sure there will be no more write
     WALUtils.checkEndOfStream(distributedLogManager);
     distributedLogManager.close();
     try {
-      distributedLogNamespace.renameLog(log, archivedLogName).get();
+      distributedLogNamespace.renameLog(log, WALUtils.pathToDistributedLogName(newPath)).get();
     } catch (ExecutionException | InterruptedException | CancellationException e) {
       throw new IOException("Unable to rename " + log + " to " + newPath, e);
     }
