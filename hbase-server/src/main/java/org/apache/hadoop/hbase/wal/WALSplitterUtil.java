@@ -298,6 +298,9 @@ public final class WALSplitterUtil {
     try {
       WALUtils.checkEndOfStream(walNamespace, logStr);
       walNamespace.renameLog(logStr, WALUtils.pathToDistributedLogName(moveAsideName)).get();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Renamed log: " + logStr + " to " + moveAsideName);
+      }
     } catch (ExecutionException | InterruptedException e) {
       throw new IOException(e);
     }

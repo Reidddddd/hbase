@@ -184,7 +184,9 @@ public class DistributedLogSplitHelper extends AbstractSplitLogHelper {
             walNamespace.renameLog(entry, WALUtils.pathToDistributedLogName(newPath));
           try {
             renameFuture.join();
-            LOG.debug("Archived meta log " + entry + " to " + newPath);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Archived meta log " + entry + " to " + newPath);
+            }
           } catch (Exception e) {
             LOG.warn("Unable to move  " + entry + " to " + newPath);
           }

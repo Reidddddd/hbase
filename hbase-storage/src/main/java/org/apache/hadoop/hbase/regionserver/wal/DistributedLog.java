@@ -18,12 +18,15 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.DISTRIBUTED_LOG_ARCHIVE_PREFIX;
+import dlshade.org.apache.bookkeeper.bookie.BookieException;
 import dlshade.org.apache.distributedlog.api.DistributedLogManager;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.BKTransmitException;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -286,5 +289,32 @@ public class DistributedLog extends AbstractLog {
     } catch (Exception e) {
       throw new IOException(e);
     }
+  }
+
+  @Override
+  protected CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
+      Writer nextWriter) {
+    CompletableFuture<Void> res = super.asyncCloseWriter(writer, oldPath, newPath, nextWriter);
+    CompletableFuture<Void> newFuture = new CompletableFuture<>();
+    res.whenComplete((s, t) -> {
+      if (t == null) {
+        newFuture.complete(null);
+      } else if (t instanceof BKTransmitException) {
+        int errorCode = ((BKTransmitException) t).getBKResultCode();
+        if (errorCode == BookieException.Code.LedgerFencedException) {
+          // We will get this exception when the basic bk ledger is under recovery.
+          // It is still readable and we have already finished writer switching.
+          // Just log it and continue.
+          LOG.warn("Met exception when close writer of: " + oldPath, t);
+          newFuture.complete(null);
+        } else {
+          newFuture.completeExceptionally(t);
+        }
+      } else {
+        newFuture.completeExceptionally(t);
+      }
+    });
+
+    return newFuture;
   }
 }

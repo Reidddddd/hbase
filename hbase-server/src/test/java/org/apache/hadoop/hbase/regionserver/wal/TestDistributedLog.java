@@ -23,9 +23,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.doThrow;
 import dlshade.org.apache.distributedlog.DLMTestUtil;
 import dlshade.org.apache.distributedlog.TestDistributedLogBase;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
+import dlshade.org.apache.distributedlog.exceptions.BKTransmitException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -35,6 +37,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -87,6 +90,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.TestName;
+import org.mockito.Mockito;
 
 /**
  * Provides DistributedLog test cases.
@@ -678,6 +682,43 @@ public class TestDistributedLog extends TestDistributedLogBase {
     log.archiveLogUnities(archiveLogs);
 
     assertTrue(namespace.logExists("oldWALs/log2Archive4Correctness"));
+  }
+
+  @Test
+  public void testLegerFencingDoesNotBlockCloseAsyncCloseWriter() throws IOException {
+    Configuration conf4This = HBaseConfiguration.create(conf);
+    conf4This.setInt("hbase.regionserver.logroll.errors.tolerated", 0);
+
+    Writer writer1 = Mockito.mock(Writer.class);
+    // -101 is the code for LedgerFencedException
+    doThrow(new BKTransmitException("test error", -101)).when(writer1).close();
+
+    Writer writer2 = Mockito.mock(Writer.class);
+
+    // This code is randomly selected to -s
+    doThrow(new BKTransmitException("test error", -2)).when(writer2).close();
+
+    DistributedLog log =
+      new DistributedLog(conf4This, null, null, null, currentTest.getMethodName());
+
+    CompletableFuture<Void> future1 = log.asyncCloseWriter(writer1, "oldPath", "newPath", null);
+
+    try {
+      future1.join();
+    } catch (Exception e) {
+      fail("Future1 should complete without exception but got: " + e);
+    }
+
+    CompletableFuture<Void> future2 = log.asyncCloseWriter(writer2, "oldPath", "newPath", null);
+
+    try {
+      future2.join();
+      fail("Future2 should complete exceptionally.");
+    } catch (Exception e) {
+      // Should arrive here.
+    }
+    // Future2 should be exceptional with other BKTransmitException
+    assertTrue(future2.isCompletedExceptionally());
   }
 
   /**
