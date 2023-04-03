@@ -1,5 +1,4 @@
 /**
- *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,7 +19,6 @@
 package org.apache.hadoop.hbase.client;
 
 import java.util.concurrent.ExecutorService;
-
 import org.apache.hadoop.hbase.TableName;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -30,22 +28,25 @@ import org.apache.yetus.audience.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public class BufferedMutatorParams {
+public class BufferedMutatorParams implements Cloneable {
 
   static final int UNSET = -1;
 
   private final TableName tableName;
   private long writeBufferSize = UNSET;
+  private long writeBufferPeriodicFlushTimeoutMs = UNSET;
+  private long writeBufferPeriodicFlushTimerTickMs = UNSET;
   private int maxKeyValueSize = UNSET;
   private ExecutorService pool = null;
-  private BufferedMutator.ExceptionListener listener = new BufferedMutator.ExceptionListener() {
-    @Override
-    public void onException(RetriesExhaustedWithDetailsException exception,
-        BufferedMutator bufferedMutator)
-        throws RetriesExhaustedWithDetailsException {
-      throw exception;
-    }
-  };
+  private BufferedMutator.ExceptionListener listener =
+      new BufferedMutator.ExceptionListener() {
+        @Override
+        public void onException(RetriesExhaustedWithDetailsException exception,
+            BufferedMutator bufferedMutator)
+            throws RetriesExhaustedWithDetailsException {
+          throw exception;
+        }
+      };
 
   public BufferedMutatorParams(TableName tableName) {
     this.tableName = tableName;
@@ -66,6 +67,32 @@ public class BufferedMutatorParams {
    */
   public BufferedMutatorParams writeBufferSize(long writeBufferSize) {
     this.writeBufferSize = writeBufferSize;
+    return this;
+  }
+
+  public long getWriteBufferPeriodicFlushTimeoutMs() {
+    return writeBufferPeriodicFlushTimeoutMs;
+  }
+
+  /**
+   * Set the max timeout before the buffer is automatically flushed.
+   */
+  public BufferedMutatorParams setWriteBufferPeriodicFlushTimeoutMs(
+      long timeoutMs) {
+    this.writeBufferPeriodicFlushTimeoutMs = timeoutMs;
+    return this;
+  }
+
+  public long getWriteBufferPeriodicFlushTimerTickMs() {
+    return writeBufferPeriodicFlushTimerTickMs;
+  }
+
+  /**
+   * Set the TimerTick how often the buffer timeout if checked.
+   */
+  public BufferedMutatorParams setWriteBufferPeriodicFlushTimerTickMs(
+      long timerTickMs) {
+    this.writeBufferPeriodicFlushTimerTickMs = timerTickMs;
     return this;
   }
 
@@ -103,8 +130,30 @@ public class BufferedMutatorParams {
   /**
    * Override the default error handler. Default handler simply rethrows the exception.
    */
-  public BufferedMutatorParams listener(BufferedMutator.ExceptionListener listener) {
+  public BufferedMutatorParams listener(
+      BufferedMutator.ExceptionListener listener) {
     this.listener = listener;
     return this;
+  }
+
+  /*
+   * (non-Javadoc)
+   *
+   * @see java.lang.Object#clone()
+   */
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "CN_IDIOM_NO_SUPER_CALL", 
+    justification = "The clone below is complete")
+  @Override
+  public BufferedMutatorParams clone() {
+    BufferedMutatorParams clone = new BufferedMutatorParams(this.tableName);
+    clone.writeBufferSize = this.writeBufferSize;
+    clone.writeBufferPeriodicFlushTimeoutMs =
+        this.writeBufferPeriodicFlushTimeoutMs;
+    clone.writeBufferPeriodicFlushTimerTickMs =
+        this.writeBufferPeriodicFlushTimerTickMs;
+    clone.maxKeyValueSize = this.maxKeyValueSize;
+    clone.pool = this.pool;
+    clone.listener = this.listener;
+    return clone;
   }
 }
