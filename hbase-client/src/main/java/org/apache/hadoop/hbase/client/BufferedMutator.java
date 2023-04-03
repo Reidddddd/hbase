@@ -64,6 +64,11 @@ import java.util.List;
 @InterfaceStability.Evolving
 public interface BufferedMutator extends Closeable {
   /**
+   * Having the timer tick run more often that once every 100ms is needless and will
+   * probably cause too many timer events firing having a negative impact on performance.
+   */
+  long MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS = 100;
+  /**
    * Gets the fully qualified table name instance of the table that this BufferedMutator writes to.
    */
   TableName getName();
@@ -110,6 +115,43 @@ public interface BufferedMutator extends Closeable {
    * @throws IOException if a remote or network exception occurs.
    */
   void flush() throws IOException;
+
+  /**
+   * Sets the maximum time before the buffer is automatically flushed checking once per second.
+   * @param timeoutMs    The maximum number of milliseconds how long records may be buffered
+   *                     before they are flushed. Set to 0 to disable.
+   */
+  void setWriteBufferPeriodicFlush(long timeoutMs);
+
+  /**
+   * Sets the maximum time before the buffer is automatically flushed.
+   * @param timeoutMs    The maximum number of milliseconds how long records may be buffered
+   *                     before they are flushed. Set to 0 to disable.
+   * @param timerTickMs  The number of milliseconds between each check if the
+   *                     timeout has been exceeded. Must be 100ms (as defined in
+   *                     {@link #MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS})
+   *                     or larger to avoid performance problems.
+   */
+  void setWriteBufferPeriodicFlush(long timeoutMs, long timerTickMs);
+
+  /**
+   * Disable periodic flushing of the write buffer.
+   */
+  void disableWriteBufferPeriodicFlush();
+
+  /**
+   * Returns the current periodic flush timeout value in milliseconds.
+   * @return The maximum number of milliseconds how long records may be buffered before they
+   *   are flushed. The value 0 means this is disabled.
+   */
+  long getWriteBufferPeriodicFlushTimeoutMs();
+
+  /**
+   * Returns the current periodic flush timertick interval in milliseconds.
+   * @return The number of milliseconds between each check if the timeout has been exceeded.
+   *   This value only has a real meaning if the timeout has been set to > 0
+   */
+  long getWriteBufferPeriodicFlushTimerTickMs();
 
   /**
    * Returns the maximum size in bytes of the write buffer for this HTable.

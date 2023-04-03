@@ -11,13 +11,12 @@
 
 package org.apache.hadoop.hbase.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.yetus.audience.InterfaceAudience;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Configuration parameters for the connection.
@@ -29,14 +28,24 @@ import com.google.common.annotations.VisibleForTesting;
  */
 @InterfaceAudience.Private
 public class ConnectionConfiguration {
-  static final Log LOG = LogFactory.getLog(ConnectionConfiguration.class);
-
-  public static final String WRITE_BUFFER_SIZE_KEY = "hbase.client.write.buffer";
+  public static final String WRITE_BUFFER_SIZE_KEY =
+      "hbase.client.write.buffer";
   public static final long WRITE_BUFFER_SIZE_DEFAULT = 2097152;
-  public static final String MAX_KEYVALUE_SIZE_KEY = "hbase.client.keyvalue.maxsize";
+  public static final String WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS =
+      "hbase.client.write.buffer.periodicflush.timeout.ms";
+  public static final String WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS =
+      "hbase.client.write.buffer.periodicflush.timertick.ms";
+  public static final long WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT = 0;
+      // 0 == Disabled
+  public static final long WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT =
+      1000L; // 1 second
+  public static final String MAX_KEYVALUE_SIZE_KEY =
+      "hbase.client.keyvalue.maxsize";
   public static final int MAX_KEYVALUE_SIZE_DEFAULT = -1;
-
+  static final Log LOG = LogFactory.getLog(ConnectionConfiguration.class);
   private final long writeBufferSize;
+  private final long writeBufferPeriodicFlushTimeoutMs;
+  private final long writeBufferPeriodicFlushTimerTickMs;
   private final int metaOperationTimeout;
   private final int operationTimeout;
   private final int scannerCaching;
@@ -53,19 +62,31 @@ public class ConnectionConfiguration {
 
   /**
    * Constructor
+   *
    * @param conf Configuration object
    */
   ConnectionConfiguration(Configuration conf) {
-    this.writeBufferSize = conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
+    this.writeBufferSize =
+        conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
 
-    this.metaOperationTimeout = conf.getInt(HConstants.HBASE_CLIENT_META_OPERATION_TIMEOUT,
-        HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+    this.writeBufferPeriodicFlushTimeoutMs =
+        conf.getLong(WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS,
+            WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT);
 
-    this.operationTimeout = conf.getInt(
-      HConstants.HBASE_CLIENT_OPERATION_TIMEOUT, HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+    this.writeBufferPeriodicFlushTimerTickMs =
+        conf.getLong(WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS,
+            WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT);
 
-    this.scannerCaching = conf.getInt(
-      HConstants.HBASE_CLIENT_SCANNER_CACHING, HConstants.DEFAULT_HBASE_CLIENT_SCANNER_CACHING);
+    this.metaOperationTimeout =
+        conf.getInt(HConstants.HBASE_CLIENT_META_OPERATION_TIMEOUT,
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+
+    this.operationTimeout =
+        conf.getInt(HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+
+    this.scannerCaching = conf.getInt(HConstants.HBASE_CLIENT_SCANNER_CACHING,
+        HConstants.DEFAULT_HBASE_CLIENT_SCANNER_CACHING);
 
     this.scannerMaxResultSize =
         conf.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
@@ -81,10 +102,11 @@ public class ConnectionConfiguration {
         conf.getInt(HConstants.HBASE_CLIENT_META_REPLICA_SCAN_TIMEOUT,
             HConstants.HBASE_CLIENT_META_REPLICA_SCAN_TIMEOUT_DEFAULT);
 
-    this.retries = conf.getInt(
-        HConstants.HBASE_CLIENT_RETRIES_NUMBER, HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+    this.retries = conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+        HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
 
-    this.maxKeyValueSize = conf.getInt(MAX_KEYVALUE_SIZE_KEY, MAX_KEYVALUE_SIZE_DEFAULT);
+    this.maxKeyValueSize =
+        conf.getInt(MAX_KEYVALUE_SIZE_KEY, MAX_KEYVALUE_SIZE_DEFAULT);
 
     this.readRpcTimeout = conf.getInt(HConstants.HBASE_RPC_READ_TIMEOUT_KEY,
         conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
@@ -94,12 +116,15 @@ public class ConnectionConfiguration {
         conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT));
 
-    this.pause = conf.getLong(HConstants.HBASE_CLIENT_PAUSE, HConstants.DEFAULT_HBASE_CLIENT_PAUSE);
-    long configuredPauseForCQTBE = conf.getLong(HConstants.HBASE_CLIENT_PAUSE_FOR_CQTBE, pause);
+    this.pause = conf.getLong(HConstants.HBASE_CLIENT_PAUSE,
+        HConstants.DEFAULT_HBASE_CLIENT_PAUSE);
+    long configuredPauseForCQTBE =
+        conf.getLong(HConstants.HBASE_CLIENT_PAUSE_FOR_CQTBE, pause);
     if (configuredPauseForCQTBE < pause) {
       LOG.warn("The " + HConstants.HBASE_CLIENT_PAUSE_FOR_CQTBE + " setting: "
-          + configuredPauseForCQTBE + " is smaller than " + HConstants.HBASE_CLIENT_PAUSE
-          + ", will use " + pause + " instead.");
+          + configuredPauseForCQTBE + " is smaller than "
+          + HConstants.HBASE_CLIENT_PAUSE + ", will use " + pause
+          + " instead.");
       this.pauseForCQTBE = pause;
     } else {
       this.pauseForCQTBE = configuredPauseForCQTBE;
@@ -114,10 +139,16 @@ public class ConnectionConfiguration {
   @VisibleForTesting
   protected ConnectionConfiguration() {
     this.writeBufferSize = WRITE_BUFFER_SIZE_DEFAULT;
-    this.metaOperationTimeout = HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
+    this.writeBufferPeriodicFlushTimeoutMs =
+        WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT;
+    this.writeBufferPeriodicFlushTimerTickMs =
+        WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT;
+    this.metaOperationTimeout =
+        HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
     this.operationTimeout = HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
     this.scannerCaching = HConstants.DEFAULT_HBASE_CLIENT_SCANNER_CACHING;
-    this.scannerMaxResultSize = HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE;
+    this.scannerMaxResultSize =
+        HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE;
     this.primaryCallTimeoutMicroSecond = 10000;
     this.replicaCallTimeoutMicroSecondScan = 1000000;
     this.metaReplicaCallTimeoutMicroSecondScan =
@@ -132,6 +163,14 @@ public class ConnectionConfiguration {
 
   public long getWriteBufferSize() {
     return writeBufferSize;
+  }
+
+  public long getWriteBufferPeriodicFlushTimeoutMs() {
+    return writeBufferPeriodicFlushTimeoutMs;
+  }
+
+  public long getWriteBufferPeriodicFlushTimerTickMs() {
+    return writeBufferPeriodicFlushTimerTickMs;
   }
 
   public int getMetaOperationTimeout() {
