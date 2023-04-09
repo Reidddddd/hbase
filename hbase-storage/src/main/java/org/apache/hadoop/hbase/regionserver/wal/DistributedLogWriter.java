@@ -86,6 +86,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void sync() throws IOException {
     // Do nothing.
+    appendOnlyStreamWriter.flush();
   }
 
   @Override
