@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors.MethodDescriptor;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
@@ -85,14 +86,6 @@ public class HTableWrapper implements HTableInterface {
     List<IOException> exceptions = new ArrayList<IOException>(2);
     try {
       table.close();
-    } catch (IOException e) {
-      exceptions.add(e);
-    }
-    try {
-      // have to self-manage our connection, as per the HTable contract
-      if (this.connection != null) {
-        this.connection.close();
-      }
     } catch (IOException e) {
       exceptions.add(e);
     }
@@ -398,4 +391,9 @@ public class HTableWrapper implements HTableInterface {
 
   @Override
   public int getReadRpcTimeout() { return table.getReadRpcTimeout(); }
+
+  @VisibleForTesting
+  public HTableInterface getWrappedTable() {
+    return this.table;
+  }
 }

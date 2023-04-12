@@ -27,6 +27,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTableWrapper;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
@@ -85,6 +87,9 @@ public class TestHTableWrapper {
   static class DummyRegionObserver extends BaseRegionObserver {
   }
 
+  static class DummyMasterObserver extends BaseMasterObserver {
+  }
+
   private HTableInterface hTableInterface;
   private Table table;
 
@@ -127,9 +132,41 @@ public class TestHTableWrapper {
   }
 
   @Test
+  public void testHTableInterfaceConnectionReuse() throws IOException {
+    Configuration conf = util.getConfiguration();
+    MasterCoprocessorHost cpHost = util.getMiniHBaseCluster().getMaster().
+      getMasterCoprocessorHost();
+    Class<?> implClazz = DummyRegionObserver.class;
+    cpHost.load(implClazz, Coprocessor.PRIORITY_HIGHEST, conf);
+    CoprocessorEnvironment env = cpHost.findCoprocessorEnvironment(implClazz.getName());
+
+    assertEquals(Coprocessor.VERSION, env.getVersion());
+    assertEquals(VersionInfo.getVersion(), env.getHBaseVersion());
+
+    // Test tables from same env share the connection.
+    HTableInterface t1 = env.getTable(TEST_TABLE);
+    HTableInterface t2 = env.getTable(TableName.valueOf("table2"));
+    HTableInterface left = ((HTableWrapper) t1).getWrappedTable();
+    HTableInterface right = ((HTableWrapper) t2).getWrappedTable();
+
+    assertSame(((HTable) left).getConnection(), ((HTable) right).getConnection());
+
+    // Test tables from different env share the connection.
+    implClazz = DummyMasterObserver.class;
+    cpHost.load(implClazz, Coprocessor.PRIORITY_HIGHEST, conf);
+    env = cpHost.findCoprocessorEnvironment(implClazz.getName());
+
+    HTableInterface t3 = env.getTable(TableName.valueOf("table3"));
+    HTableInterface anotherTable = ((HTableWrapper) t3).getWrappedTable();
+
+    assertSame(((HTable) anotherTable).getConnection(), ((HTable) left).getConnection());
+  }
+
+  @Test
   public void testHTableInterfaceMethods() throws Exception {
     Configuration conf = util.getConfiguration();
-    MasterCoprocessorHost cpHost = util.getMiniHBaseCluster().getMaster().getMasterCoprocessorHost();
+    MasterCoprocessorHost cpHost = util.getMiniHBaseCluster().getMaster().
+      getMasterCoprocessorHost();
     Class<?> implClazz = DummyRegionObserver.class;
     cpHost.load(implClazz, Coprocessor.PRIORITY_HIGHEST, conf);
     CoprocessorEnvironment env = cpHost.findCoprocessorEnvironment(implClazz.getName());
