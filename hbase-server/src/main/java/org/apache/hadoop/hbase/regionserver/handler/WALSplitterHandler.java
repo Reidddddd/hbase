@@ -69,7 +69,16 @@ public class WALSplitterHandler extends EventHandler {
   public void process() throws IOException {
     long startTime = System.currentTimeMillis();
     try {
-      Status status = this.splitTaskExecutor.exec(splitTaskDetails.getWALFile(), mode, reporter);
+      Status status = null;
+      try {
+        status = this.splitTaskExecutor.exec(splitTaskDetails.getWALFile(), mode, reporter);
+      } catch (RuntimeException e) {
+        // We could arrive here due to some erroneous wal files.
+        // The rs should not be aborted.
+        // So that we catch the runtime exception here and change the status to err.
+        LOG.warn("Met runtime exception when split wal file: " + splitTaskDetails.getWALFile(), e);
+        status = Status.ERR;
+      }
       switch (status) {
       case DONE:
         coordination.endTask(new SplitLogTask.Done(this.serverName,this.mode),
