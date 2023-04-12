@@ -20,6 +20,7 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import com.google.common.annotations.VisibleForTesting;
+import dlshade.org.apache.bookkeeper.common.concurrent.FutureUtils;
 import dlshade.org.apache.distributedlog.AppendOnlyStreamWriter;
 import dlshade.org.apache.distributedlog.api.DistributedLogManager;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
@@ -32,6 +33,7 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -57,6 +59,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
 
   private final AtomicLong actualHighestSequenceId = new AtomicLong(0);
   private final AtomicLong recordCount = new AtomicLong(0);
+  private final AtomicReference<CompletableFuture<Long>> lastFuture = new AtomicReference<>();
 
   private volatile long highestUnsyncedSequenceId = 0;
 
@@ -64,13 +67,11 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
-  private BlockingDeque<CompletableFuture<Long>> futures;
 
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     try {
       init(conf, logName, DistributedLogAccessor.getInstance(conf).getNamespace());
-      futures = new LinkedBlockingDeque<>(1024);
     } catch (Exception e) {
       LOG.error("Failed to init writer for log: " + logName);
       throw new IOException(e);
@@ -91,12 +92,11 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void sync() throws IOException {
     // Do nothing.
-    BlockingDeque<CompletableFuture<Long>> localFutures = futures;
-    futures = new LinkedBlockingDeque<>(1024);
-
-    if (localFutures.size() > 0) {
+    CompletableFuture<Long> future = lastFuture.get();
+    if (future != null) {
       try {
-        localFutures.removeLast().get();
+        FutureUtils.result(future);
+        lastFuture.set(null);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -160,11 +160,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
       appendOnlyStreamWriter.write(recordArray);
       recordCount.incrementAndGet();
     }
-    try {
-      futures.put(appendOnlyStreamWriter.flush());
-    } catch (InterruptedException e) {
-      throw new IOException("Failed append wal entry: " + entry, e);
-    }
+    lastFuture.set(appendOnlyStreamWriter.flush());
     buffer.reset();
   }
 
