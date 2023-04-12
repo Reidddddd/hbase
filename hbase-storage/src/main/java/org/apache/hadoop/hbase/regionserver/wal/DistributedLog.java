@@ -75,28 +75,28 @@ public class DistributedLog extends AbstractLog {
     rollWriter();
     initDisruptor();
 
-    forceScheduler.scheduleAtFixedRate(
-      () -> {
-        Exception lastException = null;
-        try {
-          if (writer != null) {
-            ((DistributedLogWriter) writer).forceWriter();
-          }
-        } catch (IOException e) {
-          LOG.error("Error syncing, request close of WAL", e);
-          lastException = e;
-        } catch (Exception e) {
-          LOG.warn("UNEXPECTED", e);
-          lastException = e;
-        } finally {
-          if (lastException != null) {
-            requestLogRoll();
-          } else {
-            checkLogRoll();
-          }
-        }
-      }, 100, conf.getInt(DISTRIBUTED_LOG_SYNC_PERIOD, DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD),
-      TimeUnit.MILLISECONDS);
+//    forceScheduler.scheduleAtFixedRate(
+//      () -> {
+//        Exception lastException = null;
+//        try {
+//          if (writer != null) {
+//            ((DistributedLogWriter) writer).forceWriter();
+//          }
+//        } catch (IOException e) {
+//          LOG.error("Error syncing, request close of WAL", e);
+//          lastException = e;
+//        } catch (Exception e) {
+//          LOG.warn("UNEXPECTED", e);
+//          lastException = e;
+//        } finally {
+//          if (lastException != null) {
+//            requestLogRoll();
+//          } else {
+//            checkLogRoll();
+//          }
+//        }
+//      }, 100, conf.getInt(DISTRIBUTED_LOG_SYNC_PERIOD, DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD),
+//      TimeUnit.MILLISECONDS);
   }
 
   @Override
