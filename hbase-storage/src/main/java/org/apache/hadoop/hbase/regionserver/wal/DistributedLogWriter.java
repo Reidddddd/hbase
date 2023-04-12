@@ -27,15 +27,10 @@ import dlshade.org.apache.distributedlog.exceptions.LogExistsException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -69,13 +64,13 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
-  private BlockingQueue<CompletableFuture<Long>> futures;
+  private BlockingDeque<CompletableFuture<Long>> futures;
 
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     try {
       init(conf, logName, DistributedLogAccessor.getInstance(conf).getNamespace());
-      futures = new LinkedBlockingQueue<>(1024);
+      futures = new LinkedBlockingDeque<>(1024);
     } catch (Exception e) {
       LOG.error("Failed to init writer for log: " + logName);
       throw new IOException(e);
@@ -96,19 +91,12 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void sync() throws IOException {
     // Do nothing.
-    List<CompletableFuture<Long>> tmp = new ArrayList<>(
-      futures.size()
-    );
-    futures.drainTo(tmp);
+    BlockingDeque<CompletableFuture<Long>> localFutures = futures;
+    futures = new LinkedBlockingDeque<>(1024);
 
-    CompletableFuture<Long> future = null;
-    if (tmp.size() > 0) {
-      future = tmp.get(tmp.size() - 1);
-    }
-
-    if (future != null) {
+    if (localFutures.size() > 0) {
       try {
-        future.get();
+        localFutures.removeLast().get();
       } catch (Exception e) {
         throw new IOException(e);
       }
