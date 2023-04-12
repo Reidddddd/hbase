@@ -18,8 +18,12 @@
 package org.apache.hadoop.hbase.client;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.ConnectionManager.HConnectionImplementation;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
@@ -40,6 +44,8 @@ import org.apache.yetus.audience.InterfaceStability;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class CoprocessorHConnection extends HConnectionImplementation {
+  private static final Map<String, WeakReference<ClusterConnection>> connectionMap =
+    new HashMap<>();
 
   /**
    * Create an unmanaged {@link HConnection} based on the environment in which we are running the
@@ -56,10 +62,43 @@ public class CoprocessorHConnection extends HConnectionImplementation {
       RegionCoprocessorEnvironment e = (RegionCoprocessorEnvironment) env;
       RegionServerServices services = e.getRegionServerServices();
       if (services instanceof HRegionServer) {
-        return new CoprocessorHConnection((HRegionServer) services);
+        return getConnectionInstance(env.getConfiguration(), (HRegionServer) services);
       }
     }
-    return ConnectionManager.createConnectionInternal(env.getConfiguration());
+    return getConnectionInstance(env.getConfiguration(), null);
+  }
+
+  // We need to guarantee that at one time, there is only one available coprocessor connection to
+  // each cluster. Otherwise, the coprocessor may use up connection resources on the rs.
+  public static synchronized ClusterConnection getConnectionInstance(Configuration conf,
+      HRegionServer server) throws IOException {
+    String zkServers = conf.get(HConstants.ZOOKEEPER_QUORUM);
+    String zkRoot = conf.get(HConstants.ZOOKEEPER_ZNODE_PARENT,
+      HConstants.DEFAULT_ZOOKEEPER_ZNODE_PARENT);
+    if (zkServers == null || zkRoot == null) {
+      throw new IOException("Failed get connection to illegal hbase cluster, "
+        + "the zk quorum or zk root is null.");
+    }
+
+    String connectionKey = String.join(":", zkServers, zkRoot);
+    WeakReference<ClusterConnection> weakReference = connectionMap.get(connectionKey);
+    ClusterConnection connection;
+
+    if (weakReference == null) {
+      connection = server == null ? ConnectionManager.createConnectionInternal(conf) :
+        new CoprocessorHConnection(server);
+      weakReference = new WeakReference<>(connection);
+      connectionMap.put(connectionKey, weakReference);
+    } else {
+      connection = weakReference.get();
+      if (connection == null || connection.isClosed() || connection.isAborted()) {
+        connection = server == null ? ConnectionManager.createConnectionInternal(conf) :
+          new CoprocessorHConnection(server);
+        connectionMap.put(connectionKey, new WeakReference<>(connection));
+      }
+    }
+
+    return connection;
   }
 
   private final ServerName serverName;

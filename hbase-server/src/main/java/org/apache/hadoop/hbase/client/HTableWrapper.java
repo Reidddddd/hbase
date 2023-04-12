@@ -18,12 +18,16 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.Descriptors.MethodDescriptor;
+import com.google.protobuf.Message;
+import com.google.protobuf.Service;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
@@ -33,11 +37,7 @@ import org.apache.hadoop.hbase.coprocessor.CoprocessorHost.Environment;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.io.MultipleIOException;
-
-import com.google.protobuf.Descriptors.MethodDescriptor;
-import com.google.protobuf.Message;
-import com.google.protobuf.Service;
-import com.google.protobuf.ServiceException;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A wrapper for HTable. Can be used to restrict privilege.
@@ -53,6 +53,7 @@ import com.google.protobuf.ServiceException;
  * which attempt to use objects and methods outside the Environment
  * sandbox.
  */
+@InterfaceAudience.Private
 public class HTableWrapper implements HTableInterface {
 
   private final HTableInterface table;
@@ -82,14 +83,6 @@ public class HTableWrapper implements HTableInterface {
     List<IOException> exceptions = new ArrayList<IOException>(2);
     try {
       table.close();
-    } catch (IOException e) {
-      exceptions.add(e);
-    }
-    try {
-      // have to self-manage our connection, as per the HTable contract
-      if (this.connection != null) {
-        this.connection.close();
-      }
     } catch (IOException e) {
       exceptions.add(e);
     }
@@ -395,4 +388,9 @@ public class HTableWrapper implements HTableInterface {
 
   @Override
   public int getReadRpcTimeout() { return table.getReadRpcTimeout(); }
+
+  @VisibleForTesting
+  public HTableInterface getWrappedTable() {
+    return this.table;
+  }
 }
