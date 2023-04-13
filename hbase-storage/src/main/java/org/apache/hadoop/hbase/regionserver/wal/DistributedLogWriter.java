@@ -29,9 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
@@ -92,13 +90,12 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void sync() throws IOException {
     // Do nothing.
-    CompletableFuture<Long> future = lastFuture.get();
+    CompletableFuture<Long> future = lastFuture.getAndSet(null);
     if (future != null) {
       try {
         FutureUtils.result(future);
-        lastFuture.set(null);
       } catch (Exception e) {
-        throw new IOException(e);
+        throw new IOException("Failed sync with exception: ", e);
       }
     }
   }

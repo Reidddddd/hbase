@@ -80,7 +80,7 @@ public class DistributedLog extends AbstractLog {
 //        Exception lastException = null;
 //        try {
 //          if (writer != null) {
-//            ((DistributedLogWriter) writer).forceWriter();
+//            writer.sync();
 //          }
 //        } catch (IOException e) {
 //          LOG.error("Error syncing, request close of WAL", e);
