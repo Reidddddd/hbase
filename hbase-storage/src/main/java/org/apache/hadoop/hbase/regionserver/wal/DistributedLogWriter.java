@@ -90,14 +90,14 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   @Override
   public void sync() throws IOException {
     // Do nothing.
-    CompletableFuture<Long> future = lastFuture.getAndSet(null);
-    if (future != null) {
-      try {
-        FutureUtils.result(future);
-      } catch (Exception e) {
-        throw new IOException("Failed sync with exception: ", e);
-      }
-    }
+//    CompletableFuture<Long> future = lastFuture.getAndSet(null);
+//    if (future != null) {
+//      try {
+//        FutureUtils.result(future);
+//      } catch (Exception e) {
+//        throw new IOException("Failed sync with exception: ", e);
+//      }
+//    }
   }
 
   @Override
