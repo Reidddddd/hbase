@@ -21,6 +21,7 @@ package org.apache.hadoop.hbase.master;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.Lock;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.junit.Test;
@@ -35,24 +36,28 @@ public class TestTableLocker {
     TableName tableName = TableName.valueOf("testTable");
     Semaphore flag = new Semaphore(0);
     Thread thread = new Thread(() -> {
-      locker.tryLockTable(tableName);
-      flag.release();
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+      Lock lock = locker.getLock(tableName);
+      if (lock.tryLock()) {
+        flag.release();
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        } finally {
+          lock.unlock();
+        }
       }
-      locker.unlockTable(tableName);
     });
 
+    Lock lock = locker.getLock(tableName);
     thread.start();
     // Wait the other thread lock the table.
     flag.acquire();
 
-    assertFalse(locker.tryLockTable(tableName));
+    assertFalse(lock.tryLock());
     Thread.sleep(1100);
 
-    assertTrue(locker.tryLockTable(tableName));
-    locker.unlockTable(tableName);
+    assertTrue(lock.tryLock());
+    lock.unlock();
   }
 }

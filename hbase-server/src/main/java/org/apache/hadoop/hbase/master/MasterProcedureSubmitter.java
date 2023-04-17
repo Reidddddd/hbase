@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.master;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.TableName;
@@ -54,12 +55,13 @@ public class MasterProcedureSubmitter {
    */
   public long submitProcedure(MasterProcedureUtil.NonceProcedureRunnable task, TableName tableName)
     throws IOException {
-    if (tableLocker.tryLockTable(tableName)) {
+    ReentrantLock lock = tableLocker.getLock(tableName);
+    if (lock.tryLock()) {
       try {
         // This is running synchronously.
         return MasterProcedureUtil.submitProcedure(task);
       } finally {
-        tableLocker.unlockTable(tableName);
+        lock.unlock();
       }
     } else {
       throw new IOException("Failed acquire lock for table: " + tableName);
