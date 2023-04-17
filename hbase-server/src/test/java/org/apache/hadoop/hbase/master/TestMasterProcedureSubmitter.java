@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hbase.master;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hbase.MetaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
@@ -45,7 +47,7 @@ public class TestMasterProcedureSubmitter {
 
     MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker);
 
-    when(tableLocker.tryLockTable(tableName))
+    when(tableLocker.getLock(tableName))
       .thenThrow(new IllegalStateException("Should not try lock when fail fast."));
     MockedStatic<MetaTableAccessor> metaTableAccessor = Mockito.mockStatic(MetaTableAccessor.class);
     metaTableAccessor.when(() -> MetaTableAccessor.tableExists(null, tableName))
@@ -64,7 +66,9 @@ public class TestMasterProcedureSubmitter {
     TableName tableName = TableName.valueOf("testTryLock");
 
     TableLocker tableLocker = Mockito.mock(TableLocker.class);
-    when(tableLocker.tryLockTable(tableName)).thenReturn(false);
+    ReentrantLock mockLock = Mockito.mock(ReentrantLock.class);
+    when(tableLocker.getLock(tableName)).thenReturn(mockLock);
+    when(mockLock.tryLock()).thenReturn(false);
 
     MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker);
     MasterProcedureUtil.NonceProcedureRunnable task1 =
@@ -97,7 +101,7 @@ public class TestMasterProcedureSubmitter {
       fail("Should throw exception here.");
     } catch(IOException ioe) {
       // The table should be unlocked.
-      assertTrue(tableLocker.tryLockTable(tableName));
+      assertFalse(tableLocker.getLock(tableName).isLocked());
     }
   }
 }

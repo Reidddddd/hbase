@@ -32,7 +32,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 public class TableLocker {
   private static final Log LOG = LogFactory.getLog(TableLocker.class);
 
-  private final Cache<TableName, Lock> lockCache;
+  private final Cache<TableName, ReentrantLock> lockCache;
   private final Lock lock = new ReentrantLock();
 
   public TableLocker() {
@@ -41,27 +41,16 @@ public class TableLocker {
       .build();
   }
 
-  public boolean tryLockTable(TableName tableName) {
+  public ReentrantLock getLock(TableName tableName) {
+    ReentrantLock tableLock = null;
     try {
       lock.lock();
-      Lock tableLock = lockCache.getIfPresent(tableName);
+      tableLock = lockCache.getIfPresent(tableName);
       if (tableLock == null) {
         tableLock = new ReentrantLock();
         lockCache.put(tableName, tableLock);
       }
-      return tableLock.tryLock();
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  public void unlockTable(TableName tableName) {
-    lock.lock();
-    try {
-      Lock lock = lockCache.getIfPresent(tableName);
-      if (lock != null) {
-        lock.unlock();
-      }
+      return tableLock;
     } finally {
       lock.unlock();
     }
