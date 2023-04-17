@@ -65,6 +65,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
+  private boolean useAppendFlush = false;
 
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
@@ -85,12 +86,14 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     super.init(conf);
     // Force the wal header.
     this.appendOnlyStreamWriter.force(false);
+    this.useAppendFlush = conf.getBoolean("distributedlog.writer.sync.method.two", false);
   }
 
   @Override
   public void sync() throws IOException {
     // Do nothing.
-    CompletableFuture<Long> future = lastFuture.getAndSet(null);
+    CompletableFuture<Long> future = useAppendFlush ? lastFuture.getAndSet(null) :
+      appendOnlyStreamWriter.flush();
     if (future != null) {
       try {
         FutureUtils.result(future);
@@ -157,7 +160,9 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
       appendOnlyStreamWriter.write(recordArray);
       recordCount.incrementAndGet();
     }
-    lastFuture.set(appendOnlyStreamWriter.flush());
+    if (useAppendFlush) {
+      lastFuture.set(appendOnlyStreamWriter.flush());
+    }
     buffer.reset();
   }
 
