@@ -1464,7 +1464,7 @@
     <java.min.version>${compileSource}</java.min.version>
     <!-- Dependencies -->
     <hadoop-two.version>2.10.sdi-057</hadoop-two.version>
-    <hadoop-three.version>3.1.2</hadoop-three.version>
+    <hadoop-three.version>3.3.sdi-050</hadoop-three.version>
     <!-- These must be defined here for downstream build tools that don't look at profiles.
          They ought to match the values found in our default hadoop profile, which is
          currently "hadoop-2.0". See HBASE-15925 for more info. -->
@@ -2423,7 +2423,7 @@
           --add-exports java.security.jgss/sun.security.krb5=ALL-UNNAMED
           ${hbase-surefire.argLine}</argLine>
         <!-- We need a minimum HDFS version of 3.2.0 for HADOOP-12760 -->
-        <hadoop-three.version>3.2.0</hadoop-three.version>
+        <hadoop-three.version>3.3.sdi-050</hadoop-three.version>
         <!--
           Value to use for surefire when running jdk11.
           TODO: replicate logic for windows
@@ -3437,6 +3437,10 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
               </exclusion>
+             <exclusion>
+               <groupId>org.json</groupId>
+               <artifactId>json</artifactId>
+             </exclusion>
            </exclusions>
          </dependency>
          <dependency>
@@ -3489,6 +3493,10 @@
              <exclusion>
                <groupId>io.netty</groupId>
                <artifactId>netty-all</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>org.json</groupId>
+               <artifactId>json</artifactId>
              </exclusion>
            </exclusions>
          </dependency>
@@ -3733,6 +3741,18 @@
              <exclusion>
                <groupId>log4j</groupId>
                <artifactId>log4j</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>net.java.dev.jna</groupId>
+               <artifactId>jna-platform</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>org.jetbrains.pty4j</groupId>
+               <artifactId>pty4j</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>org.jetbrains.pty4j</groupId>
+               <artifactId>purejavacomm</artifactId>
              </exclusion>
            </exclusions>
          </dependency>

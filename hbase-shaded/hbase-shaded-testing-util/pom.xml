@@ -57,6 +57,20 @@
             <artifactId>hadoop-mapreduce-client-app</artifactId>
             <type>test-jar</type>
             <scope>compile</scope>
+            <exclusions>
+              <exclusion>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna-platform</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>org.jetbrains.pty4j</groupId>
+                <artifactId>pty4j</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>org.jetbrains.pty4j</groupId>
+                <artifactId>purejavacomm</artifactId>
+              </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
