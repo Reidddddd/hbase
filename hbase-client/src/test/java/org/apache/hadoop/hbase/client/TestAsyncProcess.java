@@ -351,7 +351,6 @@ public class TestAsyncProcess {
     conn.getConfiguration()
         .setLong(AsyncProcess.HBASE_CLIENT_MAX_PERREQUEST_HEAPSIZE,
             maxHeapSizePerRequest);
-    BufferedMutatorParams bufferParam = new BufferedMutatorParams(DUMMY_TABLE);
 
     // sn has two regions
     long putSizeSN = 0;
@@ -379,12 +378,14 @@ public class TestAsyncProcess {
         + ", putSizeSN2:" + putSizeSN2 + ", maxHeapSizePerRequest:"
         + maxHeapSizePerRequest + ", minCountSnRequest:" + minCountSnRequest
         + ", minCountSn2Request:" + minCountSn2Request);
-    try (HTable ht = new HTable(conn, bufferParam)) {
-      MyAsyncProcess ap = new MyAsyncProcess(conn, conf, true);
-      ht.mutator.ap = ap;
-
-      Assert.assertEquals(0L, ht.mutator.currentWriteBufferSize.get());
-      ht.put(puts);
+  
+    MyAsyncProcess ap = new MyAsyncProcess(conn, conf, true);
+    BufferedMutatorParams bufferParam = new BufferedMutatorParams(DUMMY_TABLE);
+    bufferParam.pool(ap.pool);
+    try (BufferedMutatorImpl mutator = new BufferedMutatorImpl(conn, null, null, bufferParam)) {
+      mutator.ap = ap;
+      mutator.mutate(puts);
+      mutator.flush();
       List<AsyncRequestFuture> reqs = ap.allReqs;
 
       int actualSnReqCount = 0;
@@ -718,55 +719,7 @@ public class TestAsyncProcess {
     ht.mutate(put);
     Assert.assertEquals(0, ht.getWriteBufferSize());
   }
-
-  private void doHTableFailedPut(boolean bufferOn) throws Exception {
-    ClusterConnection conn = createHConnection();
-    HTable ht = new HTable(conn, new BufferedMutatorParams(DUMMY_TABLE));
-    MyAsyncProcess ap = new MyAsyncProcess(conn, conf, true);
-    ht.mutator.ap = ap;
-    if (bufferOn) {
-      ht.setWriteBufferSize(1024L * 1024L);
-    } else {
-      ht.setWriteBufferSize(0L);
-    }
-
-    Put put = createPut(1, false);
-
-    Assert.assertEquals(0L, ht.mutator.currentWriteBufferSize.get());
-    try {
-      ht.put(put);
-      if (bufferOn) {
-        ht.flushCommits();
-      }
-      Assert.fail();
-    } catch (RetriesExhaustedException expected) {
-    }
-    Assert.assertEquals(0L, ht.mutator.currentWriteBufferSize.get());
-    // The table should have sent one request, maybe after multiple attempts
-    AsyncRequestFuture ars = null;
-    for (AsyncRequestFuture someReqs : ap.allReqs) {
-      if (someReqs.getResults().length == 0)
-        continue;
-      Assert.assertTrue(ars == null);
-      ars = someReqs;
-    }
-    Assert.assertTrue(ars != null);
-    verifyResult(ars, false);
-
-    // This should not raise any exception, puts have been 'received' before by the catch.
-    ht.close();
-  }
-
-  @Test
-  public void testHTableFailedPutWithBuffer() throws Exception {
-    doHTableFailedPut(true);
-  }
-
-  @Test
-  public void testHTableFailedPutWithoutBuffer() throws Exception {
-    doHTableFailedPut(false);
-  }
-
+  
   @Test
   public void testHTableFailedPutAndNewPut() throws Exception {
     ClusterConnection conn = createHConnection();

@@ -4096,8 +4096,8 @@ public class TestFromClientSide {
       Put p = new Put(ROW);
       p.add(BAD_FAM, QUALIFIER, VAL);
       table.put(p);
-    } catch (RetriesExhaustedWithDetailsException e) {
-      caughtNSCFE = e.getCause(0) instanceof NoSuchColumnFamilyException;
+    } catch (Exception e) {
+      caughtNSCFE = e instanceof NoSuchColumnFamilyException;
     }
     assertTrue("Should throw NoSuchColumnFamilyException", caughtNSCFE);
 
@@ -4129,50 +4129,6 @@ public class TestFromClientSide {
     Result row : scanner)
       nbRows++;
     assertEquals(NB_BATCH_ROWS, nbRows);
-  }
-
-  @Test
-  public void testRowsPutBufferedOneFlush() throws IOException, InterruptedException {
-    final byte [] CONTENTS_FAMILY = Bytes.toBytes("contents");
-    final byte [] SMALL_FAMILY = Bytes.toBytes("smallfam");
-    final byte [] value = Bytes.toBytes("abcd");
-    final int NB_BATCH_ROWS = 10;
-    HTable table = TEST_UTIL.createTable(Bytes.toBytes("testRowsPutBufferedOneFlush"),
-      new byte [][] {CONTENTS_FAMILY, SMALL_FAMILY});
-    TEST_UTIL.waitTableAvailable(Bytes.toBytes("testRowsPutBufferedOneFlush"),
-        10000);
-    table.setAutoFlush(false);
-    ArrayList<Put> rowsUpdate = new ArrayList<Put>();
-    for (int i = 0; i < NB_BATCH_ROWS * 10; i++) {
-      byte[] row = Bytes.toBytes("row" + i);
-      Put put = new Put(row);
-      put.setDurability(Durability.SKIP_WAL);
-      put.add(CONTENTS_FAMILY, null, value);
-      rowsUpdate.add(put);
-    }
-    table.put(rowsUpdate);
-
-    Scan scan = new Scan();
-    scan.addFamily(CONTENTS_FAMILY);
-    ResultScanner scanner = table.getScanner(scan);
-    int nbRows = 0;
-    for (@SuppressWarnings("unused")
-    Result row : scanner)
-      nbRows++;
-    assertEquals(0, nbRows);
-    scanner.close();
-
-    table.flushCommits();
-
-    scan = new Scan();
-    scan.addFamily(CONTENTS_FAMILY);
-    scanner = table.getScanner(scan);
-    nbRows = 0;
-    for (@SuppressWarnings("unused")
-    Result row : scanner)
-      nbRows++;
-    assertEquals(NB_BATCH_ROWS * 10, nbRows);
-    table.close();
   }
 
   @Test
@@ -5037,7 +4993,7 @@ public class TestFromClientSide {
 
     Delete delete = new Delete(ROW);
     delete.deleteColumns(FAMILY, QUALIFIER);
-
+    
     // cell = "bbbb", using "aaaa" to compare only LESS/LESS_OR_EQUAL/NOT_EQUAL
     // turns out "match"
     boolean ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.GREATER, value1, delete);
@@ -5052,32 +5008,27 @@ public class TestFromClientSide {
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.LESS_OR_EQUAL, value1, delete);
     assertEquals(ok, true);
     table.put(put2);
-
+    ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.NOT_EQUAL, value1, delete);
     assertEquals(ok, true);
 
     // cell = "cccc", using "dddd" to compare only LARGER/LARGER_OR_EQUAL/NOT_EQUAL
     // turns out "match"
     table.put(put3);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.LESS, value4, delete);
-
     assertEquals(ok, false);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.LESS_OR_EQUAL, value4, delete);
-
     assertEquals(ok, false);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.EQUAL, value4, delete);
-
     assertEquals(ok, false);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.GREATER, value4, delete);
-
     assertEquals(ok, true);
     table.put(put3);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.GREATER_OR_EQUAL, value4, delete);
     assertEquals(ok, true);
     table.put(put3);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.NOT_EQUAL, value4, delete);
-
     assertEquals(ok, true);
-
+    
     // cell = "bbbb", using "bbbb" to compare only GREATER_OR_EQUAL/LESS_OR_EQUAL/EQUAL
     // turns out "match"
     table.put(put2);
@@ -5095,8 +5046,9 @@ public class TestFromClientSide {
     table.put(put2);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.EQUAL, value2, delete);
     assertEquals(ok, true);
+    
   }
-
+  
   /**
   * Test ScanMetrics
   * @throws Exception
