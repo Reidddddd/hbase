@@ -78,6 +78,7 @@ public class HBaseCommonTestingUtility {
   public HBaseCommonTestingUtility(Configuration conf) {
     this.conf = (conf == null ? HBaseConfiguration.create() : conf);
     this.conf.setBoolean("ignore.sdi.authenticate", true);
+    this.conf.set("hbase.wal.provider", "filesystem");
   }
 
   /**
