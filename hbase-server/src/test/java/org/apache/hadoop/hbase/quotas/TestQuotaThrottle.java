@@ -24,7 +24,6 @@ import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
@@ -515,12 +514,7 @@ public class TestQuotaThrottle {
         }
         count += tables.length;
       }
-    } catch (RetriesExhaustedWithDetailsException e) {
-      for (Throwable t : e.getCauses()) {
-        if (!(t instanceof ThrottlingException)) {
-          throw e;
-        }
-      }
+    } catch (ThrottlingException e) {
       LOG.error("put failed after nRetries=" + count, e);
     }
     return count;

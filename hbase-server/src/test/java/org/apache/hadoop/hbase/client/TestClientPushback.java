@@ -92,23 +92,21 @@ public class TestClientPushback {
   public void testClientTracksServerPushback() throws Exception{
     Configuration conf = UTIL.getConfiguration();
     TableName tablename = TableName.valueOf(tableName);
-    Connection conn = ConnectionFactory.createConnection(conf);
-    HTable table = (HTable) conn.getTable(tablename);
-    //make sure we flush after each put
-    table.setAutoFlushTo(true);
+    ClusterConnection conn = (ClusterConnection) ConnectionFactory.createConnection(conf);
+    BufferedMutatorImpl mutator = (BufferedMutatorImpl) conn.getBufferedMutator(tablename);
 
     // write some data
     Put p = new Put(Bytes.toBytes("row"));
-    p.add(family, qualifier, Bytes.toBytes("value1"));
-    table.put(p);
+    p.addColumn(family, qualifier, Bytes.toBytes("value1"));
+    mutator.mutate(p);
+    mutator.flush();
 
     // get the stats for the region hosting our table
-    ClusterConnection connection = table.connection;
-    ClientBackoffPolicy backoffPolicy = connection.getBackoffPolicy();
+    ClientBackoffPolicy backoffPolicy = conn.getBackoffPolicy();
     assertTrue("Backoff policy is not correctly configured",
       backoffPolicy instanceof ExponentialClientBackoffPolicy);
-    
-    ServerStatisticTracker stats = connection.getStatisticsTracker();
+  
+    ServerStatisticTracker stats = conn.getStatisticsTracker();
     assertNotNull( "No stats configured for the client!", stats);
     Region region = UTIL.getHBaseCluster().getRegionServer(0).getOnlineRegions(tablename).get(0);
     // get the names so we can query the stats
@@ -134,8 +132,8 @@ public class TestClientPushback {
     ops.add(p);
     final CountDownLatch latch = new CountDownLatch(1);
     final AtomicLong endTime = new AtomicLong();
-    long startTime = EnvironmentEdgeManager.currentTime();    
-    table.mutator.ap.submit(tablename, ops, true, new Batch.Callback<Result>() {
+    long startTime = EnvironmentEdgeManager.currentTime();
+    mutator.ap.submit(tablename, ops, true, new Batch.Callback<Result>() {
       @Override
       public void update(byte[] region, byte[] row, Result result) {
         endTime.set(EnvironmentEdgeManager.currentTime());
@@ -147,15 +145,15 @@ public class TestClientPushback {
     // wait and related checks below are reasonable. Revisit if the backoff
     // time reported by above debug logging has significantly deviated.
     String name = server.getServerName() + "," + Bytes.toStringBinary(regionName);
-    MetricsConnection.RegionStats rsStats = connection.getConnectionMetrics().
+    MetricsConnection.RegionStats rsStats = conn.getConnectionMetrics().
             serverStats.get(server).get(regionName);
     assertEquals(name, rsStats.name);
     assertEquals(rsStats.heapOccupancyHist.mean(),
         (double)regionStats.getHeapOccupancyPercent(), 0.1 );
     assertEquals(rsStats.memstoreLoadHist.mean(),
         (double)regionStats.getMemstoreLoadPercent(), 0.1);
-
-    MetricsConnection.RunnerStats runnerStats = connection.getConnectionMetrics().runnerStats;
+  
+    MetricsConnection.RunnerStats runnerStats = conn.getConnectionMetrics().runnerStats;
 
     assertEquals(runnerStats.delayRunners.count(), 1);
     assertEquals(runnerStats.normalRunners.count(), 1);

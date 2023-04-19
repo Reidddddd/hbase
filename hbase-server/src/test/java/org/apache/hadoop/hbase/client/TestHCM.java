@@ -446,7 +446,7 @@ public class TestHCM {
       table.setOperationTimeout(30 * 1000);
       table.put(new Put(FAM_NAM).addColumn(FAM_NAM, FAM_NAM, FAM_NAM));
       Assert.fail("We expect an exception here");
-    } catch (RetriesExhaustedWithDetailsException e) {
+    } catch (SocketTimeoutException e) {
       // The client has a CallTimeout class, but it's not shared.We're not very clean today,
       //  in the general case you can expect the call to stop, but the exception may vary.
       // In this test however, we're sure that it will be a socket timeout.
@@ -1093,6 +1093,13 @@ public class TestHCM {
       Throwable cause = ClientExceptionsUtil.findException(e.getCause(0));
       Assert.assertNotNull(cause);
       Assert.assertTrue(cause instanceof RegionMovedException);
+    } catch (RetriesExhaustedException ree) {
+      // hbase2 throws RetriesExhaustedException instead of RetriesExhaustedWithDetailsException
+      // as hbase1 used to do. Keep an eye on this to see if this changed behavior is an issue.
+      LOG.info("Put done, exception caught: " + ree.getClass());
+      Throwable cause = ClientExceptionsUtil.findException(ree.getCause());
+      Assert.assertNotNull(cause);
+      Assert.assertTrue(cause instanceof RegionMovedException);
     }
     Assert.assertNotNull("Cached connection is null", conn.getCachedLocation(TABLE_NAME, ROW));
     Assert.assertEquals(
@@ -1690,11 +1697,8 @@ public class TestHCM {
         Put p = new Put(ROW);
         p.addColumn(FAM_NAM,new byte[]{0}, new byte[]{0});
         table.put(p);
-      } catch (RetriesExhaustedWithDetailsException e) {
-        // For put we use AsyncProcess and it will wrap all exceptions to this.
-        if (e.exceptions.get(0) instanceof ServerTooBusyException) {
-          getServerBusyException = 1;
-        }
+      } catch (ServerTooBusyException e) {
+        getServerBusyException = 1;
       } catch (IOException ignore) {
       }
     }

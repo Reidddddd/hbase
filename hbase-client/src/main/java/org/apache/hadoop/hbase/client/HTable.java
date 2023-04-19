@@ -1022,10 +1022,27 @@ public class HTable implements HTableInterface, RegionLocator {
    */
   @Override
   public void put(final Put put) throws IOException {
-    getBufferedMutator().mutate(put);
-    if (autoFlush) {
-      flushCommits();
-    }
+    validatePut(put);
+    RegionServerCallable<Boolean> callable =
+        new RegionServerCallable<Boolean>(connection, getName(), put.getRow(), put.getPriority()) {
+          @Override
+          public Boolean call(int callTimeout) throws IOException {
+            HBaseRpcController controller = rpcControllerFactory.newController();
+            controller.setPriority(tableName);
+            controller.setPriority(getPriority());
+            controller.setCallTimeout(callTimeout);
+            try {
+              MutateRequest request = RequestConverter.buildMutateRequest(
+                  getLocation().getRegionInfo().getRegionName(), put);
+              MutateResponse response = getStub().mutate(controller, request);
+              return Boolean.valueOf(response.getProcessed());
+            } catch (ServiceException se) {
+              throw ProtobufUtil.getRemoteException(se);
+            }
+          }
+        };
+    rpcCallerFactory.<Boolean> newCaller(writeRpcTimeout).callWithRetries(callable,
+        this.operationTimeout);
   }
 
   /**
@@ -1034,9 +1051,14 @@ public class HTable implements HTableInterface, RegionLocator {
    */
   @Override
   public void put(final List<Put> puts) throws IOException {
-    getBufferedMutator().mutate(puts);
-    if (autoFlush) {
-      flushCommits();
+    for (Put put : puts) {
+      validatePut(put);
+    }
+    Object[] results = new Object[puts.size()];
+    try {
+      batch(puts, results, writeRpcTimeout);
+    } catch (InterruptedException e) {
+      throw (InterruptedIOException) new InterruptedIOException().initCause(e);
     }
   }
 
