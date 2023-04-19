@@ -1472,8 +1472,9 @@
     <hadoop.guava.version>11.0.2</hadoop.guava.version>
     <compat.module>hbase-hadoop2-compat</compat.module>
     <assembly.file>src/main/assembly/hadoop-two-compat.xml</assembly.file>
-    <!--This property is for hadoops netty. HBase netty
+    <!--These properties are for hadoops netty. HBase netty
          comes in via hbase-thirdparty hbase-shaded-netty-->
+    <netty.hadoop.artifact>netty</netty.hadoop.artifact>
     <netty.hadoop.version>3.6.2.Final</netty.hadoop.version>
     <!-- end HBASE-15925 default hadoop compatibility values -->
     <audience-annotations.version>0.5.0</audience-annotations.version>
@@ -2634,8 +2635,9 @@
         <hadoop.version>${hadoop-two.version}</hadoop.version>
         <compat.module>hbase-hadoop2-compat</compat.module>
         <assembly.file>src/main/assembly/hadoop-two-compat.xml</assembly.file>
-        <!--This property is for hadoops netty. HBase netty
+        <!--These properties are for hadoops netty. HBase netty
              comes in via hbase-thirdparty hbase-shaded-netty-->
+        <netty.hadoop.artifact>netty</netty.hadoop.artifact>
         <netty.hadoop.version>3.6.2.Final</netty.hadoop.version>
       </properties>
       <dependencyManagement>
@@ -3210,9 +3212,10 @@
         <!--Use this compat module for now. TODO: Make h3 one if we need one-->
         <compat.module>hbase-hadoop2-compat</compat.module>
         <assembly.file>src/main/assembly/hadoop-three-compat.xml</assembly.file>
-        <!--This property is for hadoops netty. HBase netty
+        <!--These properties are for hadoops netty. HBase netty
              comes in via hbase-thirdparty hbase-shaded-netty-->
-        <netty.hadoop.version>3.10.5.Final</netty.hadoop.version>
+        <netty.hadoop.artifact>netty-all</netty.hadoop.artifact>
+        <netty.hadoop.version>4.1.61.Final</netty.hadoop.version>
       </properties>
      <dependencyManagement>
        <dependencies>
