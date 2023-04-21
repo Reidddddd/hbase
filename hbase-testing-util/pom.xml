@@ -284,11 +284,6 @@
                 <dependency>
                   <groupId>org.apache.hadoop</groupId>
                   <artifactId>hadoop-hdfs</artifactId>
-                  <scope>compile</scope>
-                </dependency>
-                <dependency>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdfs</artifactId>
                   <type>test-jar</type>
                   <scope>compile</scope>
                 </dependency>
