@@ -306,6 +306,11 @@
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-minikdc</artifactId>
                 </dependency>
+                <dependency>
+                  <groupId>org.mockito</groupId>
+                  <artifactId>mockito-core</artifactId>
+                  <scope>test</scope>
+                </dependency>
             </dependencies>
         </profile>
     </profiles>
