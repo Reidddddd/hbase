@@ -51,6 +51,7 @@ import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -194,9 +195,39 @@ public final class FanOutOneBlockAsyncDFSOutputHelper {
     };
   }
 
-  private static LeaseManager createLeaseManager() throws NoSuchMethodException {
+  private static LeaseManager createLeaseManager3_3() throws NoSuchMethodException {
     Method beginFileLeaseMethod =
-        DFSClient.class.getDeclaredMethod("beginFileLease", long.class, DFSOutputStream.class);
+      DFSClient.class.getDeclaredMethod("beginFileLease", String.class, DFSOutputStream.class);
+    beginFileLeaseMethod.setAccessible(true);
+    Method endFileLeaseMethod = DFSClient.class.getDeclaredMethod("endFileLease", String.class);
+    endFileLeaseMethod.setAccessible(true);
+    return new LeaseManager() {
+
+      @Override
+      public void begin(DFSClient client, long inodeId) {
+        try {
+          String defaultKey = HdfsClientConfigKeys.DFS_OUTPUT_STREAM_UNIQ_DEFAULT_KEY_DEFAULT;
+          beginFileLeaseMethod.invoke(client, defaultKey + "_" + inodeId, null);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      @Override
+      public void end(DFSClient client, long inodeId) {
+        try {
+          String defaultKey = HdfsClientConfigKeys.DFS_OUTPUT_STREAM_UNIQ_DEFAULT_KEY_DEFAULT;
+          endFileLeaseMethod.invoke(client, defaultKey + "_" + inodeId);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    };
+  }
+
+  private static LeaseManager createLeaseManager3Or2() throws NoSuchMethodException {
+    Method beginFileLeaseMethod =
+      DFSClient.class.getDeclaredMethod("beginFileLease", long.class, DFSOutputStream.class);
     beginFileLeaseMethod.setAccessible(true);
     Method endFileLeaseMethod = DFSClient.class.getDeclaredMethod("endFileLease", long.class);
     endFileLeaseMethod.setAccessible(true);
@@ -220,6 +251,16 @@ public final class FanOutOneBlockAsyncDFSOutputHelper {
         }
       }
     };
+  }
+
+  private static LeaseManager createLeaseManager() throws NoSuchMethodException {
+    try {
+      return createLeaseManager3_3();
+    } catch (NoSuchMethodException e) {
+      LOG.debug(
+        "DFSClient::beginFileLease wrong number of arguments, should be hadoop 3.2 or below");
+    }
+    return createLeaseManager3Or2();
   }
 
   private static FileCreator createFileCreator3_3() throws NoSuchMethodException {
