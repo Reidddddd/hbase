@@ -2899,7 +2899,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         Cell cell = cells.get(i);
         //  Check if time is LATEST, change to time of most recent addition if so
         //  This is expensive.
-        if (cell.getTimestamp() == HConstants.LATEST_TIMESTAMP && CellUtil.isDeleteType(cell)) {
+        if (cell.getTimestamp() == HConstants.LATEST_TIMESTAMP && CellUtil.isDelete(cell)) {
           byte[] qual = CellUtil.cloneQualifier(cell);
           if (qual == null) qual = HConstants.EMPTY_BYTE_ARRAY;
 
