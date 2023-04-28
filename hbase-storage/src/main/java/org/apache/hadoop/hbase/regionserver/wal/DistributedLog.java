@@ -28,9 +28,6 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -52,11 +49,7 @@ public class DistributedLog extends AbstractLog {
   private static final String DISTRIBUTED_LOG_ROLL_SIZE =
     "hbase.regionserver.wal.distributedlog.rollsize";
   private static final long DEFAULT_DISTRIBUTED_LOG_ROLL_SIZE = 134217728; // 128 MB
-  private static final String DISTRIBUTED_LOG_SYNC_PERIOD =
-    "hbase.regionserver.wal.distributedlog.sync.period";
-  private static final int DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD = 100;
-  
-  private final ScheduledExecutorService forceScheduler = Executors.newScheduledThreadPool(1);
+
   private final Namespace distributedLogNamespace;
   private final String serverName;
 
@@ -74,29 +67,6 @@ public class DistributedLog extends AbstractLog {
     ourLogs = new LogNameFilter(prefixLogStr, logNameSuffix);
     rollWriter();
     initDisruptor();
-
-//    forceScheduler.scheduleAtFixedRate(
-//      () -> {
-//        Exception lastException = null;
-//        try {
-//          if (writer != null) {
-//            writer.sync();
-//          }
-//        } catch (IOException e) {
-//          LOG.error("Error syncing, request close of WAL", e);
-//          lastException = e;
-//        } catch (Exception e) {
-//          LOG.warn("UNEXPECTED", e);
-//          lastException = e;
-//        } finally {
-//          if (lastException != null) {
-//            requestLogRoll();
-//          } else {
-//            checkLogRoll();
-//          }
-//        }
-//      }, 100, conf.getInt(DISTRIBUTED_LOG_SYNC_PERIOD, DEFAULT_DISTRIBUTED_LOG_FORCE_PERIOD),
-//      TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -232,13 +202,6 @@ public class DistributedLog extends AbstractLog {
   }
 
   @Override
-  protected long updateHighestSyncedSequence(long sequence) {
-    long sequenceId = super.updateHighestSyncedSequence(sequence);
-    ((DistributedLogWriter) writer).setHighestUnsyncedSequenceId(sequenceId);
-    return sequenceId;
-  }
-
-  @Override
   protected void nextWriterInit(Writer nextWriter) {
     // we currently have nothing to do with the next writer.
   }
@@ -251,7 +214,6 @@ public class DistributedLog extends AbstractLog {
   public void close() throws IOException {
     shutdown();
     try {
-      forceScheduler.shutdown();
       // We only archive the logs under this server.
       Iterator<String> logNames = distributedLogNamespace.getLogs(serverName);
       String logBaseURL = distributedLogNamespace.getNamespaceDriver().getUri().getPath();

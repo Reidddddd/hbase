@@ -20,7 +20,6 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import com.google.common.annotations.VisibleForTesting;
-import dlshade.org.apache.bookkeeper.common.concurrent.FutureUtils;
 import dlshade.org.apache.distributedlog.AppendOnlyStreamWriter;
 import dlshade.org.apache.distributedlog.api.DistributedLogManager;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
@@ -29,9 +28,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -55,17 +51,10 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   // Refer to org.apache.distributedlog.LogRecord#getPersistentSize()
   private static final int LOG_RECORD_SIZE_LIMIT = 1024 * 1024 - 1024 * 8 - 20;
 
-  private final AtomicLong actualHighestSequenceId = new AtomicLong(0);
-  private final AtomicLong recordCount = new AtomicLong(0);
-  private final AtomicReference<CompletableFuture<Long>> lastFuture = new AtomicReference<>();
-
-  private volatile long highestUnsyncedSequenceId = 0;
-
   private Namespace walNamespace;
   private DistributedLogManager distributedLogManager;
   private AppendOnlyStreamWriter appendOnlyStreamWriter;
   private String logName;
-  private boolean useAppendFlush = false;
 
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
@@ -86,20 +75,15 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     super.init(conf);
     // Force the wal header.
     this.appendOnlyStreamWriter.force(false);
-    this.useAppendFlush = conf.getBoolean("distributedlog.writer.sync.method.two", false);
   }
 
   @Override
   public void sync() throws IOException {
     // Do nothing.
-    CompletableFuture<Long> future = useAppendFlush ? lastFuture.getAndSet(null) :
+    try {
       appendOnlyStreamWriter.flush();
-    if (future != null) {
-      try {
-        FutureUtils.result(future);
-      } catch (Exception e) {
-        throw new IOException("Failed sync with exception: ", e);
-      }
+    } catch (Exception e) {
+      throw new IOException("Failed sync with exception: ", e);
     }
   }
 
@@ -154,30 +138,16 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
         // Here we must use the min here to prevent the padded 0.
         appendOnlyStreamWriter.write(Arrays.copyOfRange(recordArray, i * LOG_RECORD_SIZE_LIMIT,
           Math.min((i + 1) * LOG_RECORD_SIZE_LIMIT, recordArray.length)));
-        recordCount.incrementAndGet();
       }
     } else {
       appendOnlyStreamWriter.write(recordArray);
-      recordCount.incrementAndGet();
-    }
-    if (useAppendFlush) {
-      lastFuture.set(appendOnlyStreamWriter.flush());
     }
     buffer.reset();
   }
 
   @VisibleForTesting
   public void forceWriter() throws IOException {
-    long syncedHighestSequenceId = actualHighestSequenceId.get();
-    long unsyncedHighestSequenceId = highestUnsyncedSequenceId;
-    if (appendOnlyStreamWriter != null && unsyncedHighestSequenceId > syncedHighestSequenceId) {
-      this.appendOnlyStreamWriter.force(false);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Forced writer from sequenceId: " + syncedHighestSequenceId + " to: "
-          + unsyncedHighestSequenceId);
-      }
-      actualHighestSequenceId.updateAndGet(self -> Math.max(self, unsyncedHighestSequenceId));
-    }
+    this.appendOnlyStreamWriter.force(false);
   }
 
   @Override
@@ -202,11 +172,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
       if (appendOnlyStreamWriter != null) {
         forceWriter();
         appendOnlyStreamWriter.markEndOfStream();
-        if (distributedLogManager.getLogRecordCount() != recordCount.get()) {
-          throw new IOException(
-            "We wrote " + recordCount.get() + " records to log: " + logName + " but only " +
-              distributedLogManager.getLogRecordCount() + " were received by DistributedLog.");
-        }
       }
     } catch (Exception e) {
       throw new IOException(e);
@@ -229,7 +194,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     ByteArrayOutputStream buffer = (ByteArrayOutputStream) this.output;
     appendOnlyStreamWriter.write(buffer.toByteArray());
     buffer.reset();
-    recordCount.incrementAndGet();
   }
 
   @Override
@@ -239,12 +203,6 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
     super.writeWALTrailer();
     appendOnlyStreamWriter.write(buffer.toByteArray());
     buffer.reset();
-    recordCount.incrementAndGet();
-  }
-
-  // For WAL to update the highest sequenceId.
-  void setHighestUnsyncedSequenceId(long sequenceId) {
-    this.highestUnsyncedSequenceId = sequenceId;
   }
 
   @VisibleForTesting
