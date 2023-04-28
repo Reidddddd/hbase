@@ -23,7 +23,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.testclassification.RegionServerTests;
-import org.apache.hadoop.hbase.util.FanOutOneBlockAsyncDFSOutputFlushHandler;
+import org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputFlushHandler;
 import org.apache.hadoop.hbase.wal.AsyncFSWALProvider;
 import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.hadoop.hbase.wal.WALProvider.AsyncWriter;

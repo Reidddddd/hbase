@@ -30,8 +30,8 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.io.ByteArrayOutputStream;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALTrailer;
-import org.apache.hadoop.hbase.util.FanOutOneBlockAsyncDFSOutput;
-import org.apache.hadoop.hbase.util.FanOutOneBlockAsyncDFSOutputHelper;
+import org.apache.hadoop.hbase.io.asyncfs.AsyncFSOutput;
+import org.apache.hadoop.hbase.io.asyncfs.AsyncFSOutputHelper;
 import org.apache.hadoop.hbase.wal.AsyncFSWALProvider;
 import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -97,7 +97,7 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
 
   private final EventLoop eventLoop;
 
-  private FanOutOneBlockAsyncDFSOutput output;
+  private AsyncFSOutput output;
 
   private ByteArrayOutputStream buf;
 
@@ -149,7 +149,7 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
     this.output = null;
   }
 
-  public FanOutOneBlockAsyncDFSOutput getOutput() {
+  public AsyncFSOutput getOutput() {
     return this.output;
   }
 
@@ -157,7 +157,7 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
   protected void initOutput(FileSystem fs, Path path, boolean overwritable, int bufferSize,
                             short replication, long blockSize) throws IOException {
     this.output =
-            FanOutOneBlockAsyncDFSOutputHelper.createOutput((DistributedFileSystem) fs, path,
+            AsyncFSOutputHelper.createOutput((DistributedFileSystem) fs, path,
                     overwritable, false, replication, blockSize, eventLoop);
     this.buf = new ByteArrayOutputStream();
   }
