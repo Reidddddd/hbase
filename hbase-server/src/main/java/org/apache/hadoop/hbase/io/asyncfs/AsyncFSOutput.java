@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.io.asyncfs;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.CompletionHandler;
 
 
@@ -43,6 +44,16 @@ public interface AsyncFSOutput extends Closeable {
    * {@link #flush(Object, CompletionHandler, boolean)} to flush the buffer manually.
    */
   void write(byte[] b, int off, int len);
+
+  /**
+   * Write an int to the buffer.
+   */
+  void writeInt(int i);
+
+  /**
+   * Copy the data in the given {@code bb} into the buffer.
+   */
+  void write(ByteBuffer bb);
 
   /**
    * Return the current size of buffered data.

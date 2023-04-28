@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.regionserver.wal;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.channels.CompletionHandler;
 
 import org.apache.commons.logging.Log;
@@ -28,6 +29,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.io.ByteArrayOutputStream;
+import org.apache.hadoop.hbase.io.ByteBufferSupportOutputStream;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALTrailer;
 import org.apache.hadoop.hbase.io.asyncfs.AsyncFSOutput;
@@ -99,7 +101,48 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
 
   private AsyncFSOutput output;
 
-  private ByteArrayOutputStream buf;
+  private static final class OutputStreamWrapper extends OutputStream
+          implements ByteBufferSupportOutputStream {
+
+    private final AsyncFSOutput out;
+
+    private final byte[] oneByteBuf = new byte[1];
+
+    @Override
+    public void write(int b) throws IOException {
+      oneByteBuf[0] = (byte) b;
+      write(oneByteBuf);
+    }
+
+    public OutputStreamWrapper(AsyncFSOutput out) {
+      this.out = out;
+    }
+
+    @Override
+    public void write(ByteBuffer b, int off, int len) throws IOException {
+      ByteBuffer bb = b.duplicate();
+      bb.position(off);
+      bb.limit(off + len);
+      out.write(bb);
+    }
+
+    @Override
+    public void writeInt(int i) throws IOException {
+      out.writeInt(i);
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+      out.write(b, off, len);
+    }
+
+    @Override
+    public void close() throws IOException {
+      out.close();
+    }
+  }
+
+  private OutputStream asyncOutputWrapper;
 
   public AsyncProtobufLogWriter(EventLoop eventLoop) {
     this.eventLoop = eventLoop;
@@ -107,26 +150,22 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
 
   @Override
   public void append(Entry entry) {
-    buf.reset();
+    int buffered = output.buffered();
     entry.setCompressionContext(compressionContext);
     try {
       entry.getKey().getBuilder(compressor).setFollowingKvCount(entry.getEdit().size()).build()
-              .writeDelimitedTo(buf);
+              .writeDelimitedTo(asyncOutputWrapper);
     } catch (IOException e) {
       throw new AssertionError("should not happen", e);
     }
-    length.addAndGet(buf.size());
-    output.write(buf.getBuffer(), 0, buf.size());
     try {
       for (Cell cell : entry.getEdit().getCells()) {
-        buf.reset();
         cellEncoder.write(cell);
-        length.addAndGet(buf.size());
-        output.write(buf.getBuffer(), 0, buf.size());
       }
     } catch (IOException e) {
       throw new AssertionError("should not happen", e);
     }
+    length.addAndGet(output.buffered() - buffered);
   }
 
   @Override
@@ -157,24 +196,23 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
   protected void initOutput(FileSystem fs, Path path, boolean overwritable, int bufferSize,
                             short replication, long blockSize) throws IOException {
     this.output =
-            AsyncFSOutputHelper.createOutput((DistributedFileSystem) fs, path,
+            AsyncFSOutputHelper.createOutput(fs, path,
                     overwritable, false, replication, blockSize, eventLoop);
-    this.buf = new ByteArrayOutputStream();
+    this.asyncOutputWrapper = new OutputStreamWrapper(output);
   }
 
   @Override
   protected long writeMagicAndWALHeader(byte[] magic, WALHeader header) throws IOException {
-    buf.reset();
-    header.writeDelimitedTo(buf);
     final BlockingCompletionHandler handler = new BlockingCompletionHandler();
-    eventLoop.execute(new Runnable() {
-
-      @Override
-      public void run() {
-        output.write(ProtobufLogReader.PB_WAL_MAGIC);
-        output.write(buf.getBuffer(), 0, buf.size());
-        output.flush(null, handler, false);
+    eventLoop.execute(() -> {
+      output.write(magic);
+      try {
+        header.writeDelimitedTo(asyncOutputWrapper);
+      } catch (IOException e) {
+        // should not happen
+        throw new AssertionError(e);
       }
+      output.flush(null, handler, false);
     });
     return handler.get();
   }
@@ -182,22 +220,23 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
   @Override
   protected long writeWALTrailerAndMagic(WALTrailer trailer, final byte[] magic)
           throws IOException {
-    buf.reset();
-    trailer.writeTo(buf);
     final BlockingCompletionHandler handler = new BlockingCompletionHandler();
-    eventLoop.execute(new Runnable() {
-      public void run() {
-        output.write(buf.getBuffer(), 0, buf.size());
-        output.write(Ints.toByteArray(buf.size()));
-        output.write(magic);
-        output.flush(null, handler, false);
+    eventLoop.execute(() -> {
+      try {
+        trailer.writeTo(asyncOutputWrapper);
+      } catch (IOException e) {
+        // should not happen
+        throw new AssertionError(e);
       }
+      output.writeInt(trailer.getSerializedSize());
+      output.write(magic);
+      output.flush(null, handler, false);
     });
     return handler.get();
   }
 
   @Override
   protected OutputStream getOutputStreamForCellEncoder() {
-    return buf;
+    return asyncOutputWrapper;
   }
 }

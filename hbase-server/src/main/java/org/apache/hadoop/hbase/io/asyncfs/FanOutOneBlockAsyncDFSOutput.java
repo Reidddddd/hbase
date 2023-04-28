@@ -28,6 +28,7 @@ import static org.apache.hadoop.hdfs.protocol.HdfsConstants.READ_TIMEOUT;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.CompletionHandler;
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -336,6 +337,33 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     setupReceiver(conf.getInt(DFS_CLIENT_SOCKET_TIMEOUT_KEY, READ_TIMEOUT));
   }
 
+  private void writeInt0(int i) {
+    buf.ensureWritable(4).writeInt(i);
+  }
+
+  @Override
+  public void writeInt(int i) {
+    if (eventLoop.inEventLoop()) {
+      writeInt0(i);
+    } else {
+      eventLoop.submit(() -> writeInt0(i));
+    }
+  }
+
+  private void write0(ByteBuffer bb) {
+    int len = bb.remaining();
+    buf.ensureWritable(len).writeBytes(bb);
+  }
+
+  @Override
+  public void write(ByteBuffer bb) {
+    if (eventLoop.inEventLoop()) {
+      write0(bb);
+    } else {
+      eventLoop.submit(() -> write0(bb));
+    }
+  }
+
   @Override
   public void write(byte[] b) {
     write(b, 0, b.length);
@@ -346,12 +374,8 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     if (eventLoop.inEventLoop()) {
       buf.ensureWritable(len).writeBytes(b, off, len);
     } else {
-      eventLoop.submit(new Runnable() {
-
-        @Override
-        public void run() {
-          buf.ensureWritable(len).writeBytes(b, off, len);
-        }
+      eventLoop.submit(() -> {
+        buf.ensureWritable(len).writeBytes(b, off, len);
       }).syncUninterruptibly();
     }
   }
@@ -361,13 +385,7 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     if (eventLoop.inEventLoop()) {
       return buf.readableBytes();
     } else {
-      return eventLoop.submit(new Callable<Integer>() {
-
-        @Override
-        public Integer call() throws Exception {
-          return buf.readableBytes();
-        }
-      }).syncUninterruptibly().getNow().intValue();
+      return eventLoop.submit(() -> buf.readableBytes()).syncUninterruptibly().getNow();
     }
   }
 

@@ -20,8 +20,10 @@ package org.apache.hadoop.hbase.io;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+import org.apache.hadoop.hbase.util.ByteBufferUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -30,7 +32,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * synchronized and supports writing ByteBuffer directly to it.
  */
 @InterfaceAudience.Private
-public class ByteArrayOutputStream extends OutputStream {
+public class ByteArrayOutputStream extends OutputStream implements ByteBufferSupportOutputStream {
 
   // Borrowed from openJDK:
   // http://grepcode.com/file/repository.grepcode.com/java/root/jdk/openjdk/8-b132/java/util/ArrayList.java#221
@@ -47,27 +49,34 @@ public class ByteArrayOutputStream extends OutputStream {
     this.buf = new byte[capacity];
   }
 
+  @Override
+  public void write(ByteBuffer b, int off, int len) {
+    checkSizeAndGrow(len);
+    ByteBufferUtils.copyFromBufferToArray(this.buf, b, off, this.pos, len);
+    this.pos += len;
+  }
+
   /**
    * Writes an <code>int</code> to the underlying output stream as four
    * bytes, high byte first.
    * @param i the <code>int</code> to write
    * @throws IOException if an I/O error occurs.
   */
-  public void writeInt(int i) throws IOException {
+  public void writeInt(int i) {
     checkSizeAndGrow(Bytes.SIZEOF_INT);
     Bytes.putInt(this.buf, this.pos, i);
     this.pos += Bytes.SIZEOF_INT;
   }
 
   @Override
-  public void write(int b) throws IOException {
+  public void write(int b) {
     checkSizeAndGrow(Bytes.SIZEOF_BYTE);
     buf[this.pos] = (byte) b;
     this.pos++;
   }
 
   @Override
-  public void write(byte[] b, int off, int len) throws IOException {
+  public void write(byte[] b, int off, int len) {
     checkSizeAndGrow(len);
     System.arraycopy(b, off, this.buf, this.pos, len);
     this.pos += len;
@@ -107,7 +116,7 @@ public class ByteArrayOutputStream extends OutputStream {
    *
    * @return the contents of this output stream, as new byte array.
    */
-  public byte toByteArray()[] {
+  public byte[] toByteArray() {
     return Arrays.copyOf(buf, pos);
   }
 
