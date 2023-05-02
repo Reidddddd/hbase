@@ -187,4 +187,32 @@ public class TestFanOutOneBlockAsyncDFSOutput {
       assertTrue(e.unwrapRemoteException() instanceof FileNotFoundException);
     }
   }
+
+  @Test
+  public void testWriteLargeChunk() throws IOException, InterruptedException, ExecutionException {
+    Path f = new Path("/" + name.getMethodName());
+    EventLoop eventLoop = EVENT_LOOP_GROUP.next();
+    final FanOutOneBlockAsyncDFSOutput out = FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS, f,
+            true, false, (short) 3, 1024 * 1024 * 1024, eventLoop);
+    byte[] b = new byte[50 * 1024 * 1024];
+    ThreadLocalRandom.current().nextBytes(b);
+    FanOutOneBlockAsyncDFSOutputFlushHandler handler =
+            new FanOutOneBlockAsyncDFSOutputFlushHandler();
+    eventLoop.execute(new Runnable() {
+
+      @Override
+      public void run() {
+        out.write(b);
+        out.flush(null, handler, false);
+      }
+    });
+    assertEquals(b.length, handler.get());
+    out.close();
+    assertEquals(b.length, FS.getFileStatus(f).getLen());
+    byte[] actual = new byte[b.length];
+    try (FSDataInputStream in = FS.open(f)) {
+      in.readFully(actual);
+    }
+    assertArrayEquals(b, actual);
+  }
 }

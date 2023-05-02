@@ -40,7 +40,21 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-import io.netty.channel.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.EventLoop;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.protobuf.ProtobufDecoder;
+import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.FutureListener;
+import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.PromiseCombiner;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
@@ -60,17 +74,6 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.util.DataChecksum;
 
 import com.google.common.base.Supplier;
-
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.protobuf.ProtobufDecoder;
-import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
-import io.netty.handler.timeout.IdleState;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.FutureListener;
-import io.netty.util.concurrent.Promise;
 
 /**
  * An asynchronous HDFS output stream implementation which fans out data to datanode and only
@@ -101,6 +104,10 @@ import io.netty.util.concurrent.Promise;
 @InterfaceAudience.Private
 public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
 
+  // The MAX_PACKET_SIZE is 16MB but it include the header size and checksum size. So here we set a
+  // smaller limit for data size.
+  private static final int MAX_DATA_LEN = 12 * 1024 * 1024;
+
   private final Configuration conf;
 
   private final FSUtils fsUtils;
@@ -124,6 +131,8 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
   private final List<Channel> datanodeList;
 
   private final DataChecksum summer;
+
+  private final int maxDataLen;
 
   private final ByteBufAllocator alloc;
 
@@ -331,6 +340,7 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     this.eventLoop = eventLoop;
     this.datanodeList = datanodeList;
     this.summer = summer;
+    this.maxDataLen = MAX_DATA_LEN - (MAX_DATA_LEN % summer.getBytesPerChecksum());
     this.alloc = alloc;
     this.buf = alloc.directBuffer();
     this.state = State.STREAMING;
@@ -394,45 +404,15 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     return locatedBlock.getLocations();
   }
 
-  private <A> void flush0(final A attachment, final CompletionHandler<Long, ? super A> handler,
+  private Promise<Void> flushBuffer(ByteBuf dataBuf, long nextPacketOffsetInBlock,
       boolean syncBlock) {
-    if (state != State.STREAMING) {
-      handler.failed(new IOException("stream already broken"), attachment);
-      return;
-    }
-    int dataLen = buf.readableBytes();
-    final long ackedLength = nextPacketOffsetInBlock + dataLen;
-    if (ackedLength == locatedBlock.getBlock().getNumBytes()) {
-      // no new data, just return
-      handler.completed(locatedBlock.getBlock().getNumBytes(), attachment);
-      return;
-    }
-    Promise<Void> promise = eventLoop.newPromise();
-    promise.addListener(new FutureListener<Void>() {
-
-      @Override
-      public void operationComplete(Future<Void> future) throws Exception {
-        if (future.isSuccess()) {
-          locatedBlock.getBlock().setNumBytes(ackedLength);
-          handler.completed(ackedLength, attachment);
-        } else {
-          handler.failed(future.cause(), attachment);
-        }
-      }
-    });
-    Callback c = waitingAckQueue.peekLast();
-    if (c != null && ackedLength == c.ackedLength) {
-      // just append it to the tail of waiting ack queue,, do not issue new hflush request.
-      waitingAckQueue
-          .addLast(new Callback(promise, ackedLength, Collections.<Channel> emptyList()));
-      return;
-    }
+    int dataLen = dataBuf.readableBytes();
     int chunkLen = summer.getBytesPerChecksum();
     int trailingPartialChunkLen = dataLen % chunkLen;
     int numChecks = dataLen / chunkLen + (trailingPartialChunkLen != 0 ? 1 : 0);
     int checksumLen = numChecks * summer.getChecksumSize();
     ByteBuf checksumBuf = alloc.directBuffer(checksumLen);
-    summer.calculateChunkedSums(buf.nioBuffer(), checksumBuf.nioBuffer(0, checksumLen));
+    summer.calculateChunkedSums(dataBuf.nioBuffer(), checksumBuf.nioBuffer(0, checksumLen));
     checksumBuf.writerIndex(checksumLen);
     PacketHeader header = new PacketHeader(4 + checksumLen + dataLen, nextPacketOffsetInBlock,
         nextPacketSeqno, false, dataLen, syncBlock);
@@ -441,14 +421,75 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     header.putInBuffer(headerBuf.nioBuffer(0, headerLen));
     headerBuf.writerIndex(headerLen);
 
+    long ackedLength = nextPacketOffsetInBlock + dataLen;
+    Promise<Void> promise = eventLoop.<Void> newPromise().addListener(future -> {
+      if (future.isSuccess()) {
+        locatedBlock.getBlock().setNumBytes(ackedLength);
+      }
+    });
     waitingAckQueue.addLast(new Callback(promise, ackedLength, datanodeList));
     for (Channel ch : datanodeList) {
       ch.write(headerBuf.duplicate().retain());
       ch.write(checksumBuf.duplicate().retain());
-      ch.writeAndFlush(buf.duplicate().retain());
+      ch.writeAndFlush(dataBuf.duplicate().retain());
     }
     checksumBuf.release();
     headerBuf.release();
+    dataBuf.release();
+    nextPacketSeqno++;
+    return promise;
+  }
+
+  private <A> void flush0(final A attachment, final CompletionHandler<Long, ? super A> handler,
+                          boolean syncBlock) {
+    if (state != State.STREAMING) {
+      handler.failed(new IOException("stream already broken"), attachment);
+      return;
+    }
+    int dataLen = buf.readableBytes();
+    final long lengthAfterFlush = nextPacketOffsetInBlock + dataLen;
+    if (lengthAfterFlush == locatedBlock.getBlock().getNumBytes()) {
+      // no new data, just return
+      handler.completed(locatedBlock.getBlock().getNumBytes(), attachment);
+      return;
+    }
+    Callback c = waitingAckQueue.peekLast();
+    if (c != null && lengthAfterFlush == c.ackedLength) {
+      // just append it to the tail of waiting ack queue,, do not issue new hflush request.
+      waitingAckQueue.addLast(new Callback(eventLoop.<Void> newPromise().addListener(future -> {
+        if (future.isSuccess()) {
+          handler.completed(lengthAfterFlush, attachment);
+        } else {
+          handler.failed(future.cause(), attachment);
+        }
+      }), lengthAfterFlush, Collections.<Channel> emptyList()));
+      return;
+    }
+    Promise<Void> promise;
+    if (dataLen > maxDataLen) {
+      // We need to write out the data by multiple packets as the max packet allowed is 16M.
+      PromiseCombiner combiner = new PromiseCombiner();
+      long nextSubPacketOffsetInBlock = nextPacketOffsetInBlock;
+      for (int remaining = dataLen; remaining > 0;) {
+        int toWriteDataLen = Math.min(remaining, maxDataLen);
+        combiner.add(flushBuffer(buf.readRetainedSlice(toWriteDataLen), nextSubPacketOffsetInBlock,
+                syncBlock));
+        nextSubPacketOffsetInBlock += toWriteDataLen;
+        remaining -= toWriteDataLen;
+      }
+      promise = eventLoop.newPromise();
+      combiner.finish(promise);
+    } else {
+      promise = flushBuffer(buf.retain(), nextPacketOffsetInBlock, syncBlock);
+    }
+    promise.addListener(future -> {
+      if (future.isSuccess()) {
+        handler.completed(lengthAfterFlush, attachment);
+      } else {
+        handler.failed(future.cause(), attachment);
+      }
+    });
+    int trailingPartialChunkLen = dataLen % summer.getBytesPerChecksum();
     ByteBuf newBuf = alloc.directBuffer().ensureWritable(trailingPartialChunkLen);
     if (trailingPartialChunkLen != 0) {
       buf.readerIndex(dataLen - trailingPartialChunkLen).readBytes(newBuf, trailingPartialChunkLen);
@@ -456,7 +497,6 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     buf.release();
     this.buf = newBuf;
     nextPacketOffsetInBlock += dataLen - trailingPartialChunkLen;
-    nextPacketSeqno++;
   }
 
   /**
