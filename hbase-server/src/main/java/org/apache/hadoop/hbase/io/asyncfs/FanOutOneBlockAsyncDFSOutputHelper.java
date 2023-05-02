@@ -33,6 +33,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import io.netty.util.concurrent.FutureListener;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -605,13 +606,15 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
     beginFileLease(client, src, stat.getFileId());
     boolean succ = false;
     LocatedBlock locatedBlock = null;
-    List<Channel> datanodeList = new ArrayList<>();
+    List<Future<Channel>> futureList = null;
     try {
       DataChecksum summer = createChecksum(client);
       locatedBlock = namenode.addBlock(src, client.getClientName(), null, null, stat.getFileId(),
         null, null);
-      for (Future<Channel> future : connectToDataNodes(conf, clientName, locatedBlock, 0L, 0L,
-        PIPELINE_SETUP_CREATE, summer, eventLoop)) {
+      List<Channel> datanodeList = new ArrayList<>();
+      futureList = connectToDataNodes(conf, clientName, locatedBlock, 0L, 0L, PIPELINE_SETUP_CREATE,
+              summer, eventLoop);
+      for (Future<Channel> future : futureList) {
         // fail the creation if there are connection failures since we are fail-fast. The upper
         // layer should retry itself if needed.
         datanodeList.add(future.syncUninterruptibly().getNow());
@@ -621,8 +624,18 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
           stat.getFileId(), locatedBlock, eventLoop, datanodeList, summer, ALLOC);
     } finally {
       if (!succ) {
-        for (Channel c : datanodeList) {
-          c.close();
+        if (futureList != null) {
+          for (Future<Channel> f : futureList) {
+            f.addListener(new FutureListener<Channel>() {
+
+              @Override
+              public void operationComplete(Future<Channel> future) throws Exception {
+                if (future.isSuccess()) {
+                  future.getNow().close();
+                }
+              }
+            });
+          }
         }
         endFileLease(client, src, stat.getFileId());
         fsUtils.recoverFileLease(dfs, new Path(src), conf, new CancelOnClose(client));
