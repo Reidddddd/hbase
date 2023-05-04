@@ -31,10 +31,7 @@ import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
 import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.DrainBarrier;
-import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.util.*;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -216,12 +213,31 @@ public abstract class AbstractFSWAL<W> implements WAL {
     }
   };
 
+  private static final class WalProps {
+
+    /**
+     *  Map the encoded region name to the highest sequence id. Contain all the regions it has entries of
+     */
+    public final Map<byte[], Long> encodedName2HighestSequenceId;
+
+    /**
+     * The log file size. Notice that the size may not be accurate if we do asynchronous close in
+     * sub classes.
+     */
+    public final long logSize;
+
+    public WalProps(Map<byte[], Long> encodedName2HighestSequenceId, long logSize) {
+      this.encodedName2HighestSequenceId = encodedName2HighestSequenceId;
+      this.logSize = logSize;
+    }
+  }
+
   /**
-   * Map of WAL log file to the latest sequence ids of all regions it has entries of. The map is
-   * sorted by the log file creation timestamp (contained in the log file name).
+   * Map of WAL log file to properties. The map is sorted by the log file creation timestamp
+   * (contained in the log file name).
    */
-  protected ConcurrentNavigableMap<Path, Map<byte[], Long>> byWalRegionSequenceIds =
-      new ConcurrentSkipListMap<Path, Map<byte[], Long>>(LOG_NAME_COMPARATOR);
+  protected ConcurrentNavigableMap<Path, WalProps> walFile2Props = new ConcurrentSkipListMap<>(
+          LOG_NAME_COMPARATOR);
 
   /**
    * A cache of sync futures reused by threads.
@@ -488,7 +504,7 @@ public abstract class AbstractFSWAL<W> implements WAL {
   // public only until class moves to o.a.h.h.wal
   /** @return the number of rolled log files */
   public int getNumRolledLogFiles() {
-    return byWalRegionSequenceIds.size();
+    return walFile2Props.size();
   }
 
   // public only until class moves to o.a.h.h.wal
@@ -508,8 +524,9 @@ public abstract class AbstractFSWAL<W> implements WAL {
     byte[][] regions = null;
     int logCount = getNumRolledLogFiles();
     if (logCount > this.maxLogs && logCount > 0) {
-      Map.Entry<Path, Map<byte[], Long>> firstWALEntry = this.byWalRegionSequenceIds.firstEntry();
-      regions = this.sequenceIdAccounting.findLower(firstWALEntry.getValue());
+      Map.Entry<Path, WalProps> firstWALEntry = this.walFile2Props.firstEntry();
+      regions = this.sequenceIdAccounting
+              .findLower(firstWALEntry.getValue().encodedName2HighestSequenceId);
     }
     if (regions != null) {
       StringBuilder sb = new StringBuilder();
@@ -529,27 +546,27 @@ public abstract class AbstractFSWAL<W> implements WAL {
    * Archive old logs. A WAL is eligible for archiving if all its WALEdits have been flushed.
    */
   private void cleanOldLogs() throws IOException {
-    List<Path> logsToArchive = null;
+    List<Pair<Path, Long>> logsToArchive = null;
     // For each log file, look at its Map of regions to highest sequence id; if all sequence ids
     // are older than what is currently in memory, the WAL can be GC'd.
-    for (Map.Entry<Path, Map<byte[], Long>> e : this.byWalRegionSequenceIds.entrySet()) {
+    for (Map.Entry<Path, WalProps> e : this.walFile2Props.entrySet()) {
       Path log = e.getKey();
-      Map<byte[], Long> sequenceNums = e.getValue();
+      Map<byte[], Long> sequenceNums = e.getValue().encodedName2HighestSequenceId;
       if (this.sequenceIdAccounting.areAllLower(sequenceNums)) {
         if (logsToArchive == null) {
-          logsToArchive = new ArrayList<Path>();
+          logsToArchive = new ArrayList<>();
         }
-        logsToArchive.add(log);
+        logsToArchive.add(Pair.newPair(log, e.getValue().logSize));
         if (LOG.isTraceEnabled()) {
           LOG.trace("WAL file ready for archiving " + log);
         }
       }
     }
     if (logsToArchive != null) {
-      for (Path p : logsToArchive) {
-        this.totalLogSize.addAndGet(-this.fs.getFileStatus(p).getLen());
-        archiveLogFile(p);
-        this.byWalRegionSequenceIds.remove(p);
+      for (Pair<Path, Long> logAndSize : logsToArchive) {
+        this.totalLogSize.addAndGet(-logAndSize.getSecond());
+        archiveLogFile(logAndSize.getFirst());
+        this.walFile2Props.remove(logAndSize.getFirst());
       }
     }
   }
@@ -602,12 +619,12 @@ public abstract class AbstractFSWAL<W> implements WAL {
   Path replaceWriter(Path oldPath, Path newPath, W nextWriter) throws IOException {
     TraceScope scope = Trace.startSpan("FSHFile.replaceWriter");
     try {
-      long oldFileLen = 0L;
-      doReplaceWriter(oldPath, newPath, nextWriter);
+      long oldFileLen = doReplaceWriter(oldPath, newPath, nextWriter);
       int oldNumEntries = this.numEntries.get();
       final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
       if (oldPath != null) {
-        this.byWalRegionSequenceIds.put(oldPath, this.sequenceIdAccounting.resetHighest());
+        this.walFile2Props.put(oldPath,
+                new WalProps(this.sequenceIdAccounting.resetHighest(), oldFileLen));
         this.totalLogSize.addAndGet(oldFileLen);
         LOG.info("Rolled WAL " + FSUtils.getPath(oldPath) + " with entries=" + oldNumEntries
             + ", filesize=" + StringUtils.byteDesc(oldFileLen) + "; new WAL " + newPathString);
