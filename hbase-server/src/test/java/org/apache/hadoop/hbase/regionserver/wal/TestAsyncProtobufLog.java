@@ -23,7 +23,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.testclassification.RegionServerTests;
-import org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputFlushHandler;
 import org.apache.hadoop.hbase.wal.AsyncFSWALProvider;
 import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.hadoop.hbase.wal.WALProvider.AsyncWriter;
@@ -65,14 +64,12 @@ public class TestAsyncProtobufLog extends AbstractTestProtobufLog<AsyncWriter> {
 
   @Override
   protected void sync(AsyncWriter writer) throws IOException {
-    FanOutOneBlockAsyncDFSOutputFlushHandler handler = new FanOutOneBlockAsyncDFSOutputFlushHandler();
-    writer.sync(handler, null);
     try {
-      handler.get();
+      writer.sync().get();
     } catch (InterruptedException e) {
       throw new InterruptedIOException();
     } catch (ExecutionException e) {
-      Throwables.propagateIfPossible(e.getCause(), IOException.class);
+      Throwables.propagateIfPossible(e.getCause());
       throw new IOException(e.getCause());
     }
   }

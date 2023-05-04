@@ -200,9 +200,8 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
 
   private final long logRollerExitedCheckIntervalMs;
 
-  private final ExecutorService closeExecutor = Executors
-      .newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true)
-          .setNameFormat("Close-WAL-Writer-%d").build());
+  private final ExecutorService closeExecutor = Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Close-WAL-Writer-%d").build());
 
   private volatile AsyncFSOutput fsOut;
 
@@ -210,8 +209,8 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
 
   private final Deque<FSWALEntry> unackedEntries = new ArrayDeque<FSWALEntry>();
 
-  private final PriorityQueue<SyncFuture> syncFutures = new PriorityQueue<SyncFuture>(11,
-      SEQ_COMPARATOR);
+  private final PriorityQueue<SyncFuture> syncFutures =
+          new PriorityQueue<SyncFuture>(11, SEQ_COMPARATOR);
 
   private Promise<Void> rollPromise;
 
@@ -279,27 +278,18 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
 
   public AsyncFSWAL(FileSystem fs, Path rootDir, String logDir, String archiveDir,
                     Configuration conf, List<WALActionsListener> listeners, boolean failIfWALExists,
-                    String prefix, String suffix, EventLoop eventLoop) throws FailedLogCloseException,
-      IOException {
+                    String prefix, String suffix, EventLoop eventLoop)
+          throws FailedLogCloseException, IOException {
     super(fs, rootDir, logDir, archiveDir, conf, listeners, failIfWALExists, prefix, suffix);
     this.eventLoop = eventLoop;
     int maxHandlersCount = conf.getInt(REGION_SERVER_HANDLER_COUNT, 200);
     waitingConsumePayloads = new ArrayDeque<Payload>(maxHandlersCount * 3);
     batchSize = conf.getLong(WAL_BATCH_SIZE, DEFAULT_WAL_BATCH_SIZE);
     createMaxRetries =
-        conf.getInt(ASYNC_WAL_CREATE_MAX_RETRIES, DEFAULT_ASYNC_WAL_CREATE_MAX_RETRIES);
-    logRollerExitedCheckIntervalMs =
-            conf.getLong(ASYNC_WAL_LOG_ROLLER_EXITED_CHECK_INTERVAL_MS,
-                    DEFAULT_ASYNC_WAL_LOG_ROLLER_EXITED_CHECK_INTERVAL_MS);
+            conf.getInt(ASYNC_WAL_CREATE_MAX_RETRIES, DEFAULT_ASYNC_WAL_CREATE_MAX_RETRIES);
+    logRollerExitedCheckIntervalMs = conf.getLong(ASYNC_WAL_LOG_ROLLER_EXITED_CHECK_INTERVAL_MS,
+            DEFAULT_ASYNC_WAL_LOG_ROLLER_EXITED_CHECK_INTERVAL_MS);
     rollWriter();
-  }
-
-  /**
-   * Helper that marks the future as DONE and offers it back to the cache.
-   */
-  private void markFutureDoneAndOffer(SyncFuture future, long txid, Throwable t) {
-    future.done(txid, t);
-    syncFutureCache.offer(future);
   }
 
   private void tryFinishRoll() {
@@ -312,82 +302,85 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
     }
   }
 
+  private void syncFailed(Throwable error) {
+    LOG.warn("sync failed", error);
+    // Here we depends on the implementation of FanOutOneBlockAsyncDFSOutput and netty.
+    // When error occur, FanOutOneBlockAsyncDFSOutput will fail all pending flush requests. It
+    // is execute inside EventLoop. And in DefaultPromise in netty, it will notifyListener
+    // directly if it is already in the EventLoop thread. And in the listener method, it will
+    // call us. So here we know that all failed flush request will call us continuously, and
+    // before the last one finish, no other task can be executed in EventLoop. So here we are
+    // safe to use writerBroken as a guard.
+    // Do not forget to revisit this if we change the implementation of
+    // FanOutOneBlockAsyncDFSOutput!
+    synchronized (waitingConsumePayloads) {
+      if (writerBroken) {
+        return;
+      }
+      // schedule a periodical task to check if log roller is exited. Otherwise the the sync
+      // request maybe blocked forever since we are still waiting for a new writer to write the
+      // pending data and sync it...
+      logRollerExitedChecker = new LogRollerExitedChecker();
+      // we are currently in the EventLoop thread, so it is safe to set the future after
+      // schedule it since the task can not be executed before we release the thread.
+      logRollerExitedChecker.setFuture(eventLoop.scheduleAtFixedRate(logRollerExitedChecker,
+              logRollerExitedCheckIntervalMs, logRollerExitedCheckIntervalMs, TimeUnit.MILLISECONDS));
+      writerBroken = true;
+    }
+    for (Iterator<FSWALEntry> iter = unackedEntries.descendingIterator(); iter.hasNext();) {
+      waitingAppendEntries.addFirst(iter.next());
+    }
+    highestUnsyncedTxid = highestSyncedTxid.get();
+    if (rollPromise != null) {
+      rollPromise.trySuccess(null);
+      rollPromise = null;
+      return;
+    }
+    // request a roll.
+    if (!rollWriterLock.tryLock()) {
+      return;
+    }
+    try {
+      requestLogRoll();
+    } finally {
+      rollWriterLock.unlock();
+    }
+  }
+
+  private void syncCompleted(AsyncWriter writer, long processedTxid, long startTimeNs) {
+    highestSyncedTxid.set(processedTxid);
+    int syncCount = finishSync();
+    for (Iterator<FSWALEntry> iter = unackedEntries.iterator(); iter.hasNext();) {
+      if (iter.next().getTxid() <= processedTxid) {
+        iter.remove();
+      } else {
+        break;
+      }
+    }
+    postSync(System.nanoTime() - startTimeNs, syncCount);
+    tryFinishRoll();
+    if (!rollWriterLock.tryLock()) {
+      return;
+    }
+    try {
+      if (writer.getLength() >= logrollsize) {
+        requestLogRoll();
+      }
+    } finally {
+      rollWriterLock.unlock();
+    }
+  }
+
   private void sync(final AsyncWriter writer, final long processedTxid) {
     fileLengthAtLastSync = writer.getLength();
     final long startTimeNs = System.nanoTime();
-    writer.sync(new CompletionHandler<Long, Void>() {
-
-      @Override
-      public void completed(Long result, Void attachment) {
-        highestSyncedTxid.set(processedTxid);
-        int syncCount = finishSync();
-        for (Iterator<FSWALEntry> iter = unackedEntries.iterator(); iter.hasNext();) {
-          if (iter.next().getTxid() <= processedTxid) {
-            iter.remove();
-          } else {
-            break;
-          }
-        }
-        postSync(System.nanoTime() - startTimeNs, syncCount);
-        tryFinishRoll();
-        if (!rollWriterLock.tryLock()) {
-          return;
-        }
-        try {
-          if (writer.getLength() >= logrollsize) {
-            requestLogRoll();
-          }
-        } finally {
-          rollWriterLock.unlock();
-        }
+    writer.sync().whenComplete((result, error) -> {
+      if (error != null) {
+        syncFailed(error);
+      } else {
+        syncCompleted(writer, processedTxid, startTimeNs);
       }
-
-      @Override
-      public void failed(Throwable exc, Void attachment) {
-        LOG.warn("sync failed", exc);
-        // Here we depends on the implementation of FanOutOneBlockAsyncDFSOutput and netty.
-        // When error occur, FanOutOneBlockAsyncDFSOutput will fail all pending flush requests. It
-        // is execute inside EventLoop. And in DefaultPromise in netty, it will notifyListener
-        // directly if it is already in the EventLoop thread. And in the listener method, it will
-        // call us. So here we know that all failed flush request will call us continuously, and
-        // before the last one finish, no other task can be executed in EventLoop. So here we are
-        // safe to use writerBroken as a guard.
-        // Do not forget to revisit this if we change the implementation of
-        // FanOutOneBlockAsyncDFSOutput!
-        synchronized (waitingConsumePayloads) {
-          if (writerBroken) {
-            return;
-          }
-          // schedule a periodical task to check if log roller is exited. Otherwise the the sync
-          // request maybe blocked forever since we are still waiting for a new writer to write the
-          // pending data and sync it...
-          logRollerExitedChecker = new LogRollerExitedChecker();
-          // we are currently in the EventLoop thread, so it is safe to set the future after
-          // schedule it since the task can not be executed before we release the thread.
-          logRollerExitedChecker.setFuture(eventLoop.scheduleAtFixedRate(logRollerExitedChecker,
-                  logRollerExitedCheckIntervalMs, logRollerExitedCheckIntervalMs, TimeUnit.MILLISECONDS));
-          writerBroken = true;
-        }
-        for (Iterator<FSWALEntry> iter = unackedEntries.descendingIterator(); iter.hasNext();) {
-          waitingAppendEntries.addFirst(iter.next());
-        }
-        highestUnsyncedTxid = highestSyncedTxid.get();
-        if (rollPromise != null) {
-          rollPromise.trySuccess(null);
-          rollPromise = null;
-          return;
-        }
-        // request a roll.
-        if (!rollWriterLock.tryLock()) {
-          return;
-        }
-        try {
-          requestLogRoll();
-        } finally {
-          rollWriterLock.unlock();
-        }
-      }
-    }, null);
+    });
   }
 
   private int finishSync() {
@@ -452,13 +445,9 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
     }
   }
 
-  private static final Comparator<SyncFuture> SEQ_COMPARATOR = new Comparator<SyncFuture>() {
-
-    @Override
-    public int compare(SyncFuture o1, SyncFuture o2) {
-      int c = Long.compare(o1.getTxid(), o2.getTxid());
-      return c != 0 ? c : Integer.compare(System.identityHashCode(o1), System.identityHashCode(o2));
-    }
+  private static final Comparator<SyncFuture> SEQ_COMPARATOR = (o1, o2) -> {
+    int c = Long.compare(o1.getTxid(), o2.getTxid());
+    return c != 0 ? c : Integer.compare(System.identityHashCode(o1), System.identityHashCode(o2));
   };
 
   private final Runnable consumer = new Runnable() {
@@ -673,15 +662,11 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
     long oldFileLen;
     if (oldWriter != null) {
       oldFileLen = oldWriter.getLength();
-      closeExecutor.execute(new Runnable() {
-
-        @Override
-        public void run() {
-          try {
-            oldWriter.close();
-          } catch (IOException e) {
-            LOG.warn("close old writer failed", e);
-          }
+      closeExecutor.execute(() -> {
+        try {
+          oldWriter.close();
+        } catch (IOException e) {
+          LOG.warn("close old writer failed", e);
         }
       });
     } else {
