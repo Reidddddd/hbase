@@ -55,6 +55,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.hbase.wal.AbstractFSWALProvider.WAL_FILE_NAME_DELIMITER;
 
 /**
@@ -135,8 +137,7 @@ public abstract class AbstractFSWAL<W> implements WAL {
   protected final Configuration conf;
 
   /** Listeners that are called on WAL events. */
-  protected final List<WALActionsListener> listeners =
-      new CopyOnWriteArrayList<WALActionsListener>();
+  protected final List<WALActionsListener> listeners = new CopyOnWriteArrayList<WALActionsListener>();
 
   /**
    * Class that does accounting of sequenceids in WAL subsystem. Holds oldest outstanding sequence
@@ -216,7 +217,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
   private static final class WalProps {
 
     /**
-     *  Map the encoded region name to the highest sequence id. Contain all the regions it has entries of
+     *  Map the encoded region name to the highest sequence id. Contain all the regions it has
+     *  entries of
      */
     public final Map<byte[], Long> encodedName2HighestSequenceId;
 
@@ -255,23 +257,41 @@ public abstract class AbstractFSWAL<W> implements WAL {
    * @return timestamp, as in the log file name.
    */
   protected long getFileNumFromFileName(Path fileName) {
-    if (fileName == null) {
-      throw new IllegalArgumentException("file name can't be null");
-    }
+    checkNotNull(fileName, "file name can't be null");
     if (!ourFiles.accept(fileName)) {
-      throw new IllegalArgumentException("The log file " + fileName
-          + " doesn't belong to this WAL. (" + toString() + ")");
+      throw new IllegalArgumentException(
+              "The log file " + fileName + " doesn't belong to this WAL. (" + toString() + ")");
     }
     final String fileNameString = fileName.toString();
-    String chompedPath =
-        fileNameString.substring(prefixPathStr.length(),
-          (fileNameString.length() - walFileSuffix.length()));
+    String chompedPath = fileNameString.substring(prefixPathStr.length(),
+            (fileNameString.length() - walFileSuffix.length()));
     return Long.parseLong(chompedPath);
   }
 
   private int calculateMaxLogFiles(float memstoreSizeRatio, long logRollSize) {
     MemoryUsage mu = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
     return Math.round(mu.getMax() * memstoreSizeRatio * 2 / logRollSize);
+  }
+
+  // must be power of 2
+  protected final int getPreallocatedEventCount() {
+    // Preallocate objects to use on the ring buffer. The way that appends and syncs work, we will
+    // be stuck and make no progress if the buffer is filled with appends only and there is no
+    // sync. If no sync, then the handlers will be outstanding just waiting on sync completion
+    // before they return.
+    int preallocatedEventCount = this.conf.getInt("hbase.regionserver.wal.disruptor.event.count",
+            1024 * 16);
+    checkArgument(preallocatedEventCount >= 0,
+            "hbase.regionserver.wal.disruptor.event.count must > 0");
+    int floor = Integer.highestOneBit(preallocatedEventCount);
+    if (floor == preallocatedEventCount) {
+      return floor;
+    }
+    // max capacity is 1 << 30
+    if (floor >= 1 << 29) {
+      return 1 << 30;
+    }
+    return floor << 1;
   }
 
   protected AbstractFSWAL(final FileSystem fs, final Path rootDir, final String logDir,
@@ -294,8 +314,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
     }
 
     // If prefix is null||empty then just name it wal
-    this.walFilePrefix =
-        prefix == null || prefix.isEmpty() ? "wal" : URLEncoder.encode(prefix, "UTF8");
+    this.walFilePrefix = prefix == null || prefix.isEmpty() ? "wal"
+            : URLEncoder.encode(prefix, "UTF8");
     // we only correctly differentiate suffices when numeric ones start with '.'
     if (suffix != null && !(suffix.isEmpty()) && !(suffix.startsWith(WAL_FILE_NAME_DELIMITER))) {
       throw new IllegalArgumentException("WAL suffix must start with '" + WAL_FILE_NAME_DELIMITER
@@ -318,8 +338,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
         }
         if (walFileSuffix.isEmpty()) {
           // in the case of the null suffix, we need to ensure the filename ends with a timestamp.
-          return org.apache.commons.lang.StringUtils.isNumeric(fileNameString
-              .substring(prefixPathStr.length()));
+          return org.apache.commons.lang.StringUtils.
+                  isNumeric(fileNameString.substring(prefixPathStr.length()));
         } else if (!fileNameString.endsWith(walFileSuffix)) {
           return false;
         }
@@ -344,22 +364,19 @@ public abstract class AbstractFSWAL<W> implements WAL {
 
     // Get size to roll log at. Roll at 95% of HDFS block size so we avoid crossing HDFS blocks
     // (it costs a little x'ing bocks)
-    final long blocksize =
-        this.conf.getLong("hbase.regionserver.hlog.blocksize",
+    final long blocksize = this.conf.getLong("hbase.regionserver.hlog.blocksize",
           FSUtils.getDefaultBlockSize(this.fs, this.walDir));
-    this.logrollsize =
-        (long) (blocksize * conf.getFloat("hbase.regionserver.logroll.multiplier", 0.95f));
+    this.logrollsize = (long) (blocksize
+            * conf.getFloat("hbase.regionserver.logroll.multiplier", 0.95f));
 
-    float memstoreRatio =
-        conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_KEY, conf.getFloat(
+    float memstoreRatio = conf.getFloat(HeapMemorySizeUtil.MEMSTORE_SIZE_KEY, conf.getFloat(
           HeapMemorySizeUtil.MEMSTORE_SIZE_OLD_KEY, HeapMemorySizeUtil.DEFAULT_MEMSTORE_SIZE));
     boolean maxLogsDefined = conf.get("hbase.regionserver.maxlogs") != null;
     if (maxLogsDefined) {
       LOG.warn("'hbase.regionserver.maxlogs' was deprecated.");
     }
-    this.maxLogs =
-        conf.getInt("hbase.regionserver.maxlogs",
-          Math.max(32, calculateMaxLogFiles(memstoreRatio, logrollsize)));
+    this.maxLogs = conf.getInt("hbase.regionserver.maxlogs",
+            Math.max(32, calculateMaxLogFiles(memstoreRatio, logrollsize)));
 
     LOG.info("WAL configuration: blocksize=" + StringUtils.byteDesc(blocksize) + ", rollsize="
         + StringUtils.byteDesc(this.logrollsize) + ", prefix=" + this.walFilePrefix + ", suffix="
@@ -620,7 +637,7 @@ public abstract class AbstractFSWAL<W> implements WAL {
     TraceScope scope = Trace.startSpan("FSHFile.replaceWriter");
     try {
       long oldFileLen = doReplaceWriter(oldPath, newPath, nextWriter);
-      int oldNumEntries = this.numEntries.get();
+      int oldNumEntries = this.numEntries.getAndSet(0);
       final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
       if (oldPath != null) {
         this.walFile2Props.put(oldPath,
@@ -849,49 +866,6 @@ public abstract class AbstractFSWAL<W> implements WAL {
     return true;
   }
 
-  protected boolean append(W writer, FSWALEntry entry, boolean async) throws IOException {
-    // TODO: WORK ON MAKING THIS APPEND FASTER. DOING WAY TOO MUCH WORK WITH CPs, PBing, etc.
-    atHeadOfRingBufferEventHandlerAppend();
-    long start = EnvironmentEdgeManager.currentTime();
-    byte[] encodedRegionName = entry.getKey().getEncodedRegionName();
-    long regionSequenceId = WALKey.NO_SEQUENCE_ID;
-    // We are about to append this edit; update the region-scoped sequence number. Do it
-    // here inside this single appending/writing thread. Events are ordered on the ringbuffer
-    // so region sequenceids will also be in order.
-    regionSequenceId = entry.stampRegionSequenceId();
-    // Edits are empty, there is nothing to append. Maybe empty when we are looking for a
-    // region sequence id only, a region edit/sequence id that is not associated with an actual
-    // edit. It has to go through all the rigmarole to be sure we have the right ordering.
-    if (entry.getEdit().isEmpty()) {
-      return false;
-    }
-
-    // Coprocessor hook.
-    if (!coprocessorHost.preWALWrite(entry.getHRegionInfo(), entry.getKey(), entry.getEdit())) {
-      if (entry.getEdit().isReplay()) {
-        // Set replication scope null so that this won't be replicated
-        entry.getKey().setScopes(null);
-      }
-    }
-    if (!listeners.isEmpty()) {
-      for (WALActionsListener i: listeners) {
-        // TODO: Why does listener take a table description and CPs take a regioninfo?  Fix.
-        i.visitLogEntryBeforeWrite(entry.getHTableDescriptor(), entry.getKey(),
-                entry.getEdit());
-      }
-    }
-    doAppend(writer, entry);
-    assert highestUnsyncedTxid < entry.getTxid();
-    highestUnsyncedTxid = entry.getTxid();
-    sequenceIdAccounting.update(encodedRegionName, entry.getFamilyNames(), regionSequenceId,
-            entry.isInMemstore());
-    coprocessorHost.postWALWrite(entry.getHRegionInfo(), entry.getKey(), entry.getEdit());
-    // Update metrics.
-    postAppend(entry, EnvironmentEdgeManager.currentTime() - start);
-    numEntries.incrementAndGet();
-    return true;
-  }
-
   private long postAppend(final Entry e, final long elapsedTime) throws IOException {
     long len = 0;
     if (!listeners.isEmpty()) {
@@ -907,8 +881,7 @@ public abstract class AbstractFSWAL<W> implements WAL {
 
   protected void postSync(final long timeInNanos, final int handlerSyncs) {
     if (timeInNanos > this.slowSyncNs) {
-      String msg =
-          new StringBuilder().append("Slow sync cost: ").append(timeInNanos / 1000000)
+      String msg = new StringBuilder().append("Slow sync cost: ").append(timeInNanos / 1000000)
               .append(" ms, current pipeline: ").append(Arrays.toString(getPipeline())).toString();
       Trace.addTimelineAnnotation(msg);
       LOG.info(msg);
@@ -935,7 +908,7 @@ public abstract class AbstractFSWAL<W> implements WAL {
     try {
       FSWALEntry entry = new FSWALEntry(txid, key, edits, htd, hri, inMemstore);
       entry.stampRegionSequenceId(we);
-      ringBuffer.get(txid).loadPayload(entry);
+      ringBuffer.get(txid).load(entry);
     } finally {
       ringBuffer.publish(txid);
     }

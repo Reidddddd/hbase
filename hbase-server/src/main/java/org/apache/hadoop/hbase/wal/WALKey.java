@@ -78,7 +78,6 @@ import org.apache.hadoop.hbase.regionserver.wal.WALCellCodec;
 // TODO: Cleanup. We have logSeqNum and then WriteEntry, both are sequence id'ing. Fix.
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.REPLICATION)
 public class WALKey implements SequenceId, Comparable<WALKey> {
-  private static final Log LOG = LogFactory.getLog(WALKey.class);
 
   @InterfaceAudience.Private // For internal use only.
   public MultiVersionConcurrencyControl getMvcc() {

@@ -281,7 +281,7 @@ public class TestWALLockup {
     } finally {
       // To stop logRoller, its server has to say it is stopped.
       Mockito.when(server.isStopped()).thenReturn(true);
-      if (logRoller != null) logRoller.interrupt();
+      if (logRoller != null) logRoller.close();
       try {
         if (region != null) region.close();
         if (dodgyWAL != null) dodgyWAL.close();
@@ -460,7 +460,7 @@ public class TestWALLockup {
       assertTrue(server.isAborted());
     } finally {
       if (logRoller != null) {
-        logRoller.interrupt();
+        logRoller.close();
       }
       try {
         if (region != null) {

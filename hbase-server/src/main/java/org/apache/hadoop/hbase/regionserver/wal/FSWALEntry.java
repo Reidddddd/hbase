@@ -27,6 +27,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.htrace.Span;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -54,9 +55,9 @@ class FSWALEntry extends Entry {
   private final transient HTableDescriptor htd;
   private final transient HRegionInfo hri;
   private final transient Set<byte[]> familyNames;
-  // In the new WAL logic, we will rewrite failed WAL entries to new WAL file, so we need to avoid
-  // calling stampRegionSequenceId again.
-  private transient boolean stamped = false;
+
+  // The tracing span for this entry when writing WAL.
+  private transient Span span;
 
   FSWALEntry(final long txid, final WALKey key, final WALEdit edit,
              final HTableDescriptor htd, final HRegionInfo hri, final boolean inMemstore) {
@@ -132,39 +133,19 @@ class FSWALEntry extends Entry {
   }
 
   /**
-   * Here is where a WAL edit gets its sequenceid.
-   * SIDE-EFFECT is our stamping the sequenceid into every Cell AND setting the sequenceid into the
-   * MVCC WriteEntry!!!!
-   * @return The sequenceid we stamped on this edit.
-   */
-  long stampRegionSequenceId() throws IOException {
-    if (stamped) {
-      return getKey().getSequenceId();
-    }
-    stamped = true;
-    long regionSequenceId = WALKey.NO_SEQUENCE_ID;
-    MultiVersionConcurrencyControl mvcc = getKey().getMvcc();
-    MultiVersionConcurrencyControl.WriteEntry we = null;
-
-    if (mvcc != null) {
-      we = mvcc.begin();
-      regionSequenceId = we.getWriteNumber();
-    }
-
-    if (!this.getEdit().isReplay() && inMemstore) {
-      for (Cell c:getEdit().getCells()) {
-        CellUtil.setSequenceId(c, regionSequenceId);
-      }
-    }
-
-    getKey().setWriteEntry(we);
-    return regionSequenceId;
-  }
-
-  /**
    * @return the family names which are effected by this edit.
    */
   Set<byte[]> getFamilyNames() {
     return familyNames;
+  }
+
+  void attachSpan(Span span) {
+    this.span = span;
+  }
+
+  Span detachSpan() {
+    Span span = this.span;
+    this.span = null;
+    return span;
   }
 }

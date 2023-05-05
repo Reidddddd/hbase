@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,7 +54,7 @@ import com.google.common.annotations.VisibleForTesting;
 @VisibleForTesting
 @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="JLM_JSR166_UTILCONCURRENT_MONITORENTER",
   justification="Use of an atomic type both as monitor and condition variable is intended")
-public class LogRoller extends HasThread {
+public class LogRoller extends HasThread implements Closeable {
   private static final Log LOG = LogFactory.getLog(LogRoller.class);
   private final ReentrantLock rollLock = new ReentrantLock();
   private final AtomicBoolean rollLog = new AtomicBoolean(false);
@@ -65,6 +66,8 @@ public class LogRoller extends HasThread {
   private final long rollPeriod;
   private final int threadWakeFrequency;
   // The interval to check low replication on hlog's pipeline
+  private volatile boolean running = true;
+
   private final long checkLowReplicationInterval;
 
   public void addWAL(final WAL wal) {
@@ -142,7 +145,7 @@ public class LogRoller extends HasThread {
 
   @Override
   public void run() {
-    while (!server.isStopped()) {
+    while (running) {
       long now = EnvironmentEdgeManager.currentTime();
       checkLowReplication(now);
       if (!rollLog.get()) {
@@ -208,9 +211,6 @@ public class LogRoller extends HasThread {
         }
       }
     }
-    for (WAL wal : wals.keySet()) {
-      wal.logRollerExited();
-    }
     LOG.info("LogRoller exiting.");
   }
 
@@ -249,6 +249,12 @@ public class LogRoller extends HasThread {
       }
     }
     return true;
+  }
+
+  @Override
+  public void close() {
+    running = false;
+    interrupt();
   }
 
 

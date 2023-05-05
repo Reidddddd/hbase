@@ -144,11 +144,6 @@ public class FSHLog extends AbstractFSWAL<Writer> {
   private final Disruptor<RingBufferTruck> disruptor;
 
   /**
-   * An executorservice that runs the disruptor AppendEventHandler append executor.
-   */
-  private final ExecutorService appendExecutor;
-
-  /**
    * This fellow is run by the above appendExecutor service but it is all about batching up appends
    * and syncs; it may shutdown without cleaning out the last few appends or syncs. To guard against
    * this, keep a reference to this handler and do explicit close on way out to make sure all
@@ -194,9 +189,9 @@ public class FSHLog extends AbstractFSWAL<Writer> {
    * Exception handler to pass the disruptor ringbuffer.  Same as native implementation only it
    * logs using our logger instead of java native logger.
    */
-  static class RingBufferExceptionHandler implements ExceptionHandler {
+  static class RingBufferExceptionHandler implements ExceptionHandler<RingBufferTruck> {
     @Override
-    public void handleEventException(Throwable ex, long sequence, Object event) {
+    public void handleEventException(Throwable ex, long sequence, RingBufferTruck event) {
       LOG.error("Sequence=" + sequence + ", event=" + event, ex);
       throw new RuntimeException(ex);
     }
@@ -271,19 +266,11 @@ public class FSHLog extends AbstractFSWAL<Writer> {
     // This is the 'writer' -- a single threaded executor.  This single thread 'consumes' what is
     // put on the ring buffer.
     String hostingThreadName = Thread.currentThread().getName();
-    this.appendExecutor = Executors.
-      newSingleThreadExecutor(Threads.getNamedThreadFactory(hostingThreadName + ".append"));
-    // Preallocate objects to use on the ring buffer.  The way that appends and syncs work, we will
-    // be stuck and make no progress if the buffer is filled with appends only and there is no
-    // sync. If no sync, then the handlers will be outstanding just waiting on sync completion
-    // before they return.
-    final int preallocatedEventCount =
-      this.conf.getInt("hbase.regionserver.wal.disruptor.event.count", 1024 * 16);
     // Using BlockingWaitStrategy.  Stuff that is going on here takes so long it makes no sense
     // spinning as other strategies do.
-    this.disruptor =
-      new Disruptor<RingBufferTruck>(RingBufferTruck.EVENT_FACTORY, preallocatedEventCount,
-        this.appendExecutor, ProducerType.MULTI, new BlockingWaitStrategy());
+    this.disruptor = new Disruptor<RingBufferTruck>(RingBufferTruck::new,
+            getPreallocatedEventCount(), Threads.getNamedThreadFactory(hostingThreadName + ".append"),
+            ProducerType.MULTI, new BlockingWaitStrategy());
     // Advance the ring buffer sequence so that it starts from 1 instead of 0,
     // because SyncFuture.NOT_DONE = 0.
     this.disruptor.getRingBuffer().next();
@@ -291,7 +278,7 @@ public class FSHLog extends AbstractFSWAL<Writer> {
     int maxBatchCount = conf.getInt("hbase.regionserver.wal.sync.batch.count",
       conf.getInt(HConstants.REGION_SERVER_HANDLER_COUNT, 200));
     this.ringBufferEventHandler = new RingBufferEventHandler(syncerCount, maxBatchCount);
-    this.disruptor.handleExceptionsWith(new RingBufferExceptionHandler());
+    this.disruptor.setDefaultExceptionHandler(new RingBufferExceptionHandler());
     this.disruptor.handleEventsWith(new RingBufferEventHandler [] {this.ringBufferEventHandler});
     // Starting up threads in constructor is a no no; Interface should have an init call.
     this.disruptor.start();
@@ -496,8 +483,6 @@ public class FSHLog extends AbstractFSWAL<Writer> {
           this.disruptor.shutdown();
         }
       }
-      // With disruptor down, this is safe to let go.
-      if (this.appendExecutor !=  null) this.appendExecutor.shutdown();
 
       if (syncFutureCache != null) {
         syncFutureCache.clear();
@@ -807,7 +792,7 @@ public class FSHLog extends AbstractFSWAL<Writer> {
     SyncFuture syncFuture = getSyncFuture(sequence);
     try {
       RingBufferTruck truck = this.disruptor.getRingBuffer().get(sequence);
-      truck.loadPayload(syncFuture);
+      truck.load(syncFuture);
     } finally {
       this.disruptor.getRingBuffer().publish(sequence);
     }
@@ -852,10 +837,6 @@ public class FSHLog extends AbstractFSWAL<Writer> {
       return;
     }
     publishSyncThenBlockOnCompletion();
-  }
-
-  @Override
-  public void logRollerExited() {
   }
 
   @VisibleForTesting
@@ -1074,18 +1055,19 @@ public class FSHLog extends AbstractFSWAL<Writer> {
       // the log roller may be waiting on a signal from us here and will just hang without it.
 
       try {
-        if (truck.hasSyncFuturePayload()) {
+        if (truck.type() == RingBufferTruck.Type.SYNC) {
           this.syncFutures[this.syncFuturesCount.getAndIncrement()] =
-            truck.unloadSyncFuturePayload();
+            truck.unloadSync();
           // Force flush of syncs if we are carrying a full complement of syncFutures.
           if (this.syncFuturesCount.get() == this.syncFutures.length) {
             endOfBatch = true;
           }
-        } else if (truck.hasFSWALEntryPayload()) {
+        } else if (truck.type() == RingBufferTruck.Type.APPEND) {
+          FSWALEntry entry = truck.unloadAppend();
           // TODO handle htrace API change, see HBASE-18895
           // TraceScope scope = Trace.continueSpan(truck.unloadSpanPayload());
           try {
-            FSWALEntry entry = truck.unloadFSWALEntryPayload();
+
             if (this.exception != null) {
               // Return to keep processing events coming off the ringbuffer
               return;

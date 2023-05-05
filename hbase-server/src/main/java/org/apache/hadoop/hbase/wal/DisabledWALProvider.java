@@ -231,10 +231,6 @@ class DisabledWALProvider implements WALProvider {
     public String toString() {
       return "WAL disabled.";
     }
-
-    @Override
-    public void logRollerExited() {
-    }
   }
 
   @Override
