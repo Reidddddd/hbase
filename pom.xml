@@ -511,6 +511,19 @@
       <timezone>+8</timezone>
     </developer>
   </developers>
+  <repositories>
+    <repository>
+      <id>di-maven-central-mirror</id>
+      <name>Data Infra Maven Central mirror</name>
+      <url>https://nexus-repo.data-infra.shopee.io/repository/maven-public/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
   <build>
     <extensions>
       <extension>
@@ -4637,5 +4650,17 @@
        -->
       <url>file:///tmp</url>
     </site>
+
+    <repository>
+      <id>data-infra-release</id>
+      <name>Shopee Data Infra Release Repository</name>
+      <url>https://nexus-repo.data-infra.shopee.io/repository/maven-release/</url>
+    </repository>
+
+    <snapshotRepository>
+      <id>data-infra-snapshot</id>
+      <name>Shopee Data Infra Snapshot Repository</name>
+      <url>https://nexus-repo.data-infra.shopee.io/repository/maven-snapshot/</url>
+    </snapshotRepository>
   </distributionManagement>
 </project>
