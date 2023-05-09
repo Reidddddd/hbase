@@ -2982,11 +2982,18 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     }
 
     public abstract Mutation getMutation(int index);
+
     public abstract long getNonceGroup(int index);
+
     public abstract long getNonce(int index);
-    /** This method is potentially expensive and should only be used for non-replay CP path. */
+    
+    /** 
+     * This method is potentially expensive and should only be used for non-replay CP path.
+     */
     public abstract Mutation[] getMutationsForCoprocs();
+
     public abstract boolean isInReplay();
+
     public abstract long getReplaySequenceId();
 
     public boolean isDone() {
@@ -3494,7 +3501,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
             walEdit.add(cell);
           }
         }
-        addFamilyMapToWALEdit(familyMaps[i], walEdit);
+        walEdit.add(familyMaps[i]);
       }
 
       // -------------------------
@@ -4190,33 +4197,13 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
     long maxTs = now + timestampSlop;
     for (List<Cell> kvs : familyMap.values()) {
       assert kvs instanceof RandomAccess;
-      int listSize  = kvs.size();
-      for (int i=0; i < listSize; i++) {
-        Cell cell = kvs.get(i);
+      for (Cell cell : kvs) {
         // see if the user-side TS is out of range. latest = server-side
         long ts = cell.getTimestamp();
         if (ts != HConstants.LATEST_TIMESTAMP && ts > maxTs) {
-          throw new FailedSanityCheckException("Timestamp for KV out of range "
-              + cell + " (too.new=" + timestampSlop + ")");
+          throw new FailedSanityCheckException(
+            "Timestamp for KV out of range " + cell + " (too.new=" + timestampSlop + ")");
         }
-      }
-    }
-  }
-
-  /**
-   * Append the given map of family->edits to a WALEdit data structure.
-   * This does not write to the WAL itself.
-   * @param familyMap map of family->edits
-   * @param walEdit the destination entry to append into
-   */
-  private void addFamilyMapToWALEdit(Map<byte[], List<Cell>> familyMap,
-      WALEdit walEdit) {
-    for (List<Cell> edits : familyMap.values()) {
-      assert edits instanceof RandomAccess;
-      int listSize = edits.size();
-      for (int i=0; i < listSize; i++) {
-        Cell cell = edits.get(i);
-        walEdit.add(cell);
       }
     }
   }
@@ -7759,8 +7746,13 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
               forMemStore.put(store, results);
               // Prepare WAL updates
               if (writeToWAL) {
-                if (walEdits == null) walEdits = new WALEdit();
-                walEdits.getCells().addAll(results);
+                if (walEdits == null) {
+                  walEdits = new WALEdit();
+                }
+                WALEdit finalWalEdits = walEdits;
+                results.forEach(cell -> {
+                  finalWalEdits.add(cell, columnFamilyName);
+                });
               }
             }
           }

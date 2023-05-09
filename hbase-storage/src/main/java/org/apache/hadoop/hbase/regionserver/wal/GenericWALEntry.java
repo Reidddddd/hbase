@@ -60,20 +60,25 @@ class GenericWALEntry extends Entry {
     this.sequence = sequence;
     if (inMemstore) {
       // construct familyNames here to reduce the work of log sinker.
-      ArrayList<Cell> cells = this.getEdit().getCells();
-      if (CollectionUtils.isEmpty(cells)) {
-        this.familyNames = Collections.<byte[]> emptySet();
-      } else {
-        Set<byte[]> familySet = Sets.newTreeSet(Bytes.BYTES_COMPARATOR);
-        for (Cell cell : cells) {
-          if (!CellUtil.matchingFamily(cell, WALEdit.METAFAMILY)) {
-            familySet.add(CellUtil.cloneFamily(cell));
-          }
-        }
-        this.familyNames = Collections.unmodifiableSet(familySet);
-      }
+      this.familyNames = edit.getFamilies() != null ? edit.getFamilies() :
+        getFamilyNamesFromEdit(edit);
     } else {
       this.familyNames = Collections.<byte[]> emptySet();
+    }
+  }
+
+  private Set<byte[]> getFamilyNamesFromEdit(WALEdit edit) {
+    ArrayList<Cell> cells = edit.getCells();
+    if (CollectionUtils.isEmpty(cells)) {
+      return Collections.emptySet();
+    } else {
+      Set<byte[]> familySet = Sets.newTreeSet(Bytes.BYTES_COMPARATOR);
+      for (Cell cell : cells) {
+        if (!CellUtil.matchingFamily(cell, WALEdit.METAFAMILY)) {
+          familySet.add(CellUtil.cloneFamily(cell));
+        }
+      }
+      return Collections.unmodifiableSet(familySet);
     }
   }
 

@@ -23,8 +23,12 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
@@ -102,6 +106,14 @@ public class WALEdit implements Writable, HeapSize {
 
   private ArrayList<Cell> cells = null;
 
+  /**
+   * All the Cell families in <code>cells</code>. Updated by {@link #add(Cell)} and
+   * {@link #add(Map)}. This Set is passed to the FSWALEntry so it does not have
+   * to recalculate the Set of families in a transaction; makes for a bunch of CPU savings.
+   * An optimization that saves on CPU-expensive Cell-parsing.
+   */
+  private Set<byte []> families = null;
+
   public static final WALEdit EMPTY_WALEDIT = new WALEdit();
 
   // Only here for legacy writable deserialization
@@ -117,17 +129,43 @@ public class WALEdit implements Writable, HeapSize {
     this(false);
   }
 
+  /**
+   * @deprecated Since 2.0.1. Use {@link #WALEdit(int, boolean)} instead.
+   */
+  @Deprecated
   public WALEdit(boolean isReplay) {
     this(1, isReplay);
   }
 
+  /**
+   * @deprecated Since 2.0.1. Use {@link #WALEdit(int, boolean)} instead.
+   */
+  @Deprecated
   public WALEdit(int cellCount) {
     this(cellCount, false);
   }
 
+  /**
+   * @param cellCount Pass so can pre-size the WALEdit. Optimization.
+   */
   public WALEdit(int cellCount, boolean isReplay) {
     this.isReplay = isReplay;
     cells = new ArrayList<Cell>(cellCount);
+  }
+
+  private Set<byte[]> getOrCreateFamilies() {
+    if (this.families == null) {
+      this.families = new TreeSet<byte []>(Bytes.BYTES_COMPARATOR);
+    }
+    return this.families;
+  }
+
+  /**
+    * For use by FSWALEntry ONLY. An optimization.
+    * @return All families in {@link #getCells()}; may be null.
+    */
+  public Set<byte []> getFamilies() {
+    return this.families;
   }
 
   /**
@@ -162,9 +200,16 @@ public class WALEdit implements Writable, HeapSize {
     this.compressionContext = compressionContext;
   }
 
+  @InterfaceAudience.Private
+  public WALEdit add(Cell cell, byte[] family) {
+    getOrCreateFamilies().add(family);
+    return addCell(cell);
+  }
+
   public WALEdit add(Cell cell) {
-    this.cells.add(cell);
-    return this;
+    // We clone Family each time we add a Cell. Expensive but safe. For CPU savings, use
+    // add(Map) or add(Cell, family).
+    return add(cell, CellUtil.cloneFamily(cell));
   }
 
   public boolean isEmpty() {
@@ -187,8 +232,10 @@ public class WALEdit implements Writable, HeapSize {
    * @param cells the list of cells that this WALEdit now contains.
    */
   @InterfaceAudience.Private
+  // Used by replay.
   public void setCells(ArrayList<Cell> cells) {
     this.cells = cells;
+    this.families = null;
   }
 
   public NavigableMap<byte[], Integer> getAndRemoveScopes() {
@@ -315,7 +362,7 @@ public class WALEdit implements Writable, HeapSize {
   public static WALEdit createFlushWALEdit(HRegionInfo hri, FlushDescriptor f) {
     KeyValue kv = new KeyValue(getRowForRegion(hri), METAFAMILY, FLUSH,
       EnvironmentEdgeManager.currentTime(), f.toByteArray());
-    return new WALEdit().add(kv);
+    return new WALEdit().add(kv, METAFAMILY);
   }
 
   public static FlushDescriptor getFlushDescriptor(Cell cell) throws IOException {
@@ -329,7 +376,7 @@ public class WALEdit implements Writable, HeapSize {
       RegionEventDescriptor regionEventDesc) {
     KeyValue kv = new KeyValue(getRowForRegion(hri), METAFAMILY, REGION_EVENT,
       EnvironmentEdgeManager.currentTime(), regionEventDesc.toByteArray());
-    return new WALEdit().add(kv);
+    return new WALEdit().add(kv, METAFAMILY);
   }
 
   public static RegionEventDescriptor getRegionEventDescriptor(Cell cell) throws IOException {
@@ -347,7 +394,7 @@ public class WALEdit implements Writable, HeapSize {
     byte [] pbbytes = c.toByteArray();
     KeyValue kv = new KeyValue(getRowForRegion(hri), METAFAMILY, COMPACTION,
       EnvironmentEdgeManager.currentTime(), pbbytes);
-    return new WALEdit().add(kv); //replication scope null so that this won't be replicated
+    return new WALEdit().add(kv, METAFAMILY); //replication scope null so this won't be replicated
   }
 
   public static byte[] getRowForRegion(HRegionInfo hri) {
@@ -395,7 +442,7 @@ public class WALEdit implements Writable, HeapSize {
         BULK_LOAD,
         EnvironmentEdgeManager.currentTime(),
         bulkLoadDescriptor.toByteArray());
-    return new WALEdit().add(kv);
+    return new WALEdit().add(kv, METAFAMILY);
   }
 
   /**
@@ -408,5 +455,35 @@ public class WALEdit implements Writable, HeapSize {
       return WALProtos.BulkLoadDescriptor.parseFrom(cell.getValue());
     }
     return null;
+  }
+
+  /**
+    * Append the given map of family->edits to a WALEdit data structure.
+    * This does not write to the WAL itself.
+    * Note that as an optimization, we will stamp the Set of column families into the WALEdit
+    * to save on our having to calculate it subsequently way down in the actual WAL writing.
+    *
+    * @param familyMap map of family->edits
+    */
+  public void add(Map<byte[], List<Cell>> familyMap) {
+    for (Map.Entry<byte [], List<Cell>> e: familyMap.entrySet()) {
+      // 'foreach' loop NOT used. See HBASE-12023 "...creates too many iterator objects."
+      int listSize = e.getValue().size();
+      // Add all Cells first and then at end, add the family rather than call {@link #add(Cell)}
+      // and have it clone family each time. Optimization!
+      for (int i = 0; i < listSize; i++) {
+        addCell(e.getValue().get(i));
+      }
+      addFamily(e.getKey());
+    }
+  }
+
+  private void addFamily(byte [] family) {
+    getOrCreateFamilies().add(family);
+  }
+
+  private WALEdit addCell(Cell cell) {
+    this.cells.add(cell);
+    return this;
   }
 }
