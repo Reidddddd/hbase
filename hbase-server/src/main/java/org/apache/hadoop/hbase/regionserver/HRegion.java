@@ -3575,17 +3575,13 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         addedSize += applyFamilyMapToMemstore(familyMaps[i]);
       }
 
-      // -------------------------------
-      // STEP 6. Release row locks, etc.
-      // -------------------------------
-      if (locked) {
-        this.updatesLock.readLock().unlock();
-        locked = false;
-      }
-      releaseRowLocks(acquiredRowLocks);
+      // We should not release row locks before wal sync and complete mvcc.
+      // If we release the row locks here, the two sequential mutate cells may have same ts,
+      // which makes data loss.
+      // The locks will be released in the "finally" block.
 
       // -------------------------
-      // STEP 7. Sync wal.
+      // STEP 6. Sync wal.
       // -------------------------
       if (txid != 0) {
         syncOrDefer(txid, durability);
@@ -3604,7 +3600,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       }
 
       // ------------------------------------------------------------------
-      // STEP 8. Advance mvcc. This will make this put visible to scanners and getters.
+      // STEP 7. Advance mvcc. This will make this put visible to scanners and getters.
       // ------------------------------------------------------------------
       if (writeEntry != null) {
         mvcc.completeAndWait(writeEntry);
@@ -3621,7 +3617,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       }
 
       // ------------------------------------
-      // STEP 9. Run coprocessor post hooks. This should be done after the wal is
+      // STEP 8. Run coprocessor post hooks. This should be done after the wal is
       // synced so that the coprocessor contract is adhered to.
       // ------------------------------------
       if (!isInReplay && coprocessorHost != null) {
@@ -3657,6 +3653,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         }
       }
 
+      // STEP 9 release row locks
       if (locked) {
         this.updatesLock.readLock().unlock();
       }
