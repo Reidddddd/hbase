@@ -52,7 +52,7 @@ class SyncFuture {
   // Implementation notes: I tried using a cyclicbarrier in here for handler and sync threads
   // to coordinate on but it did not give any obvious advantage and some issues with order in which
   // events happen.
-  private static final long NOT_DONE = 0;
+  private static final long NOT_DONE = -1L;
 
   /**
    * The transaction id of this operation, monotonically increases.
@@ -61,16 +61,14 @@ class SyncFuture {
 
   /**
    * The transaction id that was set in here when we were marked done. Should be equal or > txnId.
-   * Put this data member into the NOT_DONE state while this class is in use. But for the first
-   * position on construction, let it be -1 so we can immediately call {@link #reset(long, Span)}
-   * below and it will work.
+   * Put this data member into the NOT_DONE state while this class is in use.
    */
-  private long doneTxid = -1;
+  private long doneTxid;
 
   /**
    * If error, the associated throwable. Set when the future is 'done'.
    */
-  private Throwable throwable = null;
+  private Throwable throwable;
 
   private Thread t;
 
@@ -98,16 +96,16 @@ class SyncFuture {
    *             resuming after a call to {@link #get()}.
    * @return this
    */
-  synchronized SyncFuture reset(final long txnId, Span span) {
+  synchronized SyncFuture reset(final long txId, Span span) {
     if (t != null && t != Thread.currentThread()) {
       throw new IllegalStateException();
     }
     t = Thread.currentThread();
     if (!isDone()) {
-      throw new IllegalStateException("" + txnId + " " + Thread.currentThread());
+      throw new IllegalStateException("" + txId + " " + Thread.currentThread());
     }
     this.doneTxid = NOT_DONE;
-    this.txid = txnId;
+    this.txid = txId;
     this.span = span;
     this.throwable = null;
     return this;
@@ -164,11 +162,11 @@ class SyncFuture {
     return true;
   }
 
-  public boolean cancel(boolean mayInterruptIfRunning) {
+  boolean cancel(boolean mayInterruptIfRunning) {
     throw new UnsupportedOperationException();
   }
 
-  public synchronized long get(long timeout) throws InterruptedException,
+  synchronized long get(long timeout) throws InterruptedException,
       ExecutionException, TimeoutIOException {
     final long done = EnvironmentEdgeManager.currentTime() + timeout;
     while (!isDone()) {
