@@ -149,9 +149,9 @@ public abstract class AbstractFSWAL<W> implements WAL {
   /** The barrier used to ensure that close() waits for all log rolls and flushes to finish. */
   protected final DrainBarrier closeBarrier = new DrainBarrier();
 
-  protected final int slowSyncNs;
+  protected final long slowSyncNs;
 
-  private final long walSyncTimeout;
+  private final long walSyncTimeoutNs;
 
   // If > than this size, roll the log.
   protected final long logrollsize;
@@ -207,12 +207,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
    * WAL Comparator; it compares the timestamp (log filenum), present in the log file name. Throws
    * an IllegalArgumentException if used to compare paths from different wals.
    */
-  final Comparator<Path> LOG_NAME_COMPARATOR = new Comparator<Path>() {
-    @Override
-    public int compare(Path o1, Path o2) {
-      return Long.compare(getFileNumFromFileName(o1), getFileNumFromFileName(o2));
-    }
-  };
+  final Comparator<Path> LOG_NAME_COMPARATOR =
+          (o1, o2) -> Long.compare(getFileNumFromFileName(o1), getFileNumFromFileName(o2));
 
   private static final class WalProps {
 
@@ -381,10 +377,10 @@ public abstract class AbstractFSWAL<W> implements WAL {
     LOG.info("WAL configuration: blocksize=" + StringUtils.byteDesc(blocksize) + ", rollsize="
         + StringUtils.byteDesc(this.logrollsize) + ", prefix=" + this.walFilePrefix + ", suffix="
         + walFileSuffix + ", logDir=" + this.walDir + ", archiveDir=" + this.walArchiveDir);
-    this.slowSyncNs =
-        1000000 * conf.getInt("hbase.regionserver.hlog.slowsync.ms", DEFAULT_SLOW_SYNC_TIME_MS);
-    this.walSyncTimeout = conf.getLong("hbase.regionserver.hlog.sync.timeout",
-            DEFAULT_WAL_SYNC_TIMEOUT_MS);
+    this.slowSyncNs = TimeUnit.MILLISECONDS
+            .toNanos(conf.getInt("hbase.regionserver.hlog.slowsync.ms", DEFAULT_SLOW_SYNC_TIME_MS));
+    this.walSyncTimeoutNs = TimeUnit.MILLISECONDS
+            .toNanos(conf.getLong("hbase.regionserver.hlog.sync.timeout", DEFAULT_WAL_SYNC_TIMEOUT_MS));
     this.syncFutureCache = new SyncFutureCache(conf);
   }
 
@@ -660,7 +656,7 @@ public abstract class AbstractFSWAL<W> implements WAL {
     // Now we have published the ringbuffer, halt the current thread until we get an answer back.
     try {
       if (syncFuture != null) {
-        syncFuture.get(walSyncTimeout);
+        syncFuture.get(walSyncTimeoutNs);
       }
     } catch (TimeoutIOException tioe) {
       throw tioe;

@@ -29,22 +29,14 @@ import org.junit.experimental.categories.Category;
 @Category({ RegionServerTests.class, SmallTests.class })
 public class TestSyncFuture {
 
-  @Test(timeout = 60000)
+  @Test(expected = TimeoutIOException.class)
   public void testGet() throws Exception {
     long timeout = 5000;
     long txid = 100000;
-    SyncFuture syncFulture = new SyncFuture();
-    syncFulture.reset(txid);
-    syncFulture.done(txid, null);
-    assertEquals(txid, syncFulture.get(timeout));
+    SyncFuture syncFuture = new SyncFuture().reset(txid, null);
+    syncFuture.done(txid, null);
+    assertEquals(txid, syncFuture.get(timeout));
 
-    syncFulture.reset(txid);
-    try {
-      syncFulture.get(timeout);
-      fail("Should have timed out but not");
-    } catch (TimeoutIOException e) {
-      // test passed
-    }
+    syncFuture.reset(txid, null).get(timeout);
   }
-
 }

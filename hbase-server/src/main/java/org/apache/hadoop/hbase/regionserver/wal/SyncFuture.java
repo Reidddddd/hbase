@@ -166,18 +166,20 @@ class SyncFuture {
     throw new UnsupportedOperationException();
   }
 
-  synchronized long get(long timeout) throws InterruptedException,
+  synchronized long get(long timeoutNs) throws InterruptedException,
       ExecutionException, TimeoutIOException {
-    final long done = EnvironmentEdgeManager.currentTime() + timeout;
+    final long done = System.nanoTime() + timeoutNs;
     while (!isDone()) {
       wait(1000);
-      if (EnvironmentEdgeManager.currentTime() >= done) {
-        throw new TimeoutIOException("Failed to get sync result after "
-            + timeout + " ms for txid=" + this.txid
-            + ", WAL system stuck?");
+      if (System.nanoTime() >= done) {
+        throw new TimeoutIOException(
+                "Failed to get sync result after " + TimeUnit.NANOSECONDS.toMillis(timeoutNs)
+                        + " ms for txid=" + this.txid + ", WAL system stuck?");
       }
     }
-    if (this.throwable != null) throw new ExecutionException(this.throwable);
+    if (this.throwable != null) {
+      throw new ExecutionException(this.throwable);
+    }
     return this.doneTxid;
   }
 
