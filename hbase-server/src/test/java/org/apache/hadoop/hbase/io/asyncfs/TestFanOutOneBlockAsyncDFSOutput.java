@@ -31,6 +31,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -95,9 +99,9 @@ public class TestFanOutOneBlockAsyncDFSOutput {
     // will fail.
     for (;;) {
       try {
-        FanOutOneBlockAsyncDFSOutput out = FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS,
-                new Path("/ensureDatanodeAlive"), true, true, (short) 3, FS.getDefaultBlockSize(),
-                EVENT_LOOP_GROUP.next());
+        FanOutOneBlockAsyncDFSOutput out =
+                FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS, new Path("/ensureDatanodeAlive"),
+                        true, true, (short) 3, FS.getDefaultBlockSize(), EVENT_LOOP_GROUP);
         out.close();
         break;
       } catch (IOException e) {
@@ -108,17 +112,32 @@ public class TestFanOutOneBlockAsyncDFSOutput {
 
   private void writeAndVerify(EventLoop eventLoop, Path f, final FanOutOneBlockAsyncDFSOutput out)
       throws IOException, InterruptedException, ExecutionException {
-    final byte[] b = new byte[10];
-    ThreadLocalRandom.current().nextBytes(b);
-    out.write(b, 0, b.length);
-    assertEquals(b.length, out.flush(false).get().longValue());
-    out.close();
-    assertEquals(b.length, FS.getFileStatus(f).getLen());
-    byte[] actual = new byte[b.length];
-    try (FSDataInputStream in = FS.open(f)) {
-      in.readFully(actual);
+    List<CompletableFuture<Long>> futures = new ArrayList<>();
+    byte[] b = new byte[10];
+    Random rand = new Random(12345);
+    // test pipelined flush
+    for (int i = 0; i < 10; i++) {
+      rand.nextBytes(b);
+      out.write(b);
+      futures.add(out.flush(false));
+      futures.add(out.flush(false));
     }
-    assertArrayEquals(b, actual);
+    for (int i = 0; i < 10; i++) {
+      assertEquals((i + 1) * b.length, futures.get(2 * i).join().longValue());
+      assertEquals((i + 1) * b.length, futures.get(2 * i + 1).join().longValue());
+    }
+    out.close();
+    assertEquals(b.length * 10, FS.getFileStatus(f).getLen());
+    byte[] actual = new byte[b.length];
+    rand.setSeed(12345);
+    try (FSDataInputStream in = FS.open(f)) {
+      for (int i = 0; i < 10; i++) {
+        in.readFully(actual);
+        rand.nextBytes(b);
+        assertArrayEquals(b, actual);
+      }
+      assertEquals(-1, in.read());
+    }
   }
 
   @Test
@@ -129,21 +148,6 @@ public class TestFanOutOneBlockAsyncDFSOutput {
         FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS, f, true, false, (short) 3,
           FS.getDefaultBlockSize(), eventLoop);
     writeAndVerify(eventLoop, f, out);
-  }
-
-  @Test
-  public void testMaxByteBufAllocated() throws Exception {
-    Path f = new Path("/" + name.getMethodName());
-    EventLoop eventLoop = EVENT_LOOP_GROUP.next();
-    final FanOutOneBlockAsyncDFSOutput out = FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS, f,
-            true, false, (short) 3, FS.getDefaultBlockSize(), eventLoop);
-    out.guess(5 * 1024);
-    assertEquals(8 * 1024, out.guess(5 * 1024));
-    assertEquals(16 * 1024, out.guess(10 * 1024));
-    // it wont reduce directly to 4KB
-    assertEquals(8 * 1024, out.guess(4 * 1024));
-    // This time it will reduece
-    assertEquals(4 * 1024, out.guess(4 * 1024));
   }
 
   @Test

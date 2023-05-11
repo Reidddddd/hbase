@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import io.netty.channel.EventLoopGroup;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -56,11 +57,11 @@ public final class AsyncFSOutputHelper {
    * implementation for other {@link FileSystem} which wraps around a {@link FSDataOutputStream}.
    */
   public static AsyncFSOutput createOutput(FileSystem fs, Path f, boolean overwrite,
-      boolean createParent, short replication, long blockSize, final EventLoop eventLoop)
+      boolean createParent, short replication, long blockSize, EventLoopGroup eventLoopGroup)
       throws IOException {
     if (fs instanceof DistributedFileSystem) {
       return FanOutOneBlockAsyncDFSOutputHelper.createOutput((DistributedFileSystem) fs, f,
-        overwrite, createParent, replication, blockSize, eventLoop);
+        overwrite, createParent, replication, blockSize, eventLoopGroup);
     }
     final FSDataOutputStream fsOut;
     int bufferSize = fs.getConf().getInt(CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY,
@@ -78,17 +79,23 @@ public final class AsyncFSOutputHelper {
       private final ByteArrayOutputStream out = new ByteArrayOutputStream();
 
       @Override
-      public void write(final byte[] b, final int off, final int len) {
-        if (eventLoop.inEventLoop()) {
-          out.write(b, off, len);
-        } else {
-          eventLoop.submit(() -> out.write(b, off, len)).syncUninterruptibly();
-        }
+      public void write(byte[] b, int off, int len) {
+        out.write(b, off, len);
       }
 
       @Override
       public void write(byte[] b) {
         write(b, 0, b.length);
+      }
+
+      @Override
+      public void writeInt(int i) {
+        out.writeInt(i);
+      }
+
+      @Override
+      public void write(ByteBuffer bb) {
+        out.write(bb, bb.position(), bb.remaining());
       }
 
       @Override
@@ -108,7 +115,7 @@ public final class AsyncFSOutputHelper {
             out.reset();
           }
         } catch (IOException e) {
-          eventLoop.execute(() -> future.completeExceptionally(e));
+          eventLoopGroup.next().execute(() -> future.completeExceptionally(e));
           return;
         }
         try {
@@ -118,9 +125,9 @@ public final class AsyncFSOutputHelper {
             fsOut.hflush();
           }
           long pos = fsOut.getPos();
-          eventLoop.execute(() -> future.complete(pos));
+          eventLoopGroup.next().execute(() -> future.complete(pos));
         } catch (IOException e) {
-          eventLoop.execute(() -> future.completeExceptionally(e));
+          eventLoopGroup.next().execute(() -> future.completeExceptionally(e));
         }
       }
 
@@ -155,16 +162,6 @@ public final class AsyncFSOutputHelper {
       @Override
       public int buffered() {
         return out.size();
-      }
-
-      @Override
-      public void writeInt(int i) {
-        out.writeInt(i);
-      }
-
-      @Override
-      public void write(ByteBuffer bb) {
-        out.write(bb, bb.position(), bb.remaining());
       }
     };
   }

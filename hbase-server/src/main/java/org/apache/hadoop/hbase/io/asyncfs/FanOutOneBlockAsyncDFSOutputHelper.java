@@ -33,6 +33,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import io.netty.channel.*;
 import io.netty.util.concurrent.FutureListener;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -91,14 +92,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoop;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
@@ -581,7 +574,7 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
 
   private static List<Future<Channel>> connectToDataNodes(Configuration conf, String clientName,
       LocatedBlock locatedBlock, long maxBytesRcvd, long latestGS, BlockConstructionStage stage,
-      DataChecksum summer, EventLoop eventLoop) {
+      DataChecksum summer, EventLoopGroup eventLoopGroup) {
     Enum<?>[] storageTypes = locatedBlock.getStorageTypes();
     DatanodeInfo[] datanodeInfos = locatedBlock.getLocations();
     boolean connectToDnViaHostname =
@@ -604,10 +597,10 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
     for (int i = 0; i < datanodeInfos.length; i++) {
       DatanodeInfo dnInfo = datanodeInfos[i];
       Enum<?> storageType = storageTypes[i];
-      Promise<Channel> promise = eventLoop.newPromise();
+      Promise<Channel> promise = eventLoopGroup.next().newPromise();
       futureList.add(promise);
       String dnAddr = dnInfo.getXferAddr(connectToDnViaHostname);
-      new Bootstrap().group(eventLoop).channel(NioSocketChannel.class)
+      new Bootstrap().group(eventLoopGroup).channel(NioSocketChannel.class)
           .option(CONNECT_TIMEOUT_MILLIS, timeoutMs).handler(new ChannelInitializer<Channel>() {
 
             @Override
@@ -643,7 +636,7 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
 
   private static FanOutOneBlockAsyncDFSOutput createOutput(DistributedFileSystem dfs, String src,
       boolean overwrite, boolean createParent, short replication, long blockSize,
-      EventLoop eventLoop) throws IOException {
+      EventLoopGroup eventLoopGroup) throws IOException {
     Configuration conf = dfs.getConf();
     FSUtils fsUtils = FSUtils.getInstance(dfs, conf);
     DFSClient client = dfs.getClient();
@@ -673,7 +666,7 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
               stat.getFileId(), null);
       List<Channel> datanodeList = new ArrayList<>();
       futureList = connectToDataNodes(conf, clientName, locatedBlock, 0L, 0L, PIPELINE_SETUP_CREATE,
-              summer, eventLoop);
+              summer, eventLoopGroup);
       for (Future<Channel> future : futureList) {
         // fail the creation if there are connection failures since we are fail-fast. The upper
         // layer should retry itself if needed.
@@ -681,7 +674,7 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
       }
       succ = true;
       return new FanOutOneBlockAsyncDFSOutput(conf, fsUtils, dfs, client, namenode, clientName, src,
-          stat.getFileId(), locatedBlock, eventLoop, datanodeList, summer, ALLOC);
+          stat.getFileId(), locatedBlock, datanodeList, summer, ALLOC);
     } finally {
       if (!succ) {
         if (futureList != null) {
@@ -705,19 +698,18 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
 
   /**
    * Create a {@link FanOutOneBlockAsyncDFSOutput}. The method maybe blocked so do not call it
-   * inside {@link EventLoop}.
-   * @param eventLoop all connections to datanode will use the same event loop.
+   * inside an {@link EventLoop}.
    */
   public static FanOutOneBlockAsyncDFSOutput createOutput(DistributedFileSystem dfs, Path f,
       boolean overwrite, boolean createParent, short replication, long blockSize,
-      EventLoop eventLoop) throws IOException {
+      EventLoopGroup eventLoopGroup) throws IOException {
     return new FileSystemLinkResolver<FanOutOneBlockAsyncDFSOutput>() {
 
       @Override
       public FanOutOneBlockAsyncDFSOutput doCall(Path p)
           throws IOException, UnresolvedLinkException {
         return createOutput(dfs, p.toUri().getPath(), overwrite, createParent, replication,
-          blockSize, eventLoop);
+          blockSize, eventLoopGroup);
       }
 
       @Override

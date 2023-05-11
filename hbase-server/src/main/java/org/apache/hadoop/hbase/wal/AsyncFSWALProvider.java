@@ -70,7 +70,7 @@ public class AsyncFSWALProvider extends AbstractFSWALProvider<AsyncFSWAL> {
    * public because of AsyncFSWAL. Should be package-private
    */
   public static AsyncWriter createAsyncWriter(Configuration conf, FileSystem fs, Path path,
-                                              boolean overwritable, EventLoop eventLoop) throws IOException {
+      boolean overwritable, EventLoop eventLoop) throws IOException {
     try {
       AsyncWriter writer = new AsyncProtobufLogWriter(eventLoop);
       writer.init(fs, path, conf, overwritable);
