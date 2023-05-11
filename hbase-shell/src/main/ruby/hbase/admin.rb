@@ -926,7 +926,7 @@ module Hbase
       else
          args.each do |arg|
             ttl = arg[TTL]
-            ttl = ttl ? ttl.to_java(:long) : -1
+            ttl = ttl ? ttl.to_java(:long) : 0
             snapshot_props = java.util.HashMap.new
             snapshot_props.put("TTL", ttl)
             if arg[SKIP_FLUSH] == true
