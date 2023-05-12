@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
+import io.netty.channel.EventLoopGroup;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
@@ -56,7 +57,7 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
 
   private static final Log LOG = LogFactory.getLog(AsyncProtobufLogWriter.class);
 
-  private final EventLoop eventLoop;
+  private final EventLoopGroup eventLoopGroup;
 
   private AsyncFSOutput output;
 
@@ -103,8 +104,8 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
 
   private OutputStream asyncOutputWrapper;
 
-  public AsyncProtobufLogWriter(EventLoop eventLoop) {
-    this.eventLoop = eventLoop;
+  public AsyncProtobufLogWriter(EventLoopGroup eventLoopGroup) {
+    this.eventLoopGroup = eventLoopGroup;
   }
 
   @Override
@@ -156,13 +157,13 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
                             short replication, long blockSize) throws IOException {
     this.output =
             AsyncFSOutputHelper.createOutput(fs, path,
-                    overwritable, false, replication, blockSize, eventLoop);
+                    overwritable, false, replication, blockSize, eventLoopGroup);
     this.asyncOutputWrapper = new OutputStreamWrapper(output);
   }
 
   private long write(Consumer<CompletableFuture<Long>> action) throws IOException {
     CompletableFuture<Long> future = new CompletableFuture<Long>();
-    eventLoop.execute(() -> action.accept(future));
+    action.accept(future);
     try {
       return future.get().longValue();
     } catch (InterruptedException e) {

@@ -58,7 +58,7 @@ public class AsyncFSWALProvider extends AbstractFSWALProvider<AsyncFSWAL> {
     return new AsyncFSWAL(FSUtils.getWALFileSystem(conf), FSUtils.getWALRootDir(conf),
             getWALDirectoryName(factory.factoryId), HConstants.HREGION_OLDLOGDIR_NAME, conf, listeners,
             true, logPrefix, META_WAL_PROVIDER_ID.equals(providerId) ? META_WAL_PROVIDER_ID : null,
-            eventLoopGroup.next());
+            eventLoopGroup);
   }
 
   @Override
@@ -70,9 +70,9 @@ public class AsyncFSWALProvider extends AbstractFSWALProvider<AsyncFSWAL> {
    * public because of AsyncFSWAL. Should be package-private
    */
   public static AsyncWriter createAsyncWriter(Configuration conf, FileSystem fs, Path path,
-      boolean overwritable, EventLoop eventLoop) throws IOException {
+      boolean overwritable, EventLoopGroup eventLoopGroup) throws IOException {
     try {
-      AsyncWriter writer = new AsyncProtobufLogWriter(eventLoop);
+      AsyncWriter writer = new AsyncProtobufLogWriter(eventLoopGroup);
       writer.init(fs, path, conf, overwritable);
       return writer;
     } catch (Exception e) {

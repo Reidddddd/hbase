@@ -891,11 +891,12 @@ public abstract class AbstractFSWAL<W> implements WAL {
     }
   }
 
-  protected long stampSequenceIdAndPublishToRingBuffer(final HTableDescriptor htd, HRegionInfo hri, WALKey key, WALEdit edits,
-                                                       boolean inMemstore, RingBuffer<RingBufferTruck> ringBuffer)
+  protected long stampSequenceIdAndPublishToRingBuffer(final HTableDescriptor htd, HRegionInfo hri,
+          WALKey key, WALEdit edits, boolean inMemstore, RingBuffer<RingBufferTruck> ringBuffer)
           throws IOException {
     if (this.closed) {
-      throw new IOException("Cannot append; log is closed, regionName = " + hri.getRegionNameAsString());
+      throw new IOException(
+              "Cannot append; log is closed, regionName = " + hri.getRegionNameAsString());
     }
     TraceScope scope = Trace.startSpan(getClass().getSimpleName() + ".append");
     MutableLong txidHolder = new MutableLong();
