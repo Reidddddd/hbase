@@ -414,6 +414,10 @@
                                       <pattern>javax.cache</pattern>
                                       <shadedPattern>${shaded.prefix}.javax.cache</shadedPattern>
                                     </relocation>
+                                    <relocation>
+                                      <pattern>org.apache.hadoop.hdfs.client.HdfsDataInputStream</pattern>
+                                      <shadedPattern>${shaded.prefix}.org.apache.hadoop.hdfs.client.HdfsDataInputStream</shadedPattern>
+                                    </relocation>
                                 </relocations>
                                 <transformers>
                                   <!-- Need to filter out some extraneous license files.
