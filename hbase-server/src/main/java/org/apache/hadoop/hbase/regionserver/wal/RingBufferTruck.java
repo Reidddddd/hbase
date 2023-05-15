@@ -18,10 +18,9 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.htrace.Span;
-
 import com.lmax.disruptor.EventFactory;
+import org.apache.htrace.core.Span;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A 'truck' to carry a payload across the {@link FSHLog} ring buffer from Handler to WAL.
@@ -39,17 +38,10 @@ class RingBufferTruck {
   private FSWALEntry entry;
 
   /**
-   * The tracing span for this entry.  Can be null.
-   * TODO: Fix up tracing.
-   */
-  private Span span;
-
-  /**
    * Load the truck with a {@link FSWALEntry} and associated {@link Span}.
    */
-  void loadPayload(final FSWALEntry entry, final Span span) {
+  void loadPayload(final FSWALEntry entry) {
     this.entry = entry;
-    this.span = span;
     this.syncFuture = null;
   }
 
@@ -59,7 +51,6 @@ class RingBufferTruck {
   void loadPayload(final SyncFuture syncFuture) {
     this.syncFuture = syncFuture;
     this.entry = null;
-    this.span = null;
   }
 
   /**
@@ -93,15 +84,6 @@ class RingBufferTruck {
   SyncFuture unloadSyncFuturePayload() {
     SyncFuture ret = this.syncFuture;
     this.syncFuture = null;
-    return ret;
-  }
-
-  /**
-   * Unload the truck of its {@link Span} payload. The internal reference is released.
-   */
-  Span unloadSpanPayload() {
-    Span ret = this.span;
-    this.span = null;
     return ret;
   }
 

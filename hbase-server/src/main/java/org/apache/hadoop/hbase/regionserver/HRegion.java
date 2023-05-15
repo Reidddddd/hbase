@@ -59,7 +59,6 @@ import java.util.NavigableSet;
 import java.util.RandomAccess;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
@@ -113,7 +112,6 @@ import org.apache.hadoop.hbase.Tag;
 import org.apache.hadoop.hbase.TagType;
 import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.backup.HFileArchiver;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
@@ -184,6 +182,7 @@ import org.apache.hadoop.hbase.regionserver.wal.WALUtil;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.snapshot.SnapshotDescriptionUtils;
 import org.apache.hadoop.hbase.snapshot.SnapshotManifest;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.ByteStringer;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
@@ -205,8 +204,8 @@ import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.wal.WALSplitter.MutationReplay;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
+import org.apache.htrace.core.TraceScope;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
 @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="JLM_JSR166_UTILCONCURRENT_MONITORENTER",
@@ -5565,16 +5564,10 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
 
     RowLockContext rowLockContext = null;
     RowLockImpl result = null;
-    TraceScope traceScope = null;
-
-    // If we're tracing start a span to show how long this took.
-    if (Trace.isTracing()) {
-      traceScope = Trace.startSpan("HRegion.getRowLock");
-      traceScope.getSpan().addTimelineAnnotation("Getting a " + (readLock?"readLock":"writeLock"));
-    }
 
     boolean success = false;
-    try {
+    try (TraceScope scope = TraceUtil.createTrace("HRegion.getRowLock")) {
+      TraceUtil.addTimelineAnnotation("Getting a " + (readLock ? "readLock" : "writeLock"));
       // Keep trying until we have a lock or error out.
       // TODO: do we need to add a time component here?
       while (result == null) {
@@ -5629,9 +5622,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         }
       }
       if (!lockAvailable) {
-        if (traceScope != null) {
-          traceScope.getSpan().addTimelineAnnotation("Failed to get row lock");
-        }
+        TraceUtil.addTimelineAnnotation("Failed to get row lock");
         result = null;
         String message = "Timed out waiting for lock for row: " + rowKey + " in region " +
             getRegionInfo().getEncodedName() + ", timeout=" + timeout + ", deadlined=" +
@@ -5657,9 +5648,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       LOG.warn("Thread interrupted waiting for lock on row: " + rowKey);
       InterruptedIOException iie = new InterruptedIOException();
       iie.initCause(ie);
-      if (traceScope != null) {
-        traceScope.getSpan().addTimelineAnnotation("Interrupted exception getting row lock");
-      }
+      TraceUtil.addTimelineAnnotation("Interrupted exception getting row lock");
       Thread.currentThread().interrupt();
       throw iie;
     } catch (Error error) {
@@ -5667,19 +5656,13 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
       // is reached, it will throw out an Error. This Error needs to be caught so it can
       // go ahead to process the minibatch with lock acquired.
       LOG.warn("Error to get row lock for " + Bytes.toStringBinary(row) + ", cause: " + error);
-      IOException ioe = new IOException();
-      ioe.initCause(error);
-      if (traceScope != null) {
-        traceScope.getSpan().addTimelineAnnotation("Error getting row lock");
-      }
+      IOException ioe = new IOException(error);
+      TraceUtil.addTimelineAnnotation("Error getting row lock");
       throw ioe;
     } finally {
       // Clean up the counts just in case this was the thing keeping the context alive.
       if (!success && rowLockContext != null) {
         rowLockContext.cleanUp();
-      }
-      if (traceScope != null) {
-        traceScope.close();
       }
     }
   }

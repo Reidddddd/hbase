@@ -19,6 +19,11 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.wal.DefaultWALProvider.WAL_FILE_NAME_DELIMITER;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.lmax.disruptor.*;
+import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -48,9 +53,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.lmax.disruptor.*;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -66,7 +68,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
 import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
@@ -88,14 +89,7 @@ import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.htrace.NullScope;
-import org.apache.htrace.Span;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Implementation of {@link WAL} to go against {@link FileSystem}; i.e. keep WALs in HDFS.
@@ -665,8 +659,6 @@ public class FSHLog implements WAL {
 
   /**
    * Run a sync after opening to set up the pipeline.
-   * @param nextWriter
-   * @param startTimeNanos
    */
   private void preemptiveSync(final ProtobufLogWriter nextWriter) {
     long startTimeNanos = System.nanoTime();
@@ -694,7 +686,6 @@ public class FSHLog implements WAL {
         LOG.debug("WAL closing. Skipping rolling of writer");
         return regionsToFlush;
       }
-      TraceScope scope = Trace.startSpan("FSHLog.rollWriter");
       try {
         Path oldPath = getOldPath();
         Path newPath = getNewPath();
@@ -718,8 +709,6 @@ public class FSHLog implements WAL {
         }
       } finally {
         closeBarrier.endOp();
-        assert scope == NullScope.INSTANCE || !scope.isDetached();
-        scope.close();
       }
       return regionsToFlush;
     } finally {
@@ -845,7 +834,6 @@ public class FSHLog implements WAL {
       zigzagLatch = this.ringBufferEventHandler.attainSafePoint();
     }
     afterCreatingZigZagLatch();
-    TraceScope scope = Trace.startSpan("FSHFile.replaceWriter");
     CompletableFuture<Void> closeFuture = null;
     try {
       // Wait on the safe point to be achieved.  Send in a sync in case nothing has hit the
@@ -858,7 +846,6 @@ public class FSHLog implements WAL {
           // use assert to make sure no change breaks the logic that
           // sequence and zigzagLatch will be set together
           assert sequence > 0L : "Failed to get sequence from ring buffer";
-          Trace.addTimelineAnnotation("awaiting safepoint");
           syncFuture = zigzagLatch.waitSafePoint(publishSyncOnRingBuffer(sequence));
         }
       } catch (FailedSyncBeforeLogCloseException e) {
@@ -910,7 +897,6 @@ public class FSHLog implements WAL {
             throw e;
           }
         }
-        scope.close();
       }
     }
     return newPath;
@@ -922,9 +908,7 @@ public class FSHLog implements WAL {
     closeExecutor.execute(() -> {
       try {
         if (writer != null) {
-          Trace.addTimelineAnnotation("closing writer");
           writer.close();
-          Trace.addTimelineAnnotation("writer closed");
         }
         this.closeErrorCount.set(0);
         int oldNumEntries = this.numEntries.get();
@@ -1137,7 +1121,6 @@ public class FSHLog implements WAL {
     if (this.closed) throw new IOException("Cannot append; log is closed");
     // Make a trace scope for the append.  It is closed on other side of the ring buffer by the
     // single consuming thread.  Don't have to worry about it.
-    TraceScope scope = Trace.startSpan("FSHLog.append");
     final MutableLong txidHolder = new MutableLong();
     final RingBuffer<RingBufferTruck> ringBuffer = disruptor.getRingBuffer();
     MultiVersionConcurrencyControl.WriteEntry we = key.getMvcc().begin(new Runnable() {
@@ -1149,7 +1132,7 @@ public class FSHLog implements WAL {
     try {
       FSWALEntry entry = new FSWALEntry(txid, key, edits, htd, hri, inMemstore);
       entry.stampRegionSequenceId(we);
-      ringBuffer.get(txid).loadPayload(entry, scope.detach());
+      ringBuffer.get(txid).loadPayload(entry);
     } finally {
       ringBuffer.publish(txid);
     }
@@ -1312,14 +1295,13 @@ public class FSHLog implements WAL {
           }
           // I got something.  Lets run.  Save off current sequence number in case it changes
           // while we run.
-          TraceScope scope = Trace.continueSpan(sf.getSpan());
+          // TODO handle htrace API change, see HBASE-18895
+          // TraceScope scope = Trace.continueSpan(sf.getSpan());
           long start = System.nanoTime();
           Throwable lastException = null;
           try {
-            Trace.addTimelineAnnotation("syncing writer");
             long unSyncedFlushSeq = highestUnsyncedSequence;
             writer.sync();
-            Trace.addTimelineAnnotation("writer synced");
             if (unSyncedFlushSeq > currentSequence) {
               currentSequence = unSyncedFlushSeq;
             }
@@ -1332,7 +1314,8 @@ public class FSHLog implements WAL {
             lastException = e;
           } finally {
             // reattach the span to the future before releasing.
-            sf.setSpan(scope.detach());
+            // TODO handle htrace API change, see HBASE-18895
+            // sf.setSpan(scope.detach());
             // First release what we 'took' from the queue.
             syncCount += releaseSyncFuture(sf, currentSequence, lastException);
             // Can we release other syncs?
@@ -1423,22 +1406,18 @@ public class FSHLog implements WAL {
     return logRollNeeded;
   }
 
-  private SyncFuture publishSyncOnRingBuffer(long sequence) {
-    return publishSyncOnRingBuffer(sequence, null);
-  }
-
   private long getSequenceOnRingBuffer() {
     return this.disruptor.getRingBuffer().next();
   }
 
   @InterfaceAudience.Private
-  public SyncFuture publishSyncOnRingBuffer(Span span) {
+  public SyncFuture publishSyncOnRingBuffer() {
     long sequence = this.disruptor.getRingBuffer().next();
-    return publishSyncOnRingBuffer(sequence, span);
+    return publishSyncOnRingBuffer(sequence);
   }
 
-  private SyncFuture publishSyncOnRingBuffer(long sequence, Span span) {
-    SyncFuture syncFuture = getSyncFuture(sequence, span);
+  private SyncFuture publishSyncOnRingBuffer(long sequence) {
+    SyncFuture syncFuture = getSyncFuture(sequence);
     try {
       RingBufferTruck truck = this.disruptor.getRingBuffer().get(sequence);
       truck.loadPayload(syncFuture);
@@ -1449,15 +1428,17 @@ public class FSHLog implements WAL {
   }
 
   // Sync all known transactions
-  private Span publishSyncThenBlockOnCompletion(Span span) throws IOException {
-    return blockOnSync(publishSyncOnRingBuffer(span));
+  private void publishSyncThenBlockOnCompletion() throws IOException {
+    SyncFuture syncFuture = publishSyncOnRingBuffer();
+    blockOnSync(syncFuture);
   }
 
-  private Span blockOnSync(final SyncFuture syncFuture) throws IOException {
+  private void blockOnSync(final SyncFuture syncFuture) throws IOException {
     // Now we have published the ringbuffer, halt the current thread until we get an answer back.
     try {
-      syncFuture.get(walSyncTimeout);
-      return syncFuture.getSpan();
+      if (syncFuture != null) {
+        syncFuture.get(walSyncTimeout);
+      }
     } catch (TimeoutIOException tioe) {
       throw tioe;
     } catch (InterruptedException ie) {
@@ -1475,7 +1456,7 @@ public class FSHLog implements WAL {
     return ioe;
   }
 
-  private SyncFuture getSyncFuture(final long sequence, Span span) {
+  private SyncFuture getSyncFuture(final long sequence) {
     return syncFutureCache.getIfPresentOrNew().reset(sequence);
   }
 
@@ -1485,7 +1466,6 @@ public class FSHLog implements WAL {
           new StringBuilder().append("Slow sync cost: ")
               .append(timeInNanos / 1000000).append(" ms, current pipeline: ")
               .append(Arrays.toString(getPipeLine())).toString();
-      Trace.addTimelineAnnotation(msg);
       LOG.info(msg);
     }
     if (!listeners.isEmpty()) {
@@ -1536,13 +1516,7 @@ public class FSHLog implements WAL {
 
   @Override
   public void sync() throws IOException {
-    TraceScope scope = Trace.startSpan("FSHLog.sync");
-    try {
-      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
-    } finally {
-      assert scope == NullScope.INSTANCE || !scope.isDetached();
-      scope.close();
-    }
+    publishSyncThenBlockOnCompletion();
   }
 
   @Override
@@ -1551,13 +1525,7 @@ public class FSHLog implements WAL {
       // Already sync'd.
       return;
     }
-    TraceScope scope = Trace.startSpan("FSHLog.sync");
-    try {
-      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
-    } finally {
-      assert scope == NullScope.INSTANCE || !scope.isDetached();
-      scope.close();
-    }
+    publishSyncThenBlockOnCompletion();
   }
 
   // public only until class moves to o.a.h.h.wal
@@ -1857,7 +1825,8 @@ public class FSHLog implements WAL {
             endOfBatch = true;
           }
         } else if (truck.hasFSWALEntryPayload()) {
-          TraceScope scope = Trace.continueSpan(truck.unloadSpanPayload());
+          // TODO handle htrace API change, see HBASE-18895
+          // TraceScope scope = Trace.continueSpan(truck.unloadSpanPayload());
           try {
             FSWALEntry entry = truck.unloadFSWALEntryPayload();
             if (this.exception != null) {
@@ -1876,9 +1845,6 @@ public class FSHLog implements WAL {
                     : new DamagedWALException("On sync", this.exception));
             // Return to keep processing events coming off the ringbuffer
             return;
-          } finally {
-            assert scope == NullScope.INSTANCE || !scope.isDetached();
-            scope.close(); // append scope is complete
           }
         } else {
           // What is this if not an append or sync. Fail all up to this!!!

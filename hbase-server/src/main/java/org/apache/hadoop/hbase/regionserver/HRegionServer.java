@@ -92,6 +92,7 @@ import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.YouAreDeadException;
 import org.apache.hadoop.hbase.ZNodeClearer;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
@@ -526,6 +527,7 @@ public class HRegionServer extends HasThread implements
   public HRegionServer(Configuration conf, CoordinatedStateManager csm)
       throws IOException, InterruptedException {
     super("RegionServer");  // thread name
+    TraceUtil.initTracer(conf);
     this.startcode = System.currentTimeMillis();
     this.fsOk = true;
     this.conf = conf;

@@ -46,10 +46,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.DroppedSnapshotException;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.RemoteExceptionHandler;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.RegionReplicaUtil;
 import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
 import org.apache.hadoop.hbase.regionserver.Region.FlushResult;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.HasThread;
@@ -57,9 +57,9 @@ import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.StringUtils.TraditionalBinaryPrefix;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
 import org.apache.hadoop.hbase.util.Counter;
+import org.apache.htrace.core.TraceScope;
+import org.apache.yetus.audience.InterfaceAudience;
 
 import com.google.common.base.Preconditions;
 
@@ -462,8 +462,8 @@ class MemStoreFlusher implements FlushRequester {
             "store files; delaying flush up to " + this.blockingWaitTime + "ms");
           if (!this.server.compactSplitThread.requestSplit(region)) {
             try {
-              this.server.compactSplitThread.requestSystemCompaction(
-                  region, Thread.currentThread().getName());
+              this.server.compactSplitThread.requestSystemCompaction(region,
+                Thread.currentThread().getName());
             } catch (IOException e) {
               LOG.error("Cache flush failed for region " +
                   Bytes.toStringBinary(region.getRegionInfo().getRegionName()),
@@ -579,11 +579,9 @@ class MemStoreFlusher implements FlushRequester {
    * amount of memstore consumption.
    */
   public void reclaimMemStoreMemory() {
-    try (TraceScope scope = Trace.startSpan("MemStoreFluser.reclaimMemStoreMemory")) {
+    try (TraceScope scope = TraceUtil.createTrace("MemStoreFluser.reclaimMemStoreMemory")) {
       if (isAboveHighWaterMark()) {
-        if (Trace.isTracing()) {
-          scope.getSpan().addTimelineAnnotation("Force Flush. We're above high water mark.");
-        }
+        TraceUtil.addTimelineAnnotation("Force Flush. We're above high water mark.");
         long start = EnvironmentEdgeManager.currentTime();
         long nextLogTimeMs = start;
         synchronized (this.blockSignal) {

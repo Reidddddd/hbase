@@ -1299,7 +1299,8 @@
     <jruby.version>9.3.8.0</jruby.version>
     <junit.version>4.12</junit.version>
     <hamcrest.version>1.3</hamcrest.version>
-    <htrace.version>3.1.0-incubating</htrace.version>
+    <htrace.version>4.2.0-incubating</htrace.version>
+    <htrace-hadoop.version>3.2.0-incubating</htrace-hadoop.version>
     <log4j.version>1.2.17</log4j.version>
     <mockito.version>4.8.0</mockito.version>
     <protobuf.version>2.5.0</protobuf.version>
@@ -1985,7 +1986,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.htrace</groupId>
-        <artifactId>htrace-core</artifactId>
+        <artifactId>htrace-core4</artifactId>
         <version>${htrace.version}</version>
       </dependency>
       <dependency>
@@ -2346,6 +2347,10 @@
             <artifactId>hadoop-hdfs</artifactId>
             <exclusions>
               <exclusion>
+                <groupId>org.apache.htrace</groupId>
+                <artifactId>htrace-core</artifactId>
+              </exclusion>
+              <exclusion>
                 <groupId>javax.servlet.jsp</groupId>
                 <artifactId>jsp-api</artifactId>
               </exclusion>
@@ -2375,6 +2380,10 @@
             <type>test-jar</type>
             <scope>test</scope>
             <exclusions>
+              <exclusion>
+                <groupId>org.apache.htrace</groupId>
+                <artifactId>htrace-core</artifactId>
+              </exclusion>
               <exclusion>
                 <groupId>javax.servlet.jsp</groupId>
                 <artifactId>jsp-api</artifactId>
@@ -2407,6 +2416,10 @@
             <artifactId>hadoop-common</artifactId>
             <version>${hadoop-two.version}</version>
             <exclusions>
+              <exclusion>
+                <groupId>org.apache.htrace</groupId>
+                <artifactId>htrace-core</artifactId>
+              </exclusion>
               <exclusion>
                 <groupId>javax.servlet.jsp</groupId>
                 <artifactId>jsp-api</artifactId>
@@ -2441,6 +2454,14 @@
             <artifactId>hadoop-minicluster</artifactId>
             <version>${hadoop-two.version}</version>
             <exclusions>
+              <exclusion>
+                <groupId>org.apache.htrace</groupId>
+                <artifactId>htrace-core</artifactId>
+              </exclusion>
+              <exclusion>
+                <groupId>commons-httpclient</groupId>
+                <artifactId>commons-httpclient</artifactId>
+              </exclusion>
               <exclusion>
                 <groupId>javax.servlet.jsp</groupId>
                 <artifactId>jsp-api</artifactId>
@@ -2537,6 +2558,10 @@
            <type>test-jar</type>
            <scope>test</scope>
            <exclusions>
+             <exclusion>
+               <groupId>org.apache.htrace</groupId>
+               <artifactId>htrace-core</artifactId>
+             </exclusion>
              <exclusion>
                <groupId>io.netty</groupId>
                <artifactId>netty</artifactId>

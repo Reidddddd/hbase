@@ -255,6 +255,10 @@
           <artifactId>hadoop-common</artifactId>
           <exclusions>
             <exclusion>
+              <groupId>org.apache.htrace</groupId>
+              <artifactId>htrace-core</artifactId>
+            </exclusion>
+            <exclusion>
               <groupId>com.github.stephenc.findbugs</groupId>
               <artifactId>findbugs-annotations</artifactId>
             </exclusion>

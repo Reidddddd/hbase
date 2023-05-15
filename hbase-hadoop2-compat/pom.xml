@@ -214,6 +214,10 @@ limitations under the License.
       <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>org.apache.htrace</groupId>
+          <artifactId>htrace-core</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.codehaus.jackson</groupId>
           <artifactId>jackson-jaxrs</artifactId>
         </exclusion>

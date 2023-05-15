@@ -57,7 +57,7 @@ The `LocalFileSpanReceiver` looks in _hbase-site.xml_      for a `hbase.local-fi
 
 <property>
   <name>hbase.trace.spanreceiver.classes</name>
-  <value>org.htrace.impl.LocalFileSpanReceiver</value>
+  <value>org.apache.htrace.core.LocalFileSpanReceiver</value>
 </property>
 <property>
   <name>hbase.local-file-span-receiver.path</name>
@@ -89,7 +89,7 @@ The `ZipkinSpanReceiver` looks in _hbase-site.xml_      for a `hbase.zipkin.coll
 
 <property>
   <name>hbase.trace.spanreceiver.classes</name>
-  <value>org.htrace.impl.ZipkinSpanReceiver</value>
+  <value>org.apache.htrace.core.ZipkinSpanReceiver</value>
 </property> 
 <property>
   <name>hbase.zipkin.collector-hostname</name>

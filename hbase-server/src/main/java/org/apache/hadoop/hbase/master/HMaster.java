@@ -80,6 +80,7 @@ import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownRegionException;
 import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
@@ -459,6 +460,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
   public HMaster(final Configuration conf, CoordinatedStateManager csm)
       throws IOException, KeeperException, InterruptedException {
     super(conf, csm);
+    TraceUtil.initTracer(conf);
     this.rsFatals = new MemoryBoundedLogMessageBuffer(
       conf.getLong("hbase.master.buffer.for.rs.fatals", 1*1024*1024));
 

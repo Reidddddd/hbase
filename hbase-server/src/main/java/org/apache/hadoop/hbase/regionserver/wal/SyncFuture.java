@@ -19,11 +19,10 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.htrace.Span;
+import org.apache.htrace.core.Span;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A Future on a filesystem sync call.  It given to a client or 'Handler' for it to wait on till

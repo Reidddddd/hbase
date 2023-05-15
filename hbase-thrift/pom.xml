@@ -338,7 +338,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.htrace</groupId>
-      <artifactId>htrace-core</artifactId>
+      <artifactId>htrace-core4</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.thrift</groupId>
@@ -581,6 +581,10 @@
           <artifactId>hadoop-common</artifactId>
           <exclusions>
             <exclusion>
+              <groupId>org.apache.htrace</groupId>
+              <artifactId>htrace-core</artifactId>
+            </exclusion>
+            <exclusion>
               <groupId>org.codehaus.jackson</groupId>
               <artifactId>jackson-jaxrs</artifactId>
             </exclusion>
@@ -603,6 +607,10 @@
           <artifactId>hadoop-minicluster</artifactId>
           <scope>test</scope>
           <exclusions>
+            <exclusion>
+              <groupId>org.apache.htrace</groupId>
+              <artifactId>htrace-core</artifactId>
+            </exclusion>
             <exclusion>
               <groupId>org.codehaus.jackson</groupId>
               <artifactId>jackson-core-asl</artifactId>
