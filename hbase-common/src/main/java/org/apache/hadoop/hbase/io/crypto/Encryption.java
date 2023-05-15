@@ -21,6 +21,7 @@ import static java.lang.String.format;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -33,6 +34,7 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -96,6 +98,12 @@ public final class Encryption {
    */
   public static final boolean CRYPTO_KEY_FAIL_ON_ALGORITHM_MISMATCH_CONF_DEFAULT = false;
 
+  /**
+   * Return the SHA-256 digest of the concatenation of the supplied arguments in hex string.
+   */
+  public static byte[] hash256Hex(String... args) {
+    return Hex.encodeHexString(hash256(args)).getBytes(StandardCharsets.UTF_8);
+  }
 
   /**
    * Crypto context
