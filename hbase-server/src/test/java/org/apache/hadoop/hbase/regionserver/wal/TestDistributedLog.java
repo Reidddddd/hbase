@@ -269,7 +269,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
       // Force a safe point
       final AbstractLog.SafePointZigZagLatch latch = ringBufferEventHandler.attainSafePoint();
       try {
-        final SyncFuture future0 = log.publishSyncOnRingBuffer(null);
+        final SyncFuture future0 = log.publishSyncOnRingBuffer();
         // Wait for the sync to be done.
         Waiter.waitFor(conf, TEST_TIMEOUT_MS, new Waiter.Predicate<Exception>() {
           @Override
@@ -278,7 +278,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
           }
         });
         // Publish another sync from the same thread, this should not overwrite the done sync.
-        SyncFuture future1 = log.publishSyncOnRingBuffer(null);
+        SyncFuture future1 = log.publishSyncOnRingBuffer();
         assertFalse(future1.isDone());
         // Unblock the safe point trigger..
         blockBeforeSafePoint.countDown();

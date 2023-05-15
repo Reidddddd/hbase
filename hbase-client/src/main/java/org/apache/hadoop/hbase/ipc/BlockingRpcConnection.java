@@ -56,7 +56,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.security.AuthenticationFailedException;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.exceptions.ConnectionClosingException;
 import org.apache.hadoop.hbase.io.ByteArrayOutputStream;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController.CancellationCallback;
@@ -74,8 +73,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Thread that reads responses and notifies callers. Each connection owns a socket connected to a
@@ -521,9 +519,7 @@ class BlockingRpcConnection extends RpcConnection implements Runnable {
   }
 
   private void tracedWriteRequest(Call call) throws IOException {
-    try (TraceScope ignored = Trace.startSpan("RpcClientImpl.tracedWriteRequest", call.span)) {
-      writeRequest(call);
-    }
+    writeRequest(call);
   }
 
   /**

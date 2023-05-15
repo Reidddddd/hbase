@@ -27,10 +27,10 @@ import java.util.Random;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.RetryCounter;
 import org.apache.hadoop.hbase.util.RetryCounterFactory;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -44,8 +44,6 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.proto.CreateRequest;
 import org.apache.zookeeper.proto.SetDataRequest;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
 
 /**
  * A zookeeper that can handle 'recoverable' errors.
@@ -166,42 +164,35 @@ public class RecoverableZooKeeper {
    * This function will not throw NoNodeException if the path does not
    * exist.
    */
-  public void delete(String path, int version)
-  throws InterruptedException, KeeperException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.delete");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      boolean isRetry = false; // False for first attempt, true for all retries.
-      while (true) {
-        try {
-          checkZk().delete(path, version);
-          return;
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case NONODE:
-              if (isRetry) {
-                LOG.debug("Node " + path + " already deleted. Assuming a " +
-                    "previous attempt succeeded.");
-                return;
-              }
-              LOG.debug("Node " + path + " already deleted, retry=" + isRetry);
-              throw e;
+  public void delete(String path, int version) throws InterruptedException, KeeperException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    boolean isRetry = false; // False for first attempt, true for all retries.
+    while (true) {
+      try {
+        checkZk().delete(path, version);
+        return;
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case NONODE:
+            if (isRetry) {
+              LOG.debug("Node " + path + " already deleted. Assuming a " +
+                  "previous attempt succeeded.");
+              return;
+            }
+            LOG.debug("Node " + path + " already deleted, retry=" + isRetry);
+            throw e;
 
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "delete");
-              break;
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "delete");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
-        isRetry = true;
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
+      isRetry = true;
     }
   }
 
@@ -209,30 +200,23 @@ public class RecoverableZooKeeper {
    * exists is an idempotent operation. Retry before throwing exception
    * @return A Stat instance
    */
-  public Stat exists(String path, Watcher watcher)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.exists");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          return checkZk().exists(path, watcher);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "exists");
-              break;
+  public Stat exists(String path, Watcher watcher) throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        return checkZk().exists(path, watcher);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "exists");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -240,30 +224,23 @@ public class RecoverableZooKeeper {
    * exists is an idempotent operation. Retry before throwing exception
    * @return A Stat instance
    */
-  public Stat exists(String path, boolean watch)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.exists");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          return checkZk().exists(path, watch);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "exists");
-              break;
+  public Stat exists(String path, boolean watch) throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        return checkZk().exists(path, watch);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "exists");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -283,28 +260,22 @@ public class RecoverableZooKeeper {
    */
   public List<String> getChildren(String path, Watcher watcher)
     throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.getChildren");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          return checkZk().getChildren(path, watcher);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "getChildren");
-              break;
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        return checkZk().getChildren(path, watcher);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "getChildren");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -313,29 +284,23 @@ public class RecoverableZooKeeper {
    * @return List of children znodes
    */
   public List<String> getChildren(String path, boolean watch)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.getChildren");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          return checkZk().getChildren(path, watch);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "getChildren");
-              break;
+    throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        return checkZk().getChildren(path, watch);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "getChildren");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -344,30 +309,24 @@ public class RecoverableZooKeeper {
    * @return Data
    */
   public byte[] getData(String path, Watcher watcher, Stat stat)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.getData");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          byte[] revData = checkZk().getData(path, watcher, stat);
-          return removeMetaData(revData);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "getData");
-              break;
+    throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        byte[] revData = checkZk().getData(path, watcher, stat);
+        return removeMetaData(revData);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "getData");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -376,30 +335,24 @@ public class RecoverableZooKeeper {
    * @return Data
    */
   public byte[] getData(String path, boolean watch, Stat stat)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.getData");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          byte[] revData = checkZk().getData(path, watch, stat);
-          return removeMetaData(revData);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "getData");
-              break;
+    throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        byte[] revData = checkZk().getData(path, watch, stat);
+        return removeMetaData(revData);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "getData");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -410,47 +363,41 @@ public class RecoverableZooKeeper {
    * @return Stat instance
    */
   public Stat setData(String path, byte[] data, int version)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.setData");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      byte[] newData = appendMetaData(data);
-      boolean isRetry = false;
-      while (true) {
-        try {
-          return checkZk().setData(path, newData, version);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "setData");
-              break;
-            case BADVERSION:
-              if (isRetry) {
-                // try to verify whether the previous setData success or not
-                try{
-                  Stat stat = new Stat();
-                  byte[] revData = checkZk().getData(path, false, stat);
-                  if(Bytes.compareTo(revData, newData) == 0) {
-                    // the bad version is caused by previous successful setData
-                    return stat;
-                  }
-                } catch(KeeperException keeperException){
-                  // the ZK is not reliable at this moment. just throwing exception
-                  throw keeperException;
+    throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    byte[] newData = appendMetaData(data);
+    boolean isRetry = false;
+    while (true) {
+      try {
+        return checkZk().setData(path, newData, version);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "setData");
+            break;
+          case BADVERSION:
+            if (isRetry) {
+              // try to verify whether the previous setData success or not
+              try{
+                Stat stat = new Stat();
+                byte[] revData = checkZk().getData(path, false, stat);
+                if(Bytes.compareTo(revData, newData) == 0) {
+                  // the bad version is caused by previous successful setData
+                  return stat;
                 }
+              } catch(KeeperException keeperException){
+                // the ZK is not reliable at this moment. just throwing exception
+                throw keeperException;
               }
-            // throw other exceptions and verified bad version exceptions
-            default:
-              throw e;
-          }
+            }
+          // throw other exceptions and verified bad version exceptions
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
-        isRetry = true;
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
+      isRetry = true;
     }
   }
 
@@ -458,30 +405,23 @@ public class RecoverableZooKeeper {
    * getAcl is an idempotent operation. Retry before throwing exception
    * @return list of ACLs
    */
-  public List<ACL> getAcl(String path, Stat stat)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.getAcl");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          return checkZk().getACL(path, stat);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "getAcl");
-              break;
+  public List<ACL> getAcl(String path, Stat stat) throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        return checkZk().getACL(path, stat);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "getAcl");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -490,29 +430,23 @@ public class RecoverableZooKeeper {
    * @return list of ACLs
    */
   public Stat setAcl(String path, List<ACL> acls, int version)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.setAcl");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      while (true) {
-        try {
-          return checkZk().setACL(path, acls, version);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "setAcl");
-              break;
+    throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    while (true) {
+      try {
+        return checkZk().setACL(path, acls, version);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "setAcl");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
       }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      retryCounter.sleepUntilNextRetry();
     }
   }
 
@@ -531,28 +465,21 @@ public class RecoverableZooKeeper {
    *
    * @return Path
    */
-  public String create(String path, byte[] data, List<ACL> acl,
-      CreateMode createMode)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.create");
-      byte[] newData = appendMetaData(data);
-      switch (createMode) {
-        case EPHEMERAL:
-        case PERSISTENT:
-          return createNonSequential(path, newData, acl, createMode);
+  public String create(String path, byte[] data, List<ACL> acl, CreateMode createMode)
+    throws KeeperException, InterruptedException {
+    byte[] newData = appendMetaData(data);
+    switch (createMode) {
+      case EPHEMERAL:
+      case PERSISTENT:
+        return createNonSequential(path, newData, acl, createMode);
 
-        case EPHEMERAL_SEQUENTIAL:
-        case PERSISTENT_SEQUENTIAL:
-          return createSequential(path, newData, acl, createMode);
+      case EPHEMERAL_SEQUENTIAL:
+      case PERSISTENT_SEQUENTIAL:
+        return createSequential(path, newData, acl, createMode);
 
-        default:
-          throw new IllegalArgumentException("Unrecognized CreateMode: " +
-              createMode);
-      }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      default:
+        throw new IllegalArgumentException("Unrecognized CreateMode: " +
+            createMode);
     }
   }
 
@@ -660,31 +587,24 @@ public class RecoverableZooKeeper {
   /**
    * Run multiple operations in a transactional manner. Retry before throwing exception
    */
-  public List<OpResult> multi(Iterable<Op> ops)
-  throws KeeperException, InterruptedException {
-    TraceScope traceScope = null;
-    try {
-      traceScope = Trace.startSpan("RecoverableZookeeper.multi");
-      RetryCounter retryCounter = retryCounterFactory.create();
-      Iterable<Op> multiOps = prepareZKMulti(ops);
-      while (true) {
-        try {
-          return checkZk().multi(multiOps);
-        } catch (KeeperException e) {
-          switch (e.code()) {
-            case CONNECTIONLOSS:
-            case OPERATIONTIMEOUT:
-              retryOrThrow(retryCounter, e, "multi");
-              break;
+  public List<OpResult> multi(Iterable<Op> ops) throws KeeperException, InterruptedException {
+    RetryCounter retryCounter = retryCounterFactory.create();
+    Iterable<Op> multiOps = prepareZKMulti(ops);
+    while (true) {
+      try {
+        return checkZk().multi(multiOps);
+      } catch (KeeperException e) {
+        switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            retryOrThrow(retryCounter, e, "multi");
+            break;
 
-            default:
-              throw e;
-          }
+          default:
+            throw e;
         }
-        retryCounter.sleepUntilNextRetry();
-    }
-    } finally {
-      if (traceScope != null) traceScope.close();
+      }
+      retryCounter.sleepUntilNextRetry();
     }
   }
 

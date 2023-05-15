@@ -141,7 +141,6 @@ import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hbase.thirdparty.com.google.gson.Gson;
-import org.apache.htrace.TraceInfo;
 
 /**
  * An RPC server that hosts protobuf described Services.
@@ -348,7 +347,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     protected long size;                          // size of current call
     protected boolean isError;
-    protected TraceInfo tinfo;
     private ByteBuffer cellBlock = null;
 
     private User user;
@@ -365,7 +363,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         justification="Can't figure why this complaint is happening... see below")
     Call(int id, final BlockingService service, final MethodDescriptor md, RequestHeader header,
          Message param, CellScanner cellScanner, Connection connection, Responder responder,
-         long size, TraceInfo tinfo, final InetAddress remoteAddress, int timeout) {
+         long size, final InetAddress remoteAddress, int timeout) {
       this.id = id;
       this.service = service;
       this.md = md;
@@ -378,7 +376,6 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       this.responder = responder;
       this.isError = false;
       this.size = size;
-      this.tinfo = tinfo;
       this.user = connection == null? null: connection.user; // FindBugs: NP_NULL_ON_SOME_PATH
       this.remoteAddress = remoteAddress;
       this.saslWrapDone = false;
@@ -1356,13 +1353,13 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
     // Fake 'call' for failed authorization response
     private static final int AUTHORIZATION_FAILED_CALLID = -1;
     private final Call authFailedCall = new Call(AUTHORIZATION_FAILED_CALLID, null, null, null,
-        null, null, this, null, 0, null, null, 0);
+        null, null, this, null, 0, null, 0);
     private ByteArrayOutputStream authFailedResponse =
         new ByteArrayOutputStream();
     // Fake 'call' for SASL context setup
     private static final int SASL_CALLID = -33;
     private final Call saslCall = new Call(SASL_CALLID, null, null, null, null, null, this, null,
-        0, null, null, 0);
+        0, null, 0);
 
     // was authentication allowed with a fallback to simple auth
     private boolean authenticatedWithFallback;
@@ -1770,7 +1767,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
               // Notify the client about the offending request
               Call reqTooBig = new Call(header.getCallId(), service, null, null, null,
-                  null, this, responder, 0, null, this.addr,0);
+                  null, this, responder, 0, this.addr,0);
               metrics.exception(REQUEST_TOO_BIG_EXCEPTION);
               // Make sure the client recognizes the underlying exception
               // Otherwise, throw a DoNotRetryIOException.
@@ -1842,7 +1839,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
     private int doBadPreambleHandling(final String msg, final Exception e) throws IOException {
       LOG.warn(msg);
-      Call fakeCall = new Call(-1, null, null, null, null, null, this, responder, -1, null, null,0);
+      Call fakeCall = new Call(-1, null, null, null, null, null, this, responder, -1, null,0);
       setupResponse(null, fakeCall, e, msg);
       responder.doRespond(fakeCall);
       // Returning -1 closes out the connection.
@@ -2030,7 +2027,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       if (!isPersonAllowedFallback) {
         final Call authenticationFailed =
             new Call(id, this.service, null, null, null, null, this,
-                responder, totalRequestSize, null, null, 0);
+                responder, totalRequestSize, null, 0);
         AuthenticationFailedException ae =
             new AuthenticationFailedException("User " + this.user.getShortName() +
                 " is not allowed to fallback to SIMPLE authentication. ");
@@ -2045,7 +2042,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       if ((totalRequestSize + callQueueSize.get()) > maxQueueSize) {
         final Call callTooBig =
           new Call(id, this.service, null, null, null, null, this,
-            responder, totalRequestSize, null, null, 0);
+            responder, totalRequestSize, null, 0);
         ByteArrayOutputStream responseBuffer = new ByteArrayOutputStream();
         metrics.exception(CALL_QUEUE_TOO_BIG_EXCEPTION);
         setupResponse(responseBuffer, callTooBig, CALL_QUEUE_TOO_BIG_EXCEPTION,
@@ -2104,7 +2101,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
 
         final Call readParamsFailedCall =
           new Call(id, this.service, null, null, null, null, this,
-            responder, totalRequestSize, null, null, 0);
+            responder, totalRequestSize, null, 0);
         ByteArrayOutputStream responseBuffer = new ByteArrayOutputStream();
         setupResponse(responseBuffer, readParamsFailedCall, t,
           msg + "; " + t.getMessage());
@@ -2112,15 +2109,12 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
         return;
       }
 
-      TraceInfo traceInfo = header.hasTraceInfo()
-          ? new TraceInfo(header.getTraceInfo().getTraceId(), header.getTraceInfo().getParentId())
-          : null;
       int timeout = 0;
       if (header.hasTimeout() && header.getTimeout() > 0){
         timeout = Math.max(minClientRequestTimeout, header.getTimeout());
       }
       Call call = new Call(id, this.service, md, header, param, cellScanner, this, responder,
-              totalRequestSize, traceInfo, this.addr, timeout);
+        totalRequestSize, this.addr, timeout);
 
       if (!scheduler.dispatch(new CallRunner(RpcServer.this, call))) {
         callQueueSize.add(-1 * call.getSize());

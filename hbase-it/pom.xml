@@ -346,7 +346,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.htrace</groupId>
-      <artifactId>htrace-core</artifactId>
+      <artifactId>htrace-core4</artifactId>
     </dependency>
 <!--    <dependency>-->
 <!--      <groupId>org.codehaus.jackson</groupId>-->
@@ -460,6 +460,10 @@
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-common</artifactId>
           <exclusions>
+            <exclusion>
+              <groupId>org.apache.htrace</groupId>
+              <artifactId>htrace-core</artifactId>
+            </exclusion>
             <exclusion>
               <groupId>org.codehaus.jackson</groupId>
               <artifactId>jackson-jaxrs</artifactId>

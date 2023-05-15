@@ -264,6 +264,10 @@
           <artifactId>hadoop-common</artifactId>
           <exclusions>
             <exclusion>
+              <groupId>org.apache.htrace</groupId>
+              <artifactId>htrace-core</artifactId>
+            </exclusion>
+            <exclusion>
               <groupId>org.codehaus.jackson</groupId>
               <artifactId>jackson-jaxrs</artifactId>
             </exclusion>

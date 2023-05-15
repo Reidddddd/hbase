@@ -19,7 +19,7 @@
 package org.apache.hadoop.hbase.mttr;
 
 import static org.junit.Assert.assertEquals;
-
+import com.google.common.base.Objects;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
@@ -27,7 +27,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -63,18 +62,16 @@ import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.ipc.FatalConnectionException;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.security.AccessDeniedException;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.LoadTestTool;
-import org.apache.htrace.Span;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
-import org.apache.htrace.impl.AlwaysSampler;
+import org.apache.htrace.core.Span;
+import org.apache.htrace.core.TraceScope;
+import org.apache.htrace.core.AlwaysSampler;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-
-import com.google.common.base.Objects;
 
 /**
  * Integration test that should benchmark how fast HBase can recover from failures. This test starts
@@ -358,7 +355,7 @@ public class IntegrationTestMTTR {
    */
   private static class TimingResult {
     DescriptiveStatistics stats = new DescriptiveStatistics();
-    ArrayList<Long> traces = new ArrayList<Long>(10);
+    ArrayList<String> traces = new ArrayList<>(10);
 
     /**
      * Add a result to this aggregate result.
@@ -366,9 +363,12 @@ public class IntegrationTestMTTR {
      * @param span Span.  To be kept if the time taken was over 1 second
      */
     public void addResult(long time, Span span) {
+      if (span == null) {
+        return;
+      }
       stats.addValue(TimeUnit.MILLISECONDS.convert(time, TimeUnit.NANOSECONDS));
       if (TimeUnit.SECONDS.convert(time, TimeUnit.NANOSECONDS) >= 1) {
-        traces.add(span.getTraceId());
+        traces.add(span.getTracerId());
       }
     }
 
@@ -408,12 +408,15 @@ public class IntegrationTestMTTR {
       final int maxIterations = 10;
       int numAfterDone = 0;
       int resetCount = 0;
+      TraceUtil.addSampler(AlwaysSampler.INSTANCE);
       // Keep trying until the rs is back up and we've gotten a put through
       while (numAfterDone < maxIterations) {
         long start = System.nanoTime();
-        TraceScope scope = null;
-        try {
-          scope = Trace.startSpan(getSpanName(), AlwaysSampler.INSTANCE);
+        Span span = null;
+        try (TraceScope scope = TraceUtil.createTrace(getSpanName())) {
+          if (scope != null) {
+            span = scope.getSpan();
+          }
           boolean actionResult = doAction();
           if (actionResult && future.isDone()) {
             numAfterDone++;
@@ -459,12 +462,8 @@ public class IntegrationTestMTTR {
             LOG.info("Too many unexpected Exceptions. Aborting.", e);
             throw e;
           }
-        } finally {
-          if (scope != null) {
-            scope.close();
-          }
         }
-        result.addResult(System.nanoTime() - start, scope.getSpan());
+        result.addResult(System.nanoTime() - start, span);
       }
       return result;
     }

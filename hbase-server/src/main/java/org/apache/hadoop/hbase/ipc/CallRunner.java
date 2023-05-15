@@ -24,6 +24,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.CallDroppedException;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
@@ -32,8 +33,6 @@ import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
 
 import com.google.protobuf.Message;
 
@@ -110,16 +109,13 @@ public class CallRunner {
       String error = null;
       Pair<Message, CellScanner> resultPair = null;
       RpcServer.CurCall.set(call);
-      TraceScope traceScope = null;
       try {
         if (!this.rpcServer.isStarted()) {
           InetSocketAddress address = rpcServer.getListenerAddress();
-          throw new ServerNotRunningYetException("Server " +
-              (address != null ? address : "(channel closed)") + " is not running yet");
+          throw new ServerNotRunningYetException(
+            "Server " + (address != null ? address : "(channel closed)") + " is not running yet");
         }
-        if (call.tinfo != null) {
-          traceScope = Trace.startSpan(call.toTraceString(), call.tinfo);
-        }
+        TraceUtil.createTrace(call.toTraceString());
         // make the call
         resultPair = this.rpcServer.call(call.service, call.md, call.param, call.cellScanner,
             call.timestamp, this.status, call.startTime, call.timeout);
@@ -134,9 +130,6 @@ public class CallRunner {
           throw (Error)e;
         }
       } finally {
-        if (traceScope != null) {
-          traceScope.close();
-        }
         RpcServer.CurCall.set(null);
         if (resultPair != null) {
           this.rpcServer.addCallSize(call.getSize() * -1);

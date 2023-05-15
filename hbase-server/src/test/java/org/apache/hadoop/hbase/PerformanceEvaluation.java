@@ -51,6 +51,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.trace.TraceUtil;
+import org.apache.htrace.core.ProbabilitySampler;
+import org.apache.htrace.core.Sampler;
+import org.apache.htrace.core.TraceScope;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Append;
@@ -104,10 +108,6 @@ import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.stats.UniformSample;
 
 import org.apache.hbase.thirdparty.com.google.gson.Gson;
-import org.apache.htrace.Sampler;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
-import org.apache.htrace.impl.ProbabilitySampler;
 
 /**
  * Script used evaluating HBase performance and scalability.  Runs a HBase
@@ -1006,7 +1006,7 @@ public class PerformanceEvaluation extends Configured implements Tool {
     protected final TestOptions opts;
 
     private final Status status;
-    private final Sampler<?> traceSampler;
+    private final Sampler traceSampler;
     private final SpanReceiverHost receiverHost;
 
     private String testName;
@@ -1223,15 +1223,13 @@ public class PerformanceEvaluation extends Configured implements Tool {
     void testTimed() throws IOException, InterruptedException {
       int startRow = getStartRow();
       int lastRow = getLastRow();
+      TraceUtil.addSampler(traceSampler);
       // Report on completion of 1/10th of total.
       for (int i = startRow; i < lastRow; i++) {
         if (i % everyN != 0) continue;
         long startTime = System.nanoTime();
-        TraceScope scope = Trace.startSpan("test row", traceSampler);
-        try {
+        try (TraceScope scope = TraceUtil.createTrace("test row");){
           testRow(i);
-        } finally {
-          scope.close();
         }
         // If multiget is enabled, say set to 10, testRow() returns immediately first 9 times
         // and sends the actual get request in the 10th iteration. We should only set latency

@@ -75,10 +75,6 @@ import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.Writer;
-import org.apache.htrace.NullScope;
-import org.apache.htrace.Span;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
@@ -348,7 +344,6 @@ public abstract class AbstractLog implements WAL {
     }
     // Make a trace scope for the append.  It is closed on other side of the ring buffer by the
     // single consuming thread.  Don't have to worry about it.
-    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".append");
     final MutableLong txidHolder = new MutableLong();
     final RingBuffer<RingBufferTruck> ringBuffer = disruptor.getRingBuffer();
     MultiVersionConcurrencyControl.WriteEntry we = key.getMvcc().begin(new Runnable() {
@@ -360,7 +355,7 @@ public abstract class AbstractLog implements WAL {
     try {
       GenericWALEntry entry = new GenericWALEntry(txid, key, edits, htd, hri, inMemstore);
       entry.stampRegionSequenceId(we);
-      ringBuffer.get(txid).loadPayload(entry, scope.detach());
+      ringBuffer.get(txid).loadPayload(entry);
     } finally {
       ringBuffer.publish(txid);
     }
@@ -409,13 +404,7 @@ public abstract class AbstractLog implements WAL {
 
   @Override
   public void sync() throws IOException {
-    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".sync");
-    try {
-      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
-    } finally {
-      assert scope == NullScope.INSTANCE || !scope.isDetached();
-      scope.close();
-    }
+    publishSyncThenBlockOnCompletion();
   }
 
   @Override
@@ -424,25 +413,18 @@ public abstract class AbstractLog implements WAL {
       // Already sync'd.
       return;
     }
-    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".sync");
-    try {
-      scope = Trace.continueSpan(publishSyncThenBlockOnCompletion(scope.detach()));
-    } finally {
-      assert scope == NullScope.INSTANCE || !scope.isDetached();
-      scope.close();
-    }
+    publishSyncThenBlockOnCompletion();
   }
 
   // Sync all known transactions
-  protected Span publishSyncThenBlockOnCompletion(Span span) throws IOException {
-    return blockOnSync(publishSyncOnRingBuffer(span));
+  protected void publishSyncThenBlockOnCompletion() throws IOException {
+    blockOnSync(publishSyncOnRingBuffer());
   }
 
-  protected Span blockOnSync(final SyncFuture syncFuture) throws IOException {
+  protected void blockOnSync(final SyncFuture syncFuture) throws IOException {
     // Now we have published the ringbuffer, halt the current thread until we get an answer back.
     try {
       syncFuture.get(walSyncTimeout);
-      return syncFuture.getSpan();
     } catch (TimeoutIOException tioe) {
       throw tioe;
     } catch (InterruptedException ie) {
@@ -467,17 +449,13 @@ public abstract class AbstractLog implements WAL {
   }
 
   @InterfaceAudience.Private
-  public SyncFuture publishSyncOnRingBuffer(Span span) {
+  public SyncFuture publishSyncOnRingBuffer() {
     long sequence = this.disruptor.getRingBuffer().next();
-    return publishSyncOnRingBuffer(sequence, span);
+    return publishSyncOnRingBuffer(sequence);
   }
 
-  protected SyncFuture publishSyncOnRingBuffer(long sequence) {
-    return publishSyncOnRingBuffer(sequence, null);
-  }
-
-  private SyncFuture publishSyncOnRingBuffer(long sequence, Span span) {
-    SyncFuture syncFuture = getSyncFuture(sequence, span);
+  private SyncFuture publishSyncOnRingBuffer(long sequence) {
+    SyncFuture syncFuture = getSyncFuture(sequence);
     try {
       RingBufferTruck truck = this.disruptor.getRingBuffer().get(sequence);
       truck.loadPayload(syncFuture);
@@ -487,8 +465,8 @@ public abstract class AbstractLog implements WAL {
     return syncFuture;
   }
 
-  private SyncFuture getSyncFuture(final long sequence, Span span) {
-    return syncFutureCache.getIfPresentOrNew().reset(sequence, span);
+  private SyncFuture getSyncFuture(final long sequence) {
+    return syncFutureCache.getIfPresentOrNew().reset(sequence);
   }
 
   private IOException convertInterruptedExceptionToIOException(final InterruptedException ie) {
@@ -615,13 +593,10 @@ public abstract class AbstractLog implements WAL {
         LOG.debug("WAL closing. Skipping rolling of writer");
         return regionsToFlush;
       }
-      TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".rollWriter");
       try {
         regionsToFlush = doRolling();
       } finally {
         closeBarrier.endOp();
-        assert scope == NullScope.INSTANCE || !scope.isDetached();
-        scope.close();
       }
       return regionsToFlush;
     } finally {
@@ -694,7 +669,6 @@ public abstract class AbstractLog implements WAL {
       zigzagLatch = this.ringBufferEventHandler.attainSafePoint();
     }
     afterCreatingZigZagLatch();
-    TraceScope scope = Trace.startSpan(this.getClass().getSimpleName() + ".replaceWriter");
     CompletableFuture<Void> closeFuture = null;
     try {
       // Wait on the safe point to be achieved.  Send in a sync in case nothing has hit the
@@ -707,7 +681,6 @@ public abstract class AbstractLog implements WAL {
           // use assert to make sure no change breaks the logic that
           // sequence and zigzagLatch will be set together
           assert sequence > 0L : "Failed to get sequence from ring buffer";
-          Trace.addTimelineAnnotation("awaiting safepoint");
           syncFuture = zigzagLatch.waitSafePoint(publishSyncOnRingBuffer(sequence));
         }
       } catch (FailedSyncBeforeLogCloseException e) {
@@ -752,7 +725,6 @@ public abstract class AbstractLog implements WAL {
           }
         }
       } finally {
-        scope.close();
         if (closeFuture != null) {
           try {
             closeFuture.join();
@@ -776,9 +748,7 @@ public abstract class AbstractLog implements WAL {
     closeExecutor.execute(() -> {
       try {
         if (writer != null) {
-          Trace.addTimelineAnnotation("closing writer");
           writer.close();
-          Trace.addTimelineAnnotation("writer closed");
         }
         this.closeErrorCount.set(0);
         afterReplaceWriter(newPath, oldPath, nextWriter);
@@ -1132,7 +1102,6 @@ public abstract class AbstractLog implements WAL {
             endOfBatch = true;
           }
         } else if (truck.hasFSWALEntryPayload()) {
-          TraceScope scope = Trace.continueSpan(truck.unloadSpanPayload());
           try {
             GenericWALEntry entry = truck.unloadFSWALEntryPayload();
             if (this.exception != null) {
@@ -1152,9 +1121,6 @@ public abstract class AbstractLog implements WAL {
                 : new DamagedWALException("On sync", this.exception));
             // Return to keep processing events coming off the ringbuffer
             return;
-          } finally {
-            assert scope == NullScope.INSTANCE || !scope.isDetached();
-            scope.close(); // append scope is complete
           }
         } else {
           // What is this if not an append or sync. Fail all up to this!!!
@@ -1368,7 +1334,6 @@ public abstract class AbstractLog implements WAL {
   protected void postSync(final long timeInNanos, final int handlerSyncs) {
     if (timeInNanos > this.slowSyncNs) {
       String msg = "Slow sync cost: " + timeInNanos / 1000000 + " ms.";
-      Trace.addTimelineAnnotation(msg);
       LOG.info(msg);
     }
     if (!listeners.isEmpty()) {
@@ -1512,14 +1477,11 @@ public abstract class AbstractLog implements WAL {
           }
           // I got something.  Lets run.  Save off current sequence number in case it changes
           // while we run.
-          TraceScope scope = Trace.continueSpan(sf.getSpan());
           long start = System.nanoTime();
           Throwable lastException = null;
           try {
-            Trace.addTimelineAnnotation("syncing writer");
             long unSyncedFlushSeq = highestUnsyncedSequence;
             writer.sync();
-            Trace.addTimelineAnnotation("writer synced");
             if (unSyncedFlushSeq > currentSequence) {
               currentSequence = unSyncedFlushSeq;
             }
@@ -1531,8 +1493,6 @@ public abstract class AbstractLog implements WAL {
             LOG.warn("UNEXPECTED", e);
             lastException = e;
           } finally {
-            // reattach the span to the future before releasing.
-            sf.setSpan(scope.detach());
             // First release what we 'took' from the queue.
             syncCount += releaseSyncFuture(sf, currentSequence, lastException);
             // Can we release other syncs?

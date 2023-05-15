@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-import org.apache.htrace.Span;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -63,7 +62,7 @@ class SyncFuture {
    * The sequence that was set in here when we were marked done. Should be equal
    * or > ringBufferSequence.  Put this data member into the NOT_DONE state while this
    * class is in use.  But for the first position on construction, let it be -1 so we can
-   * immediately call {@link #reset(long, Span)} below and it will work.
+   * immediately call {@link #reset(long)} below and it will work.
    */
   private long doneSequence = -1;
 
@@ -75,11 +74,6 @@ class SyncFuture {
   private Thread t;
 
   /**
-   * Optionally carry a disconnected scope to the SyncRunner.
-   */
-  private Span span;
-
-  /**
    * Call this method to clear old usage and get it ready for new deploy. Call
    * this method even if it is being used for the first time.
    *
@@ -87,19 +81,6 @@ class SyncFuture {
    * @return this
    */
   synchronized SyncFuture reset(final long sequence) {
-    return reset(sequence, null);
-  }
-
-  /**
-   * Call this method to clear old usage and get it ready for new deploy. Call
-   * this method even if it is being used for the first time.
-   *
-   * @param sequence sequenceId from this Future's position in the RingBuffer
-   * @param span curren span, detached from caller. Don't forget to attach it when
-   *             resuming after a call to {@link #get()}.
-   * @return this
-   */
-  synchronized SyncFuture reset(final long sequence, Span span) {
     if (t != null && t != Thread.currentThread()) {
       throw new IllegalStateException();
     }
@@ -109,7 +90,6 @@ class SyncFuture {
     }
     this.doneSequence = NOT_DONE;
     this.ringBufferSequence = sequence;
-    this.span = span;
     this.throwable = null;
     return this;
   }
@@ -122,24 +102,6 @@ class SyncFuture {
 
   synchronized long getRingBufferSequence() {
     return this.ringBufferSequence;
-  }
-
-  /**
-   * Retrieve the {@code span} instance from this Future. EventHandler calls
-   * this method to continue the span. Thread waiting on this Future musn't call
-   * this method until AFTER calling {@link #get()} and the future has been
-   * released back to the originating thread.
-   */
-  synchronized Span getSpan() {
-    return this.span;
-  }
-
-  /**
-   * Used to re-attach a {@code span} to the Future. Called by the EventHandler
-   * after a it has completed processing and detached the span from its scope.
-   */
-  synchronized void setSpan(Span span) {
-    this.span = span;
   }
 
   /**

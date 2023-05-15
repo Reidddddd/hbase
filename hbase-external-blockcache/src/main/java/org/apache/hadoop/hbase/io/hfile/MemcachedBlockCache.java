@@ -19,6 +19,14 @@
 
 package org.apache.hadoop.hbase.io.hfile;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.concurrent.ExecutionException;
 import net.spy.memcached.CachedData;
 import net.spy.memcached.ConnectionFactoryBuilder;
 import net.spy.memcached.FailureMode;
@@ -28,19 +36,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Addressing;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.concurrent.ExecutionException;
+import org.apache.htrace.core.TraceScope;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Class to store blocks into memcached.
@@ -130,7 +129,7 @@ public class MemcachedBlockCache implements BlockCache {
     // Assume that nothing is the block cache
     HFileBlock result = null;
 
-    try (TraceScope traceScope = Trace.startSpan("MemcachedBlockCache.getBlock")) {
+    try (TraceScope traceScope = TraceUtil.createTrace("MemcachedBlockCache.getBlock")) {
       result = client.get(cacheKey.toString(), tc);
     } catch (Exception e) {
       // Catch a pretty broad set of exceptions to limit any changes in the memecache client

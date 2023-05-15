@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hbase.io.hfile;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.DataInput;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -33,7 +33,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.KeyValue.KVComparator;
 import org.apache.hadoop.hbase.NoTagsKeyValue;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.fs.HFileSystem;
 import org.apache.hadoop.hbase.io.FSDataInputStreamWrapper;
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoder;
@@ -41,13 +40,12 @@ import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.io.encoding.HFileBlockDecodingContext;
 import org.apache.hadoop.hbase.io.hfile.HFile.FileInfo;
 import org.apache.hadoop.hbase.regionserver.KeyValueScanner;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.IdLock;
 import org.apache.hadoop.io.WritableUtils;
-import org.apache.htrace.Trace;
-import org.apache.htrace.TraceScope;
-
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.htrace.core.TraceScope;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * {@link HFile} reader for version 2.
@@ -188,6 +186,7 @@ public class HFileReaderV2 extends AbstractHFileReader {
     // Prefetch file blocks upon open if requested
     if (cacheConf.shouldPrefetchOnOpen()) {
       PrefetchExecutor.request(path, new Runnable() {
+        @Override
         public void run() {
           long offset = 0;
           long end = 0;
@@ -407,8 +406,7 @@ public class HFileReaderV2 extends AbstractHFileReader {
         new BlockCacheKey(name, dataBlockOffset, this.isPrimaryReplicaReader(), expectedBlockType);
     boolean useLock = false;
     IdLock.Entry lockEntry = null;
-    TraceScope traceScope = Trace.startSpan("HFileReaderV2.readBlock");
-    try {
+    try (TraceScope traceScope = TraceUtil.createTrace("HFileReaderV2.readBlock")) {
       while (true) {
         // Check cache for block. If found return.
         if (cacheConf.shouldReadBlockFromCache(expectedBlockType)) {
@@ -420,9 +418,7 @@ public class HFileReaderV2 extends AbstractHFileReader {
           HFileBlock cachedBlock = getCachedBlock(cacheKey, cacheBlock, useLock, isCompaction,
             updateCacheMetrics, expectedBlockType, expectedDataBlockEncoding);
           if (cachedBlock != null) {
-            if (Trace.isTracing()) {
-              traceScope.getSpan().addTimelineAnnotation("blockCacheHit");
-            }
+            TraceUtil.addTimelineAnnotation("blockCacheHit");
             assert cachedBlock.isUnpacked() : "Packed block leak.";
             if (cachedBlock.getBlockType().isData()) {
               if (updateCacheMetrics) {
@@ -447,9 +443,7 @@ public class HFileReaderV2 extends AbstractHFileReader {
           // Carry on, please load.
         }
 
-        if (Trace.isTracing()) {
-          traceScope.getSpan().addTimelineAnnotation("blockCacheMiss");
-        }
+        TraceUtil.addTimelineAnnotation("blockCacheMiss");
         // Load block from filesystem.
         HFileBlock hfileBlock = fsBlockReader.readBlockData(dataBlockOffset, onDiskBlockSize,
             pread, !isCompaction);
@@ -471,7 +465,6 @@ public class HFileReaderV2 extends AbstractHFileReader {
         return unpacked;
       }
     } finally {
-      traceScope.close();
       if (lockEntry != null) {
         offsetLock.releaseLockEntry(lockEntry);
       }
@@ -534,6 +527,7 @@ public class HFileReaderV2 extends AbstractHFileReader {
     close(cacheConf.shouldEvictOnClose());
   }
 
+  @Override
   public void close(boolean evictOnClose) throws IOException {
     PrefetchExecutor.cancel(path);
     if (evictOnClose && cacheConf.isBlockCacheEnabled()) {

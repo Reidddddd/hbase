@@ -160,6 +160,7 @@ import org.apache.hadoop.hbase.replication.regionserver.Replication;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
+import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Addressing;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CompressionTest;
@@ -466,6 +467,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
   public HMaster(final Configuration conf, CoordinatedStateManager csm)
       throws IOException, KeeperException, InterruptedException {
     super(conf, csm);
+    TraceUtil.initTracer(conf);
     this.rsFatals = new MemoryBoundedLogMessageBuffer(
       conf.getLong("hbase.master.buffer.for.rs.fatals", 1*1024*1024));
 

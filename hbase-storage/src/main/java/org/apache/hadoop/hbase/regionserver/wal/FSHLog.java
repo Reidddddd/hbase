@@ -46,7 +46,6 @@ import org.apache.hadoop.hdfs.DFSOutputStream;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.htrace.Trace;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -531,7 +530,6 @@ public class FSHLog extends AbstractLog {
           new StringBuilder().append("Slow sync cost: ")
               .append(timeInNanos / 1000000).append(" ms, current pipeline: ")
               .append(Arrays.toString(getPipeLine())).toString();
-      Trace.addTimelineAnnotation(msg);
       LOG.info(msg);
     }
     if (!listeners.isEmpty()) {
