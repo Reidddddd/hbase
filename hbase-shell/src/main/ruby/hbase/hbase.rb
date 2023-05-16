@@ -42,7 +42,20 @@ module Hbase
         configuration.setInt('hbase.client.retries.number', 7)
         configuration.setInt('hbase.ipc.client.connect.max.retries', 3)
       end
-      @connection = ConnectionFactory.createConnection(configuration)
+      if (User.isHBaseDigestAuthEnabled(self.configuration))
+        @user = User.getCurrent()
+        @password = ENV['HBASE_AUTH_PASSWORD']
+        if not @password
+          abort("\nERROR: HBase password is not set. " +
+          "Please set the env variable HBASE_AUTH_PASSWORD first.
+          \nHOW TO SET PASSWORD:
+          export HBASE_AUTH_PASSWORD='your_password'\n ")
+        end
+        ClientTokenUtil.setUserPassword(@user, @password)
+        @connection = ConnectionFactory.createConnection(self.configuration, @user)
+      else
+        @connection = ConnectionFactory.createConnection(configuration)
+      end
     end
 
     # Returns ruby's Admin class from admin.rb
