@@ -26,6 +26,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -37,13 +39,22 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.MetricsConnection;
 import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.codec.KeyValueCodec;
+import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos.TokenIdentifier.Kind;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.token.AuthenticationTokenSelector;
+import org.apache.hadoop.hbase.security.token.ClientTokenUtil;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.PoolMap;
 import org.apache.hadoop.hbase.util.Threads;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +110,14 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
     Executors.newScheduledThreadPool(1,
       new ThreadFactoryBuilder().setNameFormat("Idle-Rpc-Conn-Sweeper-pool-%d").setDaemon(true)
         .setUncaughtExceptionHandler(Threads.LOGGING_EXCEPTION_HANDLER).build());
+
+  public final static Map<AuthenticationProtos.TokenIdentifier.Kind, TokenSelector<? extends TokenIdentifier>>
+    TOKEN_HANDLERS = new HashMap<>();
+
+  static {
+    TOKEN_HANDLERS.put(
+      AuthenticationProtos.TokenIdentifier.Kind.HBASE_AUTH_TOKEN, new AuthenticationTokenSelector());
+  }
 
   private boolean running = true; // if client runs
 
@@ -354,10 +373,42 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
       if (!running) {
         throw new StoppedRpcClientException();
       }
+      completeAuthInfoIfNotSet(remoteId);
       conn = connections.getOrCreate(remoteId, () -> createConnection(remoteId));
       conn.setLastTouched(EnvironmentEdgeManager.currentTime());
     }
     return conn;
+  }
+
+  private void completeAuthInfoIfNotSet(ConnectionId remoteId) {
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      TokenSelector<? extends TokenIdentifier> selector = TOKEN_HANDLERS.get(Kind.HBASE_AUTH_TOKEN);
+      Collection<Token<? extends TokenIdentifier>> tokens = remoteId.getTicket().getTokens();
+      if (selector.selectToken(new Text(clusterId), tokens) == null) {
+        // If we arrive here, this.clusterId must not be CLUSTER_ID_DEFAULT.
+        Token<? extends TokenIdentifier> token =
+          selector.selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), tokens);
+        if (token == null) {
+          // No valid token found. Only client will arrive here,
+          // as the region server has added the auth token at the RS initialization phase.
+          // So we directly read password from local configuration.
+          ClientTokenUtil.setUserPassword(remoteId.getTicket(), conf.get(User.DIGEST_PASSWORD_KEY));
+          // Here we need to get tokens once more. Otherwise, the tokens will be still empty.
+          tokens = remoteId.getTicket().getTokens();
+          token = selector.selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), tokens);
+          token.setService(new Text(clusterId));
+        } else {
+          // We have found the token of CLUSTER_ID_DEFAULT, but it does not match out current
+          // clusterId. Here we copy the auth token with CLUSTER_ID_DEFAULT and set the service
+          // to our real clusterId. Current user will have two authTokens, one CLUSTER_ID_DEFAULT
+          // and another with this.clusterId respectively.
+          Token<? extends TokenIdentifier> newToken = new Token<>(token);
+          newToken.setService(new Text(clusterId));
+          remoteId.getTicket().addToken(newToken);
+          remoteId.getTicket().getUGI().setAuthenticationMethod(UserGroupInformation.AuthenticationMethod.TOKEN);
+        }
+      }
+    }
   }
 
   /**

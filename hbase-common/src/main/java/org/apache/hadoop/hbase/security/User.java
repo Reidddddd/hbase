@@ -269,7 +269,22 @@ public abstract class User {
    * recommended that secure HBase should run on secure HDFS.
    */
   public static boolean isHBaseSecurityEnabled(Configuration conf) {
+    return isHBaseKerberosAuthEnabled(conf) || isHBaseDigestAuthEnabled(conf);
+  }
+
+  /**
+   * Returns whether or not kerberos authentication is enabled for HBase.
+   */
+  public static boolean isHBaseKerberosAuthEnabled(Configuration conf) {
     return "kerberos".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY));
+  }
+
+  /**
+   * Returns whether the username - password digest authentication is enabled for HBase.
+   * This authentication is dependent from HDFS security.
+   */
+  public static boolean isHBaseDigestAuthEnabled(Configuration conf) {
+    return "digest".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY));
   }
 
   /**

@@ -23,15 +23,21 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Objects;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.ipc.AbstractRpcClient;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
+import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos.TokenIdentifier.Kind;
 import org.apache.hadoop.hbase.security.User;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,6 +169,28 @@ public final class ClientTokenUtil {
     } catch (Exception e) {
       throw new UndeclaredThrowableException(e,
           "Unexpected exception obtaining token for user " + user.getName());
+    }
+  }
+
+  /**
+   * Set user's password, if there is no authentication token, will create one.
+   */
+  public static void setUserPassword(User user, String password) {
+    Objects.requireNonNull(user, "User is null, when set auth info.");
+    Objects.requireNonNull(password, "Null password is not allowed.");
+
+    Token<? extends TokenIdentifier> token =
+      AbstractRpcClient.TOKEN_HANDLERS.get(Kind.HBASE_AUTH_TOKEN)
+        .selectToken(new Text(HConstants.CLUSTER_ID_DEFAULT), user.getTokens());
+
+    if (token == null) {
+      AuthenticationTokenIdentifier identifier =
+        new AuthenticationTokenIdentifier(user.getShortName());
+      Token<AuthenticationTokenIdentifier> newToken = new Token<>(identifier.getBytes(),
+        Bytes.toBytes(password), identifier.getKind(), new Text(HConstants.CLUSTER_ID_DEFAULT));
+
+      user.addToken(newToken);
+      user.getUGI().setAuthenticationMethod(UserGroupInformation.AuthenticationMethod.TOKEN);
     }
   }
 }
