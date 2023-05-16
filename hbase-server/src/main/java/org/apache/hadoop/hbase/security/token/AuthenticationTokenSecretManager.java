@@ -55,8 +55,7 @@ import org.slf4j.LoggerFactory;
  * </p>
  */
 @InterfaceAudience.Private
-public class AuthenticationTokenSecretManager
-    extends SecretManager<AuthenticationTokenIdentifier> {
+public class AuthenticationTokenSecretManager extends AbstractAuthenticationSecretManager {
 
   static final String NAME_PREFIX = "SecretManager-";
 
@@ -99,6 +98,7 @@ public class AuthenticationTokenSecretManager
     this.clusterId = new ZKClusterId(zk, zk);
   }
 
+  @Override
   public void start() {
     try {
       // populate any existing keys
@@ -110,6 +110,7 @@ public class AuthenticationTokenSecretManager
     }
   }
 
+  @Override
   public void stop() {
     this.leaderElector.stop("SecretManager stopping");
   }

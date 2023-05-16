@@ -21,8 +21,10 @@ package org.apache.hadoop.hbase.secret.crypto;
 import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.hbase.HBaseClassTestRule;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
@@ -32,6 +34,10 @@ import org.slf4j.LoggerFactory;
 public class TestSecretCryptor {
   private static final Logger LOG = LoggerFactory.getLogger(TestSecretCryptor.class);
   private static final String PLAIN_TEXT = "plainText";
+
+  @ClassRule
+  public static final HBaseClassTestRule CLASS_RULE =
+    HBaseClassTestRule.forClass(TestSecretCryptor.class);
 
   @Test
   public void testCorrectness() throws IOException {

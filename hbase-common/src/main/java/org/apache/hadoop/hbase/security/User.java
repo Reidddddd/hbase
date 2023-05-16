@@ -60,6 +60,9 @@ public abstract class User {
   public static final String HBASE_SECURITY_AUTHORIZATION_CONF_KEY =
       "hbase.security.authorization";
 
+  // Only used when the authentication method is set digest.
+  public static final String DIGEST_PASSWORD_KEY = "hbase.authentication.password";
+
   protected UserGroupInformation ugi;
 
   public UserGroupInformation getUGI() {
