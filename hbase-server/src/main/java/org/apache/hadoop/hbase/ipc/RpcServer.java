@@ -52,7 +52,9 @@ import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.SaslUtil.QualityOfProtection;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.token.AbstractAuthenticationSecretManager;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManager;
+import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
 import org.apache.hadoop.hbase.util.GsonUtil;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -170,7 +172,7 @@ public abstract class RpcServer implements RpcServerInterface,
    */
   volatile boolean started = false;
 
-  protected AuthenticationTokenSecretManager authTokenSecretMgr = null;
+  protected AbstractAuthenticationSecretManager authTokenSecretMgr = null;
 
   protected HBaseRPCErrorHandler errorHandler = null;
 
@@ -349,10 +351,13 @@ public abstract class RpcServer implements RpcServerInterface,
     LOG.info("Refreshed super and proxy users successfully");
   }
 
-  protected AuthenticationTokenSecretManager createSecretManager() {
+  protected AbstractAuthenticationSecretManager createSecretManager() {
     if (!isSecurityEnabled) return null;
     if (server == null) return null;
     Configuration conf = server.getConfiguration();
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      return new SystemTableBasedSecretManager(server);
+    }
     long keyUpdateInterval =
         conf.getLong("hbase.auth.key.update.interval", 24*60*60*1000);
     long maxAge =

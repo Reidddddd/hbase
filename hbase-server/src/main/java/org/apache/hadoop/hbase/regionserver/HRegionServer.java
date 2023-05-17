@@ -678,7 +678,6 @@ public class HRegionServer extends Thread implements
         masterAddressTracker = null;
         clusterStatusTracker = null;
       }
-      this.rpcServices.start(zooKeeper);
       // This violates 'no starting stuff in Constructor' but Master depends on the below chore
       // and executor being created and takes a different startup route. Lots of overlap between HRS
       // and M (An M IS A HRS now). Need to refactor so less duplication between M and its super
@@ -686,6 +685,7 @@ public class HRegionServer extends Thread implements
       // class HRS. TODO.
       this.choreService = new ChoreService(getName(), true);
       this.executorService = new ExecutorService(getName());
+      this.rpcServices.start(zooKeeper);
       putUpWebUI();
     } catch (Throwable t) {
       // Make sure we log the exception. HRegionServer is often started via reflection and the

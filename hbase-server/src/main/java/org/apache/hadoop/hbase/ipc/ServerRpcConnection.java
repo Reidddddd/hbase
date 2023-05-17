@@ -37,6 +37,8 @@ import org.apache.commons.crypto.random.CryptoRandom;
 import org.apache.commons.crypto.random.CryptoRandomFactory;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
+import org.apache.hadoop.hbase.security.AuthenticationFailedException;
+import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.VersionInfoUtil;
 import org.apache.hadoop.hbase.codec.Codec;
@@ -90,6 +92,7 @@ abstract class ServerRpcConnection implements Closeable {
   protected final RpcServer rpcServer;
   // If the connection header has been read or not.
   protected boolean connectionHeaderRead = false;
+  private boolean isPersonAllowedFallback = true;
 
   protected CallCleanup callCleanup;
 
@@ -369,7 +372,7 @@ abstract class ServerRpcConnection implements Closeable {
         Throwable cause = e;
         while (cause != null) {
           if (cause instanceof InvalidToken) {
-            sendToClient = (InvalidToken) cause;
+            sendToClient = new AuthenticationFailedException(cause.getMessage());
             break;
           }
           cause = cause.getCause();
@@ -508,6 +511,11 @@ abstract class ServerRpcConnection implements Closeable {
       if (ugi != null) {
         ugi.setAuthenticationMethod(AuthenticationMethod.SIMPLE);
       }
+      if (User.isHBaseDigestAuthEnabled(rpcServer.getConf())) {
+        SystemTableBasedSecretManager secretManager =
+          (SystemTableBasedSecretManager) rpcServer.getSecretManager();
+        isPersonAllowedFallback = secretManager.isAllowedFallback(ugi.getShortUserName());
+      }
       // audit logging for SASL authenticated users happens in saslReadAndProcess()
       if (authenticatedWithFallback) {
         RpcServer.LOG.warn("Allowed fallback to SIMPLE auth for {} connecting from {}",
@@ -613,7 +621,22 @@ abstract class ServerRpcConnection implements Closeable {
       RpcServer.LOG.trace("RequestHeader " + TextFormat.shortDebugString(header)
           + " totalRequestSize: " + totalRequestSize + " bytes");
     }
-    // Enforcing the call queue size, this triggers a retry in the client
+
+    // It is not ideal to do this check here.
+    // But we are dependent on protobuf to send back exception.
+    if (!isPersonAllowedFallback) {
+      AuthenticationFailedException ae =
+        new AuthenticationFailedException("User " + this.user.getShortName() +
+          " is not allowed to fallback to SIMPLE authentication. ");
+
+      final ServerCall<?> authenticationFailed = createCall(id, this.service, null, null, null, null,
+        totalRequestSize, null, 0, this.callCleanup);
+      authenticationFailed.setResponse(null, null, ae, ae.getMessage());
+      authenticationFailed.sendResponseIfReady();
+      return;
+    }
+
+      // Enforcing the call queue size, this triggers a retry in the client
     // This is a bit late to be doing this check - we have already read in the
     // total request.
     if ((totalRequestSize +

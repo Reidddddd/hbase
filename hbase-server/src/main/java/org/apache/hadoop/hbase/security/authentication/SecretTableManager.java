@@ -22,6 +22,7 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.master.MasterServices;
 import org.apache.hadoop.hbase.secret.crypto.SecretCryptoType;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.ProcedureProtos;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -58,28 +59,28 @@ public class SecretTableManager {
     if (MetaTableAccessor.getTableState(masterServices.getConnection(),
         SECRET_TABLE_NAME) == null) {
       LOG.info("Table " + SECRET_TABLE_NAME + " not found. Creating...");
-      createSecretTable();
-    }
-    // Wait until secret table is created.
-    while (MetaTableAccessor.getTableState(masterServices.getConnection(),
-        SECRET_TABLE_NAME) == null) {
-      try {
-        // Wait for the secret table creation being finished.
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        throw new IOException(e);
+      long procId = createSecretTable();
+      // If the return value is null, this means the procedure is already finished.
+      while (masterServices.getMasterProcedureExecutor().getProcedure(procId) != null &&
+          !masterServices.getMasterProcedureExecutor().getProcedure(procId).isFinished()) {
+        try {
+          // Wait for the secret table creation being finished.
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          throw new IOException(e);
+        }
       }
+      initializeSecretKeys();
     }
-    initializeSecretKeys();
 
     initialized = true;
   }
 
-  private void createSecretTable() throws IOException {
+  private long createSecretTable() throws IOException {
     HTableDescriptor desc = new HTableDescriptor(SECRET_TABLE_NAME);
 
     desc.addFamily(SecretTableAccessor.getSecretTableColumn());
-    masterServices.createSystemTable(desc);
+    return masterServices.createSystemTable(desc);
   }
 
   private void initializeSecretKeys() throws IOException {

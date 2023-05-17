@@ -189,7 +189,9 @@ import org.apache.hadoop.hbase.replication.master.ReplicationPeerConfigUpgrader;
 import org.apache.hadoop.hbase.replication.regionserver.ReplicationStatus;
 import org.apache.hadoop.hbase.security.AccessDeniedException;
 import org.apache.hadoop.hbase.security.SecurityConstants;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.security.authentication.SecretTableManager;
 import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Addressing;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -394,6 +396,9 @@ public class HMaster extends HRegionServer implements MasterServices {
 
   /** jetty server for master to redirect requests to regionserver infoServer */
   private Server masterJettyServer;
+
+  // Class only for secret table initialization.
+  private SecretTableManager secretTableManager;
 
   // Determine if we should do normal startup or minimal "single-user" mode with no region
   // servers and no user tables. Useful for repair and recovery of hbase:meta
@@ -1060,6 +1065,11 @@ public class HMaster extends HRegionServer implements MasterServices {
       }
     }
 
+    if (User.isHBaseDigestAuthEnabled(conf)) {
+      status.setStatus("Starting secret table manager");
+      initSecretTableManager();
+    }
+
     if (this.cpHost != null) {
       try {
         this.cpHost.preMasterInitialization();
@@ -1160,6 +1170,11 @@ public class HMaster extends HRegionServer implements MasterServices {
       LOG.debug("Balancer post startup initialization complete, took " + (
           (System.currentTimeMillis() - start) / 1000) + " seconds");
     }
+  }
+
+  private void initSecretTableManager() throws IOException {
+    secretTableManager = new SecretTableManager(this);
+    secretTableManager.start();
   }
 
   private void createMissingCFsInMetaDuringUpgrade(
