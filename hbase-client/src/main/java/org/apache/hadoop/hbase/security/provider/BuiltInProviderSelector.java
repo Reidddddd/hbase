@@ -104,8 +104,6 @@ public class BuiltInProviderSelector implements AuthenticationProviderSelector {
       String clusterId, User user) {
     requireNonNull(clusterId, "Null clusterId was given");
     requireNonNull(user, "Null user was given");
-    boolean isDigest = User.isHBaseDigestAuthEnabled(conf);
-    String x = conf.get(User.HBASE_SECURITY_CONF_KEY);
 
     // Superfluous: we don't do SIMPLE auth over SASL, but we should to simplify.
     if (!User.isHBaseSecurityEnabled(conf)) {

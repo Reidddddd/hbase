@@ -20,6 +20,8 @@
 include Java
 java_import org.apache.hadoop.hbase.client.ConnectionFactory
 java_import org.apache.hadoop.hbase.HBaseConfiguration
+java_import org.apache.hadoop.hbase.security.User
+java_import org.apache.hadoop.hbase.security.token.ClientTokenUtil
 
 require 'hbase/admin'
 require 'hbase/table'

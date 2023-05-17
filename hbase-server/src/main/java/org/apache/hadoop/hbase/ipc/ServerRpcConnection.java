@@ -629,8 +629,8 @@ abstract class ServerRpcConnection implements Closeable {
         new AuthenticationFailedException("User " + this.user.getShortName() +
           " is not allowed to fallback to SIMPLE authentication. ");
 
-      final ServerCall<?> authenticationFailed = createCall(id, this.service, null, null, null, null,
-        totalRequestSize, null, 0, this.callCleanup);
+      final ServerCall<?> authenticationFailed = createCall(id, this.service, null, null, null,
+        null, totalRequestSize, null, 0, this.callCleanup);
       authenticationFailed.setResponse(null, null, ae, ae.getMessage());
       authenticationFailed.sendResponseIfReady();
       return;
@@ -714,8 +714,8 @@ abstract class ServerRpcConnection implements Closeable {
     if (header.hasTimeout() && header.getTimeout() > 0) {
       timeout = Math.max(this.rpcServer.minClientRequestTimeout, header.getTimeout());
     }
-    ServerCall<?> call = createCall(id, this.service, md, header, param, cellScanner, totalRequestSize,
-      this.addr, timeout, this.callCleanup);
+    ServerCall<?> call = createCall(id, this.service, md, header, param, cellScanner,
+      totalRequestSize, this.addr, timeout, this.callCleanup);
 
     if (!this.rpcServer.scheduler.dispatch(new CallRunner(this.rpcServer, call))) {
       this.rpcServer.callQueueSizeInBytes.add(-1 * call.getSize());

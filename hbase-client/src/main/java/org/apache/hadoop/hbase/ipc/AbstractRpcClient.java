@@ -39,7 +39,6 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.MetricsConnection;
 import org.apache.hadoop.hbase.codec.Codec;
 import org.apache.hadoop.hbase.codec.KeyValueCodec;
-import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos;
 import org.apache.hadoop.hbase.protobuf.generated.AuthenticationProtos.TokenIdentifier.Kind;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
@@ -111,12 +110,12 @@ public abstract class AbstractRpcClient<T extends RpcConnection> implements RpcC
       new ThreadFactoryBuilder().setNameFormat("Idle-Rpc-Conn-Sweeper-pool-%d").setDaemon(true)
         .setUncaughtExceptionHandler(Threads.LOGGING_EXCEPTION_HANDLER).build());
 
-  public final static Map<AuthenticationProtos.TokenIdentifier.Kind, TokenSelector<? extends TokenIdentifier>>
+  public final static Map<Kind, TokenSelector<? extends TokenIdentifier>>
     TOKEN_HANDLERS = new HashMap<>();
 
   static {
     TOKEN_HANDLERS.put(
-      AuthenticationProtos.TokenIdentifier.Kind.HBASE_AUTH_TOKEN, new AuthenticationTokenSelector());
+      Kind.HBASE_AUTH_TOKEN, new AuthenticationTokenSelector());
   }
 
   private boolean running = true; // if client runs
