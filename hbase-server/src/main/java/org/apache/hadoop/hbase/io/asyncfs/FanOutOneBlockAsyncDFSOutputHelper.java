@@ -46,9 +46,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnresolvedLinkException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
+import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos;
-import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.security.proto.SecurityProtos;
 import org.apache.hadoop.security.token.Token;
@@ -73,7 +73,6 @@ import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.CachingStrategyP
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ChecksumProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ClientOperationHeaderProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpWriteBlockProto;
-import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.OpWriteBlockProto.Builder;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.PipelineAckProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.StorageTypeProto;
@@ -728,13 +727,16 @@ public class FanOutOneBlockAsyncDFSOutputHelper {
 
   static void completeFile(DFSClient client, ClientProtocol namenode, String src, String clientName,
       ExtendedBlock block, long fileId) {
+    long startTime = EnvironmentEdgeManager.currentTime();
     for (int retry = 0;; retry++) {
       try {
         if (namenode.complete(src, clientName, block, fileId)) {
           endFileLease(client, fileId);
           return;
         } else {
-          LOG.warn("complete file " + src + " not finished, retry = " + retry);
+          if (EnvironmentEdgeManager.currentTime() - startTime > 5000) {
+            LOG.info("complete file " + src + " not finished, retry = " + retry);
+          }
         }
       } catch (LeaseExpiredException e) {
         LOG.warn("lease for file " + src + " is expired, give up", e);
