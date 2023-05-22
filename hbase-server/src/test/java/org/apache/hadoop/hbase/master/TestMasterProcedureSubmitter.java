@@ -23,6 +23,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.hadoop.hbase.MasterBusyException;
 import org.apache.hadoop.hbase.MetaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
@@ -45,7 +46,7 @@ public class TestMasterProcedureSubmitter {
     TableLocker tableLocker = Mockito.mock(TableLocker.class);
     HMaster master = Mockito.mock(HMaster.class);
 
-    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker);
+    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker, 3, 60000);
 
     when(tableLocker.getLock(tableName))
       .thenThrow(new IllegalStateException("Should not try lock when fail fast."));
@@ -70,7 +71,7 @@ public class TestMasterProcedureSubmitter {
     when(tableLocker.getLock(tableName)).thenReturn(mockLock);
     when(mockLock.tryLock()).thenReturn(false);
 
-    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker);
+    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker, 3, 60000);
     MasterProcedureUtil.NonceProcedureRunnable task1 =
       Mockito.mock(MasterProcedureUtil.NonceProcedureRunnable.class);
 
@@ -87,7 +88,7 @@ public class TestMasterProcedureSubmitter {
     TableName tableName = TableName.valueOf("testUnlockTable");
     TableLocker tableLocker = new TableLocker();
 
-    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker);
+    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker, 3, 60000);
     MasterProcedureUtil.NonceProcedureRunnable task1 =
       Mockito.mock(MasterProcedureUtil.NonceProcedureRunnable.class);
 
@@ -102,6 +103,23 @@ public class TestMasterProcedureSubmitter {
     } catch(IOException ioe) {
       // The table should be unlocked.
       assertFalse(tableLocker.getLock(tableName).isLocked());
+    }
+  }
+
+  @Test
+  public void testParallelismLimit() {
+    TableName tableName = TableName.valueOf("TestTable");
+    TableLocker tableLocker = new TableLocker();
+    // Set parallel to zero to trigger acquire failure.
+    MasterProcedureSubmitter submitter = new MasterProcedureSubmitter(tableLocker, 0, 10);
+
+    MasterProcedureUtil.NonceProcedureRunnable task1 =
+      Mockito.mock(MasterProcedureUtil.NonceProcedureRunnable.class);
+
+    try {
+      submitter.submitProcedure(task1, tableName);
+    } catch (IOException e) {
+      assertTrue(e instanceof MasterBusyException);
     }
   }
 }
