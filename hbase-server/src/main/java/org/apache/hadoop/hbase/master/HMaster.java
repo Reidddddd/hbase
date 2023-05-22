@@ -269,7 +269,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     }
   }
 
-  private final MasterProcedureSubmitter procedureSubmitter = new MasterProcedureSubmitter();
+  private final MasterProcedureSubmitter procedureSubmitter;
 
   // MASTER is name of the webapp and the attribute name used stuffing this
   //instance into web context.
@@ -519,6 +519,8 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
         getChoreService().scheduleChore(clusterStatusPublisherChore);
       }
     }
+
+    this.procedureSubmitter = new MasterProcedureSubmitter(conf);
 
     // Some unit tests don't need a cluster, so no zookeeper at all
     if (!conf.getBoolean("hbase.testing.nocluster", false)) {
