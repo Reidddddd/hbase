@@ -20,9 +20,7 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -182,8 +180,8 @@ public abstract class AbstractTestLogRolling  {
 
   /**
    * Tests that logs are deleted
-   * @throws IOException
-   * @throws org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException
+   * @throws IOException IOException
+   * @throws FailedLogCloseException FailedLogCloseException
    */
   @Test
   public void testLogRolling() throws Exception {
@@ -193,7 +191,8 @@ public abstract class AbstractTestLogRolling  {
     HRegionInfo region = server.getOnlineRegions(TableName.valueOf(tableName)).get(0)
             .getRegionInfo();
     final WAL log = server.getWAL(region);
-    LOG.info("after writing there are " + AbstractFSWALProvider.getNumRolledLogFiles(log) + " log files");
+    LOG.info("after writing there are " + AbstractFSWALProvider.getNumRolledLogFiles(log)
+      + " log files");
     assertLogFileSize(log);
 
     // flush all regions
@@ -321,8 +320,12 @@ public abstract class AbstractTestLogRolling  {
       assertEquals("Should have 1 WALs at the end", 1,
               DefaultWALProvider.getNumRolledLogFiles(log));
     } finally {
-      if (t != null) t.close();
-      if (table != null) table.close();
+      if (t != null) {
+        t.close();
+      }
+      if (table != null) {
+        table.close();
+      }
     }
   }
 

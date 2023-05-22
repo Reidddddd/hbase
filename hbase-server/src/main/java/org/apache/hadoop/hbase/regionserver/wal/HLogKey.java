@@ -154,7 +154,7 @@ public class HLogKey extends WALKey implements Writable {
   @Deprecated
   public void write(DataOutput out) throws IOException {
     LOG.warn("HLogKey is being serialized to writable - only expected in test code");
-    WritableUtils.writeVInt(out, VERSION.code);
+    WritableUtils.writeVInt(out, VERSION.getCode());
     if (compressionContext == null) {
       Bytes.writeByteArray(out, this.encodedRegionName);
       Bytes.writeByteArray(out, this.tablename.getName());

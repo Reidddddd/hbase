@@ -20,16 +20,11 @@ package org.apache.hadoop.hbase.wal;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.CompletionHandler;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-
-// imports for things that haven't moved from regionserver.wal yet.
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The Write Ahead Log (WAL) stores all durable edits to the HRegion.

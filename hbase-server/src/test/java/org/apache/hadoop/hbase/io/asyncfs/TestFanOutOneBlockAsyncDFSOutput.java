@@ -25,7 +25,6 @@ import static org.junit.Assert.fail;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -37,7 +36,6 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -100,8 +98,9 @@ public class TestFanOutOneBlockAsyncDFSOutput {
     for (;;) {
       try {
         FanOutOneBlockAsyncDFSOutput out =
-                FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS, new Path("/ensureDatanodeAlive"),
-                        true, true, (short) 3, FS.getDefaultBlockSize(), EVENT_LOOP_GROUP);
+                FanOutOneBlockAsyncDFSOutputHelper.createOutput(FS,
+                  new Path("/ensureDatanodeAlive"), true, true,
+                  (short) 3, FS.getDefaultBlockSize(), EVENT_LOOP_GROUP);
         out.close();
         break;
       } catch (IOException e) {

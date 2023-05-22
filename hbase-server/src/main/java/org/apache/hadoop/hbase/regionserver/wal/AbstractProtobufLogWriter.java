@@ -19,11 +19,9 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import static org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader.DEFAULT_WAL_TRAILER_WARN_SIZE;
 import static org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader.WAL_TRAILER_WARN_SIZE;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -104,7 +102,8 @@ public abstract class AbstractProtobufLogWriter {
     boolean doTagCompress = doCompress
             && conf.getBoolean(CompressionContext.ENABLE_WAL_TAGS_COMPRESSION, true);
     length.set(writeMagicAndWALHeader(ProtobufLogReader.PB_WAL_MAGIC, buildWALHeader(conf,
-            WALHeader.newBuilder().setHasCompression(doCompress).setHasTagCompression(doTagCompress))));
+            WALHeader.newBuilder().setHasCompression(doCompress)
+              .setHasTagCompression(doTagCompress))));
 
     initAfterHeader(doCompress);
 
@@ -143,10 +142,14 @@ public abstract class AbstractProtobufLogWriter {
         LOG.warn("WALTrailer is null. Continuing with default.");
         this.trailer = buildWALTrailer(WALTrailer.newBuilder());
         trailerSize = this.trailer.getSerializedSize();
-      } else if ((trailerSize = this.trailer.getSerializedSize()) > this.trailerWarnSize) {
-        // continue writing after warning the user.
-        LOG.warn("Please investigate WALTrailer usage. Trailer size > maximum size : " + trailerSize
-                + " > " + this.trailerWarnSize);
+      } else {
+        trailerSize = this.trailer.getSerializedSize();
+        if (trailerSize > this.trailerWarnSize) {
+          // continue writing after warning the user.
+          LOG.warn(
+            "Please investigate WALTrailer usage. Trailer size > maximum size : " + trailerSize
+              + " > " + this.trailerWarnSize);
+        }
       }
       length.set(writeWALTrailerAndMagic(trailer, ProtobufLogReader.PB_WAL_COMPLETE_MAGIC));
       this.trailerWritten = true;

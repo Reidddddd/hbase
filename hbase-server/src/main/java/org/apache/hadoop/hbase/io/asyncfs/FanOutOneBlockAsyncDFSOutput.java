@@ -25,44 +25,50 @@ import static org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputHel
 import static org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputHelper.endFileLease;
 import static org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputHelper.getStatus;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.*;
-
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelId;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.concurrent.Promise;
-import io.netty.util.concurrent.PromiseCombiner;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputHelper.CancelOnClose;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputHelper.CancelOnClose;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PacketHeader;
 import org.apache.hadoop.hdfs.protocol.datatransfer.PipelineAck;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.PipelineAckProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.Status;
 import org.apache.hadoop.util.DataChecksum;
-
-import com.google.common.base.Supplier;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * An asynchronous HDFS output stream implementation which fans out data to datanode and only
@@ -129,14 +135,15 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     // should be backed by a thread safe collection
     private final Set<ChannelId> unfinishedReplicas;
 
-    public Callback(CompletableFuture<Long> future, long ackedLength, Collection<Channel> replicas) {
+    public Callback(CompletableFuture<Long> future, long ackedLength,
+                    Collection<Channel> replicas) {
       this.future = future;
       this.ackedLength = ackedLength;
       if (replicas.isEmpty()) {
         this.unfinishedReplicas = Collections.emptySet();
       } else {
         this.unfinishedReplicas =
-                Collections.newSetFromMap(new ConcurrentHashMap<ChannelId, Boolean>(replicas.size()));
+          Collections.newSetFromMap(new ConcurrentHashMap<ChannelId, Boolean>(replicas.size()));
         replicas.stream().map(c -> c.id()).forEachOrdered(unfinishedReplicas::add);
       }
     }
@@ -252,7 +259,8 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
     }
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, PipelineAckProto ack) throws Exception {
+    protected void channelRead0(final ChannelHandlerContext ctx, PipelineAckProto ack)
+      throws Exception {
       Status reply = getStatus(ack);
       if (reply != Status.SUCCESS) {
         failed(ctx.channel(), () -> new IOException("Bad response " + reply + " for block "
@@ -318,7 +326,8 @@ public class FanOutOneBlockAsyncDFSOutput implements AsyncFSOutput {
 
   FanOutOneBlockAsyncDFSOutput(Configuration conf, FSUtils fsUtils, DistributedFileSystem dfs,
       DFSClient client, ClientProtocol namenode, String clientName, String src, long fileId,
-      LocatedBlock locatedBlock, List<Channel> datanodeList, DataChecksum summer, ByteBufAllocator alloc) {
+      LocatedBlock locatedBlock, List<Channel> datanodeList, DataChecksum summer,
+                               ByteBufAllocator alloc) {
     this.conf = conf;
     this.fsUtils = fsUtils;
     this.dfs = dfs;

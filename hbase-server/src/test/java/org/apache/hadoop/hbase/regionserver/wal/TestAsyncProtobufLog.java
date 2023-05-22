@@ -20,6 +20,9 @@ package org.apache.hadoop.hbase.regionserver.wal;
 import com.google.common.base.Throwables;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.testclassification.RegionServerTests;
@@ -29,10 +32,6 @@ import org.apache.hadoop.hbase.wal.WALProvider.AsyncWriter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.experimental.categories.Category;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.util.concurrent.ExecutionException;
 
 @Category({ RegionServerTests.class, MediumTests.class })
 public class TestAsyncProtobufLog extends AbstractTestProtobufLog<AsyncWriter> {

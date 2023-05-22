@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hbase.wal;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -29,34 +31,20 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
-import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl.WriteEntry;
-import org.apache.hadoop.hbase.util.ByteStringer;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.FamilyScope;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.ScopeType;
+import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.regionserver.SequenceId;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ByteString;
-
-
-
-// imports for things that haven't moved from regionserver.wal yet.
 import org.apache.hadoop.hbase.regionserver.wal.CompressionContext;
 import org.apache.hadoop.hbase.regionserver.wal.WALCellCodec;
+import org.apache.hadoop.hbase.util.ByteStringer;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A Key for an entry in the change log.
@@ -87,8 +75,8 @@ public class WALKey implements SequenceId, Comparable<WALKey> {
   /**
    * Will block until a write entry has been assigned by they WAL subsystem.
    * @return A WriteEntry gotten from local WAL subsystem. Must be completed by calling
-   * mvcc#complete or mvcc#completeAndWait.
-   * @throws InterruptedIOException
+   *           mvcc#complete or mvcc#completeAndWait.
+   * @throws InterruptedIOException InterruptedIOException
    * @see
    * #setWriteEntry(org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl.WriteEntry)
    */
@@ -118,7 +106,11 @@ public class WALKey implements SequenceId, Comparable<WALKey> {
     // dictionary-based compression is available in version -2.
     COMPRESSED(-2);
 
-    public final int code;
+    public int getCode() {
+      return code;
+    }
+
+    private final int code;
     static final Version[] byCode;
     static {
       byCode = Version.values();
@@ -264,12 +256,13 @@ public class WALKey implements SequenceId, Comparable<WALKey> {
    *
    * @param encodedRegionName Encoded name of the region as returned by
    *                          <code>HRegionInfo#getEncodedNameAsBytes()</code>.
-   * @param tablename
+   * @param tablename         tablename
    * @param now               Time at which this edit was written.
    * @param clusterIds        the clusters that have consumed the change(used in Replication)
-   * @param nonceGroup
-   * @param nonce
-   * @param mvcc mvcc control used to generate sequence numbers and control read/write points
+   * @param nonceGroup        nonceGroup
+   * @param nonce             nonce
+   * @param mvcc              mvcc control used to generate sequence numbers and control read/write
+   *                          points
    */
   public WALKey(final byte[] encodedRegionName, final TableName tablename,
                 final long now, List<UUID> clusterIds, long nonceGroup,
@@ -284,10 +277,10 @@ public class WALKey implements SequenceId, Comparable<WALKey> {
    *
    * @param encodedRegionName Encoded name of the region as returned by
    *                          <code>HRegionInfo#getEncodedNameAsBytes()</code>.
-   * @param tablename
-   * @param logSeqNum
-   * @param nonceGroup
-   * @param nonce
+   * @param tablename tablename
+   * @param logSeqNum logSeqNum
+   * @param nonceGroup nonceGroup
+   * @param nonce nonce
    */
   public WALKey(final byte[] encodedRegionName,
                 final TableName tablename,
@@ -348,7 +341,7 @@ public class WALKey implements SequenceId, Comparable<WALKey> {
 
   /**
    * Used to set original seq Id for WALKey during wal replay
-   * @param seqId
+   * @param seqId seqId
    */
   public void setOrigLogSeqNum(final long seqId) {
     this.origLogSeqNum = seqId;
@@ -365,7 +358,7 @@ public class WALKey implements SequenceId, Comparable<WALKey> {
   /**
    * Wait for sequence number to be assigned &amp; return the assigned value
    * @return long the new assigned sequence number
-   * @throws IOException
+   * @throws IOException IOException
    */
   @Override
   public long getSequenceId() throws IOException {

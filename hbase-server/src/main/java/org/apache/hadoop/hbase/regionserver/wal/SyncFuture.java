@@ -20,7 +20,6 @@ package org.apache.hadoop.hbase.regionserver.wal;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
-import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.htrace.core.Span;
 import org.apache.yetus.audience.InterfaceAudience;
 

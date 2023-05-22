@@ -19,10 +19,8 @@ package org.apache.hadoop.hbase.regionserver.wal;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-
 import java.io.IOException;
 import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -53,18 +51,19 @@ public class TestAsyncFSWAL extends AbstractTestFSWAL {
   }
 
   @Override
-  protected AbstractFSWAL<?> newWAL(FileSystem fs, Path rootDir, String logDir, String archiveDir,
-                                    Configuration conf, List<WALActionsListener> listeners, boolean failIfWALExists,
-                                    String prefix, String suffix) throws IOException {
+  protected AbstractFSWAL<?> newWAL(
+    FileSystem fs, Path rootDir, String logDir, String archiveDir, Configuration conf,
+    List<WALActionsListener> listeners, boolean failIfWALExists, String prefix, String suffix)
+    throws IOException {
     return new AsyncFSWAL(fs, rootDir, logDir, archiveDir, conf, listeners, failIfWALExists, prefix,
             suffix, GROUP);
   }
 
   @Override
-  protected AbstractFSWAL<?> newSlowWAL(FileSystem fs, Path rootDir, String logDir,
-                                        String archiveDir, Configuration conf, List<WALActionsListener> listeners,
-                                        boolean failIfWALExists, String prefix, String suffix, final Runnable action)
-          throws IOException {
+  protected AbstractFSWAL<?> newSlowWAL(
+    FileSystem fs, Path rootDir, String logDir, String archiveDir, Configuration conf,
+    List<WALActionsListener> listeners, boolean failIfWALExists, String prefix,
+    String suffix, final Runnable action) throws IOException {
     return new AsyncFSWAL(fs, rootDir, logDir, archiveDir, conf, listeners, failIfWALExists, prefix,
             suffix, GROUP) {
 

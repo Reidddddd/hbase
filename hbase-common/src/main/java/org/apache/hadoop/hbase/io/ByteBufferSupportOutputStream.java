@@ -19,8 +19,6 @@ package org.apache.hadoop.hbase.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
-
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**

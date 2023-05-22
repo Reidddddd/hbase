@@ -18,23 +18,38 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import java.io.Closeable;
+import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.coprocessor.SampleRegionWALObserver;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
-import org.junit.*;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
-
-import java.io.Closeable;
-import java.io.IOException;
-
-import static org.junit.Assert.*;
 
 /**
  * WAL tests that can be reused across providers.
@@ -96,7 +111,7 @@ public abstract class AbstractTestProtobufLog<W extends Closeable> {
 
   /**
    * Reads the WAL with and without WALTrailer.
-   * @throws IOException
+   * @throws IOException IOException
    */
   @Test
   public void testWALTrailer() throws IOException {
@@ -113,7 +128,7 @@ public abstract class AbstractTestProtobufLog<W extends Closeable> {
    *          call. This means that reader is not aware of the trailer. In this scenario, if the
    *          reader tries to read the trailer in its next() call, it returns false from
    *          ProtoBufLogReader.
-   * @throws IOException
+   * @throws IOException IOException
    */
   private void doRead(boolean withTrailer) throws IOException {
     final int columnCount = 5;
@@ -148,7 +163,9 @@ public abstract class AbstractTestProtobufLog<W extends Closeable> {
         append(writer, new WAL.Entry(key, edit));
       }
       sync(writer);
-      if (withTrailer) writer.close();
+      if (withTrailer) {
+        writer.close();
+      }
 
       // Now read the log using standard means.
       reader = (ProtobufLogReader) wals.createReader(fs, path);

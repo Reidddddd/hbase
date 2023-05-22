@@ -17,16 +17,18 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.NavigableMap;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -64,12 +66,6 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public abstract class AbstractTestFSWAL {
 
@@ -125,13 +121,17 @@ public abstract class AbstractTestFSWAL {
     TEST_UTIL.shutdownMiniCluster();
   }
 
-  protected abstract AbstractFSWAL<?> newWAL(FileSystem fs, Path rootDir, String logDir,
-                                             String archiveDir, Configuration conf, List<WALActionsListener> listeners,
-                                             boolean failIfWALExists, String prefix, String suffix) throws IOException;
+  protected abstract AbstractFSWAL<?> newWAL(
+          FileSystem fs, Path rootDir, String logDir, String archiveDir,
+          Configuration conf, List<WALActionsListener> listeners,
+          boolean failIfWALExists, String prefix, String suffix)
+          throws IOException;
 
-  protected abstract AbstractFSWAL<?> newSlowWAL(FileSystem fs, Path rootDir, String logDir,
-                                                 String archiveDir, Configuration conf, List<WALActionsListener> listeners,
-                                                 boolean failIfWALExists, String prefix, String suffix, Runnable action) throws IOException;
+  protected abstract AbstractFSWAL<?> newSlowWAL(
+          FileSystem fs, Path rootDir, String logDir, String archiveDir,
+          Configuration conf, List<WALActionsListener> listeners,
+          boolean failIfWALExists, String prefix, String suffix, Runnable action)
+          throws IOException;
 
   /**
    * A loaded WAL coprocessor won't break existing WAL test cases.
@@ -171,8 +171,9 @@ public abstract class AbstractTestFSWAL {
 
   /**
    * helper method to simulate region flush for a WAL.
-   * @param wal
-   * @param regionEncodedName
+   * @param wal wal
+   * @param regionEncodedName regionEncodedName
+   * @param flushedFamilyNames flushedFamilyNames
    */
   protected void flushRegion(WAL wal, byte[] regionEncodedName, Set<byte[]> flushedFamilyNames) {
     wal.startCacheFlush(regionEncodedName, flushedFamilyNames);
@@ -182,7 +183,7 @@ public abstract class AbstractTestFSWAL {
   /**
    * tests the log comparator. Ensure that we are not mixing meta logs with non-meta logs (throws
    * exception if we do). Comparison is based on the timestamp present in the wal name.
-   * @throws Exception
+   * @throws Exception Exception
    */
   @Test
   public void testWALComparator() throws Exception {
@@ -240,7 +241,7 @@ public abstract class AbstractTestFSWAL {
    * This method tests this behavior by inserting edits and rolling the wal enough times to reach
    * the max number of logs threshold. It checks whether we get the "right regions" for flush on
    * rolling the wal.
-   * @throws Exception
+   * @throws Exception Exception
    */
   @Test
   public void testFindMemStoresEligibleForFlush() throws Exception {
@@ -253,10 +254,10 @@ public abstract class AbstractTestFSWAL {
             new HTableDescriptor(TableName.valueOf("t1")).addFamily(new HColumnDescriptor("row"));
     HTableDescriptor t2 =
             new HTableDescriptor(TableName.valueOf("t2")).addFamily(new HColumnDescriptor("row"));
-    HRegionInfo hri1 =
-            new HRegionInfo(t1.getTableName(), HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);
-    HRegionInfo hri2 =
-            new HRegionInfo(t2.getTableName(), HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);
+    HRegionInfo hri1 = new HRegionInfo(
+            t1.getTableName(), HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);
+    HRegionInfo hri2 = new HRegionInfo(
+            t2.getTableName(), HConstants.EMPTY_START_ROW, HConstants.EMPTY_END_ROW);
     // add edits and roll the wal
     MultiVersionConcurrencyControl mvcc = new MultiVersionConcurrencyControl();
     try {
@@ -342,7 +343,7 @@ public abstract class AbstractTestFSWAL {
    * slowing appends in the background ring buffer thread while in foreground we call flush. The
    * addition of the sync over HRegion in flush should fix an issue where flush was returning before
    * all of its appends had made it out to the WAL (HBASE-11109).
-   * @throws IOException
+   * @throws IOException IOException
    * @see <a href="https://issues.apache.org/jira/browse/HBASE-11109">HBASE-11109</a>
    */
   @Test
@@ -376,8 +377,8 @@ public abstract class AbstractTestFSWAL {
     try {
       List<Put> puts = null;
       for (HColumnDescriptor hcd : htd.getFamilies()) {
-        puts =
-                TestWALReplay.addRegionEdits(rowName, hcd.getName(), countPerFamily, ee, region, "x");
+        puts = TestWALReplay.addRegionEdits(
+                rowName, hcd.getName(), countPerFamily, ee, region, "x");
       }
 
       // Now assert edits made it in.

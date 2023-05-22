@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
-import com.lmax.disruptor.EventFactory;
 import org.apache.htrace.core.Span;
 import org.apache.yetus.audience.InterfaceAudience;
 

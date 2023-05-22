@@ -17,8 +17,31 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.hadoop.hbase.wal.AbstractFSWALProvider.WAL_FILE_NAME_DELIMITER;
 import com.google.common.annotations.VisibleForTesting;
 import com.lmax.disruptor.RingBuffer;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,37 +50,28 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
 import org.apache.hadoop.hbase.regionserver.MultiVersionConcurrencyControl;
-import org.apache.hadoop.hbase.util.*;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.DrainBarrier;
+import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.htrace.NullScope;
-import org.apache.htrace.Span;
 import org.apache.htrace.Trace;
 import org.apache.htrace.TraceScope;
 import org.apache.yetus.audience.InterfaceAudience;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryUsage;
-import java.net.URLEncoder;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static org.apache.hadoop.hbase.wal.AbstractFSWALProvider.WAL_FILE_NAME_DELIMITER;
 
 /**
  * Implementation of {@link WAL} to go against {@link FileSystem}; i.e. keep WALs in HDFS. Only one
@@ -137,7 +151,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
   protected final Configuration conf;
 
   /** Listeners that are called on WAL events. */
-  protected final List<WALActionsListener> listeners = new CopyOnWriteArrayList<WALActionsListener>();
+  protected final List<WALActionsListener> listeners =
+    new CopyOnWriteArrayList<WALActionsListener>();
 
   /**
    * Class that does accounting of sequenceids in WAL subsystem. Holds oldest outstanding sequence
@@ -216,13 +231,13 @@ public abstract class AbstractFSWAL<W> implements WAL {
      *  Map the encoded region name to the highest sequence id. Contain all the regions it has
      *  entries of
      */
-    public final Map<byte[], Long> encodedName2HighestSequenceId;
+    private final Map<byte[], Long> encodedName2HighestSequenceId;
 
     /**
      * The log file size. Notice that the size may not be accurate if we do asynchronous close in
      * sub classes.
      */
-    public final long logSize;
+    private final long logSize;
 
     public WalProps(Map<byte[], Long> encodedName2HighestSequenceId, long logSize) {
       this.encodedName2HighestSequenceId = encodedName2HighestSequenceId;
@@ -291,7 +306,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
   }
 
   protected AbstractFSWAL(final FileSystem fs, final Path rootDir, final String logDir,
-                          final String archiveDir, final Configuration conf, final List<WALActionsListener> listeners,
+                          final String archiveDir, final Configuration conf,
+                          final List<WALActionsListener> listeners,
                           final boolean failIfWALExists, final String prefix, final String suffix)
       throws FailedLogCloseException, IOException {
     this.fs = fs;
@@ -380,7 +396,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
     this.slowSyncNs = TimeUnit.MILLISECONDS
             .toNanos(conf.getInt("hbase.regionserver.hlog.slowsync.ms", DEFAULT_SLOW_SYNC_TIME_MS));
     this.walSyncTimeoutNs = TimeUnit.MILLISECONDS
-            .toNanos(conf.getLong("hbase.regionserver.hlog.sync.timeout", DEFAULT_WAL_SYNC_TIMEOUT_MS));
+            .toNanos(conf.getLong("hbase.regionserver.hlog.sync.timeout",
+              DEFAULT_WAL_SYNC_TIMEOUT_MS));
     this.syncFutureCache = new SyncFutureCache(conf);
   }
 
@@ -927,8 +944,8 @@ public abstract class AbstractFSWAL<W> implements WAL {
    * this append; otherwise, you will just have to wait on the WriteEntry to get filled in.
    */
   @Override
-  public abstract long append(final HTableDescriptor htd, HRegionInfo info, WALKey key, WALEdit edits,
-                              boolean inMemstore)
+  public abstract long append(final HTableDescriptor htd, HRegionInfo info,
+                              WALKey key, WALEdit edits, boolean inMemstore)
       throws IOException;
 
   protected abstract void doAppend(W writer, FSWALEntry entry) throws IOException;
