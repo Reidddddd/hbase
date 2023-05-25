@@ -162,6 +162,7 @@ public class NettyRpcServer extends RpcServer {
     allChannels.close().awaitUninterruptibly();
     serverChannel.close();
     scheduler.stop();
+    auditSyncer.close();
     closed.countDown();
     running = false;
   }

@@ -475,6 +475,11 @@ public abstract class ServerCall<T extends ServerRpcConnection> implements RpcCa
   public Optional<User> getRequestUser() {
     return Optional.ofNullable(user);
   }
+  
+  @Override
+  public User getCallUser() {
+    return user;
+  }
 
   @Override
   public InetAddress getRemoteAddress() {

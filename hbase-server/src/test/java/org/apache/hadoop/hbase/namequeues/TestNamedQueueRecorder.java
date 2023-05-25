@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.HBaseClassTestRule;
@@ -48,13 +47,11 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.hbase.thirdparty.com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.hbase.thirdparty.com.google.protobuf.BlockingService;
 import org.apache.hbase.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hbase.thirdparty.com.google.protobuf.Descriptors;
 import org.apache.hbase.thirdparty.com.google.protobuf.Message;
-
 import org.apache.hadoop.hbase.shaded.protobuf.generated.AdminProtos;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.HBaseProtos;
@@ -611,12 +608,10 @@ public class TestNamedQueueRecorder {
       public BlockingService getService() {
         return null;
       }
-
       @Override
       public Descriptors.MethodDescriptor getMethod() {
         return null;
       }
-
       @Override
       public Message getParam() {
         return getMessage();
@@ -639,7 +634,6 @@ public class TestNamedQueueRecorder {
 
       @Override
       public void setStartTime(long startTime) {
-
       }
 
       @Override
@@ -703,6 +697,11 @@ public class TestNamedQueueRecorder {
       @Override
       public Optional<User> getRequestUser() {
         return getUser(userName);
+      }
+      
+      @Override
+      public User getCallUser() {
+        return getUser(userName).orElse(null);
       }
 
       @Override

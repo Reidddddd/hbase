@@ -98,6 +98,21 @@ public final class Log4jUtils {
       throw new AssertionError("should not happen", cause);
     }
   }
+  
+  
+  public static void enableAsyncAuditLog(String loggerName,
+                                         boolean blocking, int asyncAppenderBufferSize) {
+    Method method = getMethod("enableAsyncAuditLog",
+        String.class, boolean.class, int.class);
+    try {
+      method.invoke(null, loggerName, blocking, asyncAppenderBufferSize);
+    } catch (IllegalAccessException e) {
+      throw new AssertionError("should not happen", e);
+    } catch (InvocationTargetException e) {
+      throwUnchecked(e.getCause());
+      throw new AssertionError("should not happen", e.getCause());
+    }
+  }
 
   /**
    * Disables Zk- and HBase client logging

@@ -20,13 +20,11 @@ package org.apache.hadoop.hbase.procedure2.store.region;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-
 import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.HBaseClassTestRule;
 import org.apache.hadoop.hbase.client.Get;
@@ -45,11 +43,9 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.hbase.thirdparty.com.google.protobuf.BlockingService;
 import org.apache.hbase.thirdparty.com.google.protobuf.Descriptors;
 import org.apache.hbase.thirdparty.com.google.protobuf.Message;
-
 import org.apache.hadoop.hbase.shaded.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos;
 
@@ -164,7 +160,6 @@ public class TestRegionProcedureStore extends RegionProcedureStoreTestBase {
       public long getDeadline() {
         return System.currentTimeMillis();
       }
-
       @Override
       public BlockingService getService() {
         return null;
@@ -197,7 +192,6 @@ public class TestRegionProcedureStore extends RegionProcedureStoreTestBase {
 
       @Override
       public void setStartTime(long startTime) {
-
       }
 
       @Override
@@ -256,6 +250,11 @@ public class TestRegionProcedureStore extends RegionProcedureStoreTestBase {
       @Override
       public Optional<User> getRequestUser() {
         return Optional.empty();
+      }
+  
+      @Override
+      public User getCallUser() {
+        return null;
       }
 
       @Override

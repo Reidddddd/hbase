@@ -19,9 +19,12 @@ package org.apache.hadoop.hbase.logging;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -66,5 +69,29 @@ final class InternalLog4jUtils {
       }
     }
     return ret;
+  }
+  
+  static void enableAsyncAuditLog(String loggerName,
+                                  boolean blocking,  int asyncAppenderBufferSize) {
+    org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(loggerName);
+    @SuppressWarnings("unchecked") List<org.apache.log4j.Appender> appenders =
+        Collections.list(logger.getAllAppenders());
+    // failsafe against trying to async it more than once
+    if (!appenders.isEmpty() && !(appenders.get(0)
+        instanceof org.apache.log4j.AsyncAppender)) {
+      org.apache.log4j.AsyncAppender asyncAppender = new org.apache.log4j.AsyncAppender();
+      // change logger to have an async appender containing all the
+      // previously configured appenders
+      for (org.apache.log4j.Appender appender : appenders) {
+        logger.removeAppender(appender);
+        asyncAppender.addAppender(appender);
+      }
+      // non-blocking so that server will not wait for async logger
+      // even when the appender's buffer is full
+      // some audit events will be lost in this case
+      asyncAppender.setBlocking(blocking);
+      asyncAppender.setBufferSize(asyncAppenderBufferSize);
+      logger.addAppender(asyncAppender);
+    }
   }
 }

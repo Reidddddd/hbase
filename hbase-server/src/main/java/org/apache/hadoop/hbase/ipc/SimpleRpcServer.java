@@ -451,6 +451,7 @@ public class SimpleRpcServer extends RpcServer {
     listener.doStop();
     responder.interrupt();
     scheduler.stop();
+    auditSyncer.close();
     notifyAll();
   }
 

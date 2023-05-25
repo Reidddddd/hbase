@@ -27,13 +27,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.LongAdder;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.CallQueueTooBigException;
 import org.apache.hadoop.hbase.CellScanner;
@@ -45,7 +43,6 @@ import org.apache.hadoop.hbase.io.ByteBuffAllocator;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
 import org.apache.hadoop.hbase.namequeues.NamedQueueRecorder;
-import org.apache.hadoop.hbase.namequeues.RpcLogDetails;
 import org.apache.hadoop.hbase.regionserver.RSRpcServices;
 import org.apache.hadoop.hbase.security.HBasePolicyProvider;
 import org.apache.hadoop.hbase.security.SaslUtil;
@@ -55,6 +52,7 @@ import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.security.token.AbstractAuthenticationSecretManager;
 import org.apache.hadoop.hbase.security.token.AuthenticationTokenSecretManager;
 import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
+import org.apache.hadoop.hbase.util.AuditLogSyncer;
 import org.apache.hadoop.hbase.util.GsonUtil;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -75,8 +73,6 @@ import org.apache.hbase.thirdparty.com.google.protobuf.Message;
 import org.apache.hbase.thirdparty.com.google.protobuf.ServiceException;
 import org.apache.hbase.thirdparty.com.google.protobuf.TextFormat;
 
-import org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil;
-import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.ConnectionHeader;
 
 /**
@@ -211,6 +207,10 @@ public abstract class RpcServer implements RpcServerInterface,
   protected final RpcScheduler scheduler;
 
   protected UserProvider userProvider;
+  
+  protected final AuditLogSyncer auditSyncer;
+  
+  protected final boolean securityAudit;
 
   protected final ByteBuffAllocator bbAllocator;
 
@@ -304,6 +304,12 @@ public abstract class RpcServer implements RpcServerInterface,
     this.isOnlineLogProviderEnabled = conf.getBoolean(HConstants.SLOW_LOG_BUFFER_ENABLED_KEY,
       HConstants.DEFAULT_ONLINE_LOG_PROVIDER_ENABLED);
     this.scheduler = scheduler;
+  
+    this.securityAudit = conf.getBoolean(AuditLogSyncer.CONF_AUDIT, AuditLogSyncer.DEFAULT_AUDIT);
+    this.auditSyncer = new AuditLogSyncer(LOG, conf);
+    if (securityAudit) {
+      auditSyncer.enableAsyncAuditLog();
+    }
   }
 
   @Override
@@ -383,6 +389,12 @@ public abstract class RpcServer implements RpcServerInterface,
   @Override
   public Pair<Message, CellScanner> call(RpcCall call,
       MonitoredRPCHandler status) throws IOException {
+    int processingTime = -1;
+    int qTime = -1;
+    long requestSize = -1;
+    long responseSize = -1;
+    Throwable exception = null;
+    long startTime = call.getStartTime();
     try {
       MethodDescriptor md = call.getMethod();
       Message param = call.getParam();
@@ -396,10 +408,9 @@ public abstract class RpcServer implements RpcServerInterface,
       controller.setCallTimeout(call.getTimeout());
       Message result = call.getService().callBlockingMethod(md, controller, param);
       long receiveTime = call.getReceiveTime();
-      long startTime = call.getStartTime();
       long endTime = System.currentTimeMillis();
-      int processingTime = (int) (endTime - startTime);
-      int qTime = (int) (startTime - receiveTime);
+      processingTime = (int) (endTime - startTime);
+      qTime = (int) (startTime - receiveTime);
       int totalTime = (int) (endTime - receiveTime);
       if (LOG.isTraceEnabled()) {
         LOG.trace(CurCall.get().toString() +
@@ -409,8 +420,8 @@ public abstract class RpcServer implements RpcServerInterface,
             " totalTime: " + totalTime);
       }
       // Use the raw request call size for now.
-      long requestSize = call.getSize();
-      long responseSize = result.getSerializedSize();
+      requestSize = call.getSize();
+      responseSize = result.getSerializedSize();
       if (call.isClientCellBlockSupported()) {
         // Include the payload size in HBaseRpcController
         responseSize += call.getResponseCellSize();
@@ -421,28 +432,6 @@ public abstract class RpcServer implements RpcServerInterface,
       metrics.totalCall(totalTime);
       metrics.receivedRequest(requestSize);
       metrics.sentResponse(responseSize);
-      // log any RPC responses that are slower than the configured warn
-      // response time or larger than configured warning size
-      boolean tooSlow = (processingTime > warnResponseTime && warnResponseTime > -1);
-      boolean tooLarge = (responseSize > warnResponseSize && warnResponseSize > -1);
-      if (tooSlow || tooLarge) {
-        final String userName = call.getRequestUserName().orElse(StringUtils.EMPTY);
-        // when tagging, we let TooLarge trump TooSmall to keep output simple
-        // note that large responses will often also be slow.
-        logResponse(param,
-          md.getName(), md.getName() + "(" + param.getClass().getName() + ")",
-          tooLarge, tooSlow,
-          status.getClient(), startTime, processingTime, qTime,
-          responseSize, userName);
-        if (this.namedQueueRecorder != null && this.isOnlineLogProviderEnabled) {
-          // send logs to ring buffer owned by slowLogRecorder
-          final String className =
-            server == null ? StringUtils.EMPTY : server.getClass().getSimpleName();
-          this.namedQueueRecorder.addRecord(
-            new RpcLogDetails(call, param, status.getClient(), responseSize, className, tooSlow,
-              tooLarge));
-        }
-      }
       return new Pair<>(result, controller.cellScanner());
     } catch (Throwable e) {
       // The above callBlockingMethod will always return a SE.  Strip the SE wrapper before
@@ -453,6 +442,7 @@ public abstract class RpcServer implements RpcServerInterface,
           LOG.debug("Caught a ServiceException with null cause", e);
         } else {
           e = e.getCause();
+          exception = e;
         }
       }
 
@@ -463,87 +453,14 @@ public abstract class RpcServer implements RpcServerInterface,
       if (e instanceof IOException) throw (IOException)e;
       LOG.error("Unexpected throwable object ", e);
       throw new IOException(e.getMessage(), e);
+    } finally {
+      if (securityAudit) {
+        User user = getCallUser();
+        auditSyncer.logResponse(startTime, qTime, warnResponseTime, warnResponseSize,
+            requestSize, responseSize, exception, user, call.getMethod(), call.getParam(), status);
+      }
     }
   }
-
-  /**
-   * Logs an RPC response to the LOG file, producing valid JSON objects for
-   * client Operations.
-   * @param param The parameters received in the call.
-   * @param methodName The name of the method invoked
-   * @param call The string representation of the call
-   * @param tooLarge To indicate if the event is tooLarge
-   * @param tooSlow To indicate if the event is tooSlow
-   * @param clientAddress The address of the client who made this call.
-   * @param startTime The time that the call was initiated, in ms.
-   * @param processingTime The duration that the call took to run, in ms.
-   * @param qTime The duration that the call spent on the queue
-   *   prior to being initiated, in ms.
-   * @param responseSize The size in bytes of the response buffer.
-   * @param userName UserName of the current RPC Call
-   */
-  void logResponse(Message param, String methodName, String call, boolean tooLarge,
-      boolean tooSlow, String clientAddress, long startTime, int processingTime, int qTime,
-      long responseSize, String userName) {
-    final String className = server == null ? StringUtils.EMPTY :
-      server.getClass().getSimpleName();
-    // base information that is reported regardless of type of call
-    Map<String, Object> responseInfo = new HashMap<>();
-    responseInfo.put("starttimems", startTime);
-    responseInfo.put("processingtimems", processingTime);
-    responseInfo.put("queuetimems", qTime);
-    responseInfo.put("responsesize", responseSize);
-    responseInfo.put("client", clientAddress);
-    responseInfo.put("class", className);
-    responseInfo.put("method", methodName);
-    responseInfo.put("call", call);
-    // The params could be really big, make sure they don't kill us at WARN
-    String stringifiedParam = ProtobufUtil.getShortTextFormat(param);
-    if (stringifiedParam.length() > 150) {
-      // Truncate to 1000 chars if TRACE is on, else to 150 chars
-      stringifiedParam = truncateTraceLog(stringifiedParam);
-    }
-    responseInfo.put("param", stringifiedParam);
-    if (param instanceof ClientProtos.ScanRequest && rsRpcServices != null) {
-      ClientProtos.ScanRequest request = ((ClientProtos.ScanRequest) param);
-      String scanDetails;
-      if (request.hasScannerId()) {
-        long scannerId = request.getScannerId();
-        scanDetails = rsRpcServices.getScanDetailsWithId(scannerId);
-      } else {
-        scanDetails = rsRpcServices.getScanDetailsWithRequest(request);
-      }
-      if (scanDetails != null) {
-        responseInfo.put("scandetails", scanDetails);
-      }
-    }
-    if (param instanceof ClientProtos.MultiRequest) {
-      int numGets = 0;
-      int numMutations = 0;
-      int numServiceCalls = 0;
-      ClientProtos.MultiRequest multi = (ClientProtos.MultiRequest)param;
-      for (ClientProtos.RegionAction regionAction : multi.getRegionActionList()) {
-        for (ClientProtos.Action action: regionAction.getActionList()) {
-          if (action.hasMutation()) {
-            numMutations++;
-          }
-          if (action.hasGet()) {
-            numGets++;
-          }
-          if (action.hasServiceCall()) {
-            numServiceCalls++;
-          }
-        }
-      }
-      responseInfo.put(MULTI_GETS, numGets);
-      responseInfo.put(MULTI_MUTATIONS, numMutations);
-      responseInfo.put(MULTI_SERVICE_CALLS, numServiceCalls);
-    }
-    final String tag = (tooLarge && tooSlow) ? "TooLarge & TooSlow"
-      : (tooSlow ? "TooSlow" : "TooLarge");
-    LOG.warn("(response" + tag + "): " + GSON.toJson(responseInfo));
-  }
-
 
   /**
    * Truncate to number of chars decided by conf hbase.ipc.trace.log.max.length
@@ -716,6 +633,11 @@ public abstract class RpcServer implements RpcServerInterface,
   public static Optional<User> getRequestUser() {
     Optional<RpcCall> ctx = getCurrentCall();
     return ctx.isPresent() ? ctx.get().getRequestUser() : Optional.empty();
+  }
+  
+  public static User getCallUser() {
+    RpcCallContext ctx = CurCall.get();
+    return ctx == null ? null : ctx.getCallUser();
   }
 
   /**

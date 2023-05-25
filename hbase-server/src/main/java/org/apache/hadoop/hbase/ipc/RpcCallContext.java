@@ -54,6 +54,8 @@ public interface RpcCallContext {
    * @return A User
    */
   Optional<User> getRequestUser();
+  
+  User getCallUser();
 
   /**
    * @return Current request's user name or not present if none ongoing.
