@@ -1528,6 +1528,7 @@ public class HRegionServer extends HasThread implements
     int storefiles = 0;
     int storeUncompressedSizeMB = 0;
     int storefileSizeMB = 0;
+    long storefileSizeByte = 0L;
     int memstoreSizeMB = (int) (r.getMemstoreSize() / 1024 / 1024);
     int storefileIndexSizeMB = 0;
     int rootIndexSizeKB = 0;
@@ -1539,7 +1540,7 @@ public class HRegionServer extends HasThread implements
     stores += storeList.size();
     for (Store store : storeList) {
       storefiles += store.getStorefilesCount();
-      storeUncompressedSizeMB += (int) (store.getStoreSizeUncompressed() / 1024 / 1024);
+      storefileSizeByte += store.getStorefilesSize();
       storefileSizeMB += (int) (store.getStorefilesSize() / 1024 / 1024);
       storefileIndexSizeMB += (int) (store.getStorefilesIndexSize() / 1024 / 1024);
       CompactionProgress progress = store.getCompactionProgress();
@@ -1551,6 +1552,9 @@ public class HRegionServer extends HasThread implements
       totalStaticIndexSizeKB += (int) (store.getTotalStaticIndexSize() / 1024);
       totalStaticBloomSizeKB += (int) (store.getTotalStaticBloomSize() / 1024);
     }
+    //HBASE-26340 Fix false "0" size under 1MB
+    storefileSizeMB = storefileSizeByte > 0 && storefileSizeByte <= 1024 * 1024
+      ? 1 : (int) storefileSizeByte / 1024 / 1024;
 
     float dataLocality =
         r.getHDFSBlocksDistribution().getBlockLocalityIndex(serverName.getHostname());
