@@ -50,13 +50,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 public class ConnectionCache {
   private static final Logger LOG = LoggerFactory.getLogger(ConnectionCache.class);
 
-  private final Map<String, ConnectionInfo> connections = new ConcurrentHashMap<>();
-  private final KeyLocker<String> locker = new KeyLocker<>();
-  private final String realUserName;
-  private final UserGroupInformation realUser;
-  private final UserProvider userProvider;
-  private final Configuration conf;
-  private final ChoreService choreService;
+  protected final Map<String, ConnectionInfo> connections = new ConcurrentHashMap<>();
+  protected final KeyLocker<String> locker = new KeyLocker<>();
+  protected final String realUserName;
+  protected final UserGroupInformation realUser;
+  protected final UserProvider userProvider;
+  protected final Configuration conf;
+  protected final ChoreService choreService;
 
   private final ThreadLocal<String> effectiveUserNames =
       new ThreadLocal<String>() {
@@ -172,11 +172,7 @@ public class ConnectionCache {
       try {
         connInfo = connections.get(userName);
         if (connInfo == null) {
-          UserGroupInformation ugi = realUser;
-          if (!userName.equals(realUserName)) {
-            ugi = UserGroupInformation.createProxyUser(userName, realUser);
-          }
-          User user = userProvider.create(ugi);
+          User user = getConnectionUser(userName);
           Connection conn = ConnectionFactory.createConnection(conf, user);
           connInfo = new ConnectionInfo(conn, userName);
           connections.put(userName, connInfo);
@@ -186,6 +182,14 @@ public class ConnectionCache {
       }
     }
     return connInfo;
+  }
+
+  protected User getConnectionUser(String userName) {
+    UserGroupInformation ugi = realUser;
+    if (!userName.equals(realUserName)) {
+      ugi = UserGroupInformation.createProxyUser(userName, realUser);
+    }
+    return userProvider.create(ugi);
   }
 
   /**

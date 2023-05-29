@@ -25,9 +25,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.ConnectionCache;
+import org.apache.hadoop.hbase.util.ConnectionCacheWithAuthToken;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -48,8 +50,9 @@ public abstract class HBaseServiceHandler {
     this.conf = c;
     int cleanInterval = conf.getInt(CLEANUP_INTERVAL, 10 * 1000);
     int maxIdleTime = conf.getInt(MAX_IDLETIME, 10 * 60 * 1000);
-    connectionCache = new ConnectionCache(
-        conf, userProvider, cleanInterval, maxIdleTime);
+    connectionCache = User.isHBaseDigestAuthEnabled(conf) ?
+      new ConnectionCacheWithAuthToken(conf, userProvider, cleanInterval, maxIdleTime) :
+      new ConnectionCache(conf, userProvider, cleanInterval, maxIdleTime);
   }
 
   protected ThriftMetrics metrics = null;
@@ -60,6 +63,13 @@ public abstract class HBaseServiceHandler {
 
   public void setEffectiveUser(String effectiveUser) {
     connectionCache.setEffectiveUser(effectiveUser);
+  }
+
+  public void setEffectivePassword(String password) {
+    if (!User.isHBaseDigestAuthEnabled(conf)) {
+      throw new IllegalStateException("Cannot set password when digest authentication is off. ");
+    }
+    ((ConnectionCacheWithAuthToken) connectionCache).setPassword(password);
   }
 
   /**

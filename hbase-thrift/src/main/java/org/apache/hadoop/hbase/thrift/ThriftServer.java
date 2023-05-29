@@ -103,7 +103,9 @@ import org.apache.hadoop.hbase.http.InfoServer;
 import org.apache.hadoop.hbase.log.HBaseMarkers;
 import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.SecurityUtil;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.thrift.authentication.FacadeTransportFactory;
 import org.apache.hadoop.hbase.thrift.generated.Hbase;
 import org.apache.hadoop.hbase.util.DNS;
 import org.apache.hadoop.hbase.util.JvmPauseMonitor;
@@ -165,8 +167,6 @@ public class ThriftServer  extends Configured implements Tool {
 
   private static final Logger LOG = LoggerFactory.getLogger(ThriftServer.class);
 
-
-
   protected Configuration conf;
 
   protected InfoServer infoServer;
@@ -182,7 +182,6 @@ public class ThriftServer  extends Configured implements Tool {
   protected SaslUtil.QualityOfProtection qop;
   protected String host;
   protected int listenPort;
-
 
   protected boolean securityEnabled;
   protected boolean doAsEnabled;
@@ -257,7 +256,7 @@ public class ThriftServer  extends Configured implements Tool {
             SaslUtil.QualityOfProtection.PRIVACY.name()));
       }
       checkHttpSecurity(qop, conf);
-      if (!securityEnabled) {
+      if (!securityEnabled && !User.isHBaseSecurityEnabled(conf)) {
         throw new IOException("Thrift server must run in secure mode to support authentication");
       }
     }
@@ -491,6 +490,8 @@ public class ThriftServer  extends Configured implements Tool {
       LOG.debug("Using framed transport");
     } else if (qop == null) {
       transportFactory = new TTransportFactory();
+    } else if (User.isHBaseDigestAuthEnabled(conf)) {
+      transportFactory = new FacadeTransportFactory(hbaseServiceHandler);
     } else {
       // Extract the name from the principal
       String thriftKerberosPrincipal = conf.get(THRIFT_KERBEROS_PRINCIPAL_KEY);

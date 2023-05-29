@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import javax.security.sasl.SaslException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HRegionLocation;
@@ -70,6 +71,7 @@ import org.apache.hadoop.hbase.client.LogQueryFilter;
 import org.apache.hadoop.hbase.client.OnlineLogRecord;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.TableDescriptor;
+import org.apache.hadoop.hbase.security.AuthenticationFailedException;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.thrift.HBaseServiceHandler;
 import org.apache.hadoop.hbase.thrift2.generated.TAppend;
@@ -196,7 +198,12 @@ public class ThriftHBaseServiceHandler extends HBaseServiceHandler implements TH
 
   private TIOError getTIOError(IOException e) {
     TIOError err = new TIOErrorWithCause(e);
-    err.setCanRetry(!(e instanceof DoNotRetryIOException));
+    if (e.getMessage().contains(SaslException.class.getName()) || e.getMessage().contains(
+      AuthenticationFailedException.class.getName())) {
+      err.setCanRetryIsSet(false);
+    } else {
+      err.setCanRetry(!((e instanceof DoNotRetryIOException) || (e instanceof SaslException)));
+    }
     err.setMessage(e.getMessage());
     return err;
   }
