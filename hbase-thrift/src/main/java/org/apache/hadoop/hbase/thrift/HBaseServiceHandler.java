@@ -20,18 +20,16 @@ package org.apache.hadoop.hbase.thrift;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.hadoop.hbase.security.User;
-import org.apache.hadoop.hbase.util.ConnectionCacheWithAuthToken;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.ConnectionCache;
-
+import org.apache.hadoop.hbase.util.ConnectionCacheWithAuthToken;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * abstract class for HBase handler
@@ -97,5 +95,7 @@ public abstract class HBaseServiceHandler {
     return getTable(Bytes.getBytes(tableName));
   }
 
-
+  public String getEffectiveUser() {
+    return connectionCache.getEffectiveUser();
+  }
 }
