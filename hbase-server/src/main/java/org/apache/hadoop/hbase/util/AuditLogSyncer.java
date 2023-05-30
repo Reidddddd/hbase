@@ -22,46 +22,26 @@ package org.apache.hadoop.hbase.util;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.log4j.Appender;
-import org.apache.log4j.AsyncAppender;
-import org.apache.log4j.Logger;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
-public class AuditLogSyncer extends HasThread {
-
-  private static final Log AUDITLOG = LogFactory.getLog("SecurityLogger." +
-            Server.class.getName());
-  private static final int asyncAppenderBufferSize = 100000;
-  private final ConcurrentHashMap<String, AtomicInteger> events =
-          new ConcurrentHashMap<String, AtomicInteger>();
+public class AuditLogSyncer extends AbstractAuditLogSyncer {
   private final boolean auditMore;
   private final int rowKeyLimit;
   private final int logRecordLimit;
   private final int regionNameLimit;
   private String sampleEvent = "";
-  private AtomicBoolean samplingLock = new AtomicBoolean(false);
-  private final long flushInterval;
-  private final Log LOG;
-  private volatile Boolean closeAuditSyncer = Boolean.valueOf(false);
-  private Object lock = new Object();
 
   private static final String PTIME = "p_time:";
   private static final String QTIME = "q_time:";
@@ -123,9 +103,8 @@ public class AuditLogSyncer extends HasThread {
   };
 
   public AuditLogSyncer(Log LOG, Configuration conf) {
-    this.LOG = LOG;
+    super(conf.getLong(CONF_AUDIT_FLUSH_INTERVAL, DEFAULT_AUDIT_FLUSH_INTERVAL), LOG);
 
-    this.flushInterval = conf.getLong(CONF_AUDIT_FLUSH_INTERVAL, DEFAULT_AUDIT_FLUSH_INTERVAL);
     this.auditMore = conf.getBoolean(CONF_AUDIT_MORE_INFO, DEFAULT_AUDIT_MORE_INFO);
     this.rowKeyLimit = conf.getInt(CONF_AUDIT_ROW_KEY_SIZE, DEFAULT_AUDIT_ROW_KEY_SIZE);
     this.logRecordLimit = conf.getInt(CONF_AUDIT_RECORD_LIMIT, DEFAULT_AUDIT_RECORD_LIMIT);
@@ -138,30 +117,6 @@ public class AuditLogSyncer extends HasThread {
   }
 
   @Override
-  public void run() {
-    try {
-      synchronized (lock) {
-        while (!closeAuditSyncer) {
-          auditSync();
-          lock.wait(this.flushInterval);
-        }
-      }
-    } catch (InterruptedException e) {
-      LOG.debug(getName() + " interrupted while waiting for sync requests");
-    } catch (Exception e) {
-      LOG.error("Error while syncing auditLog ", e);
-    } finally {
-      LOG.info(getName() + " exiting");
-    }
-  }
-
-  public void close() {
-    synchronized (lock) {
-      closeAuditSyncer = Boolean.valueOf(true);
-      lock.notifyAll();
-    }
-  }
-
   public void auditSync() {
     // log latest warnEvent
     if (sampleEvent.length() != 0) {
@@ -174,33 +129,6 @@ public class AuditLogSyncer extends HasThread {
       int value = events.remove(e.getKey()).get();
       AUDITLOG.info((e.getKey() + "\t" + EVENTCOUNT + value));
     }
-  }
-
-  public void enableAsyncAuditLog() {
-    if (!(AUDITLOG instanceof Log4JLogger)) {
-      LOG.warn("Log4j is required to enable async auditlog");
-      return;
-    }
-    Logger logger = Logger.getLogger("SecurityLogger");
-    @SuppressWarnings("unchecked") List<Appender> appenders =
-            Collections.list(logger.getAllAppenders());
-    // failsafe against trying to async it more than once
-    if (!appenders.isEmpty() && !(appenders.get(0) instanceof AsyncAppender)) {
-      AsyncAppender asyncAppender = new AsyncAppender();
-      // change logger to have an async appender containing all the
-      // previously configured appenders
-      for (Appender appender : appenders) {
-        logger.removeAppender(appender);
-        asyncAppender.addAppender(appender);
-      }
-      // non-blocking so that server will not wait for async logger
-      // even when the appender's buffer is full
-      // some audit events will be lost in this case
-      asyncAppender.setBlocking(false);
-      asyncAppender.setBufferSize(asyncAppenderBufferSize);
-      logger.addAppender(asyncAppender);
-    }
-    LOG.info("Async AuditLog is enabled");
   }
 
   private static final String TAG_EXCEPTION = "E";
