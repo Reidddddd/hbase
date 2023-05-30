@@ -105,6 +105,8 @@ import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.SecurityUtil;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
+import org.apache.hadoop.hbase.thrift.audit.ThriftAuditEventHandler;
+import org.apache.hadoop.hbase.thrift.audit.ThriftAuditLogSyncer;
 import org.apache.hadoop.hbase.thrift.authentication.FacadeTransportFactory;
 import org.apache.hadoop.hbase.thrift.generated.Hbase;
 import org.apache.hadoop.hbase.util.DNS;
@@ -167,6 +169,9 @@ public class ThriftServer  extends Configured implements Tool {
 
   private static final Logger LOG = LoggerFactory.getLogger(ThriftServer.class);
 
+  protected static final Logger AUDITLOG = LoggerFactory.getLogger("SecurityLogger." +
+    org.apache.hadoop.hbase.Server.class.getName());
+
   protected Configuration conf;
 
   protected InfoServer infoServer;
@@ -190,6 +195,10 @@ public class ThriftServer  extends Configured implements Tool {
 
   protected volatile TServer tserver;
   protected volatile Server httpServer;
+
+  protected ThriftAuditLogSyncer auditLogSyncer;
+
+  protected boolean securityAudit;
 
 
   //
@@ -262,6 +271,17 @@ public class ThriftServer  extends Configured implements Tool {
     }
     registerFilters(conf);
     pauseMonitor.start();
+
+    this.securityAudit = conf.getBoolean(ThriftAuditLogSyncer.CONF_AUDIT,
+      ThriftAuditLogSyncer.DEFAULT_AUDIT);
+    this.auditLogSyncer = new ThriftAuditLogSyncer(
+      conf.getLong(ThriftAuditLogSyncer.CONF_AUDIT_FLUSH_INTERVAL,
+        ThriftAuditLogSyncer.DEFAULT_AUDIT_FLUSH_INTERVAL), LOG);
+
+    if (this.securityAudit) {
+      this.auditLogSyncer.enableAsyncAuditLog();
+      this.auditLogSyncer.start();
+    }
   }
 
   private String getSpengoPrincipal(Configuration conf, String host) throws IOException {
@@ -579,6 +599,13 @@ public class ThriftServer  extends Configured implements Tool {
           implType.serverClass.getName() + " but got " +
           tserver.getClass().getName());
     }
+
+    if (this.securityAudit) {
+      LOG.info("Set audit event handler,");
+      ThriftAuditEventHandler auditEventHandler =
+        new ThriftAuditEventHandler(hbaseServiceHandler, auditLogSyncer);
+      tserver.setServerEventHandler(auditEventHandler);
+    }
   }
 
   protected TServer getTNonBlockingServer(TNonblockingServerTransport serverTransport,
@@ -826,6 +853,9 @@ public class ThriftServer  extends Configured implements Tool {
         LOG.error("Problem encountered in shutting down HTTP server", e);
       }
       httpServer = null;
+    }
+    if (this.auditLogSyncer != null) {
+      this.auditLogSyncer.close();
     }
   }
 

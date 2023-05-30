@@ -21,19 +21,14 @@ package org.apache.hadoop.hbase.util;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Server;
-import org.apache.hadoop.hbase.logging.Log4jUtils;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hbase.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hbase.thirdparty.com.google.protobuf.Descriptors;
 import org.apache.hbase.thirdparty.com.google.protobuf.Message;
@@ -41,23 +36,12 @@ import org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos;
 
 
 @InterfaceAudience.Private
-public class AuditLogSyncer extends Thread {
-  
-  private static final Logger AUDITLOG = LoggerFactory.getLogger("SecurityLogger." +
-      Server.class.getName());
-  private static final int asyncAppenderBufferSize = 100000;
-  private final ConcurrentHashMap<String, AtomicInteger> events =
-      new ConcurrentHashMap<String, AtomicInteger>();
+public class AuditLogSyncer extends AbstractAuditLogSyncer {
   private final boolean auditMore;
   private final int rowKeyLimit;
   private final int logRecordLimit;
   private final int regionNameLimit;
   private String sampleEvent = "";
-  private AtomicBoolean samplingLock = new AtomicBoolean(false);
-  private final long flushInterval;
-  private final Logger LOG;
-  private volatile Boolean closeAuditSyncer = Boolean.valueOf(false);
-  private Object lock = new Object();
   
   private static final String PTIME = "p_time:";
   private static final String QTIME = "q_time:";
@@ -119,8 +103,8 @@ public class AuditLogSyncer extends Thread {
   };
   
   public AuditLogSyncer(Logger LOG, Configuration conf) {
-    this.LOG = LOG;
-    this.flushInterval = conf.getLong(CONF_AUDIT_FLUSH_INTERVAL, DEFAULT_AUDIT_FLUSH_INTERVAL);
+    super(conf.getLong(CONF_AUDIT_FLUSH_INTERVAL, DEFAULT_AUDIT_FLUSH_INTERVAL), LOG);
+
     this.auditMore = conf.getBoolean(CONF_AUDIT_MORE_INFO, DEFAULT_AUDIT_MORE_INFO);
     this.rowKeyLimit = conf.getInt(CONF_AUDIT_ROW_KEY_SIZE, DEFAULT_AUDIT_ROW_KEY_SIZE);
     this.logRecordLimit = conf.getInt(CONF_AUDIT_RECORD_LIMIT, DEFAULT_AUDIT_RECORD_LIMIT);
@@ -131,32 +115,8 @@ public class AuditLogSyncer extends Thread {
           Thread.currentThread().getName() + ".auditSyncer");
     }
   }
-  
+
   @Override
-  public void run() {
-    try {
-      synchronized (lock) {
-        while (!closeAuditSyncer) {
-          auditSync();
-          lock.wait(this.flushInterval);
-        }
-      }
-    } catch (InterruptedException e) {
-      LOG.debug(getName() + " interrupted while waiting for sync requests");
-    } catch (Exception e) {
-      LOG.error("Error while syncing auditLog ", e);
-    } finally {
-      LOG.info(getName() + " exiting");
-    }
-  }
-  
-  public void close() {
-    synchronized (lock) {
-      closeAuditSyncer = Boolean.valueOf(true);
-      lock.notifyAll();
-    }
-  }
-  
   public void auditSync() {
     // log latest warnEvent
     if (sampleEvent.length() != 0) {
@@ -169,11 +129,6 @@ public class AuditLogSyncer extends Thread {
       int value = events.remove(e.getKey()).get();
       AUDITLOG.info((e.getKey() + "\t" + EVENTCOUNT + value));
     }
-  }
-  
-  public void enableAsyncAuditLog() {
-    Log4jUtils.enableAsyncAuditLog("SecurityLogger", false, asyncAppenderBufferSize);
-    LOG.info("Async AuditLog is enabled");
   }
   
   private static final String TAG_EXCEPTION = "E";

@@ -26,11 +26,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.thrift.audit.ThriftAuditEventHandler;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.thrift.TException;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.server.ServerContext;
 import org.apache.thrift.server.TServer;
+import org.apache.thrift.server.TServerEventHandler;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TSocket;
@@ -290,11 +293,23 @@ public class TBoundedThreadPoolServer extends TServer {
         outputProtocol = outputProtocolFactory_.getProtocol(outputTransport);
         // we check stopped_ first to make sure we're not supposed to be shutting
         // down. this is necessary for graceful shutdown.
+        ServerContext sc = null;
         while (true) {
           if (stopped) {
             break;
           }
+          TServerEventHandler handler = getEventHandler();
+          if (handler != null) {
+            sc = handler.createContext(inputProtocol, outputProtocol);
+            // We need the client transport to get the client ip:port.
+            if (handler instanceof ThriftAuditEventHandler) {
+              ((ThriftAuditEventHandler) handler).extractAddressFromTransport(client);
+            }
+          }
           processor.process(inputProtocol, outputProtocol);
+          if (handler != null) {
+            handler.deleteContext(sc, inputProtocol, outputProtocol);
+          }
         }
       } catch (TTransportException ttx) {
         // Assume the client died and continue silently
