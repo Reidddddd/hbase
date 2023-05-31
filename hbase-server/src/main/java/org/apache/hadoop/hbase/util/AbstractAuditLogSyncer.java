@@ -18,10 +18,7 @@
  */
 package org.apache.hadoop.hbase.util;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.logging.Log4jUtils;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -35,14 +32,11 @@ public abstract class AbstractAuditLogSyncer extends Thread {
     Server.class.getName());
   protected static final int asyncAppenderBufferSize = 100000;
 
-  protected final ConcurrentHashMap<String, AtomicInteger> events =
-    new ConcurrentHashMap<String, AtomicInteger>();
-
   protected AtomicBoolean samplingLock = new AtomicBoolean(false);
   protected final long flushInterval;
   protected final Logger LOG;
-  protected volatile Boolean closeAuditSyncer = Boolean.valueOf(false);
-  protected Object lock = new Object();
+  protected final Object lock = new Object();
+  protected volatile Boolean closeAuditSyncer = Boolean.FALSE;
 
   public AbstractAuditLogSyncer(long flushInterval, Logger LOG) {
     this.flushInterval = flushInterval;
@@ -69,7 +63,7 @@ public abstract class AbstractAuditLogSyncer extends Thread {
 
   public void close() {
     synchronized (lock) {
-      closeAuditSyncer = Boolean.valueOf(true);
+      closeAuditSyncer = Boolean.TRUE;
       lock.notifyAll();
     }
   }
