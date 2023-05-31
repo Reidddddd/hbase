@@ -25,6 +25,7 @@ import com.google.protobuf.Message;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.commons.logging.Log;
@@ -73,6 +74,9 @@ public class AuditLogSyncer extends AbstractAuditLogSyncer {
   public static final int DEFAULT_AUDIT_ROW_KEY_SIZE = 100;
   public static final int DEFAULT_AUDIT_RECORD_LIMIT = 10000;
   public static final int DEFAULT_AUDIT_REGION_NAME_SIZE = -1;
+
+  protected final ConcurrentHashMap<String, AtomicInteger> events =
+    new ConcurrentHashMap<>();
 
   private static final ThreadLocal<StringBuilder> auditBuffer = new ThreadLocal<StringBuilder>() {
     @Override

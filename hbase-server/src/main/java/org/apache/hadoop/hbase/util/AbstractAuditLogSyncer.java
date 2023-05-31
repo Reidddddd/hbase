@@ -20,9 +20,7 @@ package org.apache.hadoop.hbase.util;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.logging.impl.Log4JLogger;
@@ -39,14 +37,11 @@ public abstract class AbstractAuditLogSyncer extends HasThread {
     Server.class.getName());
   protected static final int asyncAppenderBufferSize = 100000;
 
-  protected final ConcurrentHashMap<String, AtomicInteger> events =
-    new ConcurrentHashMap<String, AtomicInteger>();
-
   protected AtomicBoolean samplingLock = new AtomicBoolean(false);
   protected final long flushInterval;
   protected final Log LOG;
-  protected volatile Boolean closeAuditSyncer = Boolean.valueOf(false);
-  protected Object lock = new Object();
+  protected final Object lock = new Object();
+  protected volatile Boolean closeAuditSyncer = Boolean.FALSE;
 
   public AbstractAuditLogSyncer(long flushInterval, Log LOG) {
     this.flushInterval = flushInterval;
@@ -73,7 +68,7 @@ public abstract class AbstractAuditLogSyncer extends HasThread {
 
   public void close() {
     synchronized (lock) {
-      closeAuditSyncer = Boolean.valueOf(true);
+      closeAuditSyncer = Boolean.TRUE;
       lock.notifyAll();
     }
   }

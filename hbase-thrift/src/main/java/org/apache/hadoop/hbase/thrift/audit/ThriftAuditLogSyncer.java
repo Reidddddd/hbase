@@ -48,11 +48,10 @@ public class ThriftAuditLogSyncer extends AbstractAuditLogSyncer {
 
   @Override
   protected void auditSync() {
-    try {
-      ThriftConnectionInfo connectionInfo = events.take();
+    // Do not use take here, as we have synchronized outside.
+    ThriftConnectionInfo connectionInfo = events.poll();
+    if (connectionInfo != null) {
       AUDITLOG.info(connectionInfo.toString());
-    } catch(InterruptedException e) {
-      LOG.info("AuditLog is interrupted.", e);
     }
   }
 
