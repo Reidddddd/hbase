@@ -23,7 +23,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.hadoop.hbase.MasterBusyException;
 import org.apache.hadoop.hbase.MetaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
@@ -118,8 +117,9 @@ public class TestMasterProcedureSubmitter {
 
     try {
       submitter.submitProcedure(task1, tableName);
+      fail("Should catch IOException here.");
     } catch (IOException e) {
-      assertTrue(e instanceof MasterBusyException);
+      // We should go here.
     }
   }
 }
