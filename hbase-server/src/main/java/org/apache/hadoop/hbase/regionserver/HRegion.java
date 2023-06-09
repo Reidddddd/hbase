@@ -3613,26 +3613,6 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         }
       }
 
-      // ------------------------------------
-      // STEP 8. Run coprocessor post hooks. This should be done after the wal is
-      // synced so that the coprocessor contract is adhered to.
-      // ------------------------------------
-      if (!isInReplay && coprocessorHost != null) {
-        for (int i = firstIndex; i < lastIndexExclusive; i++) {
-          // only for successful puts
-          if (batchOp.retCodeDetails[i].getOperationStatusCode()
-              != OperationStatusCode.SUCCESS) {
-            continue;
-          }
-          Mutation m = batchOp.getMutation(i);
-          if (m instanceof Put) {
-            coprocessorHost.postPut((Put) m, walEdit, m.getDurability());
-          } else {
-            coprocessorHost.postDelete((Delete) m, walEdit, m.getDurability());
-          }
-        }
-      }
-
       success = true;
       return addedSize;
     } finally {
@@ -3650,7 +3630,7 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
         }
       }
 
-      // STEP 9 release row locks
+      // STEP 8 release row locks
       if (locked) {
         this.updatesLock.readLock().unlock();
       }
@@ -3688,6 +3668,26 @@ public class HRegion implements HeapSize, PropagatingConfigurationObserver, Regi
           new MiniBatchOperationInProgress<Mutation>(batchOp.getMutationsForCoprocs(),
           batchOp.retCodeDetails, batchOp.walEditsFromCoprocessors, firstIndex, lastIndexExclusive);
         coprocessorHost.postBatchMutateIndispensably(miniBatchOp, success);
+      }
+  
+      // ------------------------------------
+      // STEP 9. Run coprocessor post hooks. This should be done after the wal is
+      // synced so that the coprocessor contract is adhered to.
+      // ------------------------------------
+      if (!isInReplay && coprocessorHost != null) {
+        for (int i = firstIndex; i < lastIndexExclusive; i++) {
+          // only for successful puts
+          if (batchOp.retCodeDetails[i].getOperationStatusCode()
+              != OperationStatusCode.SUCCESS) {
+            continue;
+          }
+          Mutation m = batchOp.getMutation(i);
+          if (m instanceof Put) {
+            coprocessorHost.postPut((Put) m, walEdit, m.getDurability());
+          } else {
+            coprocessorHost.postDelete((Delete) m, walEdit, m.getDurability());
+          }
+        }
       }
 
       batchOp.nextIndexToProcess = lastIndexExclusive;
