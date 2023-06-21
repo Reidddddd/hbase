@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hbase.client;
 
+import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -45,7 +46,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.AsyncProcess.RowChecker.ReturnCode;
 import org.apache.hadoop.hbase.CallQueueTooBigException;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HConstants;
@@ -55,6 +55,7 @@ import org.apache.hadoop.hbase.RegionLocations;
 import org.apache.hadoop.hbase.RetryImmediatelyException;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.AsyncProcess.RowChecker.ReturnCode;
 import org.apache.hadoop.hbase.client.backoff.ServerStatistics;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.exceptions.ClientExceptionsUtil;
@@ -65,6 +66,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdge;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.yetus.audience.InterfaceAudience;
+
 
 /**
  * This class  allows a continuous flow of requests. It's written to be compatible with a
@@ -334,8 +336,8 @@ class AsyncProcess {
 
     this.pause = connConf.getPause();
     this.pauseForCQTBE = connConf.getPauseForCQTBE();
-
-    this.numTries = connConf.getRetriesNumber();
+    // how many times we could try in total, one more than retry number
+    this.numTries = retries2Attempts(connConf.getRetriesNumber());
     this.rpcTimeout = rpcTimeout;
     this.operationTimeout = connConf.getOperationTimeout();
 
@@ -1282,7 +1284,7 @@ class AsyncProcess {
     private void receiveGlobalFailure(
         MultiAction<Row> rsActions, ServerName server, int numAttempt, Throwable t) {
       errorsByServer.reportServerError(server);
-      Retry canRetry = errorsByServer.canRetryMore(numAttempt)
+      Retry canRetry = errorsByServer.canTryMore(numAttempt)
           ? Retry.YES : Retry.NO_RETRIES_EXHAUSTED;
 
       if (tableName == null && ClientExceptionsUtil.isMetaClearingException(t)) {
@@ -1469,7 +1471,7 @@ class AsyncProcess {
               errorsByServer.reportServerError(server);
               // We determine canRetry only once for all calls, after reporting server failure.
               retry =
-                errorsByServer.canRetryMore(numAttempt) ? Retry.YES : Retry.NO_RETRIES_EXHAUSTED;
+                errorsByServer.canTryMore(numAttempt) ? Retry.YES : Retry.NO_RETRIES_EXHAUSTED;
             }
             ++failureCount;
             switch (manageError(sentAction.getOriginalIndex(), row, retry, (Throwable) result,

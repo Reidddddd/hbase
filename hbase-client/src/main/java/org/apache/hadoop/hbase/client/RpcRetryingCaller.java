@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hbase.client;
 
+import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.lang.reflect.UndeclaredThrowableException;
@@ -26,18 +28,15 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.CallQueueTooBigException;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.exceptions.PreemptiveFastFailException;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.ExceptionUtil;
 import org.apache.hadoop.ipc.RemoteException;
-
-import com.google.protobuf.ServiceException;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Runs an rpc'ing {@link RetryingCallable}. Sets into rpc client
@@ -64,7 +63,7 @@ public class RpcRetryingCaller<T> {
 
   private final long pause;
   private final long pauseForCQTBE;
-  private final int retries;
+  private final int maxAttempts;// how many times to try
   private final int rpcTimeout;// timeout for each rpc request
   private final Object lock = new Object();
   private final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -80,7 +79,7 @@ public class RpcRetryingCaller<T> {
       RetryingCallerInterceptor interceptor, int startLogErrorsCnt, int rpcTimeout) {
     this.pause = pause;
     this.pauseForCQTBE = pauseForCQTBE;
-    this.retries = retries;
+    this.maxAttempts = retries2Attempts(retries);
     this.interceptor = interceptor;
     context = interceptor.createEmptyContext();
     this.startLogErrorsCnt = startLogErrorsCnt;
@@ -149,18 +148,18 @@ public class RpcRetryingCaller<T> {
         interceptor.handleFailure(context, t);
         t = translateException(t);
         if (tries > startLogErrorsCnt) {
-          LOG.info("Call exception, tries=" + tries + ", retries=" + retries + ", started=" +
-              (EnvironmentEdgeManager.currentTime() - this.globalStartTime) + " ms ago, "
-              + "cancelled=" + cancelled.get() + ", msg="
+          LOG.info("Call exception, tries=" + (tries + 1) + ", maxAttempts=" + maxAttempts
+              + ",started=" + (EnvironmentEdgeManager.currentTime() - this.globalStartTime)
+              + " ms ago," + "cancelled=" + cancelled.get() + ", msg="
               + t.getMessage() + " " + callable.getExceptionMessageAdditionalDetail());
         }
 
-        callable.throwable(t, retries != 1);
+        callable.throwable(t, maxAttempts != 1);
         RetriesExhaustedException.ThrowableWithExtraContext qt =
             new RetriesExhaustedException.ThrowableWithExtraContext(t,
                 EnvironmentEdgeManager.currentTime(), toString());
         exceptions.add(qt);
-        if (tries >= retries - 1) {
+        if (tries >= maxAttempts - 1) {
           throw new RetriesExhaustedException(tries, exceptions);
         }
         // If the server is dead, we need to wait a little before retrying, to give
@@ -189,7 +188,8 @@ public class RpcRetryingCaller<T> {
         }
         if (cancelled.get()) return null;
       } catch (InterruptedException e) {
-        throw new InterruptedIOException("Interrupted after " + tries + " tries  on " + retries);
+        throw new InterruptedIOException("Interrupted after " + (tries + 1)
+            + " tries while maxAttempts=" + maxAttempts);
       }
     }
   }
@@ -272,6 +272,6 @@ public class RpcRetryingCaller<T> {
   @Override
   public String toString() {
     return "RpcRetryingCaller{" + "globalStartTime=" + globalStartTime +
-        ", pause=" + pause + ", retries=" + retries + '}';
+        ", pause=" + pause + ", maxAttempts=" + maxAttempts + '}';
   }
 }

@@ -865,7 +865,8 @@ public class TestHCM {
     Configuration c2 = new Configuration(TEST_UTIL.getConfiguration());
     // We want to work on a separate connection.
     c2.set(HConstants.HBASE_CLIENT_INSTANCE_ID, String.valueOf(-1));
-    c2.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, 1);
+    // try only once w/o any retry
+    c2.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, 0);
     c2.setInt(HConstants.HBASE_RPC_TIMEOUT_KEY, 30 * 1000);
 
     HTable table = new HTable(c2, tableName);
@@ -973,7 +974,8 @@ public class TestHCM {
   public void testRegionCaching() throws Exception{
     TEST_UTIL.createMultiRegionTable(TABLE_NAME, FAM_NAM).close();
     Configuration conf =  new Configuration(TEST_UTIL.getConfiguration());
-    conf.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, 1);
+    // test with no retry, or client cache will get updated after the first failure
+    conf.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, 0);
     HTable table = new HTable(conf, TABLE_NAME);
 
     TEST_UTIL.waitUntilAllRegionsAssigned(table.getName());
