@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.apache.hadoop.hbase.client.ConnectionUtils.NO_NONCE_GENERATOR;
+import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
 import static org.apache.hadoop.hbase.client.MetricsConnection.CLIENT_SIDE_METRICS_ENABLED_KEY;
 import java.io.Closeable;
 import java.io.IOException;
@@ -660,8 +661,9 @@ class ConnectionManager {
           HConstants.DEFAULT_USE_META_REPLICAS);
       this.metaReplicaCallTimeoutScanInMicroSecond =
           connectionConfig.getMetaReplicaCallTimeoutMicroSecondScan();
-
-      this.numTries = connectionConfig.getRetriesNumber();
+      
+      // how many times to try, one more than max *retry* time
+      this.numTries = retries2Attempts(connectionConfig.getRetriesNumber());
       this.rpcTimeout = conf.getInt(
           HConstants.HBASE_RPC_TIMEOUT_KEY,
           HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
@@ -1282,13 +1284,13 @@ class ConnectionManager {
       if (this.useMetaReplicas) {
         s.setConsistency(Consistency.TIMELINE);
       }
-
-      int localNumRetries = (retry ? numTries : 1);
+  
+      int maxAttempts = (retry ? numTries : 1);
 
       for (int tries = 0; true; tries++) {
-        if (tries >= localNumRetries) {
+        if (tries >= maxAttempts) {
           throw new NoServerForRegionException("Unable to find region for " +
-            Bytes.toStringBinary(row) + " in " + tableName + " after " + tries + " tries.");
+            Bytes.toStringBinary(row) + " in " + tableName + " after " + (tries + 1) + " tries.");
         }
         if (useCache) {
           RegionLocations locations = getCachedLocation(tableName, row);
@@ -1384,10 +1386,10 @@ class ConnectionManager {
             // Give a special check on CallQueueTooBigException, see #HBASE-17114
             pauseBase = this.pauseForCQTBE;
           }
-          if (tries < localNumRetries - 1) {
+          if (tries < maxAttempts - 1) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("locateRegionInMeta parentTable=" + TableName.META_TABLE_NAME +
-                  ", metaLocation=" + ", attempt=" + tries + " of " + localNumRetries +
+                  ", metaLocation=" + ", attempt=" + (tries + 1) + " of " + maxAttempts +
                   " failed; retrying after sleep of " +
                   ConnectionUtils.getPauseTime(pauseBase, tries) + " because: " + e.getMessage());
             }
@@ -2753,21 +2755,27 @@ class ConnectionManager {
     private final ConcurrentMap<ServerName, ServerErrors> errorsByServer =
         new ConcurrentHashMap<ServerName, ServerErrors>();
     private final long canRetryUntil;
-    private final int maxRetries;
+    private final int maxTries;// max number to try
     private final long startTrackingTime;
-
-    public ServerErrorTracker(long timeout, int maxRetries) {
-      this.maxRetries = maxRetries;
+  
+    /**
+     * Constructor
+     * @param timeout how long to wait before timeout, in unit of millisecond
+     * @param maxTries how many times to try
+     */
+    public ServerErrorTracker(long timeout, int maxTries) {
+      this.maxTries = maxTries;
       this.canRetryUntil = EnvironmentEdgeManager.currentTime() + timeout;
       this.startTrackingTime = new Date().getTime();
     }
-
+    
     /**
      * We stop to retry when we have exhausted BOTH the number of retries and the time allocated.
+     * @param numAttempt how many times we have tried by now
      */
-    boolean canRetryMore(int numRetry) {
+    boolean canTryMore(int numAttempt) {
       // If there is a single try we must not take into account the time.
-      return numRetry < maxRetries || (maxRetries > 1 &&
+      return numAttempt < maxTries || (maxTries > 1 &&
           EnvironmentEdgeManager.currentTime() < this.canRetryUntil);
     }
 

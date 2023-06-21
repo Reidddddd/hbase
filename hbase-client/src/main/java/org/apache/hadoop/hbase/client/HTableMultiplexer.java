@@ -19,9 +19,9 @@
  */
 package org.apache.hadoop.hbase.client;
 
+import static org.apache.hadoop.hbase.client.ConnectionUtils.retries2Attempts;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.io.IOException;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
@@ -37,7 +37,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -47,11 +46,11 @@ import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.AsyncProcess.AsyncRequestFuture;
 import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * HTableMultiplexer provides a thread-safe non blocking PUT API across all the tables.
@@ -85,7 +84,7 @@ public class HTableMultiplexer {
   private final Configuration workerConf;
   private final ClusterConnection conn;
   private final ExecutorService pool;
-  private final int retryNum;
+  private final int maxAttempts;
   private final int perRegionServerBufferQueueSize;
   private final int maxKeyValueSize;
   private final ScheduledExecutorService executor;
@@ -111,8 +110,8 @@ public class HTableMultiplexer {
       int perRegionServerBufferQueueSize) {
     this.conn = (ClusterConnection) conn;
     this.pool = HTable.getDefaultExecutor(conf);
-    this.retryNum = conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-        HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+    this.maxAttempts =  retries2Attempts(conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+        HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER));
     this.perRegionServerBufferQueueSize = perRegionServerBufferQueueSize;
     this.maxKeyValueSize = HTable.getMaxKeyValueSize(conf);
     this.flushPeriod = conf.getLong(TABLE_MULTIPLEXER_FLUSH_PERIOD_MS, 100);
@@ -147,7 +146,7 @@ public class HTableMultiplexer {
    * @return true if the request can be accepted by its corresponding buffer queue.
    */
   public boolean put(TableName tableName, final Put put) {
-    return put(tableName, put, this.retryNum);
+    return put(tableName, put, this.maxAttempts);
   }
 
   /**
@@ -164,7 +163,7 @@ public class HTableMultiplexer {
     List <Put> failedPuts = null;
     boolean result;
     for (Put put : puts) {
-      result = put(tableName, put, this.retryNum);
+      result = put(tableName, put, this.maxAttempts);
       if (result == false) {
 
         // Create the failed puts list if necessary
@@ -223,8 +222,8 @@ public class HTableMultiplexer {
    * Deprecated. Use {@link #put(TableName, Put) } instead.
    */
   @Deprecated
-  public boolean put(final byte[] tableName, final Put put, int retry) {
-    return put(TableName.valueOf(tableName), put, retry);
+  public boolean put(final byte[] tableName, final Put put, int maxAttempts) {
+    return put(TableName.valueOf(tableName), put, maxAttempts);
   }
 
   /**
@@ -377,12 +376,12 @@ public class HTableMultiplexer {
   static class PutStatus {
     public final HRegionInfo regionInfo;
     public final Put put;
-    public final int retryCount;
-
-    public PutStatus(HRegionInfo regionInfo, Put put, int retryCount) {
+    private final int maxAttempCount;
+  
+    public PutStatus(HRegionInfo regionInfo, Put put, int maxAttempCount) {
       this.regionInfo = regionInfo;
       this.put = put;
-      this.retryCount = retryCount;
+      this.maxAttempCount = maxAttempCount;
     }
   }
 
@@ -481,7 +480,7 @@ public class HTableMultiplexer {
 
     boolean resubmitFailedPut(PutStatus ps, HRegionLocation oldLoc) throws IOException {
       // Decrease the retry count
-      final int retryCount = ps.retryCount - 1;
+      final int retryCount = ps.maxAttempCount - 1;
 
       if (retryCount <= 0) {
         // Update the failed counter and no retry any more.
@@ -528,7 +527,7 @@ public class HTableMultiplexer {
     @VisibleForTesting
     long getNextDelay(int retryCount) {
       return ConnectionUtils.getPauseTime(multiplexer.flushPeriod,
-          multiplexer.retryNum - retryCount - 1);
+          multiplexer.maxAttempts - retryCount - 1);
     }
 
     @VisibleForTesting

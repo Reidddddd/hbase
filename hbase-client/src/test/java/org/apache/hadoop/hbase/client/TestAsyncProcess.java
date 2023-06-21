@@ -591,7 +591,7 @@ public class TestAsyncProcess {
     ars = ap.submit(DUMMY_TABLE, puts, false, null, true);
     Assert.assertEquals(0, puts.size());
     ars.waitUntilDone();
-    Assert.assertEquals(2, ap.callsCt.get());
+    Assert.assertEquals(1, ap.callsCt.get());
     verifyResult(ars, true);
   }
 
@@ -1299,7 +1299,7 @@ public class TestAsyncProcess {
     // Main calls fail before replica calls can start - this is currently not handled.
     // It would probably never happen if we can get location (due to retries),
     // and it would require additional synchronization.
-    MyAsyncProcessWithReplicas ap = createReplicaAp(1000, 0, 0, 1);
+    MyAsyncProcessWithReplicas ap = createReplicaAp(1000, 0, 0, 0);
     ap.addFailures(hri1, hri2);
     List<Get> rows = makeTimelineGets(DUMMY_BYTES_1, DUMMY_BYTES_2);
     AsyncRequestFuture ars =
@@ -1312,7 +1312,7 @@ public class TestAsyncProcess {
   public void testReplicaReplicaSuccessWithParallelFailures() throws Exception {
     // Main calls fails after replica calls start. For two-replica region, one replica call
     // also fails. Regardless, we get replica results for both regions.
-    MyAsyncProcessWithReplicas ap = createReplicaAp(0, 1000, 1000, 1);
+    MyAsyncProcessWithReplicas ap = createReplicaAp(0, 1000, 1000, 0);
     ap.addFailures(hri1, hri1r2, hri2);
     List<Get> rows = makeTimelineGets(DUMMY_BYTES_1, DUMMY_BYTES_2);
     AsyncRequestFuture ars =
@@ -1325,7 +1325,7 @@ public class TestAsyncProcess {
   public void testReplicaAllCallsFailForOneRegion() throws Exception {
     // For one of the region, all 3, main and replica, calls fail. For the other, replica
     // call fails but its exception should not be visible as it did succeed.
-    MyAsyncProcessWithReplicas ap = createReplicaAp(500, 1000, 0, 1);
+    MyAsyncProcessWithReplicas ap = createReplicaAp(500, 1000, 0, 0);
     ap.addFailures(hri1, hri1r1, hri1r2, hri2r1);
     List<Get> rows = makeTimelineGets(DUMMY_BYTES_1, DUMMY_BYTES_2);
     AsyncRequestFuture ars =
@@ -1351,7 +1351,7 @@ public class TestAsyncProcess {
     Configuration conf = new Configuration();
     ClusterConnection conn = createHConnectionWithReplicas();
     conf.setInt(AsyncProcess.PRIMARY_CALL_TIMEOUT_KEY, replicaAfterMs * 1000);
-    if (retries > 0) {
+    if (retries >= 0) {
       conf.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, retries);
     }
     MyAsyncProcessWithReplicas ap = new MyAsyncProcessWithReplicas(conn, conf);
@@ -1479,9 +1479,9 @@ public class TestAsyncProcess {
   public void testRetryPauseWithCallQueueTooBigException() throws Exception {
     Configuration myConf = new Configuration(conf);
     final long specialPause = 500L;
-    final int tries = 2;
+    final int retries = 1;
     myConf.setLong(HConstants.HBASE_CLIENT_PAUSE_FOR_CQTBE, specialPause);
-    myConf.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, tries);
+    myConf.setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, retries);
     ClusterConnection conn = new MyConnectionImpl(myConf);
     BufferedMutatorImpl mutator =
         (BufferedMutatorImpl) conn.getBufferedMutator(DUMMY_TABLE);
@@ -1502,7 +1502,7 @@ public class TestAsyncProcess {
     }
     long actualSleep = System.currentTimeMillis() - startTime;
     long expectedSleep = 0L;
-    for (int i = 0; i < tries - 1; i++) {
+    for (int i = 0; i < retries; i++) {
       expectedSleep += ConnectionUtils.getPauseTime(specialPause, i);
       // Prevent jitter in CollectionUtils#getPauseTime to affect result
       actualSleep += (long) (specialPause * 0.01f);
@@ -1528,7 +1528,7 @@ public class TestAsyncProcess {
     }
     actualSleep = System.currentTimeMillis() - startTime;
     expectedSleep = 0L;
-    for (int i = 0; i < tries - 1; i++) {
+    for (int i = 0; i < retries; i++) {
       expectedSleep += ConnectionUtils.getPauseTime(normalPause, i);
     }
     // plus an additional pause to balance the program execution time
@@ -1670,7 +1670,6 @@ public class TestAsyncProcess {
               getPool(pool), needResults, results, callback, callable,
               operationTimeout, rpcTimeout);
       allReqs.add(r);
-      callsCt.incrementAndGet();
       return r;
     }
 
