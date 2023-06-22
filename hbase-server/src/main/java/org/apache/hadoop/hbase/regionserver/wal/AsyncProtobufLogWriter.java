@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -195,6 +195,17 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter
     this.asyncOutputWrapper = new OutputStreamWrapper(output);
   }
 
+  @Override
+  protected void closeOutputIfNecessary() {
+    if (this.output != null) {
+      try {
+        this.output.close();
+      } catch (IOException e) {
+        LOG.warn("Close output failed", e);
+      }
+    }
+  }
+
   private long writeWALMetadata(Consumer<CompletableFuture<Long>> action) throws IOException {
     CompletableFuture<Long> future = new CompletableFuture<>();
     action.accept(future);
@@ -258,13 +269,13 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter
 
   @Override
   public long getSyncedLength() {
-   /**
-    * The statement "this.output = null;" in {@link AsyncProtobufLogWriter#close}
-    * is a sync point, if output is null, then finalSyncedLength must set,
-    * so we can return finalSyncedLength, else we return output.getSyncedLength
-    */
+    /**
+     * The statement "this.output = null;" in {@link AsyncProtobufLogWriter#close}
+     * is a sync point, if output is null, then finalSyncedLength must set,
+     * so we can return finalSyncedLength, else we return output.getSyncedLength
+     */
     AsyncFSOutput outputToUse = this.output;
-    if(outputToUse == null) {
+    if (outputToUse == null) {
         long finalSyncedLengthToUse = this.finalSyncedLength;
         assert finalSyncedLengthToUse >= 0;
         return finalSyncedLengthToUse;
