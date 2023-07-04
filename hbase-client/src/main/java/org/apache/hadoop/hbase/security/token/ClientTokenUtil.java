@@ -24,8 +24,10 @@ import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Objects;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.ipc.AbstractRpcClient;
@@ -70,6 +72,30 @@ public final class ClientTokenUtil {
   @InterfaceAudience.Private
   public static Token<AuthenticationTokenIdentifier> obtainToken(
       Connection conn) throws IOException {
+    // If the conn is null, we do not to check the local digest properties and
+    // go with the old logic.
+    if (conn != null) {
+      // If we turn on the subjective digest RPC authentication,
+      // just acquire the token from local conf.
+      Configuration conf = conn.getConfiguration();
+      if (User.isHBaseDigestAuthEnabled(conf)) {
+        AuthenticationTokenIdentifier ident =
+          new AuthenticationTokenIdentifier(User.getCurrent().getShortName());
+        String localPassword = conf.get(User.DIGEST_PASSWORD_KEY);
+        Token<AuthenticationTokenIdentifier> token = null;
+
+        if (conn instanceof ClusterConnection) {
+          token = new Token<>(ident.getBytes(), Bytes.toBytes(localPassword),
+            AuthenticationTokenIdentifier.AUTH_TOKEN_TYPE,
+            new Text(((ClusterConnection) conn).getClusterId()));
+          return token;
+        } else {
+          throw new IOException("Cannot get clusterId from connection: " + conn
+            + " obtain token failed.");
+        }
+      }
+    }
+    // Otherwise, we fetch token through one RPC.
     Table meta = null;
     try {
       injectFault();

@@ -2172,6 +2172,11 @@ class ConnectionImplementation implements ClusterConnection, Closeable {
   }
 
   @Override
+  public String getClusterId() {
+    return this.clusterId;
+  }
+
+  @Override
   public ConnectionConfiguration getConnectionConfiguration() {
     return this.connectionConfig;
   }

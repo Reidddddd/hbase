@@ -323,4 +323,9 @@ public interface ClusterConnection extends Connection {
    *         supports cell blocks.
    */
   boolean hasCellBlockSupport();
+
+  /**
+   * @return The clusterId in String form.
+   */
+  String getClusterId();
 }
