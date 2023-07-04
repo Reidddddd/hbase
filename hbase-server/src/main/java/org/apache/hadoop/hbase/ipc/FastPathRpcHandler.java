@@ -29,7 +29,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 public class FastPathRpcHandler extends RpcHandler {
   // Below are for fast-path support. Push this Handler on to the fastPathHandlerStack Deque
   // if an empty queue of CallRunners so we are available for direct handoff when one comes in.
-  final Deque<FastPathRpcHandler> fastPathHandlerStack;
+  private Deque<FastPathRpcHandler> fastPathHandlerStack;
   // Semaphore to coordinate loading of fastpathed loadedTask and our running it.
   private Semaphore semaphore = new Semaphore(0);
   // The task we get when fast-pathing.
