@@ -160,6 +160,6 @@ public class TestThriftServerWithDigestAuth extends TestThriftServer {
     handler.connectionCache.setEffectiveUser("testuser");
     ((ConnectionCacheWithAuthToken) handler.connectionCache).setPassword("123456");
 
-    return HbaseHandlerMetricsProxy.newInstance(handler, metrics, conf);
+    return HBaseHandlerMetricsProxy.newInstance(handler, metrics, conf, null);
   }
 }

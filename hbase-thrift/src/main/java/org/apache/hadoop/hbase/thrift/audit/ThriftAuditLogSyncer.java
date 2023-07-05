@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hbase.thrift.audit;
 
-import java.net.InetSocketAddress;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.hbase.util.AbstractAuditLogSyncer;
@@ -38,9 +37,11 @@ public class ThriftAuditLogSyncer extends AbstractAuditLogSyncer {
   public static final Long DEFAULT_AUDIT_FLUSH_INTERVAL = 1000L;
 
   // Used in audit log when we cannot get the ip:port of client.
-  public static final String ADDRESS_PLACEHOLDER = "default";
+  public static final String ADDRESS_PLACEHOLDER = "unknown";
 
-  private final LinkedBlockingQueue<ThriftConnectionInfo> events = new LinkedBlockingQueue<>();
+  private final LinkedBlockingQueue<ThriftAuditEntry> events = new LinkedBlockingQueue<>();
+
+  private final ThreadLocal<String> ipPort = new ThreadLocal<>();
 
   public ThriftAuditLogSyncer(long flushInterval, Log LOG) {
     super(flushInterval, LOG);
@@ -48,72 +49,82 @@ public class ThriftAuditLogSyncer extends AbstractAuditLogSyncer {
 
   @Override
   protected void auditSync() {
-    // Do not use take here, as we have synchronized outside.
-    ThriftConnectionInfo connectionInfo = events.poll();
-    if (connectionInfo != null) {
-      AUDITLOG.info(connectionInfo.toString());
+    ThriftAuditEntry logEntry = events.poll();
+    if (logEntry != null) {
+      AUDITLOG.info(logEntry.toString());
     }
   }
 
-  void logConnection(ThriftConnectionInfo connectionInfo) {
-    events.offer(connectionInfo);
+  public void logRequestProcess(String tableName, String methodName, String user, long serveTime) {
+    AUDITLOG.info(new ThriftAuditEntry().setServeTime(serveTime)
+      .setEffectiveUser(user).setTableName(tableName).setMethod(methodName)
+      .setRemoteAddress(ipPort.get()).toString());
   }
 
-  static class ThriftConnectionInfo {
+  void setIpPort(String ipPort) {
+    this.ipPort.set(ipPort);
+  }
+
+  static class ThriftAuditEntry {
+    private static final String USER = "user: ";
+    private static final String IP = "ip: ";
+    private static final String METHOD = "method: ";
+    private static final String TABLE = "table: ";
+    private static final String SERVE_TIME = "served time: ";
+
     private String effectiveUser;
+    private String methodName;
+    private String tableName;
+    private String remoteAddress;
+    private long serveTime;
 
-    private InetSocketAddress remoteAddress;
-
-    private long startTime;
-
-    private long endTime;
-
-    private final String USER = "user:";
-
-    private final String IP = "ip:";
-
-    private final String SERVE_TIME = "served time:";
-
-
-    ThriftConnectionInfo() {
-      this.effectiveUser = null;
+    ThriftAuditEntry() {
+      this.effectiveUser = "";
       this.remoteAddress = null;
-      this.startTime = 0L;
-      this.endTime = 0L;
+      this.serveTime = 0L;
     }
 
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      long servedTime = endTime - startTime;
       sb.append(USER).append(effectiveUser).append('\t');
 
       if (remoteAddress == null) {
         sb.append(IP).append(ADDRESS_PLACEHOLDER).append('\t');
       } else {
-        sb.append(IP).append(remoteAddress.getHostString()).append(':')
-          .append(remoteAddress.getPort()).append('\t');
+        sb.append(IP).append(remoteAddress).append('\t');
       }
 
-      sb.append(SERVE_TIME).append(servedTime).append(" ms").append('\t');
+      sb.append(TABLE).append(tableName).append('\t');
+      sb.append(METHOD).append(methodName).append('\t');
+      sb.append(SERVE_TIME).append(serveTime).append(" ms").append('\t');
 
       return sb.toString();
     }
 
-    public void setEffectiveUser(String user) {
+    public ThriftAuditEntry setEffectiveUser(String user) {
       this.effectiveUser = user;
+      return this;
     }
 
-    public void setStartTime(long time) {
-      this.startTime = time;
+    public ThriftAuditEntry setServeTime(long serveTime) {
+      this.serveTime = serveTime;
+      return this;
     }
 
-    public void setEndTime(long time) {
-      this.endTime = time;
-    }
-
-    public void setRemoteAddress(InetSocketAddress address) {
+    public ThriftAuditEntry setRemoteAddress(String address) {
       this.remoteAddress = address;
+      return this;
+    }
+
+    public ThriftAuditEntry setMethod(String methodName) {
+      this.methodName = methodName;
+      return this;
+    }
+
+    public ThriftAuditEntry setTableName(String tableName) {
+      this.tableName = tableName;
+      return this;
     }
   }
 

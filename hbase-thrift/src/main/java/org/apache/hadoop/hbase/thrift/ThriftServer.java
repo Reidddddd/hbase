@@ -72,12 +72,10 @@ import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_SSL_KEYSTORE_PASSW
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_SSL_KEYSTORE_STORE_KEY;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_SUPPORT_PROXYUSER_KEY;
 import static org.apache.hadoop.hbase.thrift.Constants.USE_HTTP_CONF_KEY;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -90,13 +88,11 @@ import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.SaslServer;
-
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -115,7 +111,6 @@ import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.SecurityUtil;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.thrift.generated.Hbase;
-
 import org.apache.hadoop.hbase.thrift.ldap.TLdapTransportFactory;
 import org.apache.hadoop.hbase.util.DNS;
 import org.apache.hadoop.hbase.util.HttpServerUtil;
@@ -146,15 +141,12 @@ import org.apache.thrift.transport.TSaslServerTransport;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TTransportFactory;
-
 import org.mortbay.jetty.Connector;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.nio.SelectChannelConnector;
-
 import org.mortbay.jetty.servlet.Context;
 import org.mortbay.jetty.servlet.ServletHolder;
 import org.mortbay.thread.QueuedThreadPool;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -238,6 +230,16 @@ public class ThriftServer extends Configured implements Tool{
       this.httpUGI = serviceUGI;
     }
 
+    this.securityAudit = conf.getBoolean(ThriftAuditLogSyncer.CONF_AUDIT,
+      ThriftAuditLogSyncer.DEFAULT_AUDIT);
+    this.auditLogSyncer = new ThriftAuditLogSyncer(
+      conf.getLong(ThriftAuditLogSyncer.CONF_AUDIT_FLUSH_INTERVAL,
+        ThriftAuditLogSyncer.DEFAULT_AUDIT_FLUSH_INTERVAL), LOG);
+
+    if (this.securityAudit) {
+      this.auditLogSyncer.enableAsyncAuditLog();
+    }
+
     this.listenPort = conf.getInt(PORT_CONF_KEY, DEFAULT_LISTEN_PORT);
     this.metrics = createThriftMetrics(conf);
     this.pauseMonitor = new JvmPauseMonitor(conf, this.metrics.getSource());
@@ -273,17 +275,6 @@ public class ThriftServer extends Configured implements Tool{
     }
     registerFilters(conf);
     pauseMonitor.start();
-
-    this.securityAudit = conf.getBoolean(ThriftAuditLogSyncer.CONF_AUDIT,
-      ThriftAuditLogSyncer.DEFAULT_AUDIT);
-    this.auditLogSyncer = new ThriftAuditLogSyncer(
-      conf.getLong(ThriftAuditLogSyncer.CONF_AUDIT_FLUSH_INTERVAL,
-        ThriftAuditLogSyncer.DEFAULT_AUDIT_FLUSH_INTERVAL), LOG);
-
-    if (this.securityAudit) {
-      this.auditLogSyncer.enableAsyncAuditLog();
-      this.auditLogSyncer.start();
-    }
   }
 
   private String getSpengoPrincipal(Configuration conf, String host) throws IOException {
@@ -349,7 +340,8 @@ public class ThriftServer extends Configured implements Tool{
 
   protected TProcessor createProcessor() {
     return new Hbase.Processor<>(
-        HbaseHandlerMetricsProxy.newInstance((Hbase.Iface) hBaseServiceHandler, metrics, conf));
+        HBaseHandlerMetricsProxy.newInstance(
+          (Hbase.Iface) hBaseServiceHandler, metrics, conf, auditLogSyncer));
   }
 
   /**
@@ -591,8 +583,7 @@ public class ThriftServer extends Configured implements Tool{
 
     if (this.securityAudit) {
       LOG.info("Set audit event handler,");
-      ThriftAuditEventHandler auditEventHandler =
-        new ThriftAuditEventHandler(hBaseServiceHandler, auditLogSyncer);
+      ThriftAuditEventHandler auditEventHandler = new ThriftAuditEventHandler(auditLogSyncer);
       tserver.setServerEventHandler(auditEventHandler);
     }
   }

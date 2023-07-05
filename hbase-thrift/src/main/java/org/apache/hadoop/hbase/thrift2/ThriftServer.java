@@ -21,9 +21,7 @@ package org.apache.hadoop.hbase.thrift2;
 import static org.apache.hadoop.hbase.thrift.Constants.READONLY_OPTION;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_READONLY_ENABLED;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_READONLY_ENABLED_DEFAULT;
-
 import java.io.IOException;
-
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -31,16 +29,15 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.thrift.HBaseServiceHandler;
-import org.apache.hadoop.hbase.thrift.HbaseHandlerMetricsProxy;
+import org.apache.hadoop.hbase.thrift.HBaseHandlerMetricsProxy;
 import org.apache.hadoop.hbase.thrift.ThriftMetrics;
 import org.apache.hadoop.hbase.thrift2.generated.THBaseService;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.thrift.TProcessor;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * ThriftServer - this class starts up a Thrift server which implements the HBase API specified in the
@@ -48,7 +45,7 @@ import org.apache.thrift.TProcessor;
  */
 @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "NM_SAME_SIMPLE_NAME_AS_SUPERCLASS",
   justification = "Change the name will be an incompatible change, will do it later")
-@InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.TOOLS)
+@InterfaceAudience.LimitedPrivate("Tools")
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class ThriftServer extends org.apache.hadoop.hbase.thrift.ThriftServer {
   private static final Log log = LogFactory.getLog(ThriftServer.class);
@@ -83,8 +80,8 @@ public class ThriftServer extends org.apache.hadoop.hbase.thrift.ThriftServer {
 
   @Override
   protected TProcessor createProcessor() {
-    return new THBaseService.Processor<>(HbaseHandlerMetricsProxy
-        .newInstance((THBaseService.Iface) hBaseServiceHandler, metrics, conf));
+    return new THBaseService.Processor<>(HBaseHandlerMetricsProxy
+        .newInstance((THBaseService.Iface) hBaseServiceHandler, metrics, conf, auditLogSyncer));
   }
 
   @Override
