@@ -22,47 +22,53 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-
+import java.nio.ByteBuffer;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.thrift.audit.ThriftAuditLogSyncer;
 import org.apache.hadoop.hbase.thrift.generated.Hbase;
 import org.apache.hadoop.hbase.thrift2.generated.THBaseService;
-
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Converts a Hbase.Iface using InvocationHandler so that it reports process
  * time of each call to ThriftMetrics.
  */
 @InterfaceAudience.Private
-public final class HbaseHandlerMetricsProxy implements InvocationHandler {
+public final class HBaseHandlerMetricsProxy implements InvocationHandler {
+  private static final Log LOG = LogFactory.getLog(HBaseHandlerMetricsProxy.class);
+
+  private static final String UNKNOWN = "unknown";
 
   private final Object handler;
   private final ThriftMetrics metrics;
+  private final ThriftAuditLogSyncer auditLogSyncer;
 
   public static Hbase.Iface newInstance(Hbase.Iface handler,
-      ThriftMetrics metrics,
-      Configuration conf) {
+      ThriftMetrics metrics, Configuration conf, ThriftAuditLogSyncer auditLogSyncer) {
     return (Hbase.Iface) Proxy.newProxyInstance(
         handler.getClass().getClassLoader(),
         new Class[]{Hbase.Iface.class},
-        new HbaseHandlerMetricsProxy(handler, metrics, conf));
+        new HBaseHandlerMetricsProxy(handler, metrics, conf, auditLogSyncer));
   }
 
   // for thrift 2
   public static THBaseService.Iface newInstance(THBaseService.Iface handler,
-      ThriftMetrics metrics,
-      Configuration conf) {
+      ThriftMetrics metrics, Configuration conf, ThriftAuditLogSyncer auditLogSyncer) {
     return (THBaseService.Iface) Proxy.newProxyInstance(
         handler.getClass().getClassLoader(),
         new Class[]{THBaseService.Iface.class},
-        new HbaseHandlerMetricsProxy(handler, metrics, conf)
+        new HBaseHandlerMetricsProxy(handler, metrics, conf, auditLogSyncer)
     );
   }
 
-  private HbaseHandlerMetricsProxy(Object handler, ThriftMetrics metrics,
-      Configuration conf) {
+  private HBaseHandlerMetricsProxy(Object handler, ThriftMetrics metrics, Configuration conf,
+    ThriftAuditLogSyncer auditLogSyncer) {
     this.handler = handler;
     this.metrics = metrics;
+    this.auditLogSyncer = auditLogSyncer;
   }
 
   @Override
@@ -70,6 +76,13 @@ public final class HbaseHandlerMetricsProxy implements InvocationHandler {
       throws Throwable {
     Object result;
     long start = now();
+
+    String effectiveUser = handler instanceof HBaseServiceHandler ?
+      ((HBaseServiceHandler) handler).getEffectiveUser() : UNKNOWN;
+    // In all table level ops, the first parameter should be a ByteBuffer of TableName.
+    String tableName = args != null ? args[0] instanceof ByteBuffer ?
+      Bytes.toString(Bytes.getBytes((ByteBuffer) args[0])) : UNKNOWN : UNKNOWN;
+
     try {
       result = m.invoke(handler, args);
     } catch (InvocationTargetException e) {
@@ -82,6 +95,12 @@ public final class HbaseHandlerMetricsProxy implements InvocationHandler {
     } finally {
       long processTime = now() - start;
       metrics.incMethodTime(m.getName(), processTime);
+      if (auditLogSyncer != null) {
+        this.auditLogSyncer.logRequestProcess(tableName, m.getName(), effectiveUser,
+          processTime / 1000 / 1000);
+      } else {
+        LOG.info("AuditLog Syncer is null");
+      }
     }
     return result;
   }
