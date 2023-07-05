@@ -38,9 +38,9 @@ import org.slf4j.LoggerFactory;
 public class FastPathRWQueueRpcExecutor extends RWQueueRpcExecutor {
   private static final Logger LOG = LoggerFactory.getLogger(RWQueueRpcExecutor.class);
 
-  private final Deque<FastPathRpcHandler> readHandlerStack = new ConcurrentLinkedDeque<>();
-  private final Deque<FastPathRpcHandler> writeHandlerStack = new ConcurrentLinkedDeque<>();
-  private final Deque<FastPathRpcHandler> scanHandlerStack = new ConcurrentLinkedDeque<>();
+  protected final Deque<FastPathRpcHandler> readHandlerStack = new ConcurrentLinkedDeque<>();
+  protected final Deque<FastPathRpcHandler> writeHandlerStack = new ConcurrentLinkedDeque<>();
+  protected final Deque<FastPathRpcHandler> scanHandlerStack = new ConcurrentLinkedDeque<>();
 
   public FastPathRWQueueRpcExecutor(String name, int handlerCount, int maxQueueLength,
     PriorityFunction priority, Configuration conf, Abortable abortable) {
