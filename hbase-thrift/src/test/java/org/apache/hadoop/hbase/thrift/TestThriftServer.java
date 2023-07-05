@@ -246,7 +246,7 @@ public class TestThriftServer {
   private static Hbase.Iface getHandlerForMetricsTest(ThriftMetrics metrics, Configuration conf)
       throws Exception {
     Hbase.Iface handler = new MySlowHBaseHandler(conf);
-    return HbaseHandlerMetricsProxy.newInstance((ThriftHBaseServiceHandler)handler, metrics, conf);
+    return HBaseHandlerMetricsProxy.newInstance(handler, metrics, conf, null);
   }
 
   private static ThriftMetrics getMetrics(Configuration conf) throws Exception {
@@ -788,7 +788,7 @@ public class TestThriftServer {
       ThriftMetrics metrics = getMetrics(conf);
       ThriftHBaseServiceHandler hbaseHandler =
         new ThriftHBaseServiceHandler(UTIL.getConfiguration(), UserProvider.instantiate(UTIL.getConfiguration()));
-      Hbase.Iface handler = HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, conf);
+      Hbase.Iface handler = HBaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, conf, null);
 
       ByteBuffer tTableName = asByteBuffer(tableName.getNameAsString());
 

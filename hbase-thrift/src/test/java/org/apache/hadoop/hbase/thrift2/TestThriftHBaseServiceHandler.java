@@ -81,7 +81,7 @@ import org.apache.hadoop.hbase.testclassification.ClientTests;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.thrift.ErrorThrowingGetObserver;
 import org.apache.hadoop.hbase.thrift.HBaseThriftTestingUtility;
-import org.apache.hadoop.hbase.thrift.HbaseHandlerMetricsProxy;
+import org.apache.hadoop.hbase.thrift.HBaseHandlerMetricsProxy;
 import org.apache.hadoop.hbase.thrift.ThriftMetrics;
 import org.apache.hadoop.hbase.thrift.ThriftMetrics.ThriftServerType;
 import org.apache.hadoop.hbase.thrift2.generated.TAppend;
@@ -1257,8 +1257,8 @@ public class TestThriftHBaseServiceHandler {
     ThriftMetrics metrics = getMetrics(conf);
     ThriftHBaseServiceHandler hbaseHandler = createHandler();
     THBaseService.Iface handler =
-        HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics,  conf);
-    byte[] rowName = Bytes.toBytes("testMetrics");
+        HBaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, conf, null);
+    byte[] rowName = "testMetrics".getBytes();
     ByteBuffer table = wrap(tableAname);
 
     TGet get = new TGet(wrap(rowName));
@@ -1300,7 +1300,7 @@ public class TestThriftHBaseServiceHandler {
     ThriftHBaseServiceHandler hbaseHandler = createHandler();
     ThriftMetrics metrics = getMetrics(UTIL.getConfiguration());
     THBaseService.Iface handler =
-        HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, null);
+        HBaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, null, null);
     ByteBuffer tTableName = wrap(tableName.getName());
 
     // check metrics increment with a successful get
@@ -1374,7 +1374,7 @@ public class TestThriftHBaseServiceHandler {
       ThriftHBaseServiceHandler hbaseHandler = createHandler();
       ThriftMetrics metrics = getMetrics(UTIL.getConfiguration());
       THBaseService.Iface handler =
-          HbaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, null);
+          HBaseHandlerMetricsProxy.newInstance(hbaseHandler, metrics, null, null);
       ByteBuffer tTableName = wrap(tableName.getName());
 
       // check metrics latency with a successful get

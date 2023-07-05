@@ -294,22 +294,20 @@ public class TBoundedThreadPoolServer extends TServer {
         // we check stopped_ first to make sure we're not supposed to be shutting
         // down. this is necessary for graceful shutdown.
         ServerContext sc = null;
-        while (true) {
-          if (stopped) {
-            break;
+        TServerEventHandler handler = getEventHandler();
+        if (handler != null) {
+          sc = handler.createContext(inputProtocol, outputProtocol);
+          if (handler instanceof ThriftAuditEventHandler) {
+            ((ThriftAuditEventHandler) handler).setIpPort(client);
           }
-          TServerEventHandler handler = getEventHandler();
-          if (handler != null) {
-            sc = handler.createContext(inputProtocol, outputProtocol);
-            // We need the client transport to get the client ip:port.
-            if (handler instanceof ThriftAuditEventHandler) {
-              ((ThriftAuditEventHandler) handler).extractAddressFromTransport(client);
-            }
-          }
+        }
+
+        while (!stopped) {
           processor.process(inputProtocol, outputProtocol);
-          if (handler != null) {
-            handler.deleteContext(sc, inputProtocol, outputProtocol);
-          }
+        }
+
+        if (handler != null) {
+          handler.deleteContext(sc, inputProtocol, outputProtocol);
         }
       } catch (TTransportException ttx) {
         // Assume the client died and continue silently

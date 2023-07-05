@@ -19,8 +19,6 @@
 package org.apache.hadoop.hbase.thrift.audit;
 
 import java.net.InetSocketAddress;
-import org.apache.hadoop.hbase.thrift.HBaseServiceHandler;
-import org.apache.hadoop.hbase.thrift.audit.ThriftAuditLogSyncer.ThriftConnectionInfo;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.server.ServerContext;
 import org.apache.thrift.server.TServerEventHandler;
@@ -35,15 +33,9 @@ public class ThriftAuditEventHandler implements TServerEventHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ThriftAuditEventHandler.class);
 
-  private final ThreadLocal<ThriftConnectionInfo> connectionInfo = new ThreadLocal<>();
-
-  private final HBaseServiceHandler hbaseServiceHandler;
-
   private final ThriftAuditLogSyncer auditLogSyncer;
 
-  public ThriftAuditEventHandler(HBaseServiceHandler hbaseServiceHandler,
-    ThriftAuditLogSyncer auditLogSyncer) {
-    this.hbaseServiceHandler = hbaseServiceHandler;
+  public ThriftAuditEventHandler(ThriftAuditLogSyncer auditLogSyncer) {
     this.auditLogSyncer = auditLogSyncer;
   }
 
@@ -60,16 +52,16 @@ public class ThriftAuditEventHandler implements TServerEventHandler {
    */
   @Override
   public ServerContext createContext(TProtocol tProtocol, TProtocol tProtocol1) {
-    TTransport transport = tProtocol.getTransport();
-    ThriftConnectionInfo info = new ThriftConnectionInfo();
-    info.setStartTime(System.currentTimeMillis());
-
-    if (transport instanceof TSocket) {
-      info.setRemoteAddress(
-        (InetSocketAddress) ((TSocket) transport).getSocket().getRemoteSocketAddress());
-    }
-    connectionInfo.set(info);
     return null;
+  }
+
+  public void setIpPort(TTransport transport) {
+    // We set the ip:port of the client socket here.
+    if (transport instanceof TSocket) {
+      InetSocketAddress address =
+        (InetSocketAddress) ((TSocket) transport).getSocket().getRemoteSocketAddress();
+      auditLogSyncer.setIpPort(address.getHostString() + ":" + address.getPort());
+    }
   }
 
   /**
@@ -78,21 +70,7 @@ public class ThriftAuditEventHandler implements TServerEventHandler {
   @Override
   public void deleteContext(ServerContext serverContext, TProtocol tProtocol,
     TProtocol tProtocol1) {
-    ThriftConnectionInfo info = connectionInfo.get();
-    if (info != null) {
-      info.setEffectiveUser(this.hbaseServiceHandler.getEffectiveUser());
-      info.setEndTime(System.currentTimeMillis());
 
-      auditLogSyncer.logConnection(info);
-    }
-  }
-
-  public void extractAddressFromTransport(TTransport transport) {
-    if (transport instanceof TSocket) {
-      ThriftConnectionInfo info = connectionInfo.get();
-      info.setRemoteAddress(
-        (InetSocketAddress) ((TSocket) transport).getSocket().getRemoteSocketAddress());
-    }
   }
 
   /**

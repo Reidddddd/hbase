@@ -21,7 +21,6 @@ package org.apache.hadoop.hbase.thrift2;
 import static org.apache.hadoop.hbase.thrift.Constants.READONLY_OPTION;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_READONLY_ENABLED;
 import static org.apache.hadoop.hbase.thrift.Constants.THRIFT_READONLY_ENABLED_DEFAULT;
-
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -29,7 +28,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.thrift.HBaseServiceHandler;
-import org.apache.hadoop.hbase.thrift.HbaseHandlerMetricsProxy;
+import org.apache.hadoop.hbase.thrift.HBaseHandlerMetricsProxy;
 import org.apache.hadoop.hbase.thrift.ThriftMetrics;
 import org.apache.hadoop.hbase.thrift2.generated.THBaseService;
 import org.apache.hadoop.util.Shell;
@@ -85,8 +84,8 @@ public class ThriftServer extends org.apache.hadoop.hbase.thrift.ThriftServer {
 
   @Override
   protected TProcessor createProcessor() {
-    return new THBaseService.Processor<>(HbaseHandlerMetricsProxy
-        .newInstance((THBaseService.Iface) hbaseServiceHandler, metrics, conf));
+    return new THBaseService.Processor<>(HBaseHandlerMetricsProxy
+        .newInstance((THBaseService.Iface) hbaseServiceHandler, metrics, conf, auditLogSyncer));
   }
 
   @Override
