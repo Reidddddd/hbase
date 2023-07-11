@@ -1512,6 +1512,20 @@ public class HRegionServer extends HasThread implements
   public TableLockManager getTableLockManager() {
     return tableLockManager;
   }
+  
+  // Round the size with KB or MB.
+  // A trick here is that if the sizeInBytes is less than sizeUnit, we will round the size to 1
+  // instead of 0 if it is not 0, to avoid some schedulers think the region has no data. See
+  // HBASE-26340 for more details on why this is important.
+  private static int roundSize(long sizeInByte, int sizeUnit) {
+    if (sizeInByte == 0) {
+      return 0;
+    } else if (sizeInByte < sizeUnit) {
+      return 1;
+    } else {
+      return (int) Math.min(sizeInByte / sizeUnit, Integer.MAX_VALUE);
+    }
+  }
 
   /*
    * @param r Region to get RegionLoad for.
@@ -1526,35 +1540,40 @@ public class HRegionServer extends HasThread implements
     byte[] name = r.getRegionInfo().getRegionName();
     int stores = 0;
     int storefiles = 0;
-    int storeUncompressedSizeMB = 0;
-    int storefileSizeMB = 0;
-    long storefileSizeByte = 0L;
-    int memstoreSizeMB = (int) (r.getMemstoreSize() / 1024 / 1024);
-    int storefileIndexSizeMB = 0;
-    int rootIndexSizeKB = 0;
-    int totalStaticIndexSizeKB = 0;
-    int totalStaticBloomSizeKB = 0;
-    long totalCompactingKVs = 0;
-    long currentCompactedKVs = 0;
+    long storeUncompressedSize = 0L;
+    long storefileSize = 0L;
+    long storefileIndexSize = 0L;
+    long rootIndexSize = 0L;
+    long totalStaticIndexSize = 0L;
+    long totalStaticBloomSize = 0L;
+    long totalCompactingKVs = 0L;
+    long currentCompactedKVs = 0L;
     List<Store> storeList = r.getStores();
     stores += storeList.size();
     for (Store store : storeList) {
       storefiles += store.getStorefilesCount();
-      storefileSizeByte += store.getStorefilesSize();
-      storeUncompressedSizeMB += (int) (store.getStoreSizeUncompressed() / 1024 / 1024);
-      storefileIndexSizeMB += (int) (store.getStorefilesIndexSize() / 1024 / 1024);
+      storeUncompressedSize += store.getStoreSizeUncompressed();
+      storefileSize += store.getStorefilesSize();
+      storefileIndexSize += store.getStorefilesIndexSize();
       CompactionProgress progress = store.getCompactionProgress();
       if (progress != null) {
         totalCompactingKVs += progress.totalCompactingKVs;
         currentCompactedKVs += progress.currentCompactedKVs;
       }
-      rootIndexSizeKB += (int) (store.getStorefilesIndexSize() / 1024);
-      totalStaticIndexSizeKB += (int) (store.getTotalStaticIndexSize() / 1024);
-      totalStaticBloomSizeKB += (int) (store.getTotalStaticBloomSize() / 1024);
+      rootIndexSize += store.getStorefilesIndexSize();
+      totalStaticIndexSize += store.getTotalStaticIndexSize();
+      totalStaticBloomSize += store.getTotalStaticBloomSize();
     }
-    //HBASE-26340 Fix false "0" size under 1MB
-    storefileSizeMB = storefileSizeByte > 0 && storefileSizeByte <= 1024 * 1024
-      ? 1 : (int) Math.min(storefileSizeByte / 1024 / 1024, Integer.MAX_VALUE);
+    int unitMB = 1024 * 1024;
+    int unitKB = 1024;
+  
+    int memstoreSizeMB = roundSize(r.getMemstoreSize(), unitMB);
+    int storeUncompressedSizeMB = roundSize(storeUncompressedSize, unitMB);
+    int storefileSizeMB = roundSize(storefileSize, unitMB);
+    int storefileIndexSizeMB = roundSize(storefileIndexSize, unitMB);
+    int rootIndexSizeKB = roundSize(rootIndexSize, unitKB);
+    int totalStaticIndexSizeKB = roundSize(totalStaticIndexSize, unitKB);
+    int totalStaticBloomSizeKB = roundSize(totalStaticBloomSize, unitKB);
 
     float dataLocality =
         r.getHDFSBlocksDistribution().getBlockLocalityIndex(serverName.getHostname());
