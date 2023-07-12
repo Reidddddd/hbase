@@ -19,18 +19,15 @@
 package org.apache.hadoop.hbase.regionserver;
 
 import com.google.protobuf.Service;
-
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
-
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.executor.ExecutorService;
 import org.apache.hadoop.hbase.ipc.RpcServerInterface;
 import org.apache.hadoop.hbase.master.TableLockManager;
@@ -38,6 +35,8 @@ import org.apache.hadoop.hbase.protobuf.generated.RegionServerStatusProtos.Regio
 import org.apache.hadoop.hbase.quotas.RegionServerQuotaManager;
 import org.apache.hadoop.hbase.regionserver.throttle.ThroughputController;
 import org.apache.hadoop.hbase.wal.WAL;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -52,8 +51,14 @@ public interface RegionServerServices extends OnlineRegions, FavoredNodesForRegi
   boolean isStopping();
 
   /** @return the WAL for a particular region. Pass null for getting the
-   * default (common) WAL */
+   *   default (common) WAL
+   */
   WAL getWAL(HRegionInfo regionInfo) throws IOException;
+  
+  /** @return the List of WALs that are used by this server
+   *    Doesn't include the meta WAL
+   */
+  List<WAL> getWALs() throws IOException;
 
   /**
    * @return Implementation of {@link CompactionRequestor} or null.

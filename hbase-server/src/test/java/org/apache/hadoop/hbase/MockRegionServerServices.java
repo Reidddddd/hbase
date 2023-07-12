@@ -19,13 +19,13 @@ package org.apache.hadoop.hbase;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -240,6 +240,11 @@ public class MockRegionServerServices implements RegionServerServices {
   @Override
   public Leases getLeases() {
     return null;
+  }
+  
+  @Override
+  public List<WAL> getWALs() throws IOException {
+    return Collections.emptyList();
   }
 
   @Override
