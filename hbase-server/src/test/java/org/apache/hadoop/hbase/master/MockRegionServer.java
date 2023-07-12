@@ -24,6 +24,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -567,6 +568,11 @@ ClientProtos.ClientService.BlockingInterface, RegionServerServices {
   public Leases getLeases() {
     // TODO Auto-generated method stub
     return null;
+  }
+  
+  @Override
+  public List<WAL> getWALs() throws IOException {
+    return Collections.emptyList();
   }
 
   @Override

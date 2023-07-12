@@ -68,6 +68,11 @@ public class MockRegionServerServicesWithWALs implements RegionServerServices {
   public boolean isStopping() {
     return rss.isStopping();
   }
+  
+  @Override
+  public List<WAL> getWALs() throws IOException {
+    return provider.getWALs();
+  }
 
   @Override
   public WAL getWAL(HRegionInfo hri) throws IOException {
