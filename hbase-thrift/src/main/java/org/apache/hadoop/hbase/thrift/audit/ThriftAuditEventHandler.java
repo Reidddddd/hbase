@@ -56,11 +56,21 @@ public class ThriftAuditEventHandler implements TServerEventHandler {
   }
 
   public void setIpPort(TTransport transport) {
-    // We set the ip:port of the client socket here.
-    if (transport instanceof TSocket) {
-      InetSocketAddress address =
-        (InetSocketAddress) ((TSocket) transport).getSocket().getRemoteSocketAddress();
-      auditLogSyncer.setIpPort(address.getHostString() + ":" + address.getPort());
+    try {
+      // We set the ip:port of the client socket here.
+      if (transport instanceof TSocket) {
+        InetSocketAddress address =
+          (InetSocketAddress) ((TSocket) transport).getSocket().getRemoteSocketAddress();
+        if (address != null) {
+          auditLogSyncer.setIpPort(address.getHostString() + ":" + address.getPort());
+        }
+      }
+    } catch (Throwable t) {
+      // This will be noisy when there are plenty of requests on processing.
+      // So that turn the log level to debug.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Failed to acquire IP address with exception: ", t);
+      }
     }
   }
 
