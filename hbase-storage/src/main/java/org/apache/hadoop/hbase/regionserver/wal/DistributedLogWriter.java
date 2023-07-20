@@ -81,7 +81,7 @@ public class DistributedLogWriter extends AbstractProtobufLogWriter implements S
   public void sync() throws IOException {
     // Do nothing.
     try {
-      appendOnlyStreamWriter.flush();
+      appendOnlyStreamWriter.flush(false);
     } catch (Exception e) {
       throw new IOException("Failed sync with exception: ", e);
     }
