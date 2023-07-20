@@ -174,7 +174,7 @@ public class TestFSErrorsExposed {
    * removes the data from HDFS underneath it, and ensures that
    * errors are bubbled to the client.
    */
-  @Test(timeout=5 * 60 * 1000)
+  @Test
   public void testFullSystemBubblesFSErrors() throws Exception {
     // We won't have an error if the datanode is not there if we use short circuit
     //  it's a known 'feature'.
@@ -184,6 +184,8 @@ public class TestFSErrorsExposed {
       // Make it fail faster.
       util.getConfiguration().setInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER, 1);
       util.getConfiguration().setInt(HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD, 90000);
+      util.getConfiguration().setInt("hbase.lease.recovery.timeout", 10000);
+      util.getConfiguration().setInt("hbase.lease.recovery.dfs.timeout", 1000);
       util.startMiniCluster(1);
       TableName tableName = TableName.valueOf("table");
       byte[] fam = Bytes.toBytes("fam");
