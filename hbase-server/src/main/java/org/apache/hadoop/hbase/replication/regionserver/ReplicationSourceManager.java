@@ -21,7 +21,6 @@ package org.apache.hadoop.hbase.replication.regionserver;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +40,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -52,7 +50,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerCoprocessorHost;
 import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
@@ -67,6 +64,7 @@ import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.replication.ReplicationTracker;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This class is responsible to manage all the replication
@@ -107,7 +105,7 @@ public class ReplicationSourceManager implements ReplicationListener {
   private final Configuration conf;
   private final FileSystem fs;
   // The paths to the latest log of each wal group, for new coming peers
-  private Set<Path> latestPaths;
+  private final Set<Path> latestPaths;
   // Path to the wals directories
   private final Path logDir;
   // Path to the wal archive
@@ -124,14 +122,14 @@ public class ReplicationSourceManager implements ReplicationListener {
   /**
    * Creates a replication manager and sets the watch on all the other registered region servers
    * @param replicationQueues the interface for manipulating replication queues
-   * @param replicationPeers
-   * @param replicationTracker
+   * @param replicationPeers the interface for manipulating replication peers
+   * @param replicationTracker the interface for tracking replication events
    * @param conf the configuration to use
    * @param server the server for this region server
    * @param fs the file system to use
    * @param logDir the directory that contains all wal directories of live RSs
    * @param oldLogDir the directory where old logs are archived
-   * @param clusterId
+   * @param clusterId unique UUID for the cluster
    */
   public ReplicationSourceManager(final ReplicationQueues replicationQueues,
       final ReplicationPeers replicationPeers, final ReplicationTracker replicationTracker,
@@ -144,7 +142,7 @@ public class ReplicationSourceManager implements ReplicationListener {
     this.replicationPeers = replicationPeers;
     this.replicationTracker = replicationTracker;
     this.server = server;
-    this.walsById = new HashMap<String, Map<String, SortedSet<String>>>();
+    this.walsById = new ConcurrentHashMap<String, Map<String, SortedSet<String>>>();
     this.walsByIdRecoveredQueues = new ConcurrentHashMap<String, Map<String, SortedSet<String>>>();
     this.oldsources = new CopyOnWriteArrayList<ReplicationSourceInterface>();
     this.conf = conf;
@@ -180,7 +178,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    * wal it belongs to and will log, for this region server, the current
    * position. It will also clean old logs from the queue.
    * @param log Path to the log currently being replicated from
-   * replication status in zookeeper. It will also delete older entries.
+   *   replication status in zookeeper. It will also delete older entries.
    * @param id id of the replication queue
    * @param position current location in the log
    * @param queueRecovered indicates if this queue comes from another region server
@@ -221,7 +219,7 @@ public class ReplicationSourceManager implements ReplicationListener {
         }
       }
     }
- }
+  }
 
   private void cleanOldLogs(SortedSet<String> wals, String key, String id) {
     SortedSet<String> walSet = wals.headSet(key);
@@ -266,7 +264,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    * need to enqueue the latest log of each wal group and do replication
    * @param id the id of the peer cluster
    * @return the source that was created
-   * @throws IOException
+   * @throws IOException If unable to add source
    */
   protected ReplicationSourceInterface addSource(String id) throws IOException,
       ReplicationException {
@@ -275,30 +273,28 @@ public class ReplicationSourceManager implements ReplicationListener {
     ReplicationSourceInterface src =
         getReplicationSource(this.conf, this.fs, this, this.replicationQueues,
           this.replicationPeers, server, id, this.clusterId, peerConfig, peer);
-    synchronized (this.walsById) {
+    synchronized (latestPaths) {
       this.sources.add(src);
       Map<String, SortedSet<String>> walsByGroup = new HashMap<String, SortedSet<String>>();
       this.walsById.put(id, walsByGroup);
       // Add the latest wal to that source's queue
-      synchronized (latestPaths) {
-        if (this.latestPaths.size() > 0) {
-          for (Path logPath : latestPaths) {
-            String name = logPath.getName();
-            String walPrefix = DefaultWALProvider.getWALPrefixFromWALName(name);
-            SortedSet<String> logs = new TreeSet<String>();
-            logs.add(name);
-            walsByGroup.put(walPrefix, logs);
-            try {
-              this.replicationQueues.addLog(id, name);
-            } catch (ReplicationException e) {
-              String message =
-                  "Cannot add log to queue when creating a new source, queueId=" + id
-                      + ", filename=" + name;
-              server.stop(message);
-              throw e;
-            }
-            src.enqueueLog(logPath);
+      if (this.latestPaths.size() > 0) {
+        for (Path logPath : latestPaths) {
+          String name = logPath.getName();
+          String walPrefix = DefaultWALProvider.getWALPrefixFromWALName(name);
+          SortedSet<String> logs = new TreeSet<String>();
+          logs.add(name);
+          walsByGroup.put(walPrefix, logs);
+          try {
+            this.replicationQueues.addLog(id, name);
+          } catch (ReplicationException e) {
+            String message =
+                "Cannot add log to queue when creating a new source, queueId=" + id
+                    + ", filename=" + name;
+            server.stop(message);
+            throw e;
           }
+          src.enqueueLog(logPath);
         }
       }
     }
@@ -361,10 +357,10 @@ public class ReplicationSourceManager implements ReplicationListener {
   public List<ReplicationSourceInterface> getOldSources() {
     return this.oldsources;
   }
-
+  
   /**
    * Get the normal source for a given peer
-   * @param peerId
+   * @param peerId a short that identifies the cluster
    * @return the normal source for the give peer if it exists, otherwise null.
    */
   public ReplicationSourceInterface getSource(String peerId) {
@@ -380,11 +376,22 @@ public class ReplicationSourceManager implements ReplicationListener {
   List<String> getAllQueues() {
     return replicationQueues.getAllQueues();
   }
-
+  
   void preLogRoll(Path newLog) throws IOException {
-    recordLog(newLog);
-    String logName = newLog.getName();
+
+  }
+  
+  /**
+   * 1. Check and update the latestPaths and the walsById
+   * 2. Check and enqueue the given log to the correct source. If there's still no source for the
+   * group to which the given log belongs, create one
+   * @param logPath the log path to check and enqueue
+   * @throws IOException if unable to add log into replicationQueues
+   */
+  public void postLogRoll(Path logPath) throws IOException {
+    String logName = logPath.getName();
     String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(logName);
+    // update replication queues on ZK
     synchronized (latestPaths) {
       Iterator<Path> iterator = latestPaths.iterator();
       while (iterator.hasNext()) {
@@ -394,22 +401,7 @@ public class ReplicationSourceManager implements ReplicationListener {
           break;
         }
       }
-      this.latestPaths.add(newLog);
-    }
-  }
-
-  /**
-   * Check and enqueue the given log to the correct source. If there's still no source for the
-   * group to which the given log belongs, create one
-   * @param logPath the log path to check and enqueue
-   * @throws IOException
-   */
-  private void recordLog(Path logPath) throws IOException {
-    String logName = logPath.getName();
-    String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(logName);
-    // update replication queues on ZK
-    // synchronize on replicationPeers to avoid adding source for the to-be-removed peer
-    synchronized (replicationPeers) {
+      this.latestPaths.add(logPath);
       for (String id : replicationPeers.getPeerIds()) {
         try {
           this.replicationQueues.addLog(id, logName);
@@ -418,43 +410,39 @@ public class ReplicationSourceManager implements ReplicationListener {
               + " when creating a new source, queueId=" + id + ", filename=" + logName, e);
         }
       }
-    }
-    // update walsById map
-    synchronized (walsById) {
-      for (Map.Entry<String, Map<String, SortedSet<String>>> entry : this.walsById.entrySet()) {
-        String peerId = entry.getKey();
-        Map<String, SortedSet<String>> walsByPrefix = entry.getValue();
-        boolean existingPrefix = false;
-        for (Map.Entry<String, SortedSet<String>> walsEntry : walsByPrefix.entrySet()) {
-          SortedSet<String> wals = walsEntry.getValue();
-          if (this.sources.isEmpty()) {
-            // If there's no slaves, don't need to keep the old wals since
-            // we only consider the last one when a new slave comes in
-            wals.clear();
+      // update walsById map
+      synchronized (walsById) {
+        for (Map.Entry<String, Map<String, SortedSet<String>>> entry : this.walsById.entrySet()) {
+          String peerId = entry.getKey();
+          Map<String, SortedSet<String>> walsByPrefix = entry.getValue();
+          boolean existingPrefix = false;
+          for (Map.Entry<String, SortedSet<String>> walsEntry : walsByPrefix.entrySet()) {
+            SortedSet<String> wals = walsEntry.getValue();
+            if (this.sources.isEmpty()) {
+              // If there's no slaves, don't need to keep the old wals since
+              // we only consider the last one when a new slave comes in
+              wals.clear();
+            }
+            if (logPrefix.equals(walsEntry.getKey())) {
+              wals.add(logName);
+              existingPrefix = true;
+            }
           }
-          if (logPrefix.equals(walsEntry.getKey())) {
+          if (!existingPrefix) {
+            // The new log belongs to a new group, add it into this peer
+            LOG.debug("Start tracking logs for wal group " + logPrefix + " for peer " + peerId);
+            SortedSet<String> wals = new TreeSet<String>();
             wals.add(logName);
-            existingPrefix = true;
+            walsByPrefix.put(logPrefix, wals);
           }
         }
-        if (!existingPrefix) {
-          // The new log belongs to a new group, add it into this peer
-          LOG.debug("Start tracking logs for wal group " + logPrefix + " for peer " + peerId);
-          SortedSet<String> wals = new TreeSet<String>();
-          wals.add(logName);
-          walsByPrefix.put(logPrefix, wals);
-        }
+      }
+      for (ReplicationSourceInterface source : this.sources) {
+        source.enqueueLog(logPath);
       }
     }
   }
-
-  void postLogRoll(Path newLog) throws IOException {
-    // This only updates the sources we own, not the recovered ones
-    for (ReplicationSourceInterface source : this.sources) {
-      source.enqueueLog(newLog);
-    }
-  }
-
+  
   /**
    * Factory method to create a replication source
    * @param conf the configuration to use
@@ -463,7 +451,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    * @param server the server object for this region server
    * @param peerId the id of the peer cluster
    * @return the created source
-   * @throws IOException
+   * @throws IOException if unable to pass replication endpoint implementation
    */
   protected ReplicationSourceInterface getReplicationSource(final Configuration conf,
       final FileSystem fs, final ReplicationSourceManager manager,
@@ -519,19 +507,20 @@ public class ReplicationSourceManager implements ReplicationListener {
       clusterId, replicationEndpoint, metrics);
 
     // init replication endpoint
-    replicationEndpoint.init(new ReplicationEndpoint.Context(conf, replicationPeer.getConfiguration(),
-      fs, peerId, clusterId, replicationPeer, metrics, tableDescriptors, server));
+    replicationEndpoint.init(new ReplicationEndpoint.Context(
+        conf, replicationPeer.getConfiguration(), fs, peerId,
+        clusterId, replicationPeer, metrics, tableDescriptors, server));
 
     return src;
   }
-
+  
   /**
    * Transfer all the queues of the specified to this region server.
    * First it tries to grab a lock and if it works it will move the
    * znodes and finally will delete the old znodes.
    *
    * It creates one old source for any type of source of the old rs.
-   * @param rsZnode
+   * @param rsZnode region server znode
    */
   private void transferQueues(String rsZnode) {
     NodeFailoverWorker transfer =
@@ -600,8 +589,8 @@ public class ReplicationSourceManager implements ReplicationListener {
         + oldSourcesToDelete.size());
     // Now look for the one on this cluster
     List<ReplicationSourceInterface> srcToRemove = new ArrayList<ReplicationSourceInterface>();
-    // synchronize on replicationPeers to avoid adding source for the to-be-removed peer
-    synchronized (this.replicationPeers) {
+    // synchronize on latestPaths to avoid adding source for the to-be-removed peer
+    synchronized (this.latestPaths) {
       for (ReplicationSourceInterface src : this.sources) {
         if (id.equals(src.getPeerClusterId())) {
           srcToRemove.add(src);
@@ -658,9 +647,9 @@ public class ReplicationSourceManager implements ReplicationListener {
     private final ReplicationQueues rq;
     private final ReplicationPeers rp;
     private final UUID clusterId;
-
+  
     /**
-     * @param rsZnode
+     * @param rsZnode region server znode
      */
     public NodeFailoverWorker(String rsZnode) {
       this(rsZnode, replicationQueues, replicationPeers, ReplicationSourceManager.this.clusterId);
@@ -816,7 +805,9 @@ public class ReplicationSourceManager implements ReplicationListener {
    * Get the ReplicationPeers used by this ReplicationSourceManager
    * @return the ReplicationPeers used by this ReplicationSourceManager
    */
-  public ReplicationPeers getReplicationPeers() {return this.replicationPeers;}
+  public ReplicationPeers getReplicationPeers() {
+    return this.replicationPeers;
+  }
 
   /**
    * Get a string representation of all the sources' metrics
@@ -844,4 +835,11 @@ public class ReplicationSourceManager implements ReplicationListener {
   public void cleanUpHFileRefs(String peerId, List<String> files) {
     this.replicationQueues.removeHFileRefs(peerId, files);
   }
+  
+  @VisibleForTesting
+  public Set<Path> getLatestPaths() {
+    return this.latestPaths;
+  }
+  
+  
 }

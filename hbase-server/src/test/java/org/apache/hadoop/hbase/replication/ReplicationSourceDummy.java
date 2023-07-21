@@ -20,8 +20,9 @@ package org.apache.hadoop.hbase.replication;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-
+import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -29,8 +30,10 @@ import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.replication.regionserver.MetricsSource;
 import org.apache.hadoop.hbase.replication.regionserver.ReplicationSourceInterface;
+import org.apache.hadoop.hbase.replication.regionserver.ReplicationSourceLogQueue;
 import org.apache.hadoop.hbase.replication.regionserver.ReplicationSourceManager;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 
 /**
  * Source that does nothing at all, helpful to test ReplicationSourceManager
@@ -41,21 +44,31 @@ public class ReplicationSourceDummy implements ReplicationSourceInterface {
   String peerClusterId;
   Path currentPath;
   MetricsSource metrics;
+  ReplicationSourceLogQueue logQueue;
 
   @Override
   public void init(Configuration conf, FileSystem fs, ReplicationSourceManager manager,
       ReplicationQueues rq, ReplicationPeers rp, Stoppable stopper, String peerClusterId,
       UUID clusterId, ReplicationEndpoint replicationEndpoint, MetricsSource metrics)
           throws IOException {
-
     this.manager = manager;
     this.peerClusterId = peerClusterId;
     this.metrics = metrics;
+    this.logQueue = new ReplicationSourceLogQueue(conf, metrics);
   }
 
   @Override
   public void enqueueLog(Path log) {
     this.currentPath = log;
+    String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(log.getName());
+    PriorityBlockingQueue<Path> queue = getQueues().get(logPrefix);
+    if (queue == null) {
+      queue = new PriorityBlockingQueue<>();
+      queue.put(log);
+      getQueues().put(logPrefix, queue);
+    } else {
+      queue.put(log);
+    }
     metrics.incrSizeOfLogQueue();
   }
 
@@ -105,5 +118,10 @@ public class ReplicationSourceDummy implements ReplicationSourceInterface {
   @Override
   public MetricsSource getSourceMetrics() {
     return metrics;
+  }
+  
+  @Override
+  public Map<String, PriorityBlockingQueue<Path>> getQueues() {
+    return this.logQueue.getQueues();
   }
 }
