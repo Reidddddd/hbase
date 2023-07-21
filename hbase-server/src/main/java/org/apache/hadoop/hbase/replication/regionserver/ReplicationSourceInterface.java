@@ -20,9 +20,9 @@ package org.apache.hadoop.hbase.replication.regionserver;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-
-import org.apache.yetus.audience.InterfaceAudience;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -33,6 +33,7 @@ import org.apache.hadoop.hbase.replication.ReplicationException;
 import org.apache.hadoop.hbase.replication.ReplicationPeers;
 import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Interface that defines a replication source
@@ -126,5 +127,11 @@ public interface ReplicationSourceInterface {
    * @return The metrics for this source.
    */
   MetricsSource getSourceMetrics();
-
+  
+  /**
+   * Get the queues of the ReplicationSourceLogQueue belongs to the replication source.
+   *
+   * @return The queues of the ReplicationSourceLogQueue
+   */
+  Map<String, PriorityBlockingQueue<Path>> getQueues();
 }

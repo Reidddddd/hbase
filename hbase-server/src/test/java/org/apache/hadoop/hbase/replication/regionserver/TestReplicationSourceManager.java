@@ -83,6 +83,7 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALKey;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -280,6 +281,33 @@ public class TestReplicationSourceManager {
 
 
     // TODO Need a case with only 2 WALs and we only want to delete the first one
+  }
+  
+  
+  @Test
+  public void testPreLogRollBeforeAddSourceThenPostLogRoll() throws Exception {
+    Path path = new Path("test.12345");
+    String logPrefix = WALUtils.getWALPrefixFromWALName(path.getName());
+    String peer = "testPostLogRollPeer";
+    final ReplicationPeerConfig peerConfig =
+        new ReplicationPeerConfig().setClusterKey("localhost:1:/hbase");
+    try {
+      manager.preLogRoll(path);
+      addPeerAndWait(peer, peerConfig, true);
+      manager.postLogRoll(path);
+      int enqueueCount = 0;
+      for (Path loggedPath : manager.getSource(peer).getQueues().get(logPrefix)) {
+        if (loggedPath.equals(path)) {
+          enqueueCount++;
+        }
+      }
+      //Before SPDI-96053 the enqueueCount should be 2 because
+      //the path was enqueued twice in addSource and postLogRoll method the path
+      assertEquals(1, enqueueCount);
+    } finally {
+      removePeerAndWait(peer);
+      manager.getLatestPaths().remove(path);
+    }
   }
 
   @Test
@@ -518,7 +546,7 @@ public class TestReplicationSourceManager {
    * corresponding ReplicationSourceInterface correctly cleans up the corresponding
    * replication queue and ReplicationPeer.
    * See HBASE-16096.
-   * @throws Exception
+   * @throws Exception If unable to add or remove peer
    */
   @Test
   public void testPeerRemovalCleanup() throws Exception{
@@ -576,7 +604,7 @@ public class TestReplicationSourceManager {
       int globalLogQueueSizeInitial = globalSource.getSizeOfLogQueue();
 
       // Enqueue log and check if metrics updated
-      source.enqueueLog(new Path("abc"));
+      source.enqueueLog(new Path("test.abc"));
       assertEquals(1, source.getSourceMetrics().getSizeOfLogQueue());
       assertEquals(1 + globalLogQueueSizeInitial, globalSource.getSizeOfLogQueue());
 
@@ -594,13 +622,13 @@ public class TestReplicationSourceManager {
       removePeerAndWait(peerId);
     }
   }
-
+  
   /**
    * Add a peer and wait for it to initialize
-   * @param peerId
-   * @param peerConfig
+   * @param peerId peer cluster id to be added
+   * @param peerConfig configuration for the replication slave cluster
    * @param waitForSource Whether to wait for replication source to initialize
-   * @throws Exception
+   * @throws Exception If unable to add or remove peer
    */
   private void addPeerAndWait(final String peerId, final ReplicationPeerConfig peerConfig,
       final boolean waitForSource) throws Exception {
@@ -616,11 +644,11 @@ public class TestReplicationSourceManager {
       }
     });
   }
-
+  
   /**
    * Remove a peer and wait for it to get cleaned up
-   * @param peerId
-   * @throws Exception
+   * @param peerId peer cluster id to be removed
+   * @throws Exception If unable to remove peer
    */
   private void removePeerAndWait(final String peerId) throws Exception {
     final ReplicationPeers rp = manager.getReplicationPeers();

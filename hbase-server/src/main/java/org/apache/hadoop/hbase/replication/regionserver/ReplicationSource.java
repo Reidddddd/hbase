@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,7 +33,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -219,6 +217,7 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
   }
 
   @InterfaceAudience.Private
+  @Override
   public Map<String, PriorityBlockingQueue<Path>> getQueues() {
     return logQueue.getQueues();
   }
@@ -429,7 +428,9 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
   @VisibleForTesting
   public Path getCurrentPath() {
     for (ReplicationSourceShipperThread worker : workerThreads.values()) {
-      if (worker.getCurrentPath() != null) return worker.getCurrentPath();
+      if (worker.getCurrentPath() != null) {
+        return worker.getCurrentPath();
+      }
     }
     return null;
   }
