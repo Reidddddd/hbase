@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.replication;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -45,6 +46,7 @@ public class ReplicationSourceDummy implements ReplicationSourceInterface {
   Path currentPath;
   MetricsSource metrics;
   ReplicationSourceLogQueue logQueue;
+  Map<String, Long> lastPositions;
 
   @Override
   public void init(Configuration conf, FileSystem fs, ReplicationSourceManager manager,
@@ -55,6 +57,7 @@ public class ReplicationSourceDummy implements ReplicationSourceInterface {
     this.peerClusterId = peerClusterId;
     this.metrics = metrics;
     this.logQueue = new ReplicationSourceLogQueue(conf, metrics);
+    this.lastPositions =  new HashMap<>();
   }
 
   @Override
@@ -123,5 +126,14 @@ public class ReplicationSourceDummy implements ReplicationSourceInterface {
   @Override
   public Map<String, PriorityBlockingQueue<Path>> getQueues() {
     return this.logQueue.getQueues();
+  }
+  
+  @Override
+  public Map<String, Long> getLastPositions() {
+    return new HashMap<>(this.lastPositions);
+  }
+  
+  public void putPosition(String path, long position) {
+    this.lastPositions.put(path, position);
   }
 }
