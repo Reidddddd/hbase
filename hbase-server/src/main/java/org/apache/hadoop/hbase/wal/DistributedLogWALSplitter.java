@@ -393,7 +393,14 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     return splits;
   }
 
+  // This method is only invoked by ZKSplitLogManagerCoordination.
+  // Need to care about the lagName format if invoked by other method.
   public static void finishSplitLogs(String logName, Configuration conf) throws IOException {
+    // The logName starts with prefix wals/
+    // We need to remove it here to make log archived as expected.
+    if (logName.startsWith(ZKSplitLog.TASK_PREFIX)) {
+      logName = logName.substring(ZKSplitLog.TASK_PREFIX.length());
+    }
     Namespace walNamespace = null;
     Path walRoot = new Path("/");
     Path oldLogDir = new Path(HConstants.HREGION_OLDLOGDIR_NAME);

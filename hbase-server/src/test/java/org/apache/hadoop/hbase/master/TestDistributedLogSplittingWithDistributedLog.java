@@ -252,6 +252,16 @@ public class TestDistributedLogSplittingWithDistributedLog extends TestDistribut
       Threads.sleep(3000);
       List<String> logs = WALUtils.listLogsUnderPath(new Path("oldWALs"), namespace);
       assertTrue(logs.isEmpty());
+
+      // In a correctly finished splitting process, all splitting logs should be archived.
+      // If there is still log path with the splitting suffix, we fail the UT here.
+      List<String> currentLogs = WALUtils.listLogsUnderPath(new Path("/"), namespace);
+      for (String logPathStr : currentLogs) {
+        if (logPathStr.contains("-splitting")) {
+          fail("There are splitting logs not archived as expected.");
+        }
+      }
+
     } finally {
       if (ht != null) {
         ht.close();
