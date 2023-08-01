@@ -223,29 +223,31 @@ public class DistributedLogRecoveredEditsOutputSink extends AbstractLogRecovered
     Path regionEdits =
       WALSplitterUtil.getRegionSplitEditsPath4DistributedLog(entry, logInSplitting);
     String regionEditsStr = WALUtils.pathToDistributedLogName(regionEdits);
+    String logStreamName = DistributedLogAccessor.getDistributedLogStreamName(conf);
+    handleOldExistingLog(namespace, regionEditsStr, logStreamName);
 
-    if (namespace.logExists(regionEditsStr)) {
-      DistributedLogManager dlm = namespace.openLog(regionEditsStr);
-      LOG.warn("Found old edits log. It could be the "
-        + "result of a previous failed split attempt. Deleting " + regionEditsStr + ", length="
-        + dlm.getLastTxId());
-      try {
-        LOG.info("Delete existing log: " + regionEditsStr);
-        WALUtils.checkEndOfStream(dlm);
-        WALUtils.deleteLogsUnderPath(namespace, regionEditsStr,
-          DistributedLogAccessor.getDistributedLogStreamName(conf), true);
-      } catch (DLException e) {
-        LOG.warn("Failed delete of old " + regionEditsStr);
-      } finally {
-        dlm.close();
-      }
-    }
     Writer w = this.walSplitter.createWriter(regionEdits);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Creating writer path=" + regionEditsStr);
-    }
     LOG.info("Created writer for edits log: " + regionEdits);
     return new WriterAndPath(regionEdits, w, entry.getKey().getLogSeqNum());
+  }
+
+  void handleOldExistingLog(Namespace namespace, String regionEditsStr, String logStreamName)
+    throws IOException {
+    if (namespace.logExists(regionEditsStr)) {
+      try (DistributedLogManager dlm = namespace.openLog(regionEditsStr)) {
+        // If the log is empty, here will raise an EmptyLog exception if we getLastTxId directly.
+        long existingLen = dlm.getLogRecordCount() < 1 ? 0 : dlm.getLastTxId();
+        LOG.warn("Found old edits log. It could be the result of a previous failed split attempt."
+          + " Deleting " + regionEditsStr + ", length=" + existingLen);
+        if (existingLen != 0) {
+          // If the log is not empty, we check the end of stream. Otherwise, remove it directly.
+          WALUtils.checkEndOfStream(dlm);
+        }
+        WALUtils.deleteLogsUnderPath(namespace, regionEditsStr,logStreamName, true);
+      } catch (IOException e) {
+        LOG.warn("Failed delete of old " + regionEditsStr);
+      }
+    }
   }
 
   public void setLogInSplitting(String logInSplitting) {

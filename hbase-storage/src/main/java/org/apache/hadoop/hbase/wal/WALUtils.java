@@ -532,7 +532,7 @@ public class WALUtils {
 
   public static void checkEndOfStream(DistributedLogManager dlm) {
     try {
-      if (!dlm.isEndOfStreamMarked()) {
+      if (dlm.getLogRecordCount() > 0 && !dlm.isEndOfStreamMarked()) {
         LogWriter writer = dlm.openLogWriter();
         writer.markEndOfStream();
         writer.close();
