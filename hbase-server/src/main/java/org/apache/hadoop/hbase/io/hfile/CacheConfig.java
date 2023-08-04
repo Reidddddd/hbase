@@ -26,6 +26,7 @@ import java.lang.management.MemoryUsage;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.io.hfile.bucket.BufferedBucketCache;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -138,6 +139,12 @@ public class CacheConfig {
   private static final String EXTERNAL_BLOCKCACHE_CLASS_KEY="hbase.blockcache.external.class";
   private static final String DROP_BEHIND_CACHE_COMPACTION_KEY="hbase.hfile.drop.behind.compaction";
   private static final boolean DROP_BEHIND_CACHE_COMPACTION_DEFAULT = true;
+
+  /**
+   * Parameter to turn on bucketcache ramBuffer.
+   */
+  static final String RAM_BUFFER_ENABLE = "hbase.bucketcache.rambuffer.enable";
+  static final boolean RAM_BUFFER_ENABLE_DEFAULT = false;
 
   /**
    * @deprecated use {@link CacheConfig#BLOCKCACHE_BLOCKSIZE_KEY} instead.
@@ -669,9 +676,11 @@ public class CacheConfig {
         "hbase.bucketcache.ioengine.errors.tolerated.duration",
         BucketCache.DEFAULT_ERROR_TOLERATION_DURATION);
       // Bucket cache logs its stats on creation internal to the constructor.
-      bucketCache = new BucketCache(bucketCacheIOEngineName,
-        bucketCacheSize, blockSize, bucketSizes, writerThreads, writerQueueLen, persistentPath,
-        ioErrorsTolerationDuration, c);
+      bucketCache = c.getBoolean(RAM_BUFFER_ENABLE, RAM_BUFFER_ENABLE_DEFAULT) ?
+        new BufferedBucketCache(bucketCacheIOEngineName, bucketCacheSize, blockSize, bucketSizes,
+          writerThreads, writerQueueLen, persistentPath, ioErrorsTolerationDuration, c) :
+        new BucketCache(bucketCacheIOEngineName, bucketCacheSize, blockSize, bucketSizes,
+          writerThreads, writerQueueLen, persistentPath, ioErrorsTolerationDuration, c);
     } catch (IOException ioex) {
       LOG.error("Can't instantiate bucket cache", ioex); throw new RuntimeException(ioex);
     }
