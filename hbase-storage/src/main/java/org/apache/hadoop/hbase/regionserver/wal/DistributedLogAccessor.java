@@ -24,6 +24,7 @@ import dlshade.org.apache.distributedlog.DistributedLogConfiguration;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import dlshade.org.apache.distributedlog.api.namespace.NamespaceBuilder;
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.logging.Log;
@@ -47,68 +48,39 @@ public class DistributedLogAccessor implements Closeable {
   private static final String DEFAULT_DISTRIBUTED_LOG_ZK_QUORUM = "localhost:2181";
   private static final String DISTRIBUTED_LOG_ZNODE_PARENT = "distributedlog.znode.parent";
   private static final String DEFAULT_DISTRIBUTED_LOG_ZNODE_PARENT = "/messaging/WALs";
-  private static final String DISTRIBUTED_LOG_STREAM_NAME = "distributedlog.stream.name";
-  private static final String DEFAULT_DISTRIBUTED_LOG_STREAM_NAME = "logs";
-  private static final String DISTRIBUTED_LOG_WRITE_BUFFER_SIZE =
-    "distributedlog.write.buffer.size";
-  private static final int DEFAULT_DISTRIBUTED_LOG_WRITE_BUFFER_SIZE = 1024;
-  private static final String DISTRIBUTED_LOG_ZK_REQUEST_RATE = "distributedlog.zk.request.rate";
-  private static final int DEFAULT_DISTRIBUTED_ZK_REQUEST_RATE = 0;
-  private static final String DISTRIBUTED_LOG_IMMEDIATE_FLUSH = "distributedlog.immediate.flush";
-  private static final boolean DEFAULT_DISTRIBUTED_LOG_IMMEDIATE_FLUSH = false;
-  private static final String DISTRIBUTED_LOG_COMPRESSION_TYPE = "distributedlog.compression.type";
-  private static final String DEFAULT_DISTRIBUTED_LOG_COMPRESSION_TYPE = "none";
-  private static final String DISTRIBUTED_LOG_IMMEDIATE_FLUSH_INTERVAL =
-    "distributedlog.immediate.flush.interval";
-  private static final int DEFAULT_DISTRIBUTED_LOG_IMMEDIATE_FLUSH_INTERVAL = 0;
-  private static final String DISTRIBUTED_LOG_ASYNC_THROTTLE = "distributedlog.async.throttle";
-  private static final int DEFAULT_DISTRIBUTED_LOG_ASYNC_THROTTLE = 0;
+  private static final String DISTRIBUTED_LOG_CONF_FILE_PATH = "distributelog.conf.path";
+  private static final String DEFAULT_DISTRIBUTED_LOG_CONF_FILE_PATH = "./dlconfig";
 
   private final Configuration conf;
   private final String zkAddress;
   private final String zkRoot;
   private final DistributedLogConfiguration distributedLogConfiguration;
-  private final String streamName;
-  private final NamespaceBuilder namespaceBuilder;
   private final Namespace namespace;
 
   private DistributedLogAccessor(Configuration conf) throws Exception {
     this.conf = conf;
     this.zkAddress = conf.get(DISTRIBUTED_LOG_ZK_QUORUM, DEFAULT_DISTRIBUTED_LOG_ZK_QUORUM);
     this.zkRoot = conf.get(DISTRIBUTED_LOG_ZNODE_PARENT, DEFAULT_DISTRIBUTED_LOG_ZNODE_PARENT);
-    this.streamName = conf.get(DISTRIBUTED_LOG_STREAM_NAME, DEFAULT_DISTRIBUTED_LOG_STREAM_NAME);
+
     // Set distributed log conf properties.
     distributedLogConfiguration = new DistributedLogConfiguration();
-    distributedLogConfiguration.setCreateStreamIfNotExists(true);
-    distributedLogConfiguration.setUnpartitionedStreamName(streamName);
-    distributedLogConfiguration.addProperty("bkc.allowShadedLedgerManagerFactoryClass", true);
-    distributedLogConfiguration.addProperty("bkc.throttle",
-      conf.getInt(DISTRIBUTED_LOG_ASYNC_THROTTLE, DEFAULT_DISTRIBUTED_LOG_ASYNC_THROTTLE)
-    );
-    distributedLogConfiguration.setCompressionType(
-      conf.get(DISTRIBUTED_LOG_COMPRESSION_TYPE, DEFAULT_DISTRIBUTED_LOG_COMPRESSION_TYPE)
-    );
-    distributedLogConfiguration.setOutputBufferSize(
-      conf.getInt(DISTRIBUTED_LOG_WRITE_BUFFER_SIZE, DEFAULT_DISTRIBUTED_LOG_WRITE_BUFFER_SIZE)
-    );
-    distributedLogConfiguration.setZKRequestRateLimit(
-      conf.getInt(DISTRIBUTED_LOG_ZK_REQUEST_RATE, DEFAULT_DISTRIBUTED_ZK_REQUEST_RATE)
-    );
-    distributedLogConfiguration.setImmediateFlushEnabled(
-      conf.getBoolean(DISTRIBUTED_LOG_IMMEDIATE_FLUSH, DEFAULT_DISTRIBUTED_LOG_IMMEDIATE_FLUSH)
-    );
-    distributedLogConfiguration.setMinDelayBetweenImmediateFlushMs(
-      conf.getInt(DISTRIBUTED_LOG_IMMEDIATE_FLUSH_INTERVAL,
-        DEFAULT_DISTRIBUTED_LOG_IMMEDIATE_FLUSH_INTERVAL)
-    );
 
-    namespaceBuilder = NamespaceBuilder.newBuilder();
+    try {
+      distributedLogConfiguration.loadConf(
+        new File(conf.get(DISTRIBUTED_LOG_CONF_FILE_PATH, DEFAULT_DISTRIBUTED_LOG_CONF_FILE_PATH))
+          .toURI().toURL());
+    } catch (Exception e) {
+      LOG.warn("Failed load distributedlog configuration from local, use default properties");
+    }
+
+    NamespaceBuilder namespaceBuilder = NamespaceBuilder.newBuilder();
     namespaceBuilder.conf(distributedLogConfiguration);
     ensureZNodeExists(zkRoot);
     // Set URI
     URI uri = new URI("distributedlog-bk://" + zkAddress.replace(',', ';') + zkRoot);
     namespaceBuilder.uri(uri);
     namespace = namespaceBuilder.build();
+    LOG.info("Finished initializing namespace of distributed log: " + uri);
   }
 
   private void ensureZNodeExists(String zNode) throws Exception {
@@ -143,6 +115,13 @@ public class DistributedLogAccessor implements Closeable {
   }
 
   public static String getDistributedLogStreamName(Configuration conf) {
-    return conf.get(DISTRIBUTED_LOG_STREAM_NAME, DEFAULT_DISTRIBUTED_LOG_STREAM_NAME);
+    if (instance == null) {
+      try {
+        return getInstance(conf).distributedLogConfiguration.getUnpartitionedStreamName();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed access distributedlog with exception: ", e);
+      }
+    }
+    return instance.distributedLogConfiguration.getUnpartitionedStreamName();
   }
 }
