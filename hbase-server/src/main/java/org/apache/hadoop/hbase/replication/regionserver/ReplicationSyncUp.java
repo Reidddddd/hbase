@@ -17,14 +17,6 @@
  */
 package org.apache.hadoop.hbase.replication.regionserver;
 
-import com.google.protobuf.Service;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -36,33 +28,14 @@ import org.apache.hadoop.hbase.ChoreService;
 import org.apache.hadoop.hbase.CoordinatedStateManager;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HRegionInfo;
+import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
-import org.apache.hadoop.hbase.executor.ExecutorService;
-import org.apache.hadoop.hbase.ipc.RpcServerInterface;
-import org.apache.hadoop.hbase.master.TableLockManager;
-import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
-import org.apache.hadoop.hbase.protobuf.generated.RegionServerStatusProtos.RegionStateTransition.TransitionCode;
-import org.apache.hadoop.hbase.quotas.RegionServerQuotaManager;
-import org.apache.hadoop.hbase.regionserver.CompactionRequestor;
-import org.apache.hadoop.hbase.regionserver.FlushRequester;
-import org.apache.hadoop.hbase.regionserver.HeapMemoryManager;
-import org.apache.hadoop.hbase.regionserver.Leases;
-import org.apache.hadoop.hbase.regionserver.MetricsRegionServer;
-import org.apache.hadoop.hbase.regionserver.Region;
-import org.apache.hadoop.hbase.regionserver.RegionServerAccounting;
-import org.apache.hadoop.hbase.regionserver.RegionServerServices;
-import org.apache.hadoop.hbase.regionserver.ServerNonceManager;
-import org.apache.hadoop.hbase.regionserver.throttle.ThroughputController;
 import org.apache.hadoop.hbase.util.FSUtils;
-import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.zookeeper.KeeperException;
 
 /**
  * In a scenario of Replication based Disaster/Recovery, when hbase
@@ -93,9 +66,7 @@ public class ReplicationSyncUp extends Configured implements Tool {
    * @throws Exception
    */
   public static void main(String[] args) throws Exception {
-    if (conf == null) {
-      conf = HBaseConfiguration.create();
-    }
+    if (conf == null) conf = HBaseConfiguration.create();
     int ret = ToolRunner.run(conf, new ReplicationSyncUp(), args);
     System.exit(ret);
   }
@@ -129,7 +100,7 @@ public class ReplicationSyncUp extends Configured implements Tool {
     logDir = new Path(walRootDir, HConstants.HREGION_LOGDIR_NAME);
 
     System.out.println("Start Replication Server start");
-    replication = new Replication(new DummyRegionServerServices(zkw), fs, logDir, oldLogDir);
+    replication = new Replication(new DummyServer(zkw), fs, logDir, oldLogDir);
     manager = replication.getReplicationManager();
     manager.init();
 
@@ -149,250 +120,72 @@ public class ReplicationSyncUp extends Configured implements Tool {
 
     return (0);
   }
-  
-  static class DummyRegionServerServices implements RegionServerServices {
+
+  static class DummyServer implements Server {
     String hostname;
     ZooKeeperWatcher zkw;
-    
-    DummyRegionServerServices(ZooKeeperWatcher zkw) {
+
+    DummyServer(ZooKeeperWatcher zkw) {
       // an unique name in case the first run fails
       hostname = System.currentTimeMillis() + ".SyncUpTool.replication.org";
       this.zkw = zkw;
     }
-    
-    DummyRegionServerServices(String hostname) {
+
+    DummyServer(String hostname) {
       this.hostname = hostname;
     }
-    
+
     @Override
     public Configuration getConfiguration() {
       return conf;
     }
-    
+
     @Override
     public ZooKeeperWatcher getZooKeeper() {
       return zkw;
     }
-    
+
     @Override
     public CoordinatedStateManager getCoordinatedStateManager() {
       return null;
     }
-    
+
     @Override
     public MetaTableLocator getMetaTableLocator() {
       return null;
     }
-    
+
     @Override
     public ServerName getServerName() {
       return ServerName.valueOf(hostname, 1234, 1L);
     }
-    
+
     @Override
     public void abort(String why, Throwable e) {
     }
-    
+
     @Override
     public boolean isAborted() {
       return false;
     }
-    
+
     @Override
     public void stop(String why) {
     }
-    
+
     @Override
     public boolean isStopped() {
       return false;
     }
-    
+
     @Override
     public ClusterConnection getConnection() {
       return null;
     }
-    
+
     @Override
     public ChoreService getChoreService() {
       return null;
-    }
-    
-    @Override
-    public void updateRegionFavoredNodesMapping(
-        String encodedRegionName, List<HBaseProtos.ServerName> favoredNodes) {
-    
-    }
-    
-    @Override
-    public InetSocketAddress[] getFavoredNodesForRegion(String encodedRegionName) {
-      return new InetSocketAddress[0];
-    }
-    
-    @Override
-    public void addToOnlineRegions(Region r) {
-    
-    }
-    
-    @Override
-    public boolean removeFromOnlineRegions(Region r, ServerName destination) {
-      return false;
-    }
-    
-    @Override
-    public Region getFromOnlineRegions(String encodedRegionName) {
-      return null;
-    }
-    
-    @Override
-    public List<Region> getOnlineRegions(TableName tableName) throws IOException {
-      return null;
-    }
-    
-    @Override
-    public List<Region> getOnlineRegions() {
-      return null;
-    }
-    
-    @Override
-    public boolean isStopping() {
-      return false;
-    }
-    
-    @Override
-    public WAL getWAL(HRegionInfo regionInfo) throws IOException {
-      return null;
-    }
-  
-    @Override
-    public List<WAL> getWALs() throws IOException {
-      return Collections.emptyList();
-    }
-  
-    @Override
-    public CompactionRequestor getCompactionRequester() {
-      return null;
-    }
-    
-    @Override
-    public FlushRequester getFlushRequester() {
-      return null;
-    }
-    
-    @Override
-    public RegionServerAccounting getRegionServerAccounting() {
-      return null;
-    }
-    
-    @Override
-    public TableLockManager getTableLockManager() {
-      return null;
-    }
-    
-    @Override
-    public RegionServerQuotaManager getRegionServerQuotaManager() {
-      return null;
-    }
-    
-    @Override
-    public void postOpenDeployTasks(
-        PostOpenDeployContext context) throws KeeperException, IOException {
-    
-    }
-    
-    @Override
-    public void postOpenDeployTasks(Region r) throws KeeperException, IOException {
-    
-    }
-    
-    @Override
-    public boolean reportRegionStateTransition(RegionStateTransitionContext context) {
-      return false;
-    }
-    
-    @Override
-    public boolean reportRegionStateTransition(
-        TransitionCode code, long openSeqNum, HRegionInfo... hris) {
-      return false;
-    }
-    
-    @Override
-    public boolean reportRegionStateTransition(TransitionCode code, HRegionInfo... hris) {
-      return false;
-    }
-    
-    @Override
-    public RpcServerInterface getRpcServer() {
-      return null;
-    }
-    
-    @Override
-    public ConcurrentMap<byte[], Boolean> getRegionsInTransitionInRS() {
-      return null;
-    }
-    
-    @Override
-    public FileSystem getFileSystem() {
-      return null;
-    }
-    
-    @Override
-    public Leases getLeases() {
-      return null;
-    }
-    
-    @Override
-    public ExecutorService getExecutorService() {
-      return null;
-    }
-    
-    @Override
-    public Map<String, Region> getRecoveringRegions() {
-      return null;
-    }
-    
-    @Override
-    public ServerNonceManager getNonceManager() {
-      return null;
-    }
-    
-    @Override
-    public boolean registerService(Service service) {
-      return false;
-    }
-    
-    @Override
-    public HeapMemoryManager getHeapMemoryManager() {
-      return null;
-    }
-    
-    @Override
-    public double getCompactionPressure() {
-      return 0;
-    }
-    
-    @Override
-    public Set<TableName> getOnlineTables() {
-      return null;
-    }
-    
-    @Override
-    public ThroughputController getFlushThroughputController() {
-      return null;
-    }
-    
-    @Override
-    public double getFlushPressure() {
-      return 0;
-    }
-    
-    @Override
-    public MetricsRegionServer getMetrics() {
-      return null;
-    }
-    
-    @Override
-    public void unassign(byte[] regionName) throws IOException {
-    
     }
   }
 }

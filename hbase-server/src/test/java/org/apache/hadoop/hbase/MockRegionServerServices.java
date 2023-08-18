@@ -82,7 +82,7 @@ public class MockRegionServerServices implements RegionServerServices {
     this.conf = (zkw == null ? new Configuration() : zkw.getConfiguration());
   }
 
-  public MockRegionServerServices(){
+  MockRegionServerServices(){
     this(null, null);
   }
 

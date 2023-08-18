@@ -70,11 +70,6 @@ public interface ReplicationSourceInterface {
    * @return the current log
    */
   Path getCurrentPath();
-  
-  /**
-   * Get all the lastLoggedPath and lastLoggedPosition of this source
-   */
-  Map<String, Long> getLastPositions();
 
   /**
    * Start the replication

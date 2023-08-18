@@ -18,9 +18,8 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 
 /**
  * A source for a replication stream has to expose this service.
@@ -34,11 +33,4 @@ public interface ReplicationSourceService extends ReplicationService {
    * observe log rolls and log archival events.
    */
   WALActionsListener getWALActionsListener();
-  
-  /**
-   * Check and mark the replication source with specific table as need to removed
-   * when all the related region is offline.
-   * @param tableName tableName
-   */
-  void markReplicationSourceAsNeedRemove(TableName tableName);
 }

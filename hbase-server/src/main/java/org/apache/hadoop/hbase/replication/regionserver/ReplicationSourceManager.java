@@ -52,7 +52,6 @@ import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerCoprocessorHost;
-import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
 import org.apache.hadoop.hbase.replication.ReplicationException;
 import org.apache.hadoop.hbase.replication.ReplicationListener;
@@ -96,8 +95,8 @@ public class ReplicationSourceManager implements ReplicationListener {
   private final ReplicationPeers replicationPeers;
   // UUID for this cluster
   private final UUID clusterId;
-  //the RegionServerServices for this region server
-  private final RegionServerServices rsServices;
+  // All about stopping
+  private final Server server;
   // All logs we are currently tracking
   // Index structure of the map is: peer_id->logPrefix/logGroup->logs
   private final Map<String, Map<String, SortedSet<String>>> walsById;
@@ -118,21 +117,15 @@ public class ReplicationSourceManager implements ReplicationListener {
 
   private final Random rand;
   private final boolean replicationForBulkLoadDataEnabled;
-  private final Map<String, Pair<CheckType, Map<String, Long>>> lastPositionsById;
-  private final ReplicationSourceCleanerChore replicationSourceCleanerChore;
-  
-  enum CheckType {
-    SKIP,
-    NOT_SKIP
-  }
-  
+
+
   /**
    * Creates a replication manager and sets the watch on all the other registered region servers
    * @param replicationQueues the interface for manipulating replication queues
    * @param replicationPeers the interface for manipulating replication peers
    * @param replicationTracker the interface for tracking replication events
    * @param conf the configuration to use
-   * @param rsServices the RegionServerServices for this region server
+   * @param server the server for this region server
    * @param fs the file system to use
    * @param logDir the directory that contains all wal directories of live RSs
    * @param oldLogDir the directory where old logs are archived
@@ -140,15 +133,15 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   public ReplicationSourceManager(final ReplicationQueues replicationQueues,
       final ReplicationPeers replicationPeers, final ReplicationTracker replicationTracker,
-      final Configuration conf, final RegionServerServices rsServices, final FileSystem fs,
-      final Path logDir, final Path oldLogDir, final UUID clusterId) {
+      final Configuration conf, final Server server, final FileSystem fs, final Path logDir,
+      final Path oldLogDir, final UUID clusterId) {
     //CopyOnWriteArrayList is thread-safe.
     //Generally, reading is more than modifying.
     this.sources = new CopyOnWriteArrayList<ReplicationSourceInterface>();
     this.replicationQueues = replicationQueues;
     this.replicationPeers = replicationPeers;
     this.replicationTracker = replicationTracker;
-    this.rsServices = rsServices;
+    this.server = server;
     this.walsById = new ConcurrentHashMap<String, Map<String, SortedSet<String>>>();
     this.walsByIdRecoveredQueues = new ConcurrentHashMap<String, Map<String, SortedSet<String>>>();
     this.oldsources = new CopyOnWriteArrayList<ReplicationSourceInterface>();
@@ -178,14 +171,6 @@ public class ReplicationSourceManager implements ReplicationListener {
     replicationForBulkLoadDataEnabled =
         conf.getBoolean(HConstants.REPLICATION_BULKLOAD_ENABLE_KEY,
           HConstants.REPLICATION_BULKLOAD_ENABLE_DEFAULT);
-    this.lastPositionsById = new HashMap<>();
-    if (this.rsServices.getChoreService() != null) {
-      this.replicationSourceCleanerChore =
-          new ReplicationSourceCleanerChore(this.rsServices, this.conf, this);
-      this.rsServices.getChoreService().scheduleChore(this.replicationSourceCleanerChore);
-    } else {
-      this.replicationSourceCleanerChore = null;
-    }
   }
 
   /**
@@ -251,7 +236,12 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   protected void init() throws IOException, ReplicationException {
     for (String id : this.replicationPeers.getPeerIds()) {
-      addPeerSource(id);
+      addSource(id);
+      if (replicationForBulkLoadDataEnabled) {
+        // Check if peer exists in hfile-refs queue, if not add it. This can happen in the case
+        // when a peer was added before replication for bulk loaded data was enabled.
+        this.replicationQueues.addPeerToHFileRefs(id);
+      }
     }
     List<String> currentReplicators = this.replicationQueues.getListOfReplicators();
     if (currentReplicators == null || currentReplicators.isEmpty()) {
@@ -268,15 +258,6 @@ public class ReplicationSourceManager implements ReplicationListener {
       }
     }
   }
-  
-  private void addPeerSource(String id) throws ReplicationException, IOException {
-    addSource(id);
-    if (replicationForBulkLoadDataEnabled) {
-      // Check if peer exists in hfile-refs queue, if not add it. This can happen in the case
-      // when a peer was added before replication for bulk loaded data was enabled.
-      this.replicationQueues.addPeerToHFileRefs(id);
-    }
-  }
 
   /**
    * Add sources for the given peer cluster on this region server. For the newly added peer, we only
@@ -291,7 +272,7 @@ public class ReplicationSourceManager implements ReplicationListener {
     ReplicationPeer peer = replicationPeers.getPeer(id);
     ReplicationSourceInterface src =
         getReplicationSource(this.conf, this.fs, this, this.replicationQueues,
-          this.replicationPeers, rsServices, id, this.clusterId, peerConfig, peer);
+          this.replicationPeers, server, id, this.clusterId, peerConfig, peer);
     synchronized (latestPaths) {
       this.sources.add(src);
       Map<String, SortedSet<String>> walsByGroup = new HashMap<String, SortedSet<String>>();
@@ -310,7 +291,7 @@ public class ReplicationSourceManager implements ReplicationListener {
             String message =
                 "Cannot add log to queue when creating a new source, queueId=" + id
                     + ", filename=" + name;
-            this.rsServices.stop(message);
+            server.stop(message);
             throw e;
           }
           src.enqueueLog(logPath);
@@ -337,9 +318,6 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   public void join() {
     this.executor.shutdown();
-    if(this.rsServices.getChoreService() != null) {
-      this.rsServices.getChoreService().cancelChore(this.replicationSourceCleanerChore);
-    }
     if (this.sources.size() == 0) {
       this.replicationQueues.removeAllQueues();
     }
@@ -415,7 +393,6 @@ public class ReplicationSourceManager implements ReplicationListener {
     String logPrefix = WALUtils.getWALPrefixFromWALName(logName);
     // update replication queues on ZK
     synchronized (latestPaths) {
-      //update the latestPaths
       Iterator<Path> iterator = latestPaths.iterator();
       while (iterator.hasNext()) {
         Path path = iterator.next();
@@ -425,46 +402,43 @@ public class ReplicationSourceManager implements ReplicationListener {
         }
       }
       this.latestPaths.add(logPath);
+      for (String id : replicationPeers.getPeerIds()) {
+        try {
+          this.replicationQueues.addLog(id, logName);
+        } catch (ReplicationException e) {
+          throw new IOException("Cannot add log to replication queue"
+              + " when creating a new source, queueId=" + id + ", filename=" + logName, e);
+        }
+      }
       // update walsById map
       synchronized (walsById) {
         for (Map.Entry<String, Map<String, SortedSet<String>>> entry : this.walsById.entrySet()) {
           String peerId = entry.getKey();
-          if (!this.lastPositionsById.containsKey(peerId)) {
-            Map<String, SortedSet<String>> walsByPrefix = entry.getValue();
-            boolean existingPrefix = false;
-            for (Map.Entry<String, SortedSet<String>> walsEntry : walsByPrefix.entrySet()) {
-              SortedSet<String> wals = walsEntry.getValue();
-              if (this.sources.isEmpty()) {
-                // If there's no slaves, don't need to keep the old wals since
-                // we only consider the last one when a new slave comes in
-                wals.clear();
-              }
-              if (logPrefix.equals(walsEntry.getKey())) {
-                wals.add(logName);
-                existingPrefix = true;
-              }
+          Map<String, SortedSet<String>> walsByPrefix = entry.getValue();
+          boolean existingPrefix = false;
+          for (Map.Entry<String, SortedSet<String>> walsEntry : walsByPrefix.entrySet()) {
+            SortedSet<String> wals = walsEntry.getValue();
+            if (this.sources.isEmpty()) {
+              // If there's no slaves, don't need to keep the old wals since
+              // we only consider the last one when a new slave comes in
+              wals.clear();
             }
-            if (!existingPrefix) {
-              // The new log belongs to a new group, add it into this peer
-              LOG.debug("Start tracking logs for wal group " + logPrefix + " for peer " + peerId);
-              SortedSet<String> wals = new TreeSet<String>();
+            if (logPrefix.equals(walsEntry.getKey())) {
               wals.add(logName);
-              walsByPrefix.put(logPrefix, wals);
+              existingPrefix = true;
             }
+          }
+          if (!existingPrefix) {
+            // The new log belongs to a new group, add it into this peer
+            LOG.debug("Start tracking logs for wal group " + logPrefix + " for peer " + peerId);
+            SortedSet<String> wals = new TreeSet<String>();
+            wals.add(logName);
+            walsByPrefix.put(logPrefix, wals);
           }
         }
       }
       for (ReplicationSourceInterface source : this.sources) {
-        String peerId = source.getPeerClusterZnode();
-        if (!this.lastPositionsById.containsKey(peerId)) {
-          source.enqueueLog(logPath);
-          try {
-            this.replicationQueues.addLog(peerId, logName);
-          } catch (ReplicationException e) {
-            throw new IOException("Cannot add log to replication queue"
-                + " when creating a new source, queueId=" + peerId + ", filename=" + logName, e);
-          }
-        }
+        source.enqueueLog(logPath);
       }
     }
   }
@@ -560,11 +534,6 @@ public class ReplicationSourceManager implements ReplicationListener {
       LOG.info("Cancelling the transfer of " + rsZnode + " because of " + ex.getMessage());
     }
   }
-  
-  @VisibleForTesting
-  Map<String, Pair<CheckType, Map<String, Long>>> getLastPositionsById() {
-    return this.lastPositionsById;
-  }
 
   /**
    * Clear the references to the specified old source
@@ -588,7 +557,6 @@ public class ReplicationSourceManager implements ReplicationListener {
     this.sources.remove(src);
     deleteSource(src.getPeerClusterZnode(), true);
     this.walsById.remove(src.getPeerClusterZnode());
-    this.lastPositionsById.remove(src.getPeerClusterZnode());
   }
 
   /**
@@ -658,7 +626,10 @@ public class ReplicationSourceManager implements ReplicationListener {
       try {
         boolean added = this.replicationPeers.peerAdded(id);
         if (added) {
-          addPeerSource(id);
+          addSource(id);
+          if (replicationForBulkLoadDataEnabled) {
+            this.replicationQueues.addPeerToHFileRefs(id);
+          }
         }
       } catch (Exception e) {
         LOG.error("Error while adding a new peer", e);
@@ -707,7 +678,7 @@ public class ReplicationSourceManager implements ReplicationListener {
         Thread.currentThread().interrupt();
       }
       // We try to lock that rs' queue directory
-      if (rsServices.isStopped()) {
+      if (server.isStopped()) {
         LOG.info("Not transferring queue since we are shutting down");
         return;
       }
@@ -761,7 +732,7 @@ public class ReplicationSourceManager implements ReplicationListener {
             replicationQueues.removeQueue(peerId);
             continue;
           }
-          if (rsServices instanceof ReplicationSyncUp.DummyRegionServerServices
+          if (server instanceof ReplicationSyncUp.DummyServer
               && peer.getPeerState().equals(PeerState.DISABLED)) {
             LOG.warn("Peer " + actualPeerId + " is disbaled. ReplicationSyncUp tool will skip "
                 + "replicating data to this peer.");
@@ -783,7 +754,7 @@ public class ReplicationSourceManager implements ReplicationListener {
           // enqueue sources
           ReplicationSourceInterface src =
               getReplicationSource(conf, fs, ReplicationSourceManager.this, this.rq, this.rp,
-                rsServices, peerId, this.clusterId, peerConfig, peer);
+                server, peerId, this.clusterId, peerConfig, peer);
           // synchronized on oldsources to avoid adding recovered source for the to-be-removed peer
           // see removePeer
           synchronized (oldsources) {
@@ -870,86 +841,5 @@ public class ReplicationSourceManager implements ReplicationListener {
     return this.latestPaths;
   }
   
-  /**
-   * Check the log position of the source that recorded the position in lastPositionsById
-   * if the lastPosition didn't change terminate the source and delete relative information
-   */
-  protected void cleanUnusedSource() {
-    String terminateMessage = "Replication source was removed by cleaner";
-    synchronized (this.latestPaths) {
-      List<String> toRemoveIds = new ArrayList<>();
-      this.lastPositionsById.forEach((id, value) -> {
-        ReplicationSourceInterface src = getSource(id);
-        //If the record is first added from the markReplicationSourceAsNeedRemove method
-        //should skip the first check lastPosition turn because the time gap may be too low
-        //and the lastPosition can not be changed at once
-        if (value.getFirst().equals(CheckType.NOT_SKIP)
-            && value.getSecond().equals(src.getLastPositions())) {
-          toRemoveIds.add(id);
-        } else {
-          this.lastPositionsById.put(id,
-              new Pair<>(CheckType.NOT_SKIP, src.getLastPositions()));
-        }
-      });
   
-      toRemoveIds.forEach(peerId -> {
-        ReplicationSourceInterface src = getSource(peerId);
-        LOG.info("Terminating the replication source peerId:" + peerId);
-        src.terminate(terminateMessage);
-        src.getSourceMetrics().clear();
-        this.sources.remove(src);
-        deleteSource(peerId, false);
-        this.walsById.remove(src.getPeerClusterZnode());
-        this.lastPositionsById.remove(peerId);
-        this.replicationQueues.removePeerFromHFileRefs(peerId);
-      });
-      
-      //Double check if there is unused replication source.normally will do nothing here.
-      sources.forEach(src -> {
-        String peerId = src.getPeerClusterZnode();
-        if (!this.lastPositionsById.containsKey(peerId)) {
-          if (!isPeerTableCFsEmpty(peerId) &&
-              this.replicationPeers.getTableCFs(peerId)
-                  .keySet()
-                  .stream()
-                  .noneMatch(rsServices.getOnlineTables()::contains)) {
-            this.lastPositionsById.put(peerId,
-                new Pair<>(CheckType.NOT_SKIP, src.getLastPositions()));
-          }
-        }
-      });
-    }
-  }
-  
-  public void markReplicationSourceAsNeedRemove(TableName tableName) {
-    synchronized (this.latestPaths) {
-      replicationPeers.getTablePeers(tableName).forEach(peerId -> {
-        if (!this.lastPositionsById.containsKey(peerId)) {
-          ReplicationSourceInterface src = getSource(peerId);
-          //If there are two tables in tableCFs and the other one is online it won't be marked
-          if (src != null &&
-              this.replicationPeers.getTableCFs(peerId)
-                  .keySet()
-                  .stream()
-                  .noneMatch(rsServices.getOnlineTables()::contains)) {
-            this.lastPositionsById.put(peerId,
-                new Pair<>(CheckType.SKIP, src.getLastPositions()));
-          }
-        }
-      });
-    }
-  }
-  
-  /**
-   * Check the tableCFs map for given peer
-   * @param peerId the peerId need to be checked
-   * @return return true if the tableCFs map is null or empty
-   */
-  private boolean isPeerTableCFsEmpty(String peerId) {
-    Map<TableName, List<String>> tableCFs = this.replicationPeers.getTableCFs(peerId);
-    if (tableCFs == null || tableCFs.isEmpty()) {
-      return true;
-    }
-    return false;
-  }
 }
