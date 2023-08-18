@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hbase;
 
-import com.google.protobuf.Service;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Collections;
@@ -55,6 +54,8 @@ import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.zookeeper.KeeperException;
 
+import com.google.protobuf.Service;
+
 /**
  * Basic mock region server services.  Should only be instantiated by HBaseTestingUtility.b
  */
@@ -82,7 +83,7 @@ public class MockRegionServerServices implements RegionServerServices {
     this.conf = (zkw == null ? new Configuration() : zkw.getConfiguration());
   }
 
-  public MockRegionServerServices(){
+  MockRegionServerServices(){
     this(null, null);
   }
 

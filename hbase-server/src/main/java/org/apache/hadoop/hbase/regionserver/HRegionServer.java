@@ -58,9 +58,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
@@ -177,7 +174,6 @@ import org.apache.hadoop.hbase.util.HasThread;
 import org.apache.hadoop.hbase.util.JSONBean;
 import org.apache.hadoop.hbase.util.JvmPauseMonitor;
 import org.apache.hadoop.hbase.util.MBeanUtil;
-import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
 import org.apache.hadoop.hbase.util.Sleeper;
 import org.apache.hadoop.hbase.util.Threads;
@@ -272,13 +268,6 @@ public class HRegionServer extends HasThread implements
    * encoded region name.  All access should be synchronized.
    */
   protected final Map<String, Region> onlineRegions = new ConcurrentHashMap<String, Region>();
-  
-  /**
-   * Map of tables currently being served by this region server. Key is the
-   * tableName of Online tables. When doing some changes on some tableName need lock it.
-   */
-  protected final Map<TableName, Pair<Lock, AtomicInteger>> onlineTableRegionCount =
-      new ConcurrentHashMap<>();
 
   /**
    * Map of encoded region names to the DataNode locations they should be hosted on
@@ -2581,12 +2570,6 @@ public class HRegionServer extends HasThread implements
 
   @Override
   public void addToOnlineRegions(Region region) {
-    TableName tableName = region.getRegionInfo().getTable();
-    this.onlineTableRegionCount.putIfAbsent(tableName,
-        new Pair<>(new ReentrantLock(), new AtomicInteger(0)));
-    this.onlineTableRegionCount.get(tableName).getFirst().lock();
-    this.onlineTableRegionCount.get(tableName).getSecond().incrementAndGet();
-    this.onlineTableRegionCount.get(tableName).getFirst().unlock();
     this.onlineRegions.put(region.getRegionInfo().getEncodedName(), region);
     configurationManager.registerObserver(region);
   }
@@ -2848,11 +2831,11 @@ public class HRegionServer extends HasThread implements
   @Override
   public Set<TableName> getOnlineTables() {
     Set<TableName> tables = new HashSet<TableName>();
-    this.onlineTableRegionCount.forEach((key, value) -> {
-      if (value.getSecond().get() > 0) {
-        tables.add(key);
+    synchronized (this.onlineRegions) {
+      for (Region region: this.onlineRegions.values()) {
+        tables.add(region.getTableDesc().getTableName());
       }
-    });
+    }
     return tables;
   }
 
@@ -3021,14 +3004,6 @@ public class HRegionServer extends HasThread implements
   @Override
   public boolean removeFromOnlineRegions(final Region r, ServerName destination) {
     Region toReturn = this.onlineRegions.remove(r.getRegionInfo().getEncodedName());
-    TableName tableName = r.getRegionInfo().getTable();
-    this.onlineTableRegionCount.get(tableName).getFirst().lock();
-    if (this.onlineTableRegionCount
-        .get(tableName).getSecond().decrementAndGet() == 0 &&
-        this.replicationSourceHandler != null) {
-      replicationSourceHandler.markReplicationSourceAsNeedRemove(tableName);
-    }
-    this.onlineTableRegionCount.get(tableName).getFirst().unlock();
     if (destination != null) {
       long closeSeqNum = r.getMaxFlushedSeqId();
       if (closeSeqNum == HConstants.NO_SEQNUM) {

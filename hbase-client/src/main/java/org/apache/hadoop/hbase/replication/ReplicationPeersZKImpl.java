@@ -27,12 +27,14 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Abortable;
 import org.apache.hadoop.hbase.CompoundConfiguration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
@@ -40,9 +42,8 @@ import org.apache.hadoop.hbase.replication.ReplicationPeer.PeerState;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
-import org.apache.hadoop.hbase.zookeeper.ZKUtil.ZKUtilOp;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
-import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.zookeeper.ZKUtil.ZKUtilOp;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -461,8 +462,8 @@ public class ReplicationPeersZKImpl extends ReplicationStateZKBase implements Re
 
   /**
    * Update the state znode of a peer cluster.
-   * @param id the peerId
-   * @param state peer state
+   * @param id
+   * @param state
    */
   private void changePeerState(String id, ZooKeeperProtos.ReplicationState.State state)
       throws ReplicationException {
@@ -490,7 +491,7 @@ public class ReplicationPeersZKImpl extends ReplicationStateZKBase implements Re
    * Helper method to connect to a peer
    * @param peerId peer's identifier
    * @return object representing the peer
-   * @throws ReplicationException if can not create peer
+   * @throws ReplicationException
    */
   private ReplicationPeerZKImpl createPeer(String peerId) throws ReplicationException {
     Pair<ReplicationPeerConfig, Configuration> pair = getPeerConf(peerId);
@@ -520,9 +521,7 @@ public class ReplicationPeersZKImpl extends ReplicationStateZKBase implements Re
   }
 
   private void checkQueuesDeleted(String peerId) throws ReplicationException {
-    if (queuesClient == null) {
-      return;
-    }
+    if (queuesClient == null) return;
     try {
       List<String> replicators = queuesClient.getListOfReplicators();
       if (replicators == null || replicators.isEmpty()) {
@@ -547,17 +546,5 @@ public class ReplicationPeersZKImpl extends ReplicationStateZKBase implements Re
     } catch (KeeperException e) {
       throw new ReplicationException("Could not check queues deleted with id=" + peerId, e);
     }
-  }
-  
-  @Override
-  public List<String> getTablePeers(TableName tableName) {
-    List<String> peersList = new ArrayList<String>();
-    peerClusters.forEach((key, value) -> {
-      Map<TableName, List<String>> tableCFs = value.getTableCFs();
-      if (tableCFs != null && tableCFs.containsKey(tableName)) {
-        peersList.add(key);
-      }
-    });
-    return peersList;
   }
 }

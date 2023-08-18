@@ -19,10 +19,12 @@
 package org.apache.hadoop.hbase.regionserver;
 
 import java.io.IOException;
+
+import org.apache.hadoop.hbase.Server;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.replication.regionserver.ReplicationLoad;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.replication.regionserver.ReplicationLoad;
-import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Gateway to Cluster Replication.
@@ -38,7 +40,7 @@ public interface ReplicationService {
    * @throws IOException
    */
   void initialize(
-    RegionServerServices rsServices, FileSystem fs, Path logdir, Path oldLogDir
+    Server rs, FileSystem fs, Path logdir, Path oldLogDir
   ) throws IOException;
 
   /**

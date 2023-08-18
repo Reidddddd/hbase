@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -435,16 +434,6 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
     }
     return null;
   }
-  
-  @Override
-  public Map<String, Long> getLastPositions() {
-    Map<String, Long> lastPositions = new HashMap<>();
-    for (ReplicationSourceShipperThread worker : workerThreads.values()) {
-      lastPositions.put(worker.getLastLoggedPath().getName(),
-          worker.getLastLoggedPosition());
-    }
-    return lastPositions;
-  }
 
   @VisibleForTesting
   public Path getLastLoggedPath() {
@@ -824,7 +813,7 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
         }
         // Path changed - try to find the right path.
         hasPathChanged = true;
-        if (stopper instanceof ReplicationSyncUp.DummyRegionServerServices) {
+        if (stopper instanceof ReplicationSyncUp.DummyServer) {
           // In the case of disaster/recovery, HMaster may be shutdown/crashed before flush data
           // from .logs to .oldlogs. Loop into .logs folders and check whether a match exists
           Path newPath = getReplSyncUpPath(path);

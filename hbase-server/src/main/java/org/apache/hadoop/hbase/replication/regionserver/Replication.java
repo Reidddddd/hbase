@@ -21,10 +21,9 @@ package org.apache.hadoop.hbase.replication.regionserver;
 import static org.apache.hadoop.hbase.HConstants.HBASE_MASTER_LOGCLEANER_PLUGINS;
 import static org.apache.hadoop.hbase.HConstants.REPLICATION_ENABLE_KEY;
 import static org.apache.hadoop.hbase.HConstants.REPLICATION_SCOPE_LOCAL;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -32,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -43,13 +43,14 @@ import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.master.cleaner.HFileCleaner;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.WALEntry;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.BulkLoadDescriptor;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.StoreDescriptor;
-import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.regionserver.ReplicationSinkService;
 import org.apache.hadoop.hbase.regionserver.ReplicationSourceService;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
@@ -65,8 +66,10 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.KeeperException;
+
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.Collection;
 
 /**
  * Gateway to Replication.  Used by {@link org.apache.hadoop.hbase.regionserver.HRegionServer}.
@@ -84,8 +87,8 @@ public class Replication extends WALActionsListener.Base implements
   private ReplicationTracker replicationTracker;
   private Configuration conf;
   private ReplicationSink replicationSink;
-  //the RegionServerServices for this region server
-  private RegionServerServices rsServices;
+  // Hosting server
+  private Server server;
   /** Statistics thread schedule pool */
   private ScheduledExecutorService scheduleThreadPool;
   private int statsThreadPeriod;
@@ -93,15 +96,15 @@ public class Replication extends WALActionsListener.Base implements
   private ReplicationLoad replicationLoad;
   /**
    * Instantiate the replication management (if rep is enabled).
-   * @param rsServices the RegionServerServices for this region server
+   * @param server Hosting server
    * @param fs handle to the filesystem
    * @param logDir
    * @param oldLogDir directory where logs are archived
    * @throws IOException
    */
-  public Replication(final RegionServerServices rsServices, final FileSystem fs,
-                     final Path logDir, final Path oldLogDir) throws IOException{
-    initialize(rsServices, fs, logDir, oldLogDir);
+  public Replication(final Server server, final FileSystem fs,
+      final Path logDir, final Path oldLogDir) throws IOException{
+    initialize(server, fs, logDir, oldLogDir);
   }
 
   /**
@@ -110,15 +113,15 @@ public class Replication extends WALActionsListener.Base implements
   public Replication() {
   }
 
-  public void initialize(final RegionServerServices rsServices, final FileSystem fs,
+  public void initialize(final Server server, final FileSystem fs,
       final Path logDir, final Path oldLogDir) throws IOException {
-    this.rsServices = rsServices;
-    this.conf = this.rsServices.getConfiguration();
+    this.server = server;
+    this.conf = this.server.getConfiguration();
     this.replication = isReplication(this.conf);
     this.replicationForBulkLoadData = isReplicationForBulkLoadDataEnabled(this.conf);
     this.scheduleThreadPool = Executors.newScheduledThreadPool(1,
       new ThreadFactoryBuilder()
-        .setNameFormat(rsServices.getServerName().toShortString() + "Replication Statistics #%d")
+        .setNameFormat(server.getServerName().toShortString() + "Replication Statistics #%d")
         .setDaemon(true)
         .build());
     if (this.replicationForBulkLoadData) {
@@ -132,29 +135,26 @@ public class Replication extends WALActionsListener.Base implements
     if (replication) {
       try {
         this.replicationQueues =
-            ReplicationFactory.getReplicationQueues(
-                this.rsServices.getZooKeeper(), this.conf, this.rsServices);
-        this.replicationQueues.init(this.rsServices.getServerName().toString());
+            ReplicationFactory.getReplicationQueues(server.getZooKeeper(), this.conf, this.server);
+        this.replicationQueues.init(this.server.getServerName().toString());
         this.replicationPeers =
-            ReplicationFactory.getReplicationPeers(
-                rsServices.getZooKeeper(), this.conf, this.rsServices);
+            ReplicationFactory.getReplicationPeers(server.getZooKeeper(), this.conf, this.server);
         this.replicationPeers.init();
         this.replicationTracker =
-            ReplicationFactory.getReplicationTracker(
-                this.rsServices.getZooKeeper(), this.replicationPeers,
-                this.conf, this.rsServices, this.rsServices);
+            ReplicationFactory.getReplicationTracker(server.getZooKeeper(), this.replicationPeers,
+              this.conf, this.server, this.server);
       } catch (ReplicationException e) {
         throw new IOException("Failed replication handler create", e);
       }
       UUID clusterId = null;
       try {
-        clusterId = ZKClusterId.getUUIDForCluster(this.rsServices.getZooKeeper());
+        clusterId = ZKClusterId.getUUIDForCluster(this.server.getZooKeeper());
       } catch (KeeperException ke) {
         throw new IOException("Could not read cluster id", ke);
       }
       this.replicationManager =
           new ReplicationSourceManager(replicationQueues, replicationPeers, replicationTracker,
-              conf, this.rsServices, fs, logDir, oldLogDir, clusterId);
+              conf, this.server, fs, logDir, oldLogDir, clusterId);
       this.statsThreadPeriod =
           this.conf.getInt("replication.stats.thread.period.seconds", 5 * 60);
       LOG.debug("ReplicationStatisticsThread " + this.statsThreadPeriod);
@@ -191,12 +191,6 @@ public class Replication extends WALActionsListener.Base implements
   public WALActionsListener getWALActionsListener() {
     return this;
   }
-  
-  @Override
-  public void markReplicationSourceAsNeedRemove(TableName tableName) {
-    this.replicationManager.markReplicationSourceAsNeedRemove(tableName);
-  }
-  
   /**
    * Stops replication service.
    */
@@ -251,7 +245,7 @@ public class Replication extends WALActionsListener.Base implements
       } catch (ReplicationException e) {
         throw new IOException(e);
       }
-      this.replicationSink = new ReplicationSink(this.conf, this.rsServices);
+      this.replicationSink = new ReplicationSink(this.conf, this.server);
       this.scheduleThreadPool.scheduleAtFixedRate(
         new ReplicationStatisticsThread(this.replicationSink, this.replicationManager),
         statsThreadPeriod, statsThreadPeriod, TimeUnit.SECONDS);
