@@ -89,6 +89,7 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    */
   public static final String UNKNOWN_SERVERNAME = "#unknown#";
 
+  private final String ip;
   private final String servername;
   private final String hostnameOnly;
   private final int port;
@@ -101,13 +102,20 @@ public class ServerName implements Comparable<ServerName>, Serializable {
   private byte [] bytes;
   public static final List<ServerName> EMPTY_SERVER_LIST = new ArrayList<ServerName>(0);
 
-  private ServerName(final String hostname, final int port, final long startcode) {
+  private ServerName(final String hostname, final int port, final long startcode, final String ip) {
     // Drop the domain is there is one; no need of it in a local cluster.  With it, we get long
     // unwieldy names.
     this.hostnameOnly = hostname;
     this.port = port;
     this.startcode = startcode;
     this.servername = getServerName(hostname, port, startcode);
+    this.ip = ip;
+  }
+
+  private ServerName(final String hostname, final int port, final long startcode) {
+    // Drop the domain is there is one; no need of it in a local cluster.  With it, we get long
+    // unwieldy names.
+    this(hostname, port, startcode, null);
   }
 
   /**
@@ -159,6 +167,11 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    */
   public static ServerName valueOf(final String hostname, final int port, final long startcode) {
     return new ServerName(hostname, port, startcode);
+  }
+
+  public static ServerName valueOf(final String hostname, final int port,
+    final long startcode, final String ip) {
+    return new ServerName(hostname, port, startcode, ip);
   }
 
   /**
@@ -225,6 +238,10 @@ public class ServerName implements Comparable<ServerName>, Serializable {
 
   public String getHostname() {
     return hostnameOnly;
+  }
+
+  public String getIP() {
+    return ip;
   }
 
   public int getPort() {

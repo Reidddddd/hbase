@@ -394,6 +394,9 @@ public final class ProtobufUtil {
     if (serverName.getStartcode() >= 0) {
       builder.setStartCode(serverName.getStartcode());
     }
+    if (serverName.getIP() != null) {
+      builder.setIp(serverName.getIP());
+    }
     return builder.build();
   }
 
@@ -404,17 +407,15 @@ public final class ProtobufUtil {
    * @return the converted ServerName
    */
   public static ServerName toServerName(final HBaseProtos.ServerName proto) {
-    if (proto == null) return null;
+    if (proto == null) {
+      return null;
+    }
     String hostName = proto.getHostName();
-    long startCode = -1;
-    int port = -1;
-    if (proto.hasPort()) {
-      port = proto.getPort();
-    }
-    if (proto.hasStartCode()) {
-      startCode = proto.getStartCode();
-    }
-    return ServerName.valueOf(hostName, port, startCode);
+    String ip = proto.hasIp() ? proto.getIp() : null;
+    long startCode = proto.hasStartCode() ? proto.getStartCode() : -1;
+    int port = proto.hasPort() ? proto.getPort() : -1;
+
+    return ServerName.valueOf(hostName, port, startCode, ip);
   }
   /**
    * Convert a list of protocol buffer ServerName to a list of ServerName
