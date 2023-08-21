@@ -15609,72 +15609,73 @@ public final class RSGroupAdminProtos {
   static {
     java.lang.String[] descriptorData = {
       "\n\022RSGroupAdmin.proto\022\010hbase.pb\032\013Table.pr" +
-      "oto\032\013HBase.proto\032\rRSGroup.proto\"4\n\032ListT" +
-      "ablesOfRSGroupRequest\022\026\n\016r_s_group_name\030" +
-      "\001 \002(\t\"F\n\033ListTablesOfRSGroupResponse\022\'\n\n" +
-      "table_name\030\001 \003(\0132\023.hbase.pb.TableName\"/\n" +
-      "\025GetRSGroupInfoRequest\022\026\n\016r_s_group_name" +
-      "\030\001 \002(\t\"G\n\026GetRSGroupInfoResponse\022-\n\016r_s_" +
-      "group_info\030\001 \001(\0132\025.hbase.pb.RSGroupInfo\"" +
-      "G\n\034GetRSGroupInfoOfTableRequest\022\'\n\ntable" +
-      "_name\030\001 \002(\0132\023.hbase.pb.TableName\"N\n\035GetR",
-      "SGroupInfoOfTableResponse\022-\n\016r_s_group_i" +
-      "nfo\030\001 \001(\0132\025.hbase.pb.RSGroupInfo\"Q\n\022Move" +
-      "ServersRequest\022\024\n\014target_group\030\001 \002(\t\022%\n\007" +
-      "servers\030\003 \003(\0132\024.hbase.pb.ServerName\"\025\n\023M" +
-      "oveServersResponse\"R\n\021MoveTablesRequest\022" +
-      "\024\n\014target_group\030\001 \002(\t\022\'\n\ntable_name\030\002 \003(" +
-      "\0132\023.hbase.pb.TableName\"\024\n\022MoveTablesResp" +
-      "onse\"+\n\021AddRSGroupRequest\022\026\n\016r_s_group_n" +
-      "ame\030\001 \002(\t\"\024\n\022AddRSGroupResponse\".\n\024Remov" +
-      "eRSGroupRequest\022\026\n\016r_s_group_name\030\001 \002(\t\"",
-      "\027\n\025RemoveRSGroupResponse\"/\n\025BalanceRSGro" +
-      "upRequest\022\026\n\016r_s_group_name\030\001 \002(\t\",\n\026Bal" +
-      "anceRSGroupResponse\022\022\n\nbalanceRan\030\001 \002(\010\"" +
-      "\031\n\027ListRSGroupInfosRequest\"I\n\030ListRSGrou" +
-      "pInfosResponse\022-\n\016r_s_group_info\030\001 \003(\0132\025" +
-      ".hbase.pb.RSGroupInfo\"E\n\035GetRSGroupInfoO" +
-      "fServerRequest\022$\n\006server\030\002 \002(\0132\024.hbase.p" +
-      "b.ServerName\"O\n\036GetRSGroupInfoOfServerRe" +
+      "oto\032\013HBase.proto\032\rRSGroup.proto\032\014Master." +
+      "proto\"4\n\032ListTablesOfRSGroupRequest\022\026\n\016r" +
+      "_s_group_name\030\001 \002(\t\"F\n\033ListTablesOfRSGro" +
+      "upResponse\022\'\n\ntable_name\030\001 \003(\0132\023.hbase.p" +
+      "b.TableName\"/\n\025GetRSGroupInfoRequest\022\026\n\016" +
+      "r_s_group_name\030\001 \002(\t\"G\n\026GetRSGroupInfoRe" +
       "sponse\022-\n\016r_s_group_info\030\001 \001(\0132\025.hbase.p" +
-      "b.RSGroupInfo\"\203\001\n\033MoveServersAndTablesRe",
-      "quest\022\024\n\014target_group\030\001 \002(\t\022%\n\007servers\030\002" +
-      " \003(\0132\024.hbase.pb.ServerName\022\'\n\ntable_name" +
-      "\030\003 \003(\0132\023.hbase.pb.TableName\"\036\n\034MoveServe" +
-      "rsAndTablesResponse\"=\n\024RemoveServersRequ" +
-      "est\022%\n\007servers\030\001 \003(\0132\024.hbase.pb.ServerNa" +
-      "me\"\027\n\025RemoveServersResponse\"J\n\024RenameRSG" +
-      "roupRequest\022\030\n\020old_rsgroup_name\030\001 \002(\t\022\030\n" +
-      "\020new_rsgroup_name\030\002 \002(\t\"\027\n\025RenameRSGroup" +
-      "Response2\254\010\n\023RSGroupAdminService\022S\n\016GetR" +
-      "SGroupInfo\022\037.hbase.pb.GetRSGroupInfoRequ",
-      "est\032 .hbase.pb.GetRSGroupInfoResponse\022h\n" +
-      "\025GetRSGroupInfoOfTable\022&.hbase.pb.GetRSG" +
-      "roupInfoOfTableRequest\032\'.hbase.pb.GetRSG" +
-      "roupInfoOfTableResponse\022k\n\026GetRSGroupInf" +
-      "oOfServer\022\'.hbase.pb.GetRSGroupInfoOfSer" +
-      "verRequest\032(.hbase.pb.GetRSGroupInfoOfSe" +
-      "rverResponse\022J\n\013MoveServers\022\034.hbase.pb.M" +
-      "oveServersRequest\032\035.hbase.pb.MoveServers" +
-      "Response\022G\n\nMoveTables\022\033.hbase.pb.MoveTa" +
-      "blesRequest\032\034.hbase.pb.MoveTablesRespons",
-      "e\022G\n\nAddRSGroup\022\033.hbase.pb.AddRSGroupReq" +
-      "uest\032\034.hbase.pb.AddRSGroupResponse\022P\n\rRe" +
-      "moveRSGroup\022\036.hbase.pb.RemoveRSGroupRequ" +
-      "est\032\037.hbase.pb.RemoveRSGroupResponse\022S\n\016" +
-      "BalanceRSGroup\022\037.hbase.pb.BalanceRSGroup" +
-      "Request\032 .hbase.pb.BalanceRSGroupRespons" +
-      "e\022Y\n\020ListRSGroupInfos\022!.hbase.pb.ListRSG" +
-      "roupInfosRequest\032\".hbase.pb.ListRSGroupI" +
-      "nfosResponse\022e\n\024MoveServersAndTables\022%.h" +
-      "base.pb.MoveServersAndTablesRequest\032&.hb",
-      "ase.pb.MoveServersAndTablesResponse\022P\n\rR" +
-      "emoveServers\022\036.hbase.pb.RemoveServersReq" +
-      "uest\032\037.hbase.pb.RemoveServersResponse\022P\n" +
-      "\rRenameRSGroup\022\036.hbase.pb.RenameRSGroupR" +
-      "equest\032\037.hbase.pb.RenameRSGroupResponseB" +
-      "H\n*org.apache.hadoop.hbase.protobuf.gene" +
-      "ratedB\022RSGroupAdminProtosH\001\210\001\001\240\001\001"
+      "b.RSGroupInfo\"G\n\034GetRSGroupInfoOfTableRe" +
+      "quest\022\'\n\ntable_name\030\001 \002(\0132\023.hbase.pb.Tab",
+      "leName\"N\n\035GetRSGroupInfoOfTableResponse\022" +
+      "-\n\016r_s_group_info\030\001 \001(\0132\025.hbase.pb.RSGro" +
+      "upInfo\"Q\n\022MoveServersRequest\022\024\n\014target_g" +
+      "roup\030\001 \002(\t\022%\n\007servers\030\003 \003(\0132\024.hbase.pb.S" +
+      "erverName\"\025\n\023MoveServersResponse\"R\n\021Move" +
+      "TablesRequest\022\024\n\014target_group\030\001 \002(\t\022\'\n\nt" +
+      "able_name\030\002 \003(\0132\023.hbase.pb.TableName\"\024\n\022" +
+      "MoveTablesResponse\"+\n\021AddRSGroupRequest\022" +
+      "\026\n\016r_s_group_name\030\001 \002(\t\"\024\n\022AddRSGroupRes" +
+      "ponse\".\n\024RemoveRSGroupRequest\022\026\n\016r_s_gro",
+      "up_name\030\001 \002(\t\"\027\n\025RemoveRSGroupResponse\"/" +
+      "\n\025BalanceRSGroupRequest\022\026\n\016r_s_group_nam" +
+      "e\030\001 \002(\t\",\n\026BalanceRSGroupResponse\022\022\n\nbal" +
+      "anceRan\030\001 \002(\010\"\031\n\027ListRSGroupInfosRequest" +
+      "\"I\n\030ListRSGroupInfosResponse\022-\n\016r_s_grou" +
+      "p_info\030\001 \003(\0132\025.hbase.pb.RSGroupInfo\"E\n\035G" +
+      "etRSGroupInfoOfServerRequest\022$\n\006server\030\002" +
+      " \002(\0132\024.hbase.pb.ServerName\"O\n\036GetRSGroup" +
+      "InfoOfServerResponse\022-\n\016r_s_group_info\030\001" +
+      " \001(\0132\025.hbase.pb.RSGroupInfo\"\203\001\n\033MoveServ",
+      "ersAndTablesRequest\022\024\n\014target_group\030\001 \002(" +
+      "\t\022%\n\007servers\030\002 \003(\0132\024.hbase.pb.ServerName" +
+      "\022\'\n\ntable_name\030\003 \003(\0132\023.hbase.pb.TableNam" +
+      "e\"\036\n\034MoveServersAndTablesResponse\"=\n\024Rem" +
+      "oveServersRequest\022%\n\007servers\030\001 \003(\0132\024.hba" +
+      "se.pb.ServerName\"\027\n\025RemoveServersRespons" +
+      "e\"J\n\024RenameRSGroupRequest\022\030\n\020old_rsgroup" +
+      "_name\030\001 \002(\t\022\030\n\020new_rsgroup_name\030\002 \002(\t\"\027\n" +
+      "\025RenameRSGroupResponse2\254\010\n\023RSGroupAdminS" +
+      "ervice\022S\n\016GetRSGroupInfo\022\037.hbase.pb.GetR",
+      "SGroupInfoRequest\032 .hbase.pb.GetRSGroupI" +
+      "nfoResponse\022h\n\025GetRSGroupInfoOfTable\022&.h" +
+      "base.pb.GetRSGroupInfoOfTableRequest\032\'.h" +
+      "base.pb.GetRSGroupInfoOfTableResponse\022k\n" +
+      "\026GetRSGroupInfoOfServer\022\'.hbase.pb.GetRS" +
+      "GroupInfoOfServerRequest\032(.hbase.pb.GetR" +
+      "SGroupInfoOfServerResponse\022J\n\013MoveServer" +
+      "s\022\034.hbase.pb.MoveServersRequest\032\035.hbase." +
+      "pb.MoveServersResponse\022G\n\nMoveTables\022\033.h" +
+      "base.pb.MoveTablesRequest\032\034.hbase.pb.Mov",
+      "eTablesResponse\022G\n\nAddRSGroup\022\033.hbase.pb" +
+      ".AddRSGroupRequest\032\034.hbase.pb.AddRSGroup" +
+      "Response\022P\n\rRemoveRSGroup\022\036.hbase.pb.Rem" +
+      "oveRSGroupRequest\032\037.hbase.pb.RemoveRSGro" +
+      "upResponse\022S\n\016BalanceRSGroup\022\037.hbase.pb." +
+      "BalanceRSGroupRequest\032 .hbase.pb.Balance" +
+      "RSGroupResponse\022Y\n\020ListRSGroupInfos\022!.hb" +
+      "ase.pb.ListRSGroupInfosRequest\032\".hbase.p" +
+      "b.ListRSGroupInfosResponse\022e\n\024MoveServer" +
+      "sAndTables\022%.hbase.pb.MoveServersAndTabl",
+      "esRequest\032&.hbase.pb.MoveServersAndTable" +
+      "sResponse\022P\n\rRemoveServers\022\036.hbase.pb.Re" +
+      "moveServersRequest\032\037.hbase.pb.RemoveServ" +
+      "ersResponse\022P\n\rRenameRSGroup\022\036.hbase.pb." +
+      "RenameRSGroupRequest\032\037.hbase.pb.RenameRS" +
+      "GroupResponseBH\n*org.apache.hadoop.hbase" +
+      ".protobuf.generatedB\022RSGroupAdminProtosH" +
+      "\001\210\001\001\240\001\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -15846,6 +15847,7 @@ public final class RSGroupAdminProtos {
           org.apache.hadoop.hbase.protobuf.generated.TableProtos.getDescriptor(),
           org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.getDescriptor(),
           org.apache.hadoop.hbase.protobuf.generated.RSGroupProtos.getDescriptor(),
+          org.apache.hadoop.hbase.protobuf.generated.MasterProtos.getDescriptor(),
         }, assigner);
   }
 
