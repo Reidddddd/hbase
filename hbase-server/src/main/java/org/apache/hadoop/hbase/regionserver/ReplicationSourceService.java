@@ -18,8 +18,9 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
-import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A source for a replication stream has to expose this service.
@@ -33,4 +34,16 @@ public interface ReplicationSourceService extends ReplicationService {
    * observe log rolls and log archival events.
    */
   WALActionsListener getWALActionsListener();
+  
+  /**
+   * Increase the online region count for the given table
+   * @param tableName the tableName of the online region
+   */
+  void increaseOnlineRegionCount(TableName tableName);
+  
+  /**
+   * Decrease the online region count for the given table
+   * @param tableName the tableName of the offline region
+   */
+  void decreaseOnlineRegionCount(TableName tableName);
 }

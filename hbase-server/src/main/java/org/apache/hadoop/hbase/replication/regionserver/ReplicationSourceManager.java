@@ -40,6 +40,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -86,8 +87,8 @@ import org.apache.yetus.audience.InterfaceAudience;
 public class ReplicationSourceManager implements ReplicationListener {
   private static final Log LOG =
       LogFactory.getLog(ReplicationSourceManager.class);
-  // List of all the sources that read this RS's logs
-  private final List<ReplicationSourceInterface> sources;
+  // Map of all the sources that read this RS's logs
+  private final Map<String, ReplicationSourceInterface> sources;
   // List of all the sources we got from died RSs
   private final List<ReplicationSourceInterface> oldsources;
   private final ReplicationQueues replicationQueues;
@@ -117,6 +118,22 @@ public class ReplicationSourceManager implements ReplicationListener {
 
   private final Random rand;
   private final boolean replicationForBulkLoadDataEnabled;
+  // Map to record the online region count in this server for the tables in this
+  private final Map<TableName, AtomicInteger> tableOnlineRegionCount;
+  // The paths that need to be consumed for the source
+  private final Map<String, Set<Path>> sourcesWaitingDrainPaths;
+  // Map to record all the peer replication table
+  private final Set<TableName> peerReplicationTables;
+  // Map to record all the peer consume status for all the sources
+  private final Map<String, PeerConsumeStatus> sourcesPeerConsumeStatus;
+  // Map to record all the metrics for all the sources
+  private final Map<String, MetricsSource> sourcesMetrics;
+  enum PeerConsumeStatus {
+    // The peer is consuming the enqueued logs
+    CONSUMING,
+    // All the related table is offline and the waiting for drain log is consumed
+    NOT_CONSUMING
+  }
 
 
   /**
@@ -135,9 +152,9 @@ public class ReplicationSourceManager implements ReplicationListener {
       final ReplicationPeers replicationPeers, final ReplicationTracker replicationTracker,
       final Configuration conf, final Server server, final FileSystem fs, final Path logDir,
       final Path oldLogDir, final UUID clusterId) {
-    //CopyOnWriteArrayList is thread-safe.
-    //Generally, reading is more than modifying.
-    this.sources = new CopyOnWriteArrayList<ReplicationSourceInterface>();
+    // ConcurrentHashMap is thread-safe.
+    // Generally, reading is more than modifying.
+    this.sources = new ConcurrentHashMap<String, ReplicationSourceInterface>();
     this.replicationQueues = replicationQueues;
     this.replicationPeers = replicationPeers;
     this.replicationTracker = replicationTracker;
@@ -171,6 +188,11 @@ public class ReplicationSourceManager implements ReplicationListener {
     replicationForBulkLoadDataEnabled =
         conf.getBoolean(HConstants.REPLICATION_BULKLOAD_ENABLE_KEY,
           HConstants.REPLICATION_BULKLOAD_ENABLE_DEFAULT);
+    this.tableOnlineRegionCount = new ConcurrentHashMap<>();
+    this.sourcesWaitingDrainPaths = new ConcurrentHashMap<String, Set<Path>>();
+    this.peerReplicationTables = Collections.synchronizedSet(new HashSet<TableName>());
+    this.sourcesPeerConsumeStatus = new ConcurrentHashMap<String, PeerConsumeStatus>();
+    this.sourcesMetrics = new ConcurrentHashMap<String, MetricsSource>();
   }
 
   /**
@@ -203,6 +225,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   public void cleanOldLogs(String key, String id, boolean queueRecovered) {
     String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(key);
+    boolean isLogDrained = false;
     if (queueRecovered) {
       Map<String, SortedSet<String>> walsForPeer = walsByIdRecoveredQueues.get(id);
       if(walsForPeer != null) {
@@ -216,7 +239,23 @@ public class ReplicationSourceManager implements ReplicationListener {
         SortedSet<String> wals = walsById.get(id).get(logPrefix);
         if (wals != null && !wals.first().equals(key)) {
           cleanOldLogs(wals, key, id);
+          Set<Path> waitingDrainPaths = this.sourcesWaitingDrainPaths.get(id);
+          if (waitingDrainPaths != null) {
+            for (Path path : waitingDrainPaths) {
+              String logName = path.getName();
+              if (logName.contains(logPrefix) && !wals.contains(logName)) {
+                waitingDrainPaths.remove(path);
+                break;
+              }
+            }
+            if (waitingDrainPaths.isEmpty()) {
+              isLogDrained = true;
+            }
+          }
         }
+      }
+      if (isLogDrained) {
+        this.executor.execute(() -> cleanWaitingDrainSource(id));
       }
     }
   }
@@ -236,11 +275,16 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   protected void init() throws IOException, ReplicationException {
     for (String id : this.replicationPeers.getPeerIds()) {
-      addSource(id);
-      if (replicationForBulkLoadDataEnabled) {
-        // Check if peer exists in hfile-refs queue, if not add it. This can happen in the case
-        // when a peer was added before replication for bulk loaded data was enabled.
-        this.replicationQueues.addPeerToHFileRefs(id);
+      MetricsSource metrics = new MetricsSource(id);
+      this.sourcesMetrics.put(id ,metrics);
+      // When init source manager only add source that the tableCFs is empty
+      Map<TableName, List<String>> tableCFs = this.replicationPeers.getTableCFs(id);
+      if (tableCFs == null || tableCFs.isEmpty()) {
+        this.sourcesPeerConsumeStatus.put(id, PeerConsumeStatus.CONSUMING);
+        addPeerSource(id, metrics);
+      } else {
+        this.sourcesPeerConsumeStatus.put(id, PeerConsumeStatus.NOT_CONSUMING);
+        this.peerReplicationTables.addAll(tableCFs.keySet());
       }
     }
     List<String> currentReplicators = this.replicationQueues.getListOfReplicators();
@@ -263,18 +307,19 @@ public class ReplicationSourceManager implements ReplicationListener {
    * Add sources for the given peer cluster on this region server. For the newly added peer, we only
    * need to enqueue the latest log of each wal group and do replication
    * @param id the id of the peer cluster
+   * @param metrics the metricsSource of the peer cluster
    * @return the source that was created
    * @throws IOException If unable to add source
    */
-  protected ReplicationSourceInterface addSource(String id) throws IOException,
-      ReplicationException {
+  protected ReplicationSourceInterface addSource(String id, MetricsSource metrics)
+      throws IOException, ReplicationException {
     ReplicationPeerConfig peerConfig = replicationPeers.getReplicationPeerConfig(id);
     ReplicationPeer peer = replicationPeers.getPeer(id);
     ReplicationSourceInterface src =
         getReplicationSource(this.conf, this.fs, this, this.replicationQueues,
-          this.replicationPeers, server, id, this.clusterId, peerConfig, peer);
+          this.replicationPeers, server, id, this.clusterId, peerConfig, peer, metrics);
     synchronized (latestPaths) {
-      this.sources.add(src);
+      this.sources.put(id, src);
       Map<String, SortedSet<String>> walsByGroup = new HashMap<String, SortedSet<String>>();
       this.walsById.put(id, walsByGroup);
       // Add the latest wal to that source's queue
@@ -321,7 +366,7 @@ public class ReplicationSourceManager implements ReplicationListener {
     if (this.sources.size() == 0) {
       this.replicationQueues.removeAllQueues();
     }
-    for (ReplicationSourceInterface source : this.sources) {
+    for (ReplicationSourceInterface source : this.sources.values()) {
       source.terminate("Region server is closing");
     }
   }
@@ -341,13 +386,21 @@ public class ReplicationSourceManager implements ReplicationListener {
   protected Map<String, Map<String, SortedSet<String>>> getWalsByIdRecoveredQueues() {
     return Collections.unmodifiableMap(walsByIdRecoveredQueues);
   }
+  
+  /**
+   * Get a list of all the replication source metrics of this rs
+   * @return list off all metrics of sources
+   */
+  public List<MetricsSource> getAllMetrics() {
+    return new ArrayList<>(this.sourcesMetrics.values());
+  }
 
   /**
    * Get a list of all the normal sources of this rs
    * @return lis of all sources
    */
   public List<ReplicationSourceInterface> getSources() {
-    return this.sources;
+    return new ArrayList<>(this.sources.values());
   }
 
   /**
@@ -364,12 +417,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    * @return the normal source for the give peer if it exists, otherwise null.
    */
   public ReplicationSourceInterface getSource(String peerId) {
-    for (ReplicationSourceInterface source: getSources()) {
-      if (source.getPeerClusterId().equals(peerId)) {
-        return source;
-      }
-    }
-    return null;
+    return this.sources.get(peerId);
   }
 
   @VisibleForTesting
@@ -393,6 +441,7 @@ public class ReplicationSourceManager implements ReplicationListener {
     String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(logName);
     // update replication queues on ZK
     synchronized (latestPaths) {
+      // update the latestPaths
       Iterator<Path> iterator = latestPaths.iterator();
       while (iterator.hasNext()) {
         Path path = iterator.next();
@@ -402,13 +451,16 @@ public class ReplicationSourceManager implements ReplicationListener {
         }
       }
       this.latestPaths.add(logPath);
-      for (String id : replicationPeers.getPeerIds()) {
+      // update the replicationQueues and enqueue the new log
+      for (ReplicationSourceInterface source : this.sources.values()) {
+        String peerId = source.getPeerClusterZnode();
         try {
-          this.replicationQueues.addLog(id, logName);
+          this.replicationQueues.addLog(peerId, logName);
         } catch (ReplicationException e) {
           throw new IOException("Cannot add log to replication queue"
-              + " when creating a new source, queueId=" + id + ", filename=" + logName, e);
+              + " when creating a new source, queueId=" + peerId + ", filename=" + logName, e);
         }
+        source.enqueueLog(logPath);
       }
       // update walsById map
       synchronized (walsById) {
@@ -437,9 +489,6 @@ public class ReplicationSourceManager implements ReplicationListener {
           }
         }
       }
-      for (ReplicationSourceInterface source : this.sources) {
-        source.enqueueLog(logPath);
-      }
     }
   }
   
@@ -457,8 +506,8 @@ public class ReplicationSourceManager implements ReplicationListener {
       final FileSystem fs, final ReplicationSourceManager manager,
       final ReplicationQueues replicationQueues, final ReplicationPeers replicationPeers,
       final Server server, final String peerId, final UUID clusterId,
-      final ReplicationPeerConfig peerConfig, final ReplicationPeer replicationPeer)
-      throws IOException {
+      final ReplicationPeerConfig peerConfig, final ReplicationPeer replicationPeer,
+      final MetricsSource metrics) throws IOException {
     RegionServerCoprocessorHost rsServerHost = null;
     TableDescriptors tableDescriptors = null;
     if (server instanceof HRegionServer) {
@@ -501,7 +550,6 @@ public class ReplicationSourceManager implements ReplicationListener {
       throw new IOException(e);
     }
 
-    MetricsSource metrics = new MetricsSource(peerId);
     // init replication source
     src.init(conf, fs, manager, replicationQueues, replicationPeers, server, peerId,
       clusterId, replicationEndpoint, metrics);
@@ -552,11 +600,31 @@ public class ReplicationSourceManager implements ReplicationListener {
    * @param src source to clear
    */
   public void closeQueue(ReplicationSourceInterface src) {
-    LOG.info("Done with the queue " + src.getPeerClusterZnode());
-    src.getSourceMetrics().clear();
-    this.sources.remove(src);
-    deleteSource(src.getPeerClusterZnode(), true);
-    this.walsById.remove(src.getPeerClusterZnode());
+    String id = src.getPeerClusterZnode();
+    this.sourcesPeerConsumeStatus.computeIfPresent(id , (peerId, status) -> {
+      this.sources.remove(peerId);
+      src.getSourceMetrics().clear();
+      clearPeerInformation(peerId);
+      this.replicationQueues.removePeerFromHFileRefs(peerId);
+      return null;
+    });
+  }
+  
+  private void clearPeerInformation(String peerId) {
+    this.sourcesMetrics.remove(peerId);
+    this.sourcesWaitingDrainPaths.remove(peerId);
+    this.walsById.remove(peerId);
+    Map<TableName, List<String>> tableCFs = this.replicationPeers.getTableCFs(peerId);
+    deleteSource(peerId, true);
+    if (tableCFs != null && !tableCFs.isEmpty()) {
+      Set<TableName> currentPeerReplicationTables =
+          this.replicationPeers.getAllPeerReplicationTables();
+      tableCFs.keySet().forEach(tableName -> {
+        if (!currentPeerReplicationTables.contains(tableName)) {
+          this.peerReplicationTables.remove(tableName);
+        }
+      });
+    }
   }
 
   /**
@@ -587,26 +655,16 @@ public class ReplicationSourceManager implements ReplicationListener {
     }
     LOG.info("Number of deleted recovered sources for " + id + ": "
         + oldSourcesToDelete.size());
-    // Now look for the one on this cluster
-    List<ReplicationSourceInterface> srcToRemove = new ArrayList<ReplicationSourceInterface>();
-    // synchronize on latestPaths to avoid adding source for the to-be-removed peer
-    synchronized (this.latestPaths) {
-      for (ReplicationSourceInterface src : this.sources) {
-        if (id.equals(src.getPeerClusterId())) {
-          srcToRemove.add(src);
-        }
+    this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+      ReplicationSourceInterface srcToRemove = getSource(peerId);
+      this.sources.remove(peerId);
+      if (srcToRemove != null) {
+        srcToRemove.terminate(terminateMessage);
+        srcToRemove.getSourceMetrics().clear();
       }
-      if (srcToRemove.isEmpty()) {
-        LOG.error("The peer we wanted to remove is missing a ReplicationSourceInterface. " +
-            "This could mean that ReplicationSourceInterface initialization failed for this peer " +
-            "and that replication on this peer may not be caught up. peerId=" + id);
-      }
-      for (ReplicationSourceInterface toRemove : srcToRemove) {
-        toRemove.terminate(terminateMessage);
-        closeQueue(toRemove);
-      }
-      deleteSource(id, true);
-    }
+      clearPeerInformation(peerId);
+      return null;
+    });
   }
 
   @Override
@@ -623,17 +681,33 @@ public class ReplicationSourceManager implements ReplicationListener {
   @Override
   public void peerListChanged(List<String> peerIds) {
     for (String id : peerIds) {
-      try {
-        boolean added = this.replicationPeers.peerAdded(id);
-        if (added) {
-          addSource(id);
-          if (replicationForBulkLoadDataEnabled) {
-            this.replicationQueues.addPeerToHFileRefs(id);
+      this.sourcesPeerConsumeStatus.computeIfAbsent(id, peerId -> {
+        MetricsSource metrics = new MetricsSource(peerId);
+        this.sourcesMetrics.put(peerId ,metrics);
+        try {
+          this.replicationPeers.peerAdded(peerId);
+          addPeerSource(peerId, metrics);
+          Map<TableName, List<String>> tableCFs = this.replicationPeers.getTableCFs(peerId);
+          if (tableCFs != null && !tableCFs.isEmpty()) {
+            this.peerReplicationTables.addAll(tableCFs.keySet());
+            // Check if new added peer's tables are online or not
+            if (tableCFs.keySet()
+                .stream()
+                .noneMatch(tableName -> {
+                  AtomicInteger onlineRegionCount = this.tableOnlineRegionCount.get(tableName);
+                  return onlineRegionCount != null && onlineRegionCount.get() > 0;
+                })
+            ) {
+              synchronized (this.latestPaths) {
+                this.sourcesWaitingDrainPaths.put(peerId, new HashSet<>(this.latestPaths));
+              }
+            }
           }
+        } catch (Exception e) {
+          LOG.error("Error while adding a new peer", e);
         }
-      } catch (Exception e) {
-        LOG.error("Error while adding a new peer", e);
-      }
+        return PeerConsumeStatus.CONSUMING;
+      });
     }
   }
 
@@ -752,9 +826,10 @@ public class ReplicationSourceManager implements ReplicationListener {
           }
 
           // enqueue sources
+          MetricsSource metrics = new MetricsSource(peerId);
           ReplicationSourceInterface src =
               getReplicationSource(conf, fs, ReplicationSourceManager.this, this.rq, this.rp,
-                server, peerId, this.clusterId, peerConfig, peer);
+                server, peerId, this.clusterId, peerConfig, peer, metrics);
           // synchronized on oldsources to avoid adding recovered source for the to-be-removed peer
           // see removePeer
           synchronized (oldsources) {
@@ -814,7 +889,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   public String getStats() {
     StringBuffer stats = new StringBuffer();
-    for (ReplicationSourceInterface source : sources) {
+    for (ReplicationSourceInterface source : this.sources.values()) {
       stats.append("Normal source for cluster " + source.getPeerClusterId() + ": ");
       stats.append(source.getStats() + "\n");
     }
@@ -827,7 +902,7 @@ public class ReplicationSourceManager implements ReplicationListener {
 
   public void addHFileRefs(TableName tableName, byte[] family, List<Pair<Path, Path>> pairs)
       throws ReplicationException {
-    for (ReplicationSourceInterface source : this.sources) {
+    for (ReplicationSourceInterface source : this.sources.values()) {
       source.addHFileRefs(tableName, family, pairs);
     }
   }
@@ -841,5 +916,120 @@ public class ReplicationSourceManager implements ReplicationListener {
     return this.latestPaths;
   }
   
+  private void addPeerSource(String id, MetricsSource metrics) throws ReplicationException,
+      IOException {
+    addSource(id, metrics);
+    if (replicationForBulkLoadDataEnabled) {
+      // Check if peer exists in hfile-refs queue, if not add it. This can happen in the case
+      // when a peer was added before replication for bulk loaded data was enabled.
+      this.replicationQueues.addPeerToHFileRefs(id);
+    }
+  }
   
+  public void increaseOnlineRegionCount(TableName tableName) {
+    this.tableOnlineRegionCount.compute(tableName, (table, onlineRegionCount) -> {
+      if (onlineRegionCount == null) {
+        return new AtomicInteger(1);
+      } else {
+        onlineRegionCount.incrementAndGet();
+        return onlineRegionCount;
+      }
+    });
+  }
+  
+  public void decreaseOnlineRegionCount(TableName tableName) {
+    this.tableOnlineRegionCount.computeIfPresent(tableName, (table, onlineRegionCount) -> {
+      if (onlineRegionCount.decrementAndGet() == 0) {
+        if (isPeerReplicationTable(table)) {
+          markReplicationSourceWaitingDrain(table);
+        }
+        return null;
+      }
+      return onlineRegionCount;
+    });
+  }
+  
+  /**
+   * Check and mark the replication source with specific table as waiting for logQueue drain
+   * when all the related region is offline.
+   * @param tableName tableName
+   */
+  private void markReplicationSourceWaitingDrain(TableName tableName) {
+    for (String id : this.replicationPeers.getTablePeers(tableName)) {
+      this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+        if (!this.sourcesWaitingDrainPaths.containsKey(peerId) &&
+            this.replicationPeers.getTableCFs(peerId)
+                .keySet()
+                .stream()
+                .noneMatch(table -> {
+                  AtomicInteger onlineRegionCount = this.tableOnlineRegionCount.get(table);
+                  return onlineRegionCount != null && onlineRegionCount.get() > 0;
+                })
+        ) {
+          synchronized (this.latestPaths) {
+            this.sourcesWaitingDrainPaths.put(peerId, new HashSet<>(this.latestPaths));
+          }
+        }
+        return status;
+      });
+    }
+  }
+  
+  /**
+   * Check given tableName is peer replication table
+   * @param tableName tableName
+   * @return true if the tableName is existing in the replcationTables in the sourceManager
+   */
+  private boolean isPeerReplicationTable(TableName tableName) {
+    return this.peerReplicationTables.contains(tableName);
+  }
+  
+  /**
+   * When all the waitingDrainPaths are consumed the source can be removed and
+   * become not consuming source
+   * @param id id of the waiting drain source
+   */
+  private void cleanWaitingDrainSource(String id) {
+    String terminateMessage = "Replication source " + id +
+        " has no online regions in this server and all the waiting drain paths is consumed";
+    this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+      Set<Path> waitingConsumePaths = this.sourcesWaitingDrainPaths.get(peerId);
+      if (waitingConsumePaths != null && waitingConsumePaths.isEmpty()) {
+        ReplicationSourceInterface source = getSource(peerId);
+        this.sources.remove(peerId);
+        source.terminate(terminateMessage);
+        this.walsById.remove(peerId);
+        this.sourcesWaitingDrainPaths.remove(peerId);
+        this.replicationQueues.removePeerFromHFileRefs(peerId);
+        deleteSource(peerId, false);
+        source.getSourceMetrics().clearSizeOfLogQueue();
+      }
+      return PeerConsumeStatus.NOT_CONSUMING;
+    });
+  }
+  
+  @VisibleForTesting
+  Set<TableName> getReplicationTables() {
+    return this.peerReplicationTables;
+  }
+  
+  @VisibleForTesting
+  Map<String, Set<Path>> getSourcesWaitingDrainPaths() {
+    return new HashMap<>(this.sourcesWaitingDrainPaths);
+  }
+  
+  @VisibleForTesting
+  Map<TableName, AtomicInteger> getTableOnlineRegionCount() {
+    return new HashMap<>(this.tableOnlineRegionCount);
+  }
+  
+  @VisibleForTesting
+  PeerConsumeStatus getSourcePeerConsumeStatus(String peerId) {
+    return this.sourcesPeerConsumeStatus.get(peerId);
+  }
+  
+  @VisibleForTesting
+  MetricsSource getSourceMetrics(String peerId) {
+    return this.sourcesMetrics.get(peerId);
+  }
 }

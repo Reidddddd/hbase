@@ -174,8 +174,9 @@ public class TestReplicationSourceManager {
         HConstants.HREGION_LOGDIR_NAME);
     replication = new Replication(new DummyServer(), fs, logDir, oldLogDir);
     manager = replication.getReplicationManager();
-
-    manager.addSource(slaveId);
+  
+    MetricsSource metrics = new MetricsSource(slaveId);
+    manager.addSource(slaveId, metrics);
 
     htd = new HTableDescriptor(test);
     HColumnDescriptor col = new HColumnDescriptor(f1);
@@ -301,8 +302,8 @@ public class TestReplicationSourceManager {
           enqueueCount++;
         }
       }
-      //Before SPDI-96053 the enqueueCount should be 2 because
-      //the path was enqueued twice in addSource and postLogRoll method the path
+      // Before SPDI-96053 the enqueueCount should be 2 because
+      // the path was enqueued twice in addSource and postLogRoll method the path
       assertEquals(1, enqueueCount);
     } finally {
       removePeerAndWait(peer);

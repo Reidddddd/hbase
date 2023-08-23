@@ -22,11 +22,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This provides an interface for maintaining a set of peer clusters. These peers are remote slave
@@ -165,4 +164,16 @@ public interface ReplicationPeers {
    * @throws ReplicationException
    */
   void updatePeerConfig(String id, ReplicationPeerConfig peerConfig) throws ReplicationException;
+  
+  /**
+   * Return the peerId list of the given table
+   * @param tableName the table of new online region
+   */
+  List<String> getTablePeers(TableName tableName);
+  
+  /**
+   * Get a set that contains all the peer's table
+   * @return a set that contains all the peer's table
+   */
+  Set<TableName> getAllPeerReplicationTables();
 }

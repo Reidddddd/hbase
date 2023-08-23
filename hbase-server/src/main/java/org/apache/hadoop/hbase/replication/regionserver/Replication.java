@@ -21,9 +21,10 @@ package org.apache.hadoop.hbase.replication.regionserver;
 import static org.apache.hadoop.hbase.HConstants.HBASE_MASTER_LOGCLEANER_PLUGINS;
 import static org.apache.hadoop.hbase.HConstants.REPLICATION_ENABLE_KEY;
 import static org.apache.hadoop.hbase.HConstants.REPLICATION_SCOPE_LOCAL;
-
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -31,7 +32,6 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -45,7 +45,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.master.cleaner.HFileCleaner;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.WALEntry;
@@ -66,10 +65,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.KeeperException;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.util.Collection;
 
 /**
  * Gateway to Replication.  Used by {@link org.apache.hadoop.hbase.regionserver.HRegionServer}.
@@ -434,13 +431,9 @@ public class Replication extends WALActionsListener.Base implements
   }
 
   private void buildReplicationLoad() {
-    List<MetricsSource> sourceMetricsList = new ArrayList<MetricsSource>();
-
     // get source
-    List<ReplicationSourceInterface> sources = this.replicationManager.getSources();
-    for (ReplicationSourceInterface source : sources) {
-      sourceMetricsList.add(source.getSourceMetrics());
-    }
+    List<MetricsSource> sourceMetricsList =
+        new ArrayList<MetricsSource>(this.replicationManager.getAllMetrics());
 
     // get old source
     List<ReplicationSourceInterface> oldSources = this.replicationManager.getOldSources();
@@ -453,5 +446,15 @@ public class Replication extends WALActionsListener.Base implements
     // get sink
     MetricsSink sinkMetrics = this.replicationSink.getSinkMetrics();
     this.replicationLoad.buildReplicationLoad(sourceMetricsList, sinkMetrics);
+  }
+  
+  @Override
+  public void increaseOnlineRegionCount(TableName tableName) {
+    this.replicationManager.increaseOnlineRegionCount(tableName);
+  }
+  
+  @Override
+  public void decreaseOnlineRegionCount(TableName tableName) {
+    this.replicationManager.decreaseOnlineRegionCount(tableName);
   }
 }

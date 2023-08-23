@@ -2570,6 +2570,9 @@ public class HRegionServer extends HasThread implements
 
   @Override
   public void addToOnlineRegions(Region region) {
+    if (this.replicationSourceHandler != null) {
+      this.replicationSourceHandler.increaseOnlineRegionCount(region.getRegionInfo().getTable());
+    }
     this.onlineRegions.put(region.getRegionInfo().getEncodedName(), region);
     configurationManager.registerObserver(region);
   }
@@ -3003,6 +3006,9 @@ public class HRegionServer extends HasThread implements
 
   @Override
   public boolean removeFromOnlineRegions(final Region r, ServerName destination) {
+    if (this.replicationSourceHandler != null) {
+      this.replicationSourceHandler.decreaseOnlineRegionCount(r.getRegionInfo().getTable());
+    }
     Region toReturn = this.onlineRegions.remove(r.getRegionInfo().getEncodedName());
     if (destination != null) {
       long closeSeqNum = r.getMaxFlushedSeqId();
