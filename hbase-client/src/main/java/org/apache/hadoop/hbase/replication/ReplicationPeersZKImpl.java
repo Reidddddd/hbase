@@ -21,20 +21,19 @@ package org.apache.hadoop.hbase.replication;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Abortable;
 import org.apache.hadoop.hbase.CompoundConfiguration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.exceptions.DeserializationException;
 import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
@@ -42,8 +41,9 @@ import org.apache.hadoop.hbase.replication.ReplicationPeer.PeerState;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
-import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil.ZKUtilOp;
+import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -521,7 +521,9 @@ public class ReplicationPeersZKImpl extends ReplicationStateZKBase implements Re
   }
 
   private void checkQueuesDeleted(String peerId) throws ReplicationException {
-    if (queuesClient == null) return;
+    if (queuesClient == null) {
+      return;
+    }
     try {
       List<String> replicators = queuesClient.getListOfReplicators();
       if (replicators == null || replicators.isEmpty()) {
@@ -546,5 +548,29 @@ public class ReplicationPeersZKImpl extends ReplicationStateZKBase implements Re
     } catch (KeeperException e) {
       throw new ReplicationException("Could not check queues deleted with id=" + peerId, e);
     }
+  }
+  
+  @Override
+  public List<String> getTablePeers(TableName tableName) {
+    List<String> peersList = new ArrayList<String>();
+    this.peerClusters.forEach((key, value) -> {
+      Map<TableName, List<String>> tableCFs = value.getTableCFs();
+      if (tableCFs != null && tableCFs.containsKey(tableName)) {
+        peersList.add(key);
+      }
+    });
+    return peersList;
+  }
+  
+  @Override
+  public Set<TableName> getAllPeerReplicationTables() {
+    Set<TableName> peerReplicationTables = new HashSet<>();
+    this.peerClusters.forEach((key, value) -> {
+      Map<TableName, List<String>> tableCFs = value.getTableCFs();
+      if (tableCFs != null && !tableCFs.isEmpty()) {
+        peerReplicationTables.addAll(tableCFs.keySet());
+      }
+    });
+    return peerReplicationTables;
   }
 }

@@ -20,15 +20,14 @@ package org.apache.hadoop.hbase.replication.regionserver;
 
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.CompatibilitySingletonFactory;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.metrics.BaseSource;
 import org.apache.hadoop.hbase.metrics.MetricRegistryInfo;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This class is for maintaining the various replication statistics for a source and publishing them
@@ -205,6 +204,17 @@ public class MetricsSource implements BaseSource {
     singleSourceSource.clear();
     globalSourceSource.decrSizeOfHFileRefsQueue(lastHFileRefsQueueSize);
     lastTimeStamps.clear();
+    lastHFileRefsQueueSize = 0;
+  }
+  
+  /**
+   * Remove the metrics for queue size
+   */
+  public void clearSizeOfLogQueue() {
+    int lastQueueSize = singleSourceSource.getSizeOfLogQueue();
+    globalSourceSource.decrSizeOfLogQueue(lastQueueSize);
+    singleSourceSource.decrSizeOfLogQueue(lastQueueSize);
+    globalSourceSource.decrSizeOfHFileRefsQueue(lastHFileRefsQueueSize);
     lastHFileRefsQueueSize = 0;
   }
 
