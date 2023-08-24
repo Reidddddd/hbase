@@ -6954,20 +6954,20 @@ public final class HBaseProtos {
      */
     long getStartCode();
 
-    // optional string ip = 4;
+    // optional string internal_hostname = 4;
     /**
-     * <code>optional string ip = 4;</code>
+     * <code>optional string internal_hostname = 4;</code>
      */
-    boolean hasIp();
+    boolean hasInternalHostname();
     /**
-     * <code>optional string ip = 4;</code>
+     * <code>optional string internal_hostname = 4;</code>
      */
-    java.lang.String getIp();
+    java.lang.String getInternalHostname();
     /**
-     * <code>optional string ip = 4;</code>
+     * <code>optional string internal_hostname = 4;</code>
      */
     com.google.protobuf.ByteString
-        getIpBytes();
+        getInternalHostnameBytes();
   }
   /**
    * Protobuf type {@code hbase.pb.ServerName}
@@ -7042,7 +7042,7 @@ public final class HBaseProtos {
             }
             case 34: {
               bitField0_ |= 0x00000008;
-              ip_ = input.readBytes();
+              internalHostname_ = input.readBytes();
               break;
             }
           }
@@ -7160,20 +7160,20 @@ public final class HBaseProtos {
       return startCode_;
     }
 
-    // optional string ip = 4;
-    public static final int IP_FIELD_NUMBER = 4;
-    private java.lang.Object ip_;
+    // optional string internal_hostname = 4;
+    public static final int INTERNAL_HOSTNAME_FIELD_NUMBER = 4;
+    private java.lang.Object internalHostname_;
     /**
-     * <code>optional string ip = 4;</code>
+     * <code>optional string internal_hostname = 4;</code>
      */
-    public boolean hasIp() {
+    public boolean hasInternalHostname() {
       return ((bitField0_ & 0x00000008) == 0x00000008);
     }
     /**
-     * <code>optional string ip = 4;</code>
+     * <code>optional string internal_hostname = 4;</code>
      */
-    public java.lang.String getIp() {
-      java.lang.Object ref = ip_;
+    public java.lang.String getInternalHostname() {
+      java.lang.Object ref = internalHostname_;
       if (ref instanceof java.lang.String) {
         return (java.lang.String) ref;
       } else {
@@ -7181,22 +7181,22 @@ public final class HBaseProtos {
             (com.google.protobuf.ByteString) ref;
         java.lang.String s = bs.toStringUtf8();
         if (bs.isValidUtf8()) {
-          ip_ = s;
+          internalHostname_ = s;
         }
         return s;
       }
     }
     /**
-     * <code>optional string ip = 4;</code>
+     * <code>optional string internal_hostname = 4;</code>
      */
     public com.google.protobuf.ByteString
-        getIpBytes() {
-      java.lang.Object ref = ip_;
+        getInternalHostnameBytes() {
+      java.lang.Object ref = internalHostname_;
       if (ref instanceof java.lang.String) {
         com.google.protobuf.ByteString b = 
             com.google.protobuf.ByteString.copyFromUtf8(
                 (java.lang.String) ref);
-        ip_ = b;
+        internalHostname_ = b;
         return b;
       } else {
         return (com.google.protobuf.ByteString) ref;
@@ -7207,7 +7207,7 @@ public final class HBaseProtos {
       hostName_ = "";
       port_ = 0;
       startCode_ = 0L;
-      ip_ = "";
+      internalHostname_ = "";
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -7235,7 +7235,7 @@ public final class HBaseProtos {
         output.writeUInt64(3, startCode_);
       }
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        output.writeBytes(4, getIpBytes());
+        output.writeBytes(4, getInternalHostnameBytes());
       }
       getUnknownFields().writeTo(output);
     }
@@ -7260,7 +7260,7 @@ public final class HBaseProtos {
       }
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(4, getIpBytes());
+          .computeBytesSize(4, getInternalHostnameBytes());
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -7300,10 +7300,10 @@ public final class HBaseProtos {
         result = result && (getStartCode()
             == other.getStartCode());
       }
-      result = result && (hasIp() == other.hasIp());
-      if (hasIp()) {
-        result = result && getIp()
-            .equals(other.getIp());
+      result = result && (hasInternalHostname() == other.hasInternalHostname());
+      if (hasInternalHostname()) {
+        result = result && getInternalHostname()
+            .equals(other.getInternalHostname());
       }
       result = result &&
           getUnknownFields().equals(other.getUnknownFields());
@@ -7330,9 +7330,9 @@ public final class HBaseProtos {
         hash = (37 * hash) + START_CODE_FIELD_NUMBER;
         hash = (53 * hash) + hashLong(getStartCode());
       }
-      if (hasIp()) {
-        hash = (37 * hash) + IP_FIELD_NUMBER;
-        hash = (53 * hash) + getIp().hashCode();
+      if (hasInternalHostname()) {
+        hash = (37 * hash) + INTERNAL_HOSTNAME_FIELD_NUMBER;
+        hash = (53 * hash) + getInternalHostname().hashCode();
       }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
@@ -7454,7 +7454,7 @@ public final class HBaseProtos {
         bitField0_ = (bitField0_ & ~0x00000002);
         startCode_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000004);
-        ip_ = "";
+        internalHostname_ = "";
         bitField0_ = (bitField0_ & ~0x00000008);
         return this;
       }
@@ -7499,7 +7499,7 @@ public final class HBaseProtos {
         if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
           to_bitField0_ |= 0x00000008;
         }
-        result.ip_ = ip_;
+        result.internalHostname_ = internalHostname_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -7527,9 +7527,9 @@ public final class HBaseProtos {
         if (other.hasStartCode()) {
           setStartCode(other.getStartCode());
         }
-        if (other.hasIp()) {
+        if (other.hasInternalHostname()) {
           bitField0_ |= 0x00000008;
-          ip_ = other.ip_;
+          internalHostname_ = other.internalHostname_;
           onChanged();
         }
         this.mergeUnknownFields(other.getUnknownFields());
@@ -7703,76 +7703,76 @@ public final class HBaseProtos {
         return this;
       }
 
-      // optional string ip = 4;
-      private java.lang.Object ip_ = "";
+      // optional string internal_hostname = 4;
+      private java.lang.Object internalHostname_ = "";
       /**
-       * <code>optional string ip = 4;</code>
+       * <code>optional string internal_hostname = 4;</code>
        */
-      public boolean hasIp() {
+      public boolean hasInternalHostname() {
         return ((bitField0_ & 0x00000008) == 0x00000008);
       }
       /**
-       * <code>optional string ip = 4;</code>
+       * <code>optional string internal_hostname = 4;</code>
        */
-      public java.lang.String getIp() {
-        java.lang.Object ref = ip_;
+      public java.lang.String getInternalHostname() {
+        java.lang.Object ref = internalHostname_;
         if (!(ref instanceof java.lang.String)) {
           java.lang.String s = ((com.google.protobuf.ByteString) ref)
               .toStringUtf8();
-          ip_ = s;
+          internalHostname_ = s;
           return s;
         } else {
           return (java.lang.String) ref;
         }
       }
       /**
-       * <code>optional string ip = 4;</code>
+       * <code>optional string internal_hostname = 4;</code>
        */
       public com.google.protobuf.ByteString
-          getIpBytes() {
-        java.lang.Object ref = ip_;
+          getInternalHostnameBytes() {
+        java.lang.Object ref = internalHostname_;
         if (ref instanceof String) {
           com.google.protobuf.ByteString b = 
               com.google.protobuf.ByteString.copyFromUtf8(
                   (java.lang.String) ref);
-          ip_ = b;
+          internalHostname_ = b;
           return b;
         } else {
           return (com.google.protobuf.ByteString) ref;
         }
       }
       /**
-       * <code>optional string ip = 4;</code>
+       * <code>optional string internal_hostname = 4;</code>
        */
-      public Builder setIp(
+      public Builder setInternalHostname(
           java.lang.String value) {
         if (value == null) {
     throw new NullPointerException();
   }
   bitField0_ |= 0x00000008;
-        ip_ = value;
+        internalHostname_ = value;
         onChanged();
         return this;
       }
       /**
-       * <code>optional string ip = 4;</code>
+       * <code>optional string internal_hostname = 4;</code>
        */
-      public Builder clearIp() {
+      public Builder clearInternalHostname() {
         bitField0_ = (bitField0_ & ~0x00000008);
-        ip_ = getDefaultInstance().getIp();
+        internalHostname_ = getDefaultInstance().getInternalHostname();
         onChanged();
         return this;
       }
       /**
-       * <code>optional string ip = 4;</code>
+       * <code>optional string internal_hostname = 4;</code>
        */
-      public Builder setIpBytes(
+      public Builder setInternalHostnameBytes(
           com.google.protobuf.ByteString value) {
         if (value == null) {
     throw new NullPointerException();
   }
   bitField0_ |= 0x00000008;
-        ip_ = value;
+        internalHostname_ = value;
         onChanged();
         return this;
       }
@@ -19614,46 +19614,46 @@ public final class HBaseProtos {
       "imeRange\022\014\n\004from\030\001 \001(\004\022\n\n\002to\030\002 \001(\004\"W\n\025Co" +
       "lumnFamilyTimeRange\022\025\n\rcolumn_family\030\001 \002" +
       "(\014\022\'\n\ntime_range\030\002 \002(\0132\023.hbase.pb.TimeRa" +
-      "nge\"M\n\nServerName\022\021\n\thost_name\030\001 \002(\t\022\014\n\004" +
-      "port\030\002 \001(\r\022\022\n\nstart_code\030\003 \001(\004\022\n\n\002ip\030\004 \001" +
-      "(\t\"\033\n\013Coprocessor\022\014\n\004name\030\001 \002(\t\"-\n\016NameS" +
-      "tringPair\022\014\n\004name\030\001 \002(\t\022\r\n\005value\030\002 \002(\t\"," +
-      "\n\rNameBytesPair\022\014\n\004name\030\001 \002(\t\022\r\n\005value\030\002" +
-      " \001(\014\"/\n\016BytesBytesPair\022\r\n\005first\030\001 \002(\014\022\016\n" +
-      "\006second\030\002 \002(\014\",\n\rNameInt64Pair\022\014\n\004name\030\001",
-      " \001(\t\022\r\n\005value\030\002 \001(\003\"\206\001\n\024ProcedureDescrip" +
-      "tion\022\021\n\tsignature\030\001 \002(\t\022\020\n\010instance\030\002 \001(" +
-      "\t\022\030\n\rcreation_time\030\003 \001(\003:\0010\022/\n\rconfigura" +
-      "tion\030\004 \003(\0132\030.hbase.pb.NameStringPair\"\n\n\010" +
-      "EmptyMsg\"\033\n\007LongMsg\022\020\n\010long_msg\030\001 \002(\003\"\037\n" +
-      "\tDoubleMsg\022\022\n\ndouble_msg\030\001 \002(\001\"\'\n\rBigDec" +
-      "imalMsg\022\026\n\016bigdecimal_msg\030\001 \002(\014\"5\n\004UUID\022" +
-      "\026\n\016least_sig_bits\030\001 \002(\004\022\025\n\rmost_sig_bits" +
-      "\030\002 \002(\004\"T\n\023NamespaceDescriptor\022\014\n\004name\030\001 " +
-      "\002(\014\022/\n\rconfiguration\030\002 \003(\0132\030.hbase.pb.Na",
-      "meStringPair\"\235\001\n\013VersionInfo\022\017\n\007version\030" +
-      "\001 \002(\t\022\013\n\003url\030\002 \002(\t\022\020\n\010revision\030\003 \002(\t\022\014\n\004" +
-      "user\030\004 \002(\t\022\014\n\004date\030\005 \002(\t\022\024\n\014src_checksum" +
-      "\030\006 \002(\t\022\025\n\rversion_major\030\007 \001(\r\022\025\n\rversion" +
-      "_minor\030\010 \001(\r\"Q\n\020RegionServerInfo\022\020\n\010info" +
-      "Port\030\001 \001(\005\022+\n\014version_info\030\002 \001(\0132\025.hbase" +
-      ".pb.VersionInfo\"\243\002\n\023SnapshotDescription\022" +
-      "\014\n\004name\030\001 \002(\t\022\r\n\005table\030\002 \001(\t\022\030\n\rcreation" +
-      "_time\030\003 \001(\003:\0010\0227\n\004type\030\004 \001(\0162\".hbase.pb." +
-      "SnapshotDescription.Type:\005FLUSH\022\017\n\007versi",
-      "on\030\005 \001(\005\022\r\n\005owner\030\006 \001(\t\022<\n\025users_and_per" +
-      "missions\030\007 \001(\0132\035.hbase.pb.UsersAndPermis" +
-      "sions\022\016\n\003ttl\030\010 \001(\003:\0010\".\n\004Type\022\014\n\010DISABLE" +
-      "D\020\000\022\t\n\005FLUSH\020\001\022\r\n\tSKIPFLUSH\020\002\"-\n\tZNodeIn" +
-      "fo\022\014\n\004path\030\001 \002(\t\022\022\n\nnode_count\030\002 \001(\005*r\n\013" +
-      "CompareType\022\010\n\004LESS\020\000\022\021\n\rLESS_OR_EQUAL\020\001" +
-      "\022\t\n\005EQUAL\020\002\022\r\n\tNOT_EQUAL\020\003\022\024\n\020GREATER_OR" +
-      "_EQUAL\020\004\022\013\n\007GREATER\020\005\022\t\n\005NO_OP\020\006*n\n\010Time" +
-      "Unit\022\017\n\013NANOSECONDS\020\001\022\020\n\014MICROSECONDS\020\002\022" +
-      "\020\n\014MILLISECONDS\020\003\022\013\n\007SECONDS\020\004\022\013\n\007MINUTE",
-      "S\020\005\022\t\n\005HOURS\020\006\022\010\n\004DAYS\020\007B>\n*org.apache.h" +
-      "adoop.hbase.protobuf.generatedB\013HBasePro" +
-      "tosH\001\240\001\001"
+      "nge\"\\\n\nServerName\022\021\n\thost_name\030\001 \002(\t\022\014\n\004" +
+      "port\030\002 \001(\r\022\022\n\nstart_code\030\003 \001(\004\022\031\n\021intern" +
+      "al_hostname\030\004 \001(\t\"\033\n\013Coprocessor\022\014\n\004name" +
+      "\030\001 \002(\t\"-\n\016NameStringPair\022\014\n\004name\030\001 \002(\t\022\r" +
+      "\n\005value\030\002 \002(\t\",\n\rNameBytesPair\022\014\n\004name\030\001" +
+      " \002(\t\022\r\n\005value\030\002 \001(\014\"/\n\016BytesBytesPair\022\r\n" +
+      "\005first\030\001 \002(\014\022\016\n\006second\030\002 \002(\014\",\n\rNameInt6",
+      "4Pair\022\014\n\004name\030\001 \001(\t\022\r\n\005value\030\002 \001(\003\"\206\001\n\024P" +
+      "rocedureDescription\022\021\n\tsignature\030\001 \002(\t\022\020" +
+      "\n\010instance\030\002 \001(\t\022\030\n\rcreation_time\030\003 \001(\003:" +
+      "\0010\022/\n\rconfiguration\030\004 \003(\0132\030.hbase.pb.Nam" +
+      "eStringPair\"\n\n\010EmptyMsg\"\033\n\007LongMsg\022\020\n\010lo" +
+      "ng_msg\030\001 \002(\003\"\037\n\tDoubleMsg\022\022\n\ndouble_msg\030" +
+      "\001 \002(\001\"\'\n\rBigDecimalMsg\022\026\n\016bigdecimal_msg" +
+      "\030\001 \002(\014\"5\n\004UUID\022\026\n\016least_sig_bits\030\001 \002(\004\022\025" +
+      "\n\rmost_sig_bits\030\002 \002(\004\"T\n\023NamespaceDescri" +
+      "ptor\022\014\n\004name\030\001 \002(\014\022/\n\rconfiguration\030\002 \003(",
+      "\0132\030.hbase.pb.NameStringPair\"\235\001\n\013VersionI" +
+      "nfo\022\017\n\007version\030\001 \002(\t\022\013\n\003url\030\002 \002(\t\022\020\n\010rev" +
+      "ision\030\003 \002(\t\022\014\n\004user\030\004 \002(\t\022\014\n\004date\030\005 \002(\t\022" +
+      "\024\n\014src_checksum\030\006 \002(\t\022\025\n\rversion_major\030\007" +
+      " \001(\r\022\025\n\rversion_minor\030\010 \001(\r\"Q\n\020RegionSer" +
+      "verInfo\022\020\n\010infoPort\030\001 \001(\005\022+\n\014version_inf" +
+      "o\030\002 \001(\0132\025.hbase.pb.VersionInfo\"\243\002\n\023Snaps" +
+      "hotDescription\022\014\n\004name\030\001 \002(\t\022\r\n\005table\030\002 " +
+      "\001(\t\022\030\n\rcreation_time\030\003 \001(\003:\0010\0227\n\004type\030\004 " +
+      "\001(\0162\".hbase.pb.SnapshotDescription.Type:",
+      "\005FLUSH\022\017\n\007version\030\005 \001(\005\022\r\n\005owner\030\006 \001(\t\022<" +
+      "\n\025users_and_permissions\030\007 \001(\0132\035.hbase.pb" +
+      ".UsersAndPermissions\022\016\n\003ttl\030\010 \001(\003:\0010\".\n\004" +
+      "Type\022\014\n\010DISABLED\020\000\022\t\n\005FLUSH\020\001\022\r\n\tSKIPFLU" +
+      "SH\020\002\"-\n\tZNodeInfo\022\014\n\004path\030\001 \002(\t\022\022\n\nnode_" +
+      "count\030\002 \001(\005*r\n\013CompareType\022\010\n\004LESS\020\000\022\021\n\r" +
+      "LESS_OR_EQUAL\020\001\022\t\n\005EQUAL\020\002\022\r\n\tNOT_EQUAL\020" +
+      "\003\022\024\n\020GREATER_OR_EQUAL\020\004\022\013\n\007GREATER\020\005\022\t\n\005" +
+      "NO_OP\020\006*n\n\010TimeUnit\022\017\n\013NANOSECONDS\020\001\022\020\n\014" +
+      "MICROSECONDS\020\002\022\020\n\014MILLISECONDS\020\003\022\013\n\007SECO",
+      "NDS\020\004\022\013\n\007MINUTES\020\005\022\t\n\005HOURS\020\006\022\010\n\004DAYS\020\007B" +
+      ">\n*org.apache.hadoop.hbase.protobuf.gene" +
+      "ratedB\013HBaseProtosH\001\240\001\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -19707,7 +19707,7 @@ public final class HBaseProtos {
           internal_static_hbase_pb_ServerName_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_hbase_pb_ServerName_descriptor,
-              new java.lang.String[] { "HostName", "Port", "StartCode", "Ip", });
+              new java.lang.String[] { "HostName", "Port", "StartCode", "InternalHostname", });
           internal_static_hbase_pb_Coprocessor_descriptor =
             getDescriptor().getMessageTypes().get(8);
           internal_static_hbase_pb_Coprocessor_fieldAccessorTable = new

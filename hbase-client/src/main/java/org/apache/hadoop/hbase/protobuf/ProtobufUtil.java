@@ -394,8 +394,8 @@ public final class ProtobufUtil {
     if (serverName.getStartcode() >= 0) {
       builder.setStartCode(serverName.getStartcode());
     }
-    if (serverName.getIP() != null) {
-      builder.setIp(serverName.getIP());
+    if (serverName.getInternalHostName() != null) {
+      builder.setInternalHostname(serverName.getInternalHostName());
     }
     return builder.build();
   }
@@ -411,11 +411,11 @@ public final class ProtobufUtil {
       return null;
     }
     String hostName = proto.getHostName();
-    String ip = proto.hasIp() ? proto.getIp() : null;
+    String internalHostName = proto.hasInternalHostname() ? proto.getInternalHostname() : null;
     long startCode = proto.hasStartCode() ? proto.getStartCode() : -1;
     int port = proto.hasPort() ? proto.getPort() : -1;
 
-    return ServerName.valueOf(hostName, port, startCode, ip);
+    return ServerName.valueOf(hostName, port, startCode, internalHostName);
   }
   /**
    * Convert a list of protocol buffer ServerName to a list of ServerName
