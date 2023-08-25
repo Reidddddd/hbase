@@ -239,9 +239,74 @@ public class TestReplicationSourceManager2 {
               && rps.getAllPeerIds().contains(multiWalPeer)
       );
       assertEquals(0, manager.getSourceMetrics(multiWalPeer).getSizeOfLogQueue());
+  
+      // Test activate
+      manager.increaseOnlineRegionCount(multiWalPeerTable);
+      assertEquals(manager.getSourcePeerConsumeStatus(multiWalPeer), PeerConsumeStatus.CONSUMING);
     } finally {
       removePeerAndWait(multiWalPeer);
       assertTrue(manager.getReplicationTables().isEmpty());
+      manager.decreaseOnlineRegionCount(multiWalPeerTable);
+      assertTrue(manager.getTableOnlineRegionCount().isEmpty());
+    }
+  }
+  
+  @Test
+  public void testActivateReplicationSourceWhenWaitingDrain() throws Exception {
+    final String activatePeer = "activatePeer";
+    
+    TableName activateTable =TableName.valueOf("table_activator");
+    Map<TableName, List<String>> activateTableCFs = new HashMap<>();
+    activateTableCFs.put(activateTable, new ArrayList<>());
+    ReplicationPeerConfig peerConfig =
+        new ReplicationPeerConfig().setClusterKey(clusterKey);
+    peerConfig.setTableCFsMap(activateTableCFs);
+    try {
+      /*
+        Test for activate new online table when the source is waiting drain
+      */
+      addPeerAndWait(activatePeer, peerConfig, false);
+      manager.increaseOnlineRegionCount(activateTable);
+      assertFalse(manager.getSourcesWaitingDrainPaths().containsKey(activatePeer));
+    } finally {
+      removePeerAndWait(activatePeer);
+      assertTrue(manager.getReplicationTables().isEmpty());
+      manager.decreaseOnlineRegionCount(activateTable);
+      assertTrue(manager.getTableOnlineRegionCount().isEmpty());
+    }
+  }
+  
+  @Test
+  public void testAddAndRemoveRegionSameTime() throws Exception {
+    String peerId = "testConcurrentPeer";
+    TableName table =TableName.valueOf("test_concurrent");
+    
+    ReplicationPeerConfig peerConfig = new ReplicationPeerConfig().setClusterKey(clusterKey);
+    Map<TableName, List<String>> tableCFs = new HashMap<>();
+    tableCFs.put(table, new ArrayList<>());
+    peerConfig.setTableCFsMap(tableCFs);
+    try {
+      /*
+          Test when replication is online, the remove and add operation happen in the same time.
+       */
+      manager.increaseOnlineRegionCount(table);
+      addPeerAndWait(peerId, peerConfig, true);
+      new Thread(()->{
+        manager.decreaseOnlineRegionCount(table);
+      }).start();
+      new Thread(()->{
+        manager.increaseOnlineRegionCount(table);
+      }).start();
+      Waiter.waitFor(conf, 20000, (Predicate<Exception>) () ->
+          manager.getSourcePeerConsumeStatus(peerId).equals(PeerConsumeStatus.CONSUMING)
+              && manager.getSource(peerId) != null
+              && manager.getAllQueues().contains(peerId)
+              && !manager.getSourcesWaitingDrainPaths().containsKey(peerId)
+      );
+    } finally {
+      removePeerAndWait(peerId);
+      assertTrue(manager.getReplicationTables().isEmpty());
+      manager.decreaseOnlineRegionCount(table);
       assertTrue(manager.getTableOnlineRegionCount().isEmpty());
     }
   }

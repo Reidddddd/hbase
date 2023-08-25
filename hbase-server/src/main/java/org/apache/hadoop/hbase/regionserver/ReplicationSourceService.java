@@ -37,12 +37,16 @@ public interface ReplicationSourceService extends ReplicationService {
   
   /**
    * Increase the online region count for the given table
+   * if the table is peer replication table call the activateReplicationSource method
+   * in ReplicationSourceManager
    * @param tableName the tableName of the online region
    */
   void increaseOnlineRegionCount(TableName tableName);
   
   /**
    * Decrease the online region count for the given table
+   * if the table is peer replication table call the markReplicationSourceWaitingDrain method
+   * in ReplicationSourceManager
    * @param tableName the tableName of the offline region
    */
   void decreaseOnlineRegionCount(TableName tableName);
