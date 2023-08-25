@@ -82,27 +82,13 @@ public class RegionServerTracker extends ZooKeeperListener {
     synchronized(this.regionServers) {
       this.regionServers.clear();
       for (String n: servers) {
-        ServerName sn = ServerName.parseServerName(ZKUtil.getNodeName(n));
+        RegionServerInfo regionServerInfo = getRegionServerInfoFromZK(n);
+        ServerName sn = regionServerInfo.hasInternalHostname() ?
+          ServerName.parseServerNameWithInternalHostName(ZKUtil.getNodeName(n),
+          regionServerInfo.getInternalHostname()) :
+          ServerName.parseServerName(ZKUtil.getNodeName(n));
         if (regionServers.get(sn) == null) {
-          RegionServerInfo.Builder rsInfoBuilder = RegionServerInfo.newBuilder();
-          try {
-            String nodePath = ZKUtil.joinZNode(watcher.rsZNode, n);
-            byte[] data = ZKUtil.getData(watcher, nodePath);
-            if (data != null && data.length > 0 && ProtobufUtil.isPBMagicPrefix(data)) {
-              int magicLen = ProtobufUtil.lengthOfPBMagic();
-              ProtobufUtil.mergeFrom(rsInfoBuilder, data, magicLen, data.length - magicLen);
-            }
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Added tracking of RS " + nodePath);
-            }
-          } catch (KeeperException e) {
-            LOG.warn("Get Rs info port from ephemeral node", e);
-          } catch (IOException e) {
-            LOG.warn("Illegal data from ephemeral node", e);
-          } catch (InterruptedException e) {
-            throw new InterruptedIOException();
-          }
-          this.regionServers.put(sn, rsInfoBuilder.build());
+          this.regionServers.put(sn, regionServerInfo);
         }
       }
     }
@@ -110,6 +96,29 @@ public class RegionServerTracker extends ZooKeeperListener {
     if (server.isInitialized()) {
       server.checkIfShouldMoveSystemRegionAsync();
     }
+  }
+
+  private RegionServerInfo getRegionServerInfoFromZK(String serverName)
+      throws InterruptedIOException {
+    RegionServerInfo.Builder rsInfoBuilder = RegionServerInfo.newBuilder();
+    try {
+      String nodePath = ZKUtil.joinZNode(watcher.rsZNode, serverName);
+      byte[] data = ZKUtil.getData(watcher, nodePath);
+      if (data != null && data.length > 0 && ProtobufUtil.isPBMagicPrefix(data)) {
+        int magicLen = ProtobufUtil.lengthOfPBMagic();
+        ProtobufUtil.mergeFrom(rsInfoBuilder, data, magicLen, data.length - magicLen);
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Added tracking of RS " + nodePath);
+      }
+    } catch (KeeperException e) {
+      LOG.warn("Get Rs info port from ephemeral node", e);
+    } catch (IOException e) {
+      LOG.warn("Illegal data from ephemeral node", e);
+    } catch (InterruptedException e) {
+      throw new InterruptedIOException();
+    }
+    return rsInfoBuilder.build();
   }
 
   private void remove(final ServerName sn) {

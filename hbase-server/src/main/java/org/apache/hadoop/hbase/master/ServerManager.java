@@ -273,7 +273,8 @@ public class ServerManager {
     // for processing by ProcessServerShutdown.
 
     final String hostname = ia.getHostAddress();
-    final String internalHostname = request.getUseThisHostnameInstead();
+    final String internalHostname = request.hasUseThisHostnameInstead() ?
+      request.getUseThisHostnameInstead() : null;
 
     ServerName sn = ServerName.valueOf(hostname, request.getPort(),
       request.getServerStartCode(), internalHostname);
@@ -476,7 +477,8 @@ public class ServerManager {
    */
   @VisibleForTesting
   void recordNewServerWithLock(final ServerName serverName, final ServerLoad sl) {
-    LOG.info("Registering server=" + serverName);
+    LOG.info("Registering server=" + serverName + " with internal hostname: "
+      + serverName.getInternalHostName());
     this.onlineServers.put(serverName, sl);
     this.rsAdmins.remove(serverName);
   }

@@ -338,12 +338,13 @@ if  (sl.getTotalCompactingKVs() > 0) {
         <%java>
         int infoPort = master.getRegionServerInfoPort(serverName);
         String url = "//" + serverName.getHostname() + ":" + infoPort + "/rs-status";
+        String internalServerName = serverName.getInternalServerName();
         </%java>
 
         <%if infoPort > 0%>
-            <a href="<% url %>"><% serverName.getServerName() %></a>
+            <a href="<% url %>"><% internalServerName %></a>
         <%else>
-            <% serverName.getServerName() %>
+            <% internalServerName %>
         </%if>
 </%def>
 

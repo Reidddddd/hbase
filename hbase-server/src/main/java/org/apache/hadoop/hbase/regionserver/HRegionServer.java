@@ -2475,9 +2475,7 @@ public class HRegionServer extends HasThread implements
       request.setPort(port);
       request.setServerStartCode(this.startcode);
       request.setServerCurrentTime(now);
-      if (serverName.hasDifferentInternalHostName()) {
-        request.setUseThisHostnameInstead(serverName.getInternalHostName());
-      }
+      request.setUseThisHostnameInstead(this.serverName.getInternalHostName());
       result = this.rssStub.regionServerStartup(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);

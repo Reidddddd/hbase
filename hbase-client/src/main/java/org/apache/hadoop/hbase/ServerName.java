@@ -403,7 +403,7 @@ public class ServerName implements Comparable<ServerName>, Serializable {
     short version = Bytes.toShort(versionedBytes);
     if (version == VERSION) {
       int length = versionedBytes.length - Bytes.SIZEOF_SHORT;
-      return valueOf(Bytes.toString(versionedBytes, Bytes.SIZEOF_SHORT, length));
+      return valueOf(Bytes.toString(versionedBytes, Bytes.SIZEOF_SHORT, length), internalHostName);
     }
     // Presume the bytes were written with an old version of hbase and that the
     // bytes are actually a String of the form "'<hostname>' ':' '<port>'".
@@ -416,8 +416,13 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    * @return A ServerName instance.
    */
   public static ServerName parseServerName(final String str) {
-    return SERVERNAME_PATTERN.matcher(str).matches()? valueOf(str) :
-        valueOf(str, NON_STARTCODE);
+    return parseServerNameWithInternalHostName(str, null);
+  }
+
+  public static ServerName parseServerNameWithInternalHostName(final String str,
+      final String internalHostName) {
+    return SERVERNAME_PATTERN.matcher(str).matches()? valueOf(str, internalHostName) :
+      valueOf(str, NON_STARTCODE, internalHostName);
   }
 
 
