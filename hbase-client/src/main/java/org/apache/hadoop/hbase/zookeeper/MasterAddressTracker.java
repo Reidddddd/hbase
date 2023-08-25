@@ -230,6 +230,7 @@ public class MasterAddressTracker extends ZooKeeperNodeTracker {
     snbuilder.setHostName(sn.getHostname());
     snbuilder.setPort(sn.getPort());
     snbuilder.setStartCode(sn.getStartcode());
+    snbuilder.setInternalHostname(sn.getInternalHostName());
     mbuilder.setMaster(snbuilder.build());
     mbuilder.setRpcVersion(HConstants.RPC_CURRENT_VERSION);
     mbuilder.setInfoPort(infoPort);
