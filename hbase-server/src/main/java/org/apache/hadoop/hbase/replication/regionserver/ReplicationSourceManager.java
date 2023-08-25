@@ -929,12 +929,38 @@ public class ReplicationSourceManager implements ReplicationListener {
   public void increaseOnlineRegionCount(TableName tableName) {
     this.tableOnlineRegionCount.compute(tableName, (table, onlineRegionCount) -> {
       if (onlineRegionCount == null) {
+        if (isPeerReplicationTable(table)) {
+          activateReplicationSource(table);
+        }
         return new AtomicInteger(1);
       } else {
         onlineRegionCount.incrementAndGet();
         return onlineRegionCount;
       }
     });
+  }
+  
+  /**
+   * When some region is new online if the table is peer replication table,
+   * activate the related sources if needed.
+   * @param tableName the tableName of new online region
+   */
+  private void activateReplicationSource(TableName tableName) {
+    for (String id : this.replicationPeers.getTablePeers(tableName)) {
+      this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+        if (status.equals(PeerConsumeStatus.NOT_CONSUMING)) {
+          try {
+            addPeerSource(peerId, this.sourcesMetrics.get(peerId));
+          } catch (ReplicationException|IOException e) {
+            String message = "Error while activating the peer:" + peerId;
+            LOG.fatal(message, e);
+            this.server.abort(message, e);
+          }
+        }
+        this.sourcesWaitingDrainPaths.remove(peerId);
+        return PeerConsumeStatus.CONSUMING;
+      });
+    }
   }
   
   public void decreaseOnlineRegionCount(TableName tableName) {
