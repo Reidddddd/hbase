@@ -47,7 +47,7 @@ import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeers;
 import org.apache.hadoop.hbase.replication.ReplicationSourceDummy;
 import org.apache.hadoop.hbase.replication.ReplicationStateZKBase;
-import org.apache.hadoop.hbase.replication.regionserver.ReplicationSourceManager.PeerConsumeStatus;
+import org.apache.hadoop.hbase.replication.regionserver.ReplicationSourceManager.PeerRunningStatus;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
@@ -64,9 +64,10 @@ import org.junit.experimental.categories.Category;
 import org.junit.rules.TestName;
 
 @Category(MediumTests.class)
-public class TestReplicationSourceManager2 {
+public class TestReplicationSourceManagerPeerOperations {
   
-  private static final Log LOG = LogFactory.getLog(TestReplicationSourceManager2.class);
+  private static final Log LOG =
+      LogFactory.getLog(TestReplicationSourceManagerPeerOperations.class);
   
   private static Configuration conf;
   
@@ -233,16 +234,18 @@ public class TestReplicationSourceManager2 {
       assertTrue(manager.getSourcesWaitingDrainPaths().get(multiWalPeer).isEmpty());
 
       Waiter.waitFor(conf, 20000, (Predicate<Exception>) () ->
-          manager.getSourcePeerConsumeStatus(multiWalPeer).equals(PeerConsumeStatus.NOT_CONSUMING)
+          manager.getPeerRunningStatus(multiWalPeer).equals(PeerRunningStatus.NOT_RUNNING)
               && manager.getSource(multiWalPeer) == null
               && !manager.getAllQueues().contains(multiWalPeer)
               && rps.getAllPeerIds().contains(multiWalPeer)
       );
       assertEquals(0, manager.getSourceMetrics(multiWalPeer).getSizeOfLogQueue());
+      assertFalse(manager.getSourceMetrics(multiWalPeer).isPeerRunning());
   
       // Test activate
       manager.increaseOnlineRegionCount(multiWalPeerTable);
-      assertEquals(manager.getSourcePeerConsumeStatus(multiWalPeer), PeerConsumeStatus.CONSUMING);
+      assertEquals(manager.getPeerRunningStatus(multiWalPeer), PeerRunningStatus.RUNNING);
+      assertTrue(manager.getSourceMetrics(multiWalPeer).isPeerRunning());
     } finally {
       removePeerAndWait(multiWalPeer);
       assertTrue(manager.getReplicationTables().isEmpty());
@@ -298,7 +301,7 @@ public class TestReplicationSourceManager2 {
         manager.increaseOnlineRegionCount(table);
       }).start();
       Waiter.waitFor(conf, 20000, (Predicate<Exception>) () ->
-          manager.getSourcePeerConsumeStatus(peerId).equals(PeerConsumeStatus.CONSUMING)
+          manager.getPeerRunningStatus(peerId).equals(PeerRunningStatus.RUNNING)
               && manager.getSource(peerId) != null
               && manager.getAllQueues().contains(peerId)
               && !manager.getSourcesWaitingDrainPaths().containsKey(peerId)
@@ -327,7 +330,8 @@ public class TestReplicationSourceManager2 {
           manager.getSource(peerId) != null
               && manager.getAllQueues().contains(peerId)
               && manager.getSourceMetrics(peerId) != null
-              && manager.getSourcePeerConsumeStatus(peerId) != null
+              && manager.getSourceMetrics(peerId).isPeerRunning()
+              && manager.getPeerRunningStatus(peerId) != null
       );
     } else {
       Waiter.waitFor(conf, 20000, (Predicate<Exception>) () ->
@@ -335,7 +339,8 @@ public class TestReplicationSourceManager2 {
               && manager.getAllQueues().contains(peerId)
               && manager.getSourcesWaitingDrainPaths().containsKey(peerId)
               && manager.getSourceMetrics(peerId) != null
-              && manager.getSourcePeerConsumeStatus(peerId) != null
+              && manager.getSourceMetrics(peerId).isPeerRunning()
+              && manager.getPeerRunningStatus(peerId) != null
       );
     }
   }
@@ -354,7 +359,7 @@ public class TestReplicationSourceManager2 {
         !manager.getAllQueues().contains(peerId)
             && rp.getPeer(peerId) == null
             && manager.getSource(peerId) == null
-            && manager.getSourcePeerConsumeStatus(peerId) == null
+            && manager.getPeerRunningStatus(peerId) == null
             && manager.getSourceMetrics(peerId) == null
     );
   }

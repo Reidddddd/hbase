@@ -61,6 +61,7 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
   private final String repeatedBytesKey;
   private final String completedLogsKey;
   private final String completedRecoveryKey;
+  private final String isPeerRunningKey;
   private final MutableFastCounter unknownFileLengthForClosedWAL;
   private final MutableFastCounter uncleanlyClosedWAL;
   private final MutableFastCounter uncleanlyClosedSkippedBytes;
@@ -69,6 +70,7 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
   private final MutableFastCounter completedWAL;
   private final MutableFastCounter completedRecoveryQueue;
   private final MutableGaugeLong oldestWalAge;
+  private final MutableGaugeLong isPeerRunning;
 
   public MetricsReplicationSourceSourceImpl(MetricsReplicationSourceImpl rms, String id) {
     this.rms = rms;
@@ -131,6 +133,9 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
 
     oldestWalAgeKey = this.keyPrefix + "oldestWalAge";
     oldestWalAge = rms.getMetricsRegistry().getGauge(oldestWalAgeKey, 0L);
+  
+    isPeerRunningKey = this.keyPrefix + "isPeerRunning";
+    isPeerRunning = rms.getMetricsRegistry().getGauge(isPeerRunningKey, 0L);
   }
 
   @Override public void setLastShippedAge(long age) {
@@ -197,6 +202,7 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
     rms.removeMetric(completedLogsKey);
     rms.removeMetric(completedRecoveryKey);
     rms.removeMetric(oldestWalAgeKey);
+    rms.removeMetric(isPeerRunningKey);
   }
 
   @Override
@@ -273,6 +279,14 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
 
   @Override public long getOldestWalAge() {
     return oldestWalAge.value();
+  }
+  
+  @Override public void setPeerRunningStatus(long running) {
+    isPeerRunning.set(running);
+  }
+  
+  @Override public int getPeerRunningStatus() {
+    return (int) isPeerRunning.value();
   }
 
   @Override
