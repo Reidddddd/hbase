@@ -73,13 +73,16 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
     sizeOfHFileRefsQueueGauge =
         rms.getMetricsRegistry().getGauge(SOURCE_SIZE_OF_HFILE_REFS_QUEUE, 0L);
 
-    unknownFileLengthForClosedWAL = rms.getMetricsRegistry().getCounter(SOURCE_CLOSED_LOGS_WITH_UNKNOWN_LENGTH, 0L);
+    unknownFileLengthForClosedWAL =
+        rms.getMetricsRegistry().getCounter(SOURCE_CLOSED_LOGS_WITH_UNKNOWN_LENGTH, 0L);
     uncleanlyClosedWAL = rms.getMetricsRegistry().getCounter(SOURCE_UNCLEANLY_CLOSED_LOGS, 0L);
-    uncleanlyClosedSkippedBytes = rms.getMetricsRegistry().getCounter(SOURCE_UNCLEANLY_CLOSED_IGNORED_IN_BYTES, 0L);
+    uncleanlyClosedSkippedBytes =
+        rms.getMetricsRegistry().getCounter(SOURCE_UNCLEANLY_CLOSED_IGNORED_IN_BYTES, 0L);
     restartWALReading = rms.getMetricsRegistry().getCounter(SOURCE_RESTARTED_LOG_READING, 0L);
     repeatedFileBytes = rms.getMetricsRegistry().getCounter(SOURCE_REPEATED_LOG_FILE_BYTES, 0L);
     completedWAL = rms.getMetricsRegistry().getCounter(SOURCE_COMPLETED_LOGS, 0L);
-    completedRecoveryQueue = rms.getMetricsRegistry().getCounter(SOURCE_COMPLETED_RECOVERY_QUEUES, 0L);
+    completedRecoveryQueue =
+        rms.getMetricsRegistry().getCounter(SOURCE_COMPLETED_RECOVERY_QUEUES, 0L);
     failedRecoveryQueue = rms.getMetricsRegistry()
         .getCounter(SOURCE_FAILED_RECOVERY_QUEUES, 0L);
   }
@@ -210,6 +213,17 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
 
   @Override
   public long getOldestWalAge() {
+    // Not implemented
+    return 0;
+  }
+  
+  @Override
+  public void setPeerRunningStatus(long running) {
+    // Not implemented
+  }
+  
+  @Override
+  public int getPeerRunningStatus() {
     // Not implemented
     return 0;
   }

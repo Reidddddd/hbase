@@ -52,6 +52,7 @@ public interface MetricsReplicationSourceSource extends BaseSource {
   public static final String SOURCE_FAILED_RECOVERY_QUEUES = "source.failedRecoverQueues";
   /* Used to track the age of oldest wal in ms since its creation time */
   String OLDEST_WAL_AGE = "source.oldestWalAge";
+  String IS_SOURCE_CONSUMING = "source.isSourceConsuming";
 
   void setLastShippedAge(long age);
   void incrSizeOfLogQueue(int size);
@@ -79,4 +80,8 @@ public interface MetricsReplicationSourceSource extends BaseSource {
   void incrFailedRecoveryQueue();
   void setOldestWalAge(long age);
   long getOldestWalAge();
+  // running = 0 means the PeerRunningStatus is NOT_RUNNING
+  // and running = 1 means the PeerRunningStatus is RUNNING.
+  void setPeerRunningStatus(long running);
+  int getPeerRunningStatus();
 }

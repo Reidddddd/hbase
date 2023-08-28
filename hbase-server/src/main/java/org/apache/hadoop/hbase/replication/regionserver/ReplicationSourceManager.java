@@ -125,14 +125,15 @@ public class ReplicationSourceManager implements ReplicationListener {
   // Map to record all the peer replication table
   private final Set<TableName> peerReplicationTables;
   // Map to record all the peer consume status for all the sources
-  private final Map<String, PeerConsumeStatus> sourcesPeerConsumeStatus;
+  private final Map<String, PeerRunningStatus> sourcesPeerRunningStatus;
   // Map to record all the metrics for all the sources
   private final Map<String, MetricsSource> sourcesMetrics;
-  enum PeerConsumeStatus {
-    // The peer is consuming the enqueued logs
-    CONSUMING,
-    // All the related table is offline and the waiting for drain log is consumed
-    NOT_CONSUMING
+  enum PeerRunningStatus {
+    // When all the related table is offline and the waiting for drain log is consumed
+    // then remove the source and related information mark the peer as not running
+    NOT_RUNNING,
+    // Opposite of NOT_RUNNING state
+    RUNNING
   }
 
 
@@ -191,7 +192,7 @@ public class ReplicationSourceManager implements ReplicationListener {
     this.tableOnlineRegionCount = new ConcurrentHashMap<>();
     this.sourcesWaitingDrainPaths = new ConcurrentHashMap<String, Set<Path>>();
     this.peerReplicationTables = Collections.synchronizedSet(new HashSet<TableName>());
-    this.sourcesPeerConsumeStatus = new ConcurrentHashMap<String, PeerConsumeStatus>();
+    this.sourcesPeerRunningStatus = new ConcurrentHashMap<String, PeerRunningStatus>();
     this.sourcesMetrics = new ConcurrentHashMap<String, MetricsSource>();
   }
 
@@ -280,10 +281,12 @@ public class ReplicationSourceManager implements ReplicationListener {
       // When init source manager only add source that the tableCFs is empty
       Map<TableName, List<String>> tableCFs = this.replicationPeers.getTableCFs(id);
       if (tableCFs == null || tableCFs.isEmpty()) {
-        this.sourcesPeerConsumeStatus.put(id, PeerConsumeStatus.CONSUMING);
+        this.sourcesPeerRunningStatus.put(id, PeerRunningStatus.RUNNING);
+        metrics.setPeerRunning();
         addPeerSource(id, metrics);
       } else {
-        this.sourcesPeerConsumeStatus.put(id, PeerConsumeStatus.NOT_CONSUMING);
+        this.sourcesPeerRunningStatus.put(id, PeerRunningStatus.NOT_RUNNING);
+        metrics.setPeerNotRunning();
         this.peerReplicationTables.addAll(tableCFs.keySet());
       }
     }
@@ -601,9 +604,8 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   public void closeQueue(ReplicationSourceInterface src) {
     String id = src.getPeerClusterZnode();
-    this.sourcesPeerConsumeStatus.computeIfPresent(id , (peerId, status) -> {
+    this.sourcesPeerRunningStatus.computeIfPresent(id , (peerId, status) -> {
       this.sources.remove(peerId);
-      src.getSourceMetrics().clear();
       clearPeerInformation(peerId);
       this.replicationQueues.removePeerFromHFileRefs(peerId);
       return null;
@@ -611,7 +613,7 @@ public class ReplicationSourceManager implements ReplicationListener {
   }
   
   private void clearPeerInformation(String peerId) {
-    this.sourcesMetrics.remove(peerId);
+    this.sourcesMetrics.remove(peerId).clear();
     this.sourcesWaitingDrainPaths.remove(peerId);
     this.walsById.remove(peerId);
     Map<TableName, List<String>> tableCFs = this.replicationPeers.getTableCFs(peerId);
@@ -655,12 +657,11 @@ public class ReplicationSourceManager implements ReplicationListener {
     }
     LOG.info("Number of deleted recovered sources for " + id + ": "
         + oldSourcesToDelete.size());
-    this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+    this.sourcesPeerRunningStatus.computeIfPresent(id, (peerId, status) -> {
       ReplicationSourceInterface srcToRemove = getSource(peerId);
       this.sources.remove(peerId);
       if (srcToRemove != null) {
         srcToRemove.terminate(terminateMessage);
-        srcToRemove.getSourceMetrics().clear();
       }
       clearPeerInformation(peerId);
       return null;
@@ -681,8 +682,9 @@ public class ReplicationSourceManager implements ReplicationListener {
   @Override
   public void peerListChanged(List<String> peerIds) {
     for (String id : peerIds) {
-      this.sourcesPeerConsumeStatus.computeIfAbsent(id, peerId -> {
+      this.sourcesPeerRunningStatus.computeIfAbsent(id, peerId -> {
         MetricsSource metrics = new MetricsSource(peerId);
+        metrics.setPeerRunning();
         this.sourcesMetrics.put(peerId ,metrics);
         try {
           this.replicationPeers.peerAdded(peerId);
@@ -706,7 +708,7 @@ public class ReplicationSourceManager implements ReplicationListener {
         } catch (Exception e) {
           LOG.error("Error while adding a new peer", e);
         }
-        return PeerConsumeStatus.CONSUMING;
+        return PeerRunningStatus.RUNNING;
       });
     }
   }
@@ -947,10 +949,12 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   private void activateReplicationSource(TableName tableName) {
     for (String id : this.replicationPeers.getTablePeers(tableName)) {
-      this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
-        if (status.equals(PeerConsumeStatus.NOT_CONSUMING)) {
+      this.sourcesPeerRunningStatus.computeIfPresent(id, (peerId, status) -> {
+        MetricsSource metrics = this.sourcesMetrics.get(peerId);
+        if (status.equals(PeerRunningStatus.NOT_RUNNING)) {
+          metrics.setPeerRunning();
           try {
-            addPeerSource(peerId, this.sourcesMetrics.get(peerId));
+            addPeerSource(peerId, metrics);
           } catch (ReplicationException|IOException e) {
             String message = "Error while activating the peer:" + peerId;
             LOG.fatal(message, e);
@@ -958,7 +962,7 @@ public class ReplicationSourceManager implements ReplicationListener {
           }
         }
         this.sourcesWaitingDrainPaths.remove(peerId);
-        return PeerConsumeStatus.CONSUMING;
+        return PeerRunningStatus.RUNNING;
       });
     }
   }
@@ -982,7 +986,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   private void markReplicationSourceWaitingDrain(TableName tableName) {
     for (String id : this.replicationPeers.getTablePeers(tableName)) {
-      this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+      this.sourcesPeerRunningStatus.computeIfPresent(id, (peerId, status) -> {
         if (!this.sourcesWaitingDrainPaths.containsKey(peerId) &&
             this.replicationPeers.getTableCFs(peerId)
                 .keySet()
@@ -1018,9 +1022,11 @@ public class ReplicationSourceManager implements ReplicationListener {
   private void cleanWaitingDrainSource(String id) {
     String terminateMessage = "Replication source " + id +
         " has no online regions in this server and all the waiting drain paths is consumed";
-    this.sourcesPeerConsumeStatus.computeIfPresent(id, (peerId, status) -> {
+    this.sourcesPeerRunningStatus.computeIfPresent(id, (peerId, status) -> {
       Set<Path> waitingConsumePaths = this.sourcesWaitingDrainPaths.get(peerId);
+      // double check happens in a situation that the region become online at the same time
       if (waitingConsumePaths != null && waitingConsumePaths.isEmpty()) {
+        MetricsSource metrics = this.sourcesMetrics.get(peerId);
         ReplicationSourceInterface source = getSource(peerId);
         this.sources.remove(peerId);
         source.terminate(terminateMessage);
@@ -1028,9 +1034,11 @@ public class ReplicationSourceManager implements ReplicationListener {
         this.sourcesWaitingDrainPaths.remove(peerId);
         this.replicationQueues.removePeerFromHFileRefs(peerId);
         deleteSource(peerId, false);
-        source.getSourceMetrics().clearSizeOfLogQueue();
+        metrics.clearSizeOfLogQueue();
+        metrics.setPeerNotRunning();
+        status = PeerRunningStatus.NOT_RUNNING;
       }
-      return PeerConsumeStatus.NOT_CONSUMING;
+      return status;
     });
   }
   
@@ -1050,8 +1058,8 @@ public class ReplicationSourceManager implements ReplicationListener {
   }
   
   @VisibleForTesting
-  PeerConsumeStatus getSourcePeerConsumeStatus(String peerId) {
-    return this.sourcesPeerConsumeStatus.get(peerId);
+  PeerRunningStatus getPeerRunningStatus(String peerId) {
+    return this.sourcesPeerRunningStatus.get(peerId);
   }
   
   @VisibleForTesting

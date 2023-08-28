@@ -372,6 +372,21 @@ public class MetricsSource implements BaseSource {
   public long getOldestWalAge() {
     return singleSourceSource.getOldestWalAge();
   }
+  
+  /*
+   Sets the PeerConsumeStatus for this Source
+  */
+  public void setPeerRunning() {
+    singleSourceSource.setPeerRunningStatus(1L);
+  }
+  
+  public void setPeerNotRunning() {
+    singleSourceSource.setPeerRunningStatus(0L);
+  }
+  
+  public boolean isPeerRunning() {
+    return singleSourceSource.getPeerRunningStatus() == 1;
+  }
 
   @Override
   public String getMetricsContext() {
