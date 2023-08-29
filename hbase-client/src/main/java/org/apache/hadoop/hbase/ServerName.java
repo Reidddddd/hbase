@@ -172,8 +172,8 @@ public class ServerName implements Comparable<ServerName>, Serializable {
   }
 
   public static ServerName valueOf(final String hostname, final int port,
-    final long startcode, final String ip) {
-    return new ServerName(hostname, port, startcode, ip);
+      final long startcode, final String internalHostName) {
+    return new ServerName(hostname, port, startcode, internalHostName);
   }
 
   /**
@@ -185,6 +185,11 @@ public class ServerName implements Comparable<ServerName>, Serializable {
     return new ServerName(serverName);
   }
 
+  public static ServerName valueOf(final String serverName, String internalHostName) {
+    return new ServerName(parseHostname(serverName), parsePort(serverName),
+      parseStartcode(serverName), internalHostName);
+  }
+
   /**
    * Retrieve an instance of ServerName.
    * Callers should use the equals method to compare returned instances, though we may return
@@ -194,9 +199,19 @@ public class ServerName implements Comparable<ServerName>, Serializable {
     return new ServerName(hostAndPort, startCode);
   }
 
+  public static ServerName valueOf(final String hostAndPort, final long startCode,
+      String internalHostName) {
+    return new ServerName(Addressing.parseHostname(hostAndPort), Addressing.parsePort(hostAndPort),
+      startCode, internalHostName);
+  }
+
   @Override
   public String toString() {
     return getServerName();
+  }
+
+  public String getInternalServerName() {
+    return getServerName(internalHostName, port, startcode);
   }
 
   /**
@@ -378,7 +393,12 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    * @return A ServerName instance.
    * @see #getVersionedBytes()
    */
-  public static ServerName parseVersionedServerName(final byte [] versionedBytes) {
+  public static ServerName parseVersionedServerName(final byte[] versionedBytes) {
+    return parseVersionedServerName(versionedBytes, null);
+  }
+
+  public static ServerName parseVersionedServerName(final byte[] versionedBytes,
+      String internalHostName) {
     // Version is a short.
     short version = Bytes.toShort(versionedBytes);
     if (version == VERSION) {
@@ -387,7 +407,7 @@ public class ServerName implements Comparable<ServerName>, Serializable {
     }
     // Presume the bytes were written with an old version of hbase and that the
     // bytes are actually a String of the form "'<hostname>' ':' '<port>'".
-    return valueOf(Bytes.toString(versionedBytes), NON_STARTCODE);
+    return valueOf(Bytes.toString(versionedBytes), NON_STARTCODE, internalHostName);
   }
 
   /**
@@ -428,7 +448,7 @@ public class ServerName implements Comparable<ServerName>, Serializable {
         ZooKeeperProtos.Master rss =
           ZooKeeperProtos.Master.PARSER.parseFrom(data, prefixLen, data.length - prefixLen);
         org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ServerName sn = rss.getMaster();
-        return valueOf(sn.getHostName(), sn.getPort(), sn.getStartCode());
+        return valueOf(sn.getHostName(), sn.getPort(), sn.getStartCode(), sn.getInternalHostname());
       } catch (InvalidProtocolBufferException e) {
         // A failed parse of the znode is pretty catastrophic. Rather than loop
         // retrying hoping the bad bytes will changes, and rather than change
@@ -458,6 +478,10 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    */
   public Address getAddress() {
     return Address.fromParts(getHostname(), getPort());
+  }
+
+  public boolean hasDifferentInternalHostName() {
+    return internalHostName.equals(hostnameOnly);
   }
 
   /**

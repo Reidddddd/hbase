@@ -272,10 +272,12 @@ public class ServerManager {
     // in, it should have been removed from serverAddressToServerInfo and queued
     // for processing by ProcessServerShutdown.
 
-    final String hostname = request.hasUseThisHostnameInstead() ?
-        request.getUseThisHostnameInstead() :ia.getHostName();
+    final String hostname = ia.getHostAddress();
+    final String internalHostname = request.getUseThisHostnameInstead();
+
     ServerName sn = ServerName.valueOf(hostname, request.getPort(),
-      request.getServerStartCode());
+      request.getServerStartCode(), internalHostname);
+
     checkClockSkew(sn, request.getServerCurrentTime());
     checkIsDead(sn, "STARTUP");
     if (!checkAndRecordNewServer(sn, ServerLoad.EMPTY_SERVERLOAD)) {
