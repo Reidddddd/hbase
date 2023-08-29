@@ -31,6 +31,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.BindException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -1103,13 +1104,13 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     InetSocketAddress initialIsa;
     InetSocketAddress bindAddress;
     if(this instanceof MasterRpcServices) {
-      String hostname = getHostname(rs.conf, true);
+      String hostname = InetAddress.getLocalHost().getHostAddress();
       int port = rs.conf.getInt(HConstants.MASTER_PORT, HConstants.DEFAULT_MASTER_PORT);
       // Creation of a HSA will force a resolve.
       initialIsa = new InetSocketAddress(hostname, port);
       bindAddress = new InetSocketAddress(rs.conf.get("hbase.master.ipc.address", hostname), port);
     } else {
-      String hostname = getHostname(rs.conf, false);
+      String hostname = InetAddress.getLocalHost().getHostAddress();
       int port = rs.conf.getInt(HConstants.REGIONSERVER_PORT,
         HConstants.DEFAULT_REGIONSERVER_PORT);
       // Creation of a HSA will force a resolve.

@@ -586,9 +586,16 @@ public class HRegionServer extends HasThread implements
         }
       }
     }
-    String hostName = shouldUseThisHostnameInstead() ? useThisHostnameInstead :
-      rpcServices.isa.getHostName();
-    serverName = ServerName.valueOf(hostName, rpcServices.isa.getPort(), startcode);
+    // We directly use IP address as the hostname to do network communication.
+    String hostName = rpcServices.isa.getAddress().getHostAddress();
+    // Internal hostname use customised first and use the local hostname for default.
+    String internalHostName = shouldUseThisHostnameInstead() ? useThisHostnameInstead
+       : rpcServices.isa.getHostName();
+
+    serverName = ServerName.valueOf(hostName, rpcServices.isa.getPort(), startcode,
+      internalHostName);
+    LOG.info("Startup with hostname: " + hostName + " internal hostname: "
+      + serverName.getInternalHostName());
 
     rpcControllerFactory = RpcControllerFactory.instantiate(this.conf);
     rpcRetryingCallerFactory = RpcRetryingCallerFactory.instantiate(this.conf);
@@ -1216,7 +1223,7 @@ public class HRegionServer extends HasThread implements
     try {
       RegionServerReportRequest.Builder request = RegionServerReportRequest.newBuilder();
       ServerName sn = ServerName.parseVersionedServerName(
-        this.serverName.getVersionedBytes());
+        this.serverName.getVersionedBytes(), this.serverName.getInternalHostName());
       request.setServer(ProtobufUtil.toServerName(sn));
       request.setLoad(sl);
       rss.regionServerReport(null, request.build());
@@ -1414,22 +1421,12 @@ public class HRegionServer extends HasThread implements
         // The hostname the master sees us as.
         if (key.equals(HConstants.KEY_FOR_HOSTNAME_SEEN_BY_MASTER)) {
           String hostnameFromMasterPOV = e.getValue();
-          this.serverName = ServerName.valueOf(hostnameFromMasterPOV,
-            rpcServices.isa.getPort(), this.startcode);
-          if (shouldUseThisHostnameInstead() &&
-              !hostnameFromMasterPOV.equals(useThisHostnameInstead)) {
+          if (!this.serverName.getHostname().equals(hostnameFromMasterPOV)) {
             String msg = "Master passed us a different hostname to use; was=" +
-                this.useThisHostnameInstead + ", but now=" + hostnameFromMasterPOV;
+              this.serverName + ", but now=" + hostnameFromMasterPOV;
             LOG.error(msg);
             throw new IOException(msg);
           }
-          if (!shouldUseThisHostnameInstead() &&
-              !hostnameFromMasterPOV.equals(rpcServices.isa.getHostName())) {
-            String msg = "Master passed us a different hostname to use; was=" +
-                rpcServices.isa.getHostName() + ", but now=" + hostnameFromMasterPOV;
-            LOG.error(msg);
-          }
-          continue;
         }
         String value = e.getValue();
         if (key.equals(HConstants.HBASE_DIR)) {
@@ -1503,6 +1500,7 @@ public class HRegionServer extends HasThread implements
     RegionServerInfo.Builder rsInfo = RegionServerInfo.newBuilder();
     rsInfo.setInfoPort(infoServer != null ? infoServer.getPort() : -1);
     rsInfo.setVersionInfo(ProtobufUtil.getVersionInfo());
+    rsInfo.setInternalHostname(this.serverName.getInternalHostName());
     byte[] data = ProtobufUtil.prependPBMagic(rsInfo.build().toByteArray());
     ZKUtil.createEphemeralNodeAndWatch(this.zooKeeper,
       getMyEphemeralNodePath(), data);
@@ -2474,12 +2472,12 @@ public class HRegionServer extends HasThread implements
       long now = EnvironmentEdgeManager.currentTime();
       int port = rpcServices.isa.getPort();
       RegionServerStartupRequest.Builder request = RegionServerStartupRequest.newBuilder();
-      if (shouldUseThisHostnameInstead()) {
-        request.setUseThisHostnameInstead(useThisHostnameInstead);
-      }
       request.setPort(port);
       request.setServerStartCode(this.startcode);
       request.setServerCurrentTime(now);
+      if (serverName.hasDifferentInternalHostName()) {
+        request.setUseThisHostnameInstead(serverName.getInternalHostName());
+      }
       result = this.rssStub.regionServerStartup(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);

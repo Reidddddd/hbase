@@ -98,7 +98,7 @@ org.apache.hadoop.hbase.zookeeper.MasterAddressTracker;
   <div class="container-fluid content">
     <div class="row inner_header">
         <div class="page-header">
-            <h1>RegionServer <small><% serverName %></small></h1>
+            <h1>RegionServer <small><% serverName.getInternalHostName() + " (" + serverName.getHostname() + ")" %></small></h1>
         </div>
     </div>
     <div class="row">
@@ -196,8 +196,9 @@ org.apache.hadoop.hbase.zookeeper.MasterAddressTracker;
                 <%java>
                 String host = masterServerName.getHostname() + ":" + infoPort;
                 String url = "//" + host + "/master-status";
+                String internalHostName = masterServerName.getInternalHostName();
                 </%java>
-                <a href="<% url %>"><% host %></a>
+                <a href="<% url %>"><% internalHostName %></a>
                 </%if>
             </td>
             <td>Address of HBase Master</td>
