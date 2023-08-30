@@ -23,8 +23,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.management.NotificationEmitter;
+import javax.management.NotificationListener;
+import javax.management.openmbean.CompositeData;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.CompatibilitySingletonFactory;
+import org.apache.hadoop.hbase.regionserver.MetricsRegionServerSource;
+import org.apache.hadoop.hbase.regionserver.MetricsRegionServerSourceFactory;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.metrics.JvmPauseMonitorSource;
 import org.apache.hadoop.conf.Configuration;
@@ -35,6 +41,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.sun.management.GarbageCollectionNotificationInfo;
 
 /**
  * Class which sets up a simple thread which runs in a loop sleeping
@@ -86,6 +93,32 @@ public class JvmPauseMonitor {
     monitorThread = new Thread(new Monitor(), "JvmPauseMonitor");
     monitorThread.setDaemon(true);
     monitorThread.start();
+    if (metricsSource != null) {
+      addGCListener();
+    }
+  }
+
+  private void addGCListener() {
+    List<GarbageCollectorMXBean> beans = ManagementFactory.getGarbageCollectorMXBeans();
+    for (GarbageCollectorMXBean gcBean : beans) {
+      NotificationEmitter emitter = (NotificationEmitter) gcBean;
+      NotificationListener listener = (notification, handback) -> {
+        if (notification.getType()
+          .equals(GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION)) {
+          GarbageCollectionNotificationInfo info = GarbageCollectionNotificationInfo
+            .from((CompositeData) notification.getUserData());
+          if (info.getGcCause().equals("Allocation Stall")) {
+            metricsSource.incAllocationStallCount();
+          }
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("GCListener: name = " + info.getGcName() + ", action = "
+              + info.getGcAction() + ", cause = " + info.getGcCause() + ", duration = "
+              + info.getGcInfo().getDuration() + "ms");
+          }
+        }
+      };
+      emitter.addNotificationListener(listener, null, null);
+    }
   }
 
   public void stop() {
@@ -213,7 +246,11 @@ public class JvmPauseMonitor {
    * log messages about the GC pauses.
    */
   public static void main(String []args) throws Exception {
-    new JvmPauseMonitor(new Configuration()).start();
+    MetricsRegionServerSourceFactory metricsRegionServerSourceFactory =
+      CompatibilitySingletonFactory.getInstance(MetricsRegionServerSourceFactory.class);
+    MetricsRegionServerSource serverSource =
+      metricsRegionServerSourceFactory.createServer(null);
+    new JvmPauseMonitor(new Configuration(), serverSource).start();
     List<String> list = Lists.newArrayList();
     int i = 0;
     while (true) {
