@@ -49,6 +49,7 @@ public class MetricsThriftServerSourceImpl extends ExceptionTrackingSourceImpl i
   private final MutableFastCounter warnPauseThresholdExceeded;
   private final MetricHistogram pausesWithGc;
   private final MetricHistogram pausesWithoutGc;
+  private final MutableFastCounter allcationStallCount;
 
   private MutableGaugeLong activeWorkerCountGauge;
 
@@ -65,6 +66,8 @@ public class MetricsThriftServerSourceImpl extends ExceptionTrackingSourceImpl i
       WARN_THRESHOLD_COUNT_DESC, 0L);
     pausesWithGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITH_GC_KEY);
     pausesWithoutGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITHOUT_GC_KEY);
+    allcationStallCount = getMetricsRegistry().newCounter(GC_COUNT_CAUSED_BY_ALLOCATION_STALL_KEY,
+      GC_COUNT_CAUSED_BY_ALLOCATION_STALL_DESC, 0L);
   }
 
   @Override
@@ -142,5 +145,10 @@ public class MetricsThriftServerSourceImpl extends ExceptionTrackingSourceImpl i
   @Override
   public void updatePauseTimeWithoutGc(long t) {
     pausesWithoutGc.add(t);
+  }
+
+  @Override
+  public void incAllocationStallCount() {
+    allcationStallCount.incr();
   }
 }

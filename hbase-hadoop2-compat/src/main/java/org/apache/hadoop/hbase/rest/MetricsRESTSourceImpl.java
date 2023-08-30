@@ -51,6 +51,7 @@ public class MetricsRESTSourceImpl extends BaseSourceImpl implements MetricsREST
   private final MutableFastCounter warnPauseThresholdExceeded;
   private final MetricHistogram pausesWithGc;
   private final MetricHistogram pausesWithoutGc;
+  private final MutableFastCounter allcationStallCount;
 
   public MetricsRESTSourceImpl() {
     this(METRICS_NAME, METRICS_DESCRIPTION, CONTEXT, JMX_CONTEXT);
@@ -69,6 +70,8 @@ public class MetricsRESTSourceImpl extends BaseSourceImpl implements MetricsREST
       WARN_THRESHOLD_COUNT_DESC, 0L);
     pausesWithGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITH_GC_KEY);
     pausesWithoutGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITHOUT_GC_KEY);
+    allcationStallCount = getMetricsRegistry().newCounter(GC_COUNT_CAUSED_BY_ALLOCATION_STALL_KEY,
+      GC_COUNT_CAUSED_BY_ALLOCATION_STALL_DESC, 0L);
   }
 
   @Override
@@ -174,5 +177,10 @@ public class MetricsRESTSourceImpl extends BaseSourceImpl implements MetricsREST
   @Override
   public void updatePauseTimeWithoutGc(long t) {
     pausesWithoutGc.add(t);
+  }
+
+  @Override
+  public void incAllocationStallCount() {
+    allcationStallCount.incr();
   }
 }
