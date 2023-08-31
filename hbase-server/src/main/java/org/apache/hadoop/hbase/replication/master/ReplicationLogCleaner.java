@@ -18,7 +18,12 @@
  */
 package org.apache.hadoop.hbase.replication.master;
 
+import static org.apache.hadoop.hbase.replication.ReplicationStateZKBase.getWALServerNameAndGroupNameFromWALName;
+import static org.apache.hadoop.hbase.replication.ReplicationStateZKBase.getWALTimestampFromWALName;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -35,12 +40,9 @@ import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -54,7 +56,6 @@ public class ReplicationLogCleaner extends BaseLogCleanerDelegate {
   private ReplicationQueuesClient replicationQueues;
   private boolean stopped = false;
 
-
   @Override
   public Iterable<FileStatus> getDeletableFiles(Iterable<FileStatus> files) {
    // all members of this class are null if replication is disabled,
@@ -63,11 +64,11 @@ public class ReplicationLogCleaner extends BaseLogCleanerDelegate {
       return files;
     }
 
-    final Set<String> wals;
+    final Map<String, String> currentConsumingWALMap;
     try {
       // The concurrently created new WALs may not be included in the return list,
       // but they won't be deleted because they're not in the checking set.
-      wals = loadWALsFromQueues();
+      currentConsumingWALMap = loadCurrentWALsFromQueues();
     } catch (KeeperException e) {
       LOG.warn("Failed to read zookeeper, skipping checking deletable files");
       return Collections.emptyList();
@@ -76,7 +77,14 @@ public class ReplicationLogCleaner extends BaseLogCleanerDelegate {
       @Override
       public boolean apply(FileStatus file) {
         String wal = file.getPath().getName();
-        boolean logInReplicationQueue = wals.contains(wal);
+        String serverNameAndGroupName = getWALServerNameAndGroupNameFromWALName(wal);
+        String timestamp = getWALTimestampFromWALName(wal);
+        boolean logInReplicationQueue = false;
+        if (currentConsumingWALMap.containsKey(serverNameAndGroupName)) {
+          if(currentConsumingWALMap.get(serverNameAndGroupName).compareTo(timestamp) <= 0) {
+            logInReplicationQueue = true;
+          }
+        }
         if (LOG.isDebugEnabled()) {
           if (logInReplicationQueue) {
             LOG.debug("Found log in ZK, keeping: " + wal);
@@ -89,20 +97,20 @@ public class ReplicationLogCleaner extends BaseLogCleanerDelegate {
   }
 
   /**
-   * Load all wals in all replication queues from ZK. This method guarantees to return a
-   * snapshot which contains all WALs in the zookeeper at the start of this call even there
-   * is concurrent queue failover. However, some newly created WALs during the call may
-   * not be included.
+   * Load current consuming wals in all replication queues from ZK. This method guarantees
+   * to return a snapshot which contains all WALs in the zookeeper at the start of this call
+   * even there is concurrent queue failover. However, some newly created WALs during the
+   * call may not be included.
    */
-  private Set<String> loadWALsFromQueues() throws KeeperException {
+  private Map<String, String> loadCurrentWALsFromQueues() throws KeeperException {
     for (int retry = 0; ; retry++) {
       int v0 = replicationQueues.getQueuesZNodeCversion();
       List<String> rss = replicationQueues.getListOfReplicators();
       if (rss == null || rss.isEmpty()) {
         LOG.debug("Didn't find any region server that replicates, won't prevent any deletions.");
-        return ImmutableSet.of();
+        return ImmutableMap.of();
       }
-      Set<String> wals = Sets.newHashSet();
+      Map<String, String> currentConsumingWALMap = new HashMap<>();
       for (String rs : rss) {
         List<String> listOfPeers = replicationQueues.getAllQueues(rs);
         // if rs just died, this will be null
@@ -110,15 +118,25 @@ public class ReplicationLogCleaner extends BaseLogCleanerDelegate {
           continue;
         }
         for (String id : listOfPeers) {
-          List<String> peersWals = replicationQueues.getLogsInQueue(rs, id);
+          List<String> peersWals = replicationQueues.getCurrentConsumingLogsInQueue(rs, id);
           if (peersWals != null) {
-            wals.addAll(peersWals);
+            peersWals.forEach(wal -> {
+              String serverNameAndGroupName = getWALServerNameAndGroupNameFromWALName(wal);
+              String timestamp = getWALTimestampFromWALName(wal);
+              if (!currentConsumingWALMap.containsKey(serverNameAndGroupName)) {
+                currentConsumingWALMap.put(serverNameAndGroupName, timestamp);
+              } else {
+                if (currentConsumingWALMap.get(serverNameAndGroupName).compareTo(timestamp) < 0) {
+                  currentConsumingWALMap.put(serverNameAndGroupName, timestamp);
+                }
+              }
+            });
           }
         }
       }
       int v1 = replicationQueues.getQueuesZNodeCversion();
       if (v0 == v1) {
-        return wals;
+        return currentConsumingWALMap;
       }
       LOG.info(String.format("Replication queue node cversion changed from %d to %d, retry = %d",
           v0, v1, retry));

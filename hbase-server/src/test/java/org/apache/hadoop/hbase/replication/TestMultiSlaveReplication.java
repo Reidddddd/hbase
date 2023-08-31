@@ -52,10 +52,10 @@ import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.MiniZooKeeperCluster;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -239,7 +239,8 @@ public class TestMultiSlaveReplication {
     replicationAdmin.addPeer("cluster2", rpc, null);
     HRegionServer rs = cluster.getRegionServer(0);
     ReplicationQueuesZKImpl zk = new ReplicationQueuesZKImpl(rs.getZooKeeper(), conf1, rs);
-    zk.init(rs.getServerName().toString());
+    zk.init(rs.getServerName().toString(), new Path(utility1.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(rs.getServerName().toString())));
     List<String> replicators = zk.getListOfReplicators();
     assertEquals(2, replicators.size());
     String zNode = cluster.getRegionServer(1).getServerName().toString();
@@ -252,7 +253,8 @@ public class TestMultiSlaveReplication {
     Thread.sleep(10000);
     HRegionServer rs1 = cluster.getRegionServer(1);
     zk = new ReplicationQueuesZKImpl(rs1.getZooKeeper(), conf1, rs1);
-    zk.init(rs1.getServerName().toString());
+    zk.init(rs1.getServerName().toString(), new Path(utility1.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(rs1.getServerName().toString())));
     assertFalse(zk.checkLockExists(zNode));
 
     utility1.shutdownMiniCluster();

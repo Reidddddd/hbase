@@ -95,13 +95,28 @@ public class Replication extends WALActionsListener.Base implements
    * Instantiate the replication management (if rep is enabled).
    * @param server Hosting server
    * @param fs handle to the filesystem
-   * @param logDir
+   * @param logDir directory of wal
    * @param oldLogDir directory where logs are archived
-   * @throws IOException
+   * @throws IOException IOException
    */
   public Replication(final Server server, final FileSystem fs,
-      final Path logDir, final Path oldLogDir) throws IOException{
-    initialize(server, fs, logDir, oldLogDir);
+                     final Path logDir, final Path oldLogDir) throws IOException{
+    this(server, fs, logDir, oldLogDir, false);
+  }
+
+  /**
+   * Instantiate the replication management (if rep is enabled).
+   * @param server Hosting server
+   * @param fs handle to the filesystem
+   * @param logDir directory of wal
+   * @param oldLogDir directory where logs are archived
+   * @param isSyncUp true if this is from ReplicationSyncUp
+   * @throws IOException IOException
+   */
+  public Replication(final Server server, final FileSystem fs,
+                     final Path logDir, final Path oldLogDir, final boolean isSyncUp)
+    throws IOException{
+    initialize(server, fs, logDir, oldLogDir, isSyncUp);
   }
 
   /**
@@ -111,7 +126,7 @@ public class Replication extends WALActionsListener.Base implements
   }
 
   public void initialize(final Server server, final FileSystem fs,
-      final Path logDir, final Path oldLogDir) throws IOException {
+      final Path logDir, final Path oldLogDir, final boolean isSyncUp) throws IOException {
     this.server = server;
     this.conf = this.server.getConfiguration();
     this.replication = isReplication(this.conf);
@@ -132,8 +147,9 @@ public class Replication extends WALActionsListener.Base implements
     if (replication) {
       try {
         this.replicationQueues =
-            ReplicationFactory.getReplicationQueues(server.getZooKeeper(), this.conf, this.server);
-        this.replicationQueues.init(this.server.getServerName().toString());
+            ReplicationFactory.getReplicationQueues(server.getZooKeeper(), this.conf, this.server,
+              fs, oldLogDir);
+        this.replicationQueues.init(this.server.getServerName().toString(), logDir);
         this.replicationPeers =
             ReplicationFactory.getReplicationPeers(server.getZooKeeper(), this.conf, this.server);
         this.replicationPeers.init();
@@ -151,7 +167,7 @@ public class Replication extends WALActionsListener.Base implements
       }
       this.replicationManager =
           new ReplicationSourceManager(replicationQueues, replicationPeers, replicationTracker,
-              conf, this.server, fs, logDir, oldLogDir, clusterId);
+              conf, this.server, fs, logDir, oldLogDir, clusterId, isSyncUp);
       this.statsThreadPeriod =
           this.conf.getInt("replication.stats.thread.period.seconds", 5 * 60);
       LOG.debug("ReplicationStatisticsThread " + this.statsThreadPeriod);
@@ -219,7 +235,7 @@ public class Replication extends WALActionsListener.Base implements
    * @param sourceBaseNamespaceDirPath Path that point to the source cluster base namespace
    *          directory required for replicating hfiles
    * @param sourceHFileArchiveDirPath Path that point to the source cluster hfile archive directory
-   * @throws IOException
+   * @throws IOException IOException
    */
   public void replicateLogEntries(List<WALEntry> entries, CellScanner cells,
       String replicationClusterId, String sourceBaseNamespaceDirPath,
@@ -233,7 +249,7 @@ public class Replication extends WALActionsListener.Base implements
   /**
    * If replication is enabled and this cluster is a master,
    * it starts
-   * @throws IOException
+   * @throws IOException IOException
    */
   public void startReplicationService() throws IOException {
     if (this.replication) {
@@ -356,7 +372,7 @@ public class Replication extends WALActionsListener.Base implements
 
   /**
    * This method modifies the master's configuration in order to inject replication-related features
-   * @param conf
+   * @param conf conf
    */
   public static void decorateMasterConfiguration(Configuration conf) {
     if (!isReplication(conf)) {

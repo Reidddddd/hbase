@@ -39,13 +39,21 @@ public interface ReplicationQueues {
    * @param serverName The server name of the region server that owns the replication queues this
    *          interface manages.
    */
-  void init(String serverName) throws ReplicationException;
+  void init(String serverName, Path logDir) throws ReplicationException;
 
   /**
    * Remove a replication queue.
    * @param queueId a String that identifies the queue.
    */
   void removeQueue(String queueId);
+
+  /**
+   * Add a new WAL file to the given queue. If the queue does not exist it is created.
+   * @param queueId a String that identifies the queue.
+   * @param filename name of the WAL
+   * @param walPrefix prefix of WAL filename
+   */
+  void initLog(String queueId, String filename, String walPrefix) throws ReplicationException;
 
   /**
    * Add a new WAL file to the given queue. If the queue does not exist it is created.
@@ -113,9 +121,10 @@ public interface ReplicationQueues {
    * Take ownership for the queue identified by queueId and belongs to a dead region server.
    * @param regionserver the id of the dead region server
    * @param queueId the id of the queue
+   * @param isSyncUp is ReplicationSyncUp
    * @return the new PeerId and A SortedSet of WALs in its queue, and null if no unclaimed queue.
    */
-  Pair<String, SortedSet<String>> claimQueue(String regionserver, String queueId);
+  Pair<String, SortedSet<String>> claimQueue(String regionserver, String queueId, boolean isSyncUp);
 
   /**
    * Remove the znode of region server if the queue is empty.

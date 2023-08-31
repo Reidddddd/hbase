@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hbase.replication;
 
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Abortable;
@@ -31,8 +33,9 @@ import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 public class ReplicationFactory {
 
   public static ReplicationQueues getReplicationQueues(final ZooKeeperWatcher zk,
-      Configuration conf, Abortable abortable) {
-    return new ReplicationQueuesZKImpl(zk, conf, abortable);
+                                                       Configuration conf, Abortable abortable,
+                                                       FileSystem fs, Path oldWALsDir) {
+    return new ReplicationQueuesZKImpl(zk, conf, abortable, fs, oldWALsDir);
   }
 
   public static ReplicationQueuesClient getReplicationQueuesClient(final ZooKeeperWatcher zk,

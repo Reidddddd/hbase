@@ -25,12 +25,16 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.replication.ReplicationFactory;
 import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.replication.ReplicationQueuesZKImpl;
 import org.apache.hadoop.hbase.testclassification.MasterTests;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -49,11 +53,15 @@ public class TestReplicationZKNodeCleaner {
   private final Configuration conf;
   private final ZooKeeperWatcher zkw;
   private final ReplicationQueues repQueues;
+  private final FileSystem fs;
+  private final Path oldLogDir;
 
   public TestReplicationZKNodeCleaner() throws Exception {
     conf = TEST_UTIL.getConfiguration();
     zkw = new ZooKeeperWatcher(conf, "TestReplicationZKNodeCleaner", null);
-    repQueues = ReplicationFactory.getReplicationQueues(zkw, conf, null);
+    fs = FileSystem.get(conf);
+    oldLogDir = new Path(TEST_UTIL.getDataTestDir(), HConstants.HREGION_OLDLOGDIR_NAME);
+    repQueues = ReplicationFactory.getReplicationQueues(zkw, conf, null, fs, oldLogDir);
     assertTrue(repQueues instanceof ReplicationQueuesZKImpl);
   }
 
@@ -70,7 +78,8 @@ public class TestReplicationZKNodeCleaner {
 
   @Test
   public void testReplicationZKNodeCleaner() throws Exception {
-    repQueues.init(SERVER_ONE);
+    repQueues.init(SERVER_ONE, new Path(TEST_UTIL.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(SERVER_ONE)));
     // add queue for ID_ONE which isn't exist
     repQueues.addLog(ID_ONE, "file1");
 
@@ -98,7 +107,8 @@ public class TestReplicationZKNodeCleaner {
 
   @Test
   public void testReplicationZKNodeCleanerChore() throws Exception {
-    repQueues.init(SERVER_ONE);
+    repQueues.init(SERVER_ONE, new Path(TEST_UTIL.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(SERVER_ONE)));
     // add queue for ID_ONE which isn't exist
     repQueues.addLog(ID_ONE, "file1");
     // add a recovery queue for ID_TWO which isn't exist

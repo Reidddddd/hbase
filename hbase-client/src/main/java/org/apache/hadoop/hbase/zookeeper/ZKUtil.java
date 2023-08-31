@@ -588,6 +588,46 @@ public class ZKUtil {
   }
 
   /**
+   * Checks if the specified znode has any children with specified prefix.
+   * Sets no watches.
+   *
+   * Returns true if the node exists and has children with specified prefix.
+   * Returns false if the node does not exist, or if the node does not have any children,
+   * or of the child nodes all with other prefix.
+   *
+   * @param zkw zk reference
+   * @param znode path of node to check for children of
+   * @param prefix the specified prefix of child nodes
+   * @return true if node has children, false if not or node does not exist
+   * @throws KeeperException if unexpected zookeeper exception
+   */
+  public static boolean nodeHasChildrenWithPrefix(ZooKeeperWatcher zkw, String znode, String prefix)
+    throws KeeperException {
+    try {
+      List<String> children = listChildrenNoWatch(zkw, znode);
+      if (children == null || children.size() == 0) {
+        return false;
+      }
+      for (String child : children) {
+        if (child.contains(prefix)) {
+          return true;
+        }
+      }
+      return false;
+    } catch(KeeperException.NoNodeException ke) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(zkw.prefix("Unable to list children of znode " + znode + " " +
+          "because node does not exist (not an error)"));
+      }
+      return false;
+    } catch (KeeperException e) {
+      LOG.warn(zkw.prefix("Unable to list children of znode " + znode), e);
+      zkw.keeperException(e);
+      return false;
+    }
+  }
+
+  /**
    * Get the number of children of the specified node.
    *
    * If the node does not exist or has no children, returns 0.

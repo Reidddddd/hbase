@@ -145,4 +145,26 @@ public abstract class ReplicationStateZKBase {
   protected String getPeerNode(String id) {
     return ZKUtil.joinZNode(this.peersZNode, id);
   }
+
+  /**
+   * Get prefix of the log from its name, assuming WAL name in format of
+   * log_prefix.filenumber.log_suffix
+   * @param name Name of the WAL to parse
+   * @return prefix of the log
+   */
+  public static String getWALServerNameAndGroupNameFromWALName(String name) {
+    int endIndex = name.replaceAll(".meta", "").lastIndexOf(".");
+    return name.substring(0, endIndex);
+  }
+
+  /**
+   * Get suffix of the log from its name, assuming WAL name in format of
+   * log_prefix.filenumber.log_suffix
+   * @param name Name of the WAL to parse
+   * @return suffix of the log
+   */
+  public static String getWALTimestampFromWALName(String name) {
+    int index = name.replaceAll(".meta", "").lastIndexOf(".");
+    return name.substring(index + 1);
+  }
 }
