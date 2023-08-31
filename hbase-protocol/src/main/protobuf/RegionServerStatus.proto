@@ -40,6 +40,9 @@ message RegionServerStartupRequest {
 
   /** hostname for region server, optional */
   optional string use_this_hostname_instead = 4;
+
+  /** rsgroup name for region server, optional */
+  optional string group_name = 5;
 }
 
 message RegionServerStartupResponse {

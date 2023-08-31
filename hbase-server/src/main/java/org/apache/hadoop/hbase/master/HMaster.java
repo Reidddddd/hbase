@@ -137,6 +137,7 @@ import org.apache.hadoop.hbase.monitoring.MonitoredTask;
 import org.apache.hadoop.hbase.monitoring.TaskMonitor;
 import org.apache.hadoop.hbase.master.normalizer.NormalizationPlan;
 import org.apache.hadoop.hbase.master.normalizer.NormalizationPlan.PlanType;
+import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.procedure.MasterProcedureManagerHost;
 import org.apache.hadoop.hbase.procedure.flush.MasterFlushTableProcedureManager;
 import org.apache.hadoop.hbase.procedure2.ProcedureExecutor;
@@ -156,6 +157,8 @@ import org.apache.hadoop.hbase.regionserver.compactions.ExploringCompactionPolic
 import org.apache.hadoop.hbase.regionserver.compactions.FIFOCompactionPolicy;
 import org.apache.hadoop.hbase.replication.master.TableCFsUpdater;
 import org.apache.hadoop.hbase.replication.regionserver.Replication;
+import org.apache.hadoop.hbase.rsgroup.RSGroupAdminClient;
+import org.apache.hadoop.hbase.rsgroup.RSGroupInfo;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
 import org.apache.hadoop.hbase.util.Addressing;
@@ -212,6 +215,10 @@ import com.google.protobuf.Service;
 @SuppressWarnings("deprecation")
 public class HMaster extends HRegionServer implements MasterServices, Server {
   private static final Log LOG = LogFactory.getLog(HMaster.class.getName());
+  private static final String CATALOG_JANITOR_CLASS_KEY = "hbase.master.catalog.janitor.class";
+  private static final Class<? extends CatalogJanitor> DEFAULT_CATALOG_JANITOR_CLASS =
+    CatalogJanitor.class;
+  private RSGroupAdminClient rsGroupAdminClient;
 
   /**
    * Protection against zombie master. Started once Master accepts active responsibility and
@@ -978,6 +985,42 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Balancer post startup initialization complete, took " + (
           (System.currentTimeMillis() - start) / 1000) + " seconds");
+    }
+    rsGroupAdminClient = isK8sModeEnabled() ? new RSGroupAdminClient(getConnection()) : null;
+  }
+
+  // Only invoked when k8s mode is on.
+  void moveServerToTargetGroup(ServerName sn, String groupName) throws IOException {
+    if (!isInitialized() || rsGroupAdminClient == null) {
+      // We are not initialized or the rsGroupAdminClient is not initialized. Skip this move.
+      return;
+    }
+    if (groupName.equals(RSGroupInfo.DEFAULT_GROUP)) {
+      // The new server will be added to the default group automatically.
+      return;
+    }
+    Set<Address> addressSet = new HashSet<>();
+    Address rsAddress = Address.fromParts(sn.getHostname(), sn.getPort());
+    addressSet.add(rsAddress);
+
+    RSGroupInfo rsGroupInfo = rsGroupAdminClient.getRSGroupInfo(groupName);
+    if (rsGroupInfo == null) {
+      // The rsgroup is new, create it.
+      try {
+        rsGroupAdminClient.addRSGroup(groupName);
+      } catch (IOException ioe) {
+        if (ioe.getMessage().contains("Group already exists")) {
+          // The rsgroup is created already, ignore the ioe here.
+          LOG.info("Tried to add an existing rsgroup " + rsGroupInfo.getName());
+        } else {
+          throw ioe;
+        }
+      }
+      rsGroupAdminClient.moveServers(addressSet, groupName);
+    } else {
+      if (!rsGroupInfo.containsServer(rsAddress)) {
+        rsGroupAdminClient.moveServers(addressSet, groupName);
+      }
     }
   }
 

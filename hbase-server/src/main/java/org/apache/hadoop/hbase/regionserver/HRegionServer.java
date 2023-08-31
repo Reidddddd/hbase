@@ -213,6 +213,9 @@ public class HRegionServer extends HasThread implements
 
   private static final Log LOG = LogFactory.getLog(HRegionServer.class);
 
+  private static final String RS_GROUP_KEY = "hbase.regionserver.group";
+  private static final String DEFAULT_RSGROUP = "default";
+
   /*
    * Strings to be used in forming the exception message for
    * RegionsAlreadyInTransitionException.
@@ -331,6 +334,10 @@ public class HRegionServer extends HasThread implements
   private final int compactionCheckFrequency;
   private static final String PERIOD_FLUSH = "hbase.regionserver.flush.check.period";
   private final int flushCheckFrequency;
+
+  private static final String K8S_MODE_ENABLED = "hbase.k8s.enabled";
+  private static final boolean K8S_MODE_ENABLED_DEFAULT = false;
+  private final boolean k8sModeEnabled;
 
   protected final int numRegionsToReport;
 
@@ -522,6 +529,7 @@ public class HRegionServer extends HasThread implements
       throws IOException, InterruptedException {
     super("RegionServer");  // thread name
     TraceUtil.initTracer(conf);
+    this.k8sModeEnabled = conf.getBoolean(K8S_MODE_ENABLED, K8S_MODE_ENABLED_DEFAULT);
     this.startcode = System.currentTimeMillis();
     this.fsOk = true;
     this.conf = conf;
@@ -952,6 +960,10 @@ public class HRegionServer extends HasThread implements
     configurationManager.registerObserver(this.compactSplitThread);
     configurationManager.registerObserver(this.rpcServices);
     configurationManager.registerObserver(this);
+  }
+
+  public boolean isK8sModeEnabled() {
+    return this.k8sModeEnabled;
   }
 
   /**
@@ -2413,6 +2425,9 @@ public class HRegionServer extends HasThread implements
       request.setServerStartCode(this.startcode);
       request.setServerCurrentTime(now);
       request.setUseThisHostnameInstead(this.serverName.getInternalHostName());
+      if (isK8sModeEnabled()) {
+        request.setGroupName(this.conf.get(RS_GROUP_KEY, DEFAULT_RSGROUP));
+      }
       result = this.rssStub.regionServerStartup(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);
