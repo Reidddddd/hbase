@@ -55,6 +55,7 @@ import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.replication.ReplicationQueuesClient;
 import org.apache.hadoop.hbase.replication.master.ReplicationLogCleaner;
 import org.apache.hadoop.hbase.replication.regionserver.Replication;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -102,15 +103,16 @@ public class TestLogsCleaner {
     conf.setBoolean(HConstants.REPLICATION_ENABLE_KEY, HConstants.REPLICATION_ENABLE_DEFAULT);
     Replication.decorateMasterConfiguration(conf);
     Server server = new DummyServer();
-    ReplicationQueues repQueues =
-        ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server);
-    repQueues.init(server.getServerName().toString());
+    final FileSystem fs = FileSystem.get(conf);
     final Path oldLogDir = new Path(TEST_UTIL.getDataTestDir(),
-        HConstants.HREGION_OLDLOGDIR_NAME);
+      HConstants.HREGION_OLDLOGDIR_NAME);
+    ReplicationQueues repQueues =
+        ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server, fs, oldLogDir);
+    repQueues.init(server.getServerName().toString(), new Path(TEST_UTIL.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
     String fakeMachineName =
       URLEncoder.encode(server.getServerName().toString(), "UTF8");
 
-    final FileSystem fs = FileSystem.get(conf);
 
     // Create 2 invalid files, 1 "recent" file, 1 very new file and 30 old files
     long now = System.currentTimeMillis();
@@ -131,8 +133,10 @@ public class TestLogsCleaner {
       // for replication so these files would pass the first log cleaner
       // (TimeToLiveLogCleaner) but would be rejected by the second
       // (ReplicationLogCleaner)
-      if (i % (30/3) == 1) {
-        repQueues.addLog(fakeMachineName, fileName.getName());
+      if (i <= 3) {
+        if (i == 3) {
+          repQueues.addLog(fakeMachineName, fileName.getName());
+        }
         System.out.println("Replication log file: " + fileName);
       }
     }
@@ -160,6 +164,7 @@ public class TestLogsCleaner {
     TEST_UTIL.waitFor(1000, new Waiter.Predicate<Exception>() {
       @Override
       public boolean evaluate() throws Exception {
+        System.out.println(fs.listStatus(oldLogDir).length + " files");
         return 5 == fs.listStatus(oldLogDir).length;
       }
     });
@@ -241,8 +246,8 @@ public class TestLogsCleaner {
     ReplicationLogCleaner cleaner = new ReplicationLogCleaner();
 
     List<FileStatus> dummyFiles = Lists.newArrayList(
-        new FileStatus(100, false, 3, 100, System.currentTimeMillis(), new Path("log1")),
-        new FileStatus(100, false, 3, 100, System.currentTimeMillis(), new Path("log2"))
+        new FileStatus(100, false, 3, 100, System.currentTimeMillis(), new Path("log.1")),
+        new FileStatus(100, false, 3, 100, System.currentTimeMillis(), new Path("log.2"))
     );
 
     ZooKeeperWatcher zkw = new ZooKeeperWatcher(conf, "testZooKeeperAbort-normal", null);
@@ -251,9 +256,9 @@ public class TestLogsCleaner {
       Iterable<FileStatus> filesToDelete = cleaner.getDeletableFiles(dummyFiles);
       Iterator<FileStatus> iter = filesToDelete.iterator();
       assertTrue(iter.hasNext());
-      assertEquals(new Path("log1"), iter.next().getPath());
+      assertEquals(new Path("log.1"), iter.next().getPath());
       assertTrue(iter.hasNext());
-      assertEquals(new Path("log2"), iter.next().getPath());
+      assertEquals(new Path("log.2"), iter.next().getPath());
       assertFalse(iter.hasNext());
     } finally {
       zkw.close();

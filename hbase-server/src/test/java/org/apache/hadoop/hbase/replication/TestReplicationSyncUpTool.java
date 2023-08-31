@@ -192,7 +192,7 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
     ht1Source = new HTable(conf1, t1_su);
     ht1Source.setWriteBufferSize(1024);
     ht2Source = new HTable(conf1, t2_su);
-    ht1Source.setWriteBufferSize(1024);
+    ht2Source.setWriteBufferSize(1024);
 
     // Get HTable from Peer1
     ht1TargetAtPeer1 = new HTable(conf2, t1_su);
@@ -268,6 +268,7 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
   private void mimicSyncUpAfterDelete() throws Exception {
     LOG.debug("mimicSyncUpAfterDelete");
     utility2.shutdownMiniHBaseCluster();
+    LOG.debug("mimicSyncUpAfterDelete shutdown slave cluster done.");
 
     List<Delete> list = new ArrayList<Delete>();
     // delete half of the rows
@@ -288,13 +289,19 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
     int rowCount_ht1Source = utility1.countRows(ht1Source);
     assertEquals("t1_syncup has 51 rows on source, after remove 50 of the replicated colfam", 51,
       rowCount_ht1Source);
+    LOG.debug("mimicSyncUpAfterDelete t1_syncup has 51 rows on source, " +
+      "after remove 50 of the replicated colfam");
 
     int rowCount_ht2Source = utility1.countRows(ht2Source);
     assertEquals("t2_syncup has 101 rows on source, after remove 100 of the replicated colfam",
       101, rowCount_ht2Source);
+    LOG.debug("mimicSyncUpAfterDelete t2_syncup has 101 rows on source, " +
+      "after remove 100 of the replicated colfam");
 
     utility1.shutdownMiniHBaseCluster();
+    LOG.debug("mimicSyncUpAfterDelete shutdown master cluster done.");
     utility2.restartHBaseCluster(1);
+    LOG.debug("mimicSyncUpAfterDelete restart slave cluster done.");
 
     Thread.sleep(SLEEP_TIME);
 
@@ -303,6 +310,8 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
     int rowCount_ht2TargetAtPeer1 = utility2.countRows(ht2TargetAtPeer1);
     assertEquals("@Peer1 t1_syncup should still have 100 rows", 100, rowCount_ht1TargetAtPeer1);
     assertEquals("@Peer1 t2_syncup should still have 200 rows", 200, rowCount_ht2TargetAtPeer1);
+
+    LOG.debug("---------- mimicSyncUpAfterDelete sync up ----------");
 
     // After sync up
     for (int i = 0; i < NB_RETRIES; i++) {
@@ -337,8 +346,12 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
 
   private void mimicSyncUpAfterPut() throws Exception {
     LOG.debug("mimicSyncUpAfterPut");
+    LOG.debug("mimicSyncUpAfterPut restart master cluster begin.");
     utility1.restartHBaseCluster(1);
+    LOG.debug("mimicSyncUpAfterPut restart master cluster done.");
+    LOG.debug("mimicSyncUpAfterPut shutdown slave cluster begin.");
     utility2.shutdownMiniHBaseCluster();
+    LOG.debug("mimicSyncUpAfterPut shutdown slave cluster done.");
 
     Put p;
     // another 100 + 1 row to t1_syncup
@@ -365,11 +378,17 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
 
     int rowCount_ht1Source = utility1.countRows(ht1Source);
     assertEquals("t1_syncup has 102 rows on source", 102, rowCount_ht1Source);
+    LOG.debug("mimicSyncUpAfterPut t1_syncup has 102 rows on source");
     int rowCount_ht2Source = utility1.countRows(ht2Source);
     assertEquals("t2_syncup has 202 rows on source", 202, rowCount_ht2Source);
+    LOG.debug("mimicSyncUpAfterPut t2_syncup has 202 rows on source");
 
+    LOG.debug("mimicSyncUpAfterPut shutdown master cluster after put begin.");
     utility1.shutdownMiniHBaseCluster();
+    LOG.debug("mimicSyncUpAfterPut shutdown master cluster after put done.");
+    LOG.debug("mimicSyncUpAfterPut restart slave cluster after put begin.");
     utility2.restartHBaseCluster(1);
+    LOG.debug("mimicSyncUpAfterPut restart slave cluster after put done.");
 
     Thread.sleep(SLEEP_TIME);
 
@@ -378,8 +397,10 @@ public class TestReplicationSyncUpTool extends TestReplicationBase {
     int rowCount_ht2TargetAtPeer1 = utility2.countRows(ht2TargetAtPeer1);
     assertEquals("@Peer1 t1_syncup should be NOT sync up and have 50 rows", 50,
       rowCount_ht1TargetAtPeer1);
+    LOG.debug("mimicSyncUpAfterPut @Peer1 t1_syncup has 50 rows on source");
     assertEquals("@Peer1 t2_syncup should be NOT sync up and have 100 rows", 100,
       rowCount_ht2TargetAtPeer1);
+    LOG.debug("mimicSyncUpAfterPut @Peer1 t2_syncup has 100 rows on source");
 
     // after syun up
     for (int i = 0; i < NB_RETRIES; i++) {

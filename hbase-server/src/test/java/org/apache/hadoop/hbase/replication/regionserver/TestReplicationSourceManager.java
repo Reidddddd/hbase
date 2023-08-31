@@ -24,6 +24,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import com.google.common.collect.Sets;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URLEncoder;
@@ -201,6 +202,7 @@ public class TestReplicationSourceManager {
   private void cleanLogDir() throws IOException {
     fs.delete(logDir, true);
     fs.delete(oldLogDir, true);
+    fs.mkdirs(oldLogDir);
   }
 
   @Before
@@ -315,16 +317,25 @@ public class TestReplicationSourceManager {
   public void testClaimQueues() throws Exception {
     conf.setBoolean(HConstants.ZOOKEEPER_USEMULTI, true);
     final Server server = new DummyServer("hostname0.example.org");
+    String serverName = server.getServerName().toString();
+    Path logDir0 = new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(serverName));
     ReplicationQueues rq =
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
-          server);
-    rq.init(server.getServerName().toString());
+          server, fs, oldLogDir);
+    rq.init(serverName, logDir0);
     // populate some znodes in the peer znode
-    files.add("log1");
-    files.add("log2");
-    for (String file : files) {
-      rq.addLog("1", file);
+    fs.mkdirs(oldLogDir);
+    files.add("log.1");
+    files.add("log.2");
+    rq.addLog("1", files.get(0));
+    List<Path> paths = new ArrayList<>();
+    for (String fileName : files) {
+      Path file = new Path(logDir0, fileName);
+      fs.create(file).close();
+      paths.add(file);
     }
+
     // create 3 DummyServers
     Server s1 = new DummyServer("dummyserver1.example.org");
     Server s2 = new DummyServer("dummyserver2.example.org");
@@ -343,12 +354,25 @@ public class TestReplicationSourceManager {
     w1.start();
     w2.start();
     w3.start();
+
+    paths.forEach(path -> {
+      try {
+        fs.moveFromLocalFile(path, oldLogDir);
+      } catch (FileNotFoundException e) {
+
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    fs.delete(logDir0);
+
     // make sure only one is successful
     int populatedMap = 0;
     // wait for result now... till all the workers are done.
     latch.await();
     populatedMap += w1.isLogZnodesMapPopulated() + w2.isLogZnodesMapPopulated()
         + w3.isLogZnodesMapPopulated();
+//    populatedMap += w1.isLogZnodesMapPopulated();
     assertEquals(1, populatedMap);
     server.abort("", null);
   }
@@ -356,10 +380,13 @@ public class TestReplicationSourceManager {
   @Test
   public void testCleanupFailoverQueues() throws Exception {
     final Server server = new DummyServer("hostname1.example.org");
+    String serverName = server.getServerName().toString();
+    Path logDir0 = new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(serverName));
     ReplicationQueues rq =
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
-          server);
-    rq.init(server.getServerName().toString());
+          server, fs, oldLogDir);
+    rq.init(serverName, logDir0);
     // populate some znodes in the peer znode
     SortedSet<String> files = new TreeSet<String>();
     String group = "testgroup";
@@ -367,20 +394,36 @@ public class TestReplicationSourceManager {
     String file2 = group + ".log2";
     files.add(file1);
     files.add(file2);
-    for (String file : files) {
-      rq.addLog("1", file);
+    rq.addLog("1", file1);
+    List<Path> paths = new ArrayList<>();
+    for (String fileName : files) {
+      Path file = new Path(logDir0, fileName);
+      fs.create(file).close();
+      paths.add(file);
     }
     Server s1 = new DummyServer("dummyserver1.example.org");
     ReplicationQueues rq1 =
-        ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1);
-    rq1.init(s1.getServerName().toString());
+        ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1, fs,
+          oldLogDir);
+    rq1.init(s1.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(s1.getServerName().toString())));
     ReplicationPeers rp1 =
         ReplicationFactory.getReplicationPeers(s1.getZooKeeper(), s1.getConfiguration(), s1);
     rp1.init();
     NodeFailoverWorker w1 =
         manager.new NodeFailoverWorker(server.getServerName().getServerName(), rq1, rp1, new UUID(
-            new Long(1), new Long(2)));
+            new Long(1), new Long(2)), false);
     w1.start();
+    paths.forEach(path -> {
+      try {
+        fs.moveFromLocalFile(path, oldLogDir);
+      } catch (FileNotFoundException e) {
+
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    fs.delete(logDir0);
     w1.join(10000);
     assertEquals(1, manager.getWalsByIdRecoveredQueues().size());
     String id = "1-" + server.getServerName().getServerName();
@@ -396,11 +439,12 @@ public class TestReplicationSourceManager {
     conf.setBoolean(HConstants.ZOOKEEPER_USEMULTI, true);
     final Server server = new DummyServer("ec2-54-234-230-108.compute-1.amazonaws.com");
     ReplicationQueues repQueues =
-        ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server);
-    repQueues.init(server.getServerName().toString());
+      ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server, fs, oldLogDir);
+    repQueues.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
     // populate some znodes in the peer znode
-    files.add("log1");
-    files.add("log2");
+    files.add("log.1");
+    files.add("log.2");
     for (String file : files) {
       repQueues.addLog("1", file);
     }
@@ -412,26 +456,32 @@ public class TestReplicationSourceManager {
 
     // simulate three servers fail sequentially
     ReplicationQueues rq1 =
-        ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1);
-    rq1.init(s1.getServerName().toString());
+        ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1, fs,
+          oldLogDir);
+    rq1.init(s1.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(s1.getServerName().toString())));
     String serverName = server.getServerName().getServerName();
     List<String> unclaimed = rq1.getUnClaimedQueueIds(serverName);
-    rq1.claimQueue(serverName, unclaimed.get(0)).getSecond();
+    rq1.claimQueue(serverName, unclaimed.get(0), false).getSecond();
     rq1.removeReplicatorIfQueueIsEmpty(unclaimed.get(0));
 
     ReplicationQueues rq2 =
-        ReplicationFactory.getReplicationQueues(s2.getZooKeeper(), s2.getConfiguration(), s2);
-    rq2.init(s2.getServerName().toString());
+      ReplicationFactory.getReplicationQueues(s2.getZooKeeper(), s2.getConfiguration(), s2, fs,
+        oldLogDir);
+    rq2.init(s2.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(s2.getServerName().toString())));
     serverName = s1.getServerName().getServerName();
     unclaimed = rq2.getUnClaimedQueueIds(serverName);
-    rq2.claimQueue(serverName, unclaimed.get(0)).getSecond();
+    rq2.claimQueue(serverName, unclaimed.get(0), false).getSecond();
     rq2.removeReplicatorIfQueueIsEmpty(unclaimed.get(0));
     ReplicationQueues rq3 =
-        ReplicationFactory.getReplicationQueues(s3.getZooKeeper(), s3.getConfiguration(), s3);
-    rq3.init(s3.getServerName().toString());
+      ReplicationFactory.getReplicationQueues(s3.getZooKeeper(), s3.getConfiguration(), s3, fs,
+        oldLogDir);
+    rq3.init(s3.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(s3.getServerName().toString())));
     serverName = s2.getServerName().getServerName();
     unclaimed = rq3.getUnClaimedQueueIds(serverName);
-    String queue3 = rq3.claimQueue(serverName, unclaimed.get(0)).getFirst();
+    String queue3 = rq3.claimQueue(serverName, unclaimed.get(0), false).getFirst();
     rq3.removeReplicatorIfQueueIsEmpty(unclaimed.get(0));
     ReplicationQueueInfo replicationQueueInfo = new ReplicationQueueInfo(queue3);
     List<String> result = replicationQueueInfo.getDeadRegionServers();
@@ -451,19 +501,22 @@ public class TestReplicationSourceManager {
     conf.setBoolean(HConstants.ZOOKEEPER_USEMULTI, true);
     final Server s0 = new DummyServer("cversion-change0.example.org");
     ReplicationQueues repQueues =
-        ReplicationFactory.getReplicationQueues(s0.getZooKeeper(), conf, s0);
-    repQueues.init(s0.getServerName().toString());
+        ReplicationFactory.getReplicationQueues(s0.getZooKeeper(), conf, s0, fs, oldLogDir);
+    repQueues.init(s0.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(s0.getServerName().toString())));
     // populate some znodes in the peer znode
-    files.add("log1");
-    files.add("log2");
+    files.add("log.1");
+    files.add("log.2");
     for (String file : files) {
       repQueues.addLog("1", file);
     }
     // simulate queue transfer
     Server s1 = new DummyServer("cversion-change1.example.org");
     ReplicationQueues rq1 =
-        ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1);
-    rq1.init(s1.getServerName().toString());
+      ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1, fs,
+        oldLogDir);
+    rq1.init(s1.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(s1.getServerName().toString())));
 
     ReplicationQueuesClient client =
         ReplicationFactory.getReplicationQueuesClient(s1.getZooKeeper(), s1.getConfiguration(), s1);
@@ -471,7 +524,7 @@ public class TestReplicationSourceManager {
     int v0 = client.getQueuesZNodeCversion();
     List<String> queues = rq1.getUnClaimedQueueIds(s0.getServerName().getServerName());
     for(String queue : queues) {
-      rq1.claimQueue(s0.getServerName().getServerName(), queue);
+      rq1.claimQueue(s0.getServerName().getServerName(), queue, false);
     }
     rq1.removeReplicatorIfQueueIsEmpty(s0.getServerName().getServerName());
     int v1 = client.getQueuesZNodeCversion();
@@ -488,8 +541,9 @@ public class TestReplicationSourceManager {
     final Server server = new DummyServer("hostname2.example.org");
     ReplicationQueues rq =
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
-          server);
-    rq.init(server.getServerName().toString());
+          server, fs, oldLogDir);
+    rq.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
+      DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
     // populate some znodes in the peer znode
     // add log to an unknown peer
     String group = "testgroup";
@@ -558,9 +612,10 @@ public class TestReplicationSourceManager {
     try {
       DummyServer server = new DummyServer();
       final ReplicationQueues rq =
-          ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
-              server);
-      rq.init(server.getServerName().toString());
+        ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
+          server, fs, oldLogDir);
+      rq.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
+        DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
       // Purposely fail ReplicationSourceManager.addSource() by causing ReplicationSourceInterface
       // initialization to throw an exception.
       conf.set("replication.replicationsource.implementation",
@@ -712,9 +767,10 @@ public class TestReplicationSourceManager {
       this.deadRsZnode = znode;
       this.server = s;
       this.rq =
-          ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
-            server);
-      this.rq.init(this.server.getServerName().toString());
+        ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
+          server, fs, oldLogDir);
+      rq.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
+        DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
     }
 
     @Override
@@ -723,7 +779,7 @@ public class TestReplicationSourceManager {
         logZnodesMap = new TreeMap<>();
         List<String> queues = rq.getUnClaimedQueueIds(deadRsZnode);
         for(String queue:queues){
-          Pair<String, SortedSet<String>> pair = rq.claimQueue(deadRsZnode, queue);
+          Pair<String, SortedSet<String>> pair = rq.claimQueue(deadRsZnode, queue, false);
           if (pair != null) {
             logZnodesMap.put(pair.getFirst(), pair.getSecond());
           }

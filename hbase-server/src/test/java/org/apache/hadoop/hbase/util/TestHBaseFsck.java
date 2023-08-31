@@ -122,6 +122,7 @@ import org.apache.hadoop.hbase.util.HBaseFsck.PrintingErrorReporter;
 import org.apache.hadoop.hbase.util.HBaseFsck.TableInfo;
 import org.apache.hadoop.hbase.util.hbck.HFileCorruptionChecker;
 import org.apache.hadoop.hbase.util.hbck.HbckTestingUtil;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZKAssign;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -2481,9 +2482,13 @@ public class TestHBaseFsck {
 
     // create replicator
     ZooKeeperWatcher zkw = new ZooKeeperWatcher(conf, "Test Hbase Fsck", connection);
+    FileSystem fs = FileSystem.get(conf);
+    Path walRootDir = FSUtils.getWALRootDir(conf);
+    Path oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
+    Path logDir = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName("server1"));
     ReplicationQueues repQueues =
-        ReplicationFactory.getReplicationQueues(zkw, conf, connection);
-    repQueues.init("server1");
+        ReplicationFactory.getReplicationQueues(zkw, conf, connection, fs, oldLogDir);
+    repQueues.init("server1", logDir);
     // queues for current peer, no errors
     repQueues.addLog("1", "file1");
     repQueues.addLog("1-server2", "file1");

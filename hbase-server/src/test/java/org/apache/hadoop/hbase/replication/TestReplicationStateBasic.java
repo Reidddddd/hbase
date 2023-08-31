@@ -20,14 +20,21 @@ package org.apache.hadoop.hbase.replication;
 
 import static org.junit.Assert.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.apache.zookeeper.KeeperException;
 import org.junit.Before;
@@ -39,6 +46,11 @@ import org.junit.Test;
  */
 public abstract class TestReplicationStateBasic {
 
+  private static final HBaseTestingUtility UTIL = HBaseTestingUtility.createLocalHTU();
+  protected static Configuration conf;
+  protected static FileSystem fs;
+  protected Path walRootDir;
+  protected Path oldLogDir;
   protected ReplicationQueues rq1;
   protected ReplicationQueues rq2;
   protected ReplicationQueues rq3;
@@ -46,6 +58,9 @@ public abstract class TestReplicationStateBasic {
   protected String server1 = ServerName.valueOf("hostname1.example.org", 1234, -1L).toString();
   protected String server2 = ServerName.valueOf("hostname2.example.org", 1234, -1L).toString();
   protected String server3 = ServerName.valueOf("hostname3.example.org", 1234, -1L).toString();
+  protected Path logDir1;
+  protected Path logDir2;
+  protected Path logDir3;
   protected ReplicationPeers rp;
   protected static final String ID_ONE = "1";
   protected static final String ID_TWO = "2";
@@ -63,24 +78,32 @@ public abstract class TestReplicationStateBasic {
   private static final Log LOG = LogFactory.getLog(TestReplicationStateBasic.class);
 
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     zkTimeoutCount = 0;
+    fs = UTIL.getTestFileSystem();
+    walRootDir = FSUtils.getWALRootDir(conf);
+    oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
+    fs.mkdirs(oldLogDir);
   }
 
   @Test
-  public void testReplicationQueuesClient() throws ReplicationException, KeeperException {
+  public void testReplicationQueuesClient()
+    throws ReplicationException, KeeperException, IOException {
     rqc.init();
     // Test methods with empty state
     assertEquals(0, rqc.getListOfReplicators().size());
-    assertNull(rqc.getLogsInQueue(server1, "qId1"));
+    assertNull(rqc.getCurrentConsumingLogsInQueue(server1, "qId1"));
     assertNull(rqc.getAllQueues(server1));
 
     /*
      * Set up data Two replicators: -- server1: three queues with 0, 1 and 2 log files each --
      * server2: zero queues
      */
-    rq1.init(server1);
-    rq2.init(server2);
+    Path walRootDir = FSUtils.getWALRootDir(conf);
+    Path logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
+    Path logDir2 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server2));
+    rq1.init(server1, logDir1);
+    rq2.init(server2, logDir2);
     rq1.addLog("qId1", "trash");
     rq1.removeLog("qId1", "trash");
     rq1.addLog("qId2", "filename1");
@@ -94,11 +117,11 @@ public abstract class TestReplicationStateBasic {
     assertTrue(server1, reps.contains(server1));
     assertTrue(server2, reps.contains(server2));
 
-    assertNull(rqc.getLogsInQueue("bogus", "bogus"));
-    assertNull(rqc.getLogsInQueue(server1, "bogus"));
-    assertEquals(0, rqc.getLogsInQueue(server1, "qId1").size());
-    assertEquals(1, rqc.getLogsInQueue(server1, "qId2").size());
-    assertEquals("filename1", rqc.getLogsInQueue(server1, "qId2").get(0));
+    assertNull(rqc.getCurrentConsumingLogsInQueue("bogus", "bogus"));
+    assertNull(rqc.getCurrentConsumingLogsInQueue(server1, "bogus"));
+    assertEquals(0, rqc.getCurrentConsumingLogsInQueue(server1, "qId1").size());
+    assertEquals(1, rqc.getCurrentConsumingLogsInQueue(server1, "qId2").size());
+    assertEquals("filename1", rqc.getCurrentConsumingLogsInQueue(server1, "qId2").get(0));
 
     assertNull(rqc.getAllQueues("bogus"));
     assertEquals(0, rqc.getAllQueues(server2).size());
@@ -109,10 +132,16 @@ public abstract class TestReplicationStateBasic {
   }
 
   @Test
-  public void testReplicationQueues() throws ReplicationException {
-    rq1.init(server1);
-    rq2.init(server2);
-    rq3.init(server3);
+  public void testReplicationQueues() throws ReplicationException, IOException {
+    logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
+    logDir2 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server2));
+    logDir3 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server3));
+    fs.mkdirs(logDir1);
+    fs.mkdirs(logDir2);
+    fs.mkdirs(logDir3);
+    rq1.init(server1, logDir1);
+    rq2.init(server2, logDir2);
+    rq3.init(server3, logDir3);
     //Initialize ReplicationPeer so we can add peers (we don't transfer lone queues)
     rp.init();
 
@@ -133,12 +162,14 @@ public abstract class TestReplicationStateBasic {
     assertEquals(3, rq1.getListOfReplicators().size());
     assertEquals(0, rq2.getLogsInQueue("qId1").size());
     assertEquals(5, rq3.getLogsInQueue("qId5").size());
-    assertEquals(0, rq3.getLogPosition("qId1", "filename0"));
-    rq3.setLogPosition("qId5", "filename4", 354L);
-    assertEquals(354L, rq3.getLogPosition("qId5", "filename4"));
+    assertEquals(0, rq3.getLogPosition("qId1", "filename.0"));
+    rq3.setLogPosition("qId5", "filename.4", 354L);
+    assertEquals(354L, rq3.getLogPosition("qId5", "filename.4"));
 
-    assertEquals(5, rq3.getLogsInQueue("qId5").size());
+    assertEquals(1, rq3.getLogsInQueue("qId5").size());
     assertEquals(0, rq2.getLogsInQueue("qId1").size());
+    assertEquals(1, rq1.getAllQueues().size());
+    rq1.removeQueue("bogus");
     assertEquals(0, rq1.getAllQueues().size());
     assertEquals(1, rq2.getAllQueues().size());
     assertEquals(5, rq3.getAllQueues().size());
@@ -150,7 +181,7 @@ public abstract class TestReplicationStateBasic {
     List<String> queues = rq2.getUnClaimedQueueIds(server3);
     assertEquals(5, queues.size());
     for(String queue: queues) {
-      rq2.claimQueue(server3, queue);
+      rq2.claimQueue(server3, queue, true);
     }
     rq2.removeReplicatorIfQueueIsEmpty(server3);
     assertEquals(1, rq2.getListOfReplicators().size());
@@ -198,9 +229,12 @@ public abstract class TestReplicationStateBasic {
   }
 
   @Test
-  public void testHfileRefsReplicationQueues() throws ReplicationException, KeeperException {
+  public void testHfileRefsReplicationQueues()
+    throws ReplicationException, KeeperException, IOException {
     rp.init();
-    rq1.init(server1);
+    Path walRootDir = FSUtils.getWALRootDir(conf);
+    Path logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
+    rq1.init(server1, logDir1);
     rqc.init();
 
     List<Pair<Path, Path>> files1 = new ArrayList<>(3);
@@ -229,8 +263,11 @@ public abstract class TestReplicationStateBasic {
   }
 
   @Test
-  public void testRemovePeerForHFileRefs() throws ReplicationException, KeeperException {
-    rq1.init(server1);
+  public void testRemovePeerForHFileRefs() throws ReplicationException, KeeperException,
+    IOException {
+    Path walRootDir = FSUtils.getWALRootDir(conf);
+    Path logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
+    rq1.init(server1, logDir1);
     rqc.init();
 
     rp.init();
@@ -358,7 +395,10 @@ public abstract class TestReplicationStateBasic {
    * three replicators: rq1 has 0 queues, rq2 has 1 queue with no logs, rq3 has 5 queues with 1, 2,
    * 3, 4, 5 log files respectively
    */
-  protected void populateQueues() throws ReplicationException {
+  protected void populateQueues() throws ReplicationException, IOException {
+//    Path testDir = UTIL.getDataTestDir();
+
+
     rq1.addLog("trash", "trash");
     rq1.removeQueue("trash");
 
@@ -367,10 +407,22 @@ public abstract class TestReplicationStateBasic {
 
     for (int i = 1; i < 6; i++) {
       for (int j = 0; j < i; j++) {
-        rq3.addLog("qId" + i, "filename" + j);
+        String fileName = "filename." + j;
+        addLog(fileName, rq3, "qId" + i);
+
       }
       //Add peers for the corresponding queues so they are not orphans
       rp.addPeer("qId" + i, new ReplicationPeerConfig().setClusterKey("localhost:2818:/bogus" + i));
+    }
+  }
+
+  protected void addLog(String fileName, ReplicationQueues rq, String queueId)
+    throws ReplicationException, IOException {
+    Path file = new Path(oldLogDir, fileName);
+    fs.create(file).close();
+    // We need to add znode only for the oldest file, so that all newer files are in queue.
+    if (fileName.equals("filename.0")) {
+      rq.addLog(queueId, fileName);
     }
   }
 }

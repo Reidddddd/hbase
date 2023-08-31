@@ -18,16 +18,21 @@
  */
 package org.apache.hadoop.hbase.replication;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
-import java.util.SortedMap;
+import java.util.Map;
 import java.util.SortedSet;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -69,19 +74,32 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
 
   /** Znode containing all replication queues for this region server. */
   private String myQueuesZnode;
+  private String serverName;
   /** Name of znode we use to lock during failover */
   public final static String RS_LOCK_ZNODE = "lock";
 
   private static final Log LOG = LogFactory.getLog(ReplicationQueuesZKImpl.class);
+  private FileSystem fs;
+  private Path walsDir;
+  private Path oldWALsDir;
 
   public ReplicationQueuesZKImpl(final ZooKeeperWatcher zk, Configuration conf,
-      Abortable abortable) {
+                                 Abortable abortable) {
     super(zk, conf, abortable);
   }
 
+  public ReplicationQueuesZKImpl(final ZooKeeperWatcher zk, Configuration conf,
+                                 Abortable abortable, FileSystem fs, Path oldWALsDir) {
+    super(zk, conf, abortable);
+    this.fs = fs;
+    this.oldWALsDir = oldWALsDir;
+  }
+
   @Override
-  public void init(String serverName) throws ReplicationException {
+  public void init(String serverName, Path walsDir) throws ReplicationException {
     this.myQueuesZnode = ZKUtil.joinZNode(this.queuesZNode, serverName);
+    this.serverName = serverName;
+    this.walsDir = walsDir;
     try {
       if (ZKUtil.checkExists(this.zookeeper, this.myQueuesZnode) < 0) {
         ZKUtil.createWithParents(this.zookeeper, this.myQueuesZnode);
@@ -122,9 +140,30 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
   }
 
   @Override
+  public void initLog(String queueId, String filename, String walPrefix)
+    throws ReplicationException {
+    try {
+      String znode = ZKUtil.joinZNode(this.myQueuesZnode, queueId);
+      if (walPrefix != null && walPrefix.length() > 0) {
+        if (ZKUtil.nodeHasChildrenWithPrefix(this.zookeeper, znode, walPrefix)) {
+          return;
+        }
+      }
+      addLog(queueId, filename);
+    } catch (KeeperException e) {
+      throw new ReplicationException(
+        "Could not add log because znode could not be created. queueId=" + queueId
+          + ", filename=" + filename);
+    }
+  }
+
+  @Override
   public void addLog(String queueId, String filename) throws ReplicationException {
     String znode = ZKUtil.joinZNode(this.myQueuesZnode, queueId);
     znode = ZKUtil.joinZNode(znode, filename);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("addLog znode = " + znode);
+    }
     try {
       ZKUtil.createWithParents(this.zookeeper, znode);
     } catch (KeeperException e) {
@@ -139,7 +178,9 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
     try {
       String znode = ZKUtil.joinZNode(this.myQueuesZnode, queueId);
       znode = ZKUtil.joinZNode(znode, filename);
-      ZKUtil.deleteNode(this.zookeeper, znode);
+      if (-1 != ZKUtil.checkExists(this.zookeeper, znode)) {
+        ZKUtil.deleteNode(this.zookeeper, znode);
+      }
     } catch (KeeperException e) {
       this.abortable.abort("Failed to remove wal from queue (queueId=" + queueId + ", filename="
           + filename + ")", e);
@@ -151,8 +192,20 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
     try {
       String znode = ZKUtil.joinZNode(this.myQueuesZnode, queueId);
       znode = ZKUtil.joinZNode(znode, filename);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("setLogPosition znode = " + znode + ", pos =" + position);
+      }
       // Why serialize String of Long and not Long as bytes?
       ZKUtil.setData(this.zookeeper, znode, ZKUtil.positionToByteArray(position));
+    } catch (KeeperException.NoNodeException e) {
+      try {
+        addLog(queueId, filename);
+      } catch (ReplicationException ex) {
+        this.abortable.abort("Failed to add log when writing replication wal position " +
+          "because znode could not be created (filename=" + filename
+          + ", position=" + position + ")", e);
+      }
+      setLogPosition(queueId, filename, position);
     } catch (KeeperException e) {
       this.abortable.abort("Failed to write replication wal position (filename=" + filename
           + ", position=" + position + ")", e);
@@ -204,15 +257,79 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
   }
 
   @Override
+  @VisibleForTesting
   public List<String> getLogsInQueue(String queueId) {
     String znode = ZKUtil.joinZNode(this.myQueuesZnode, queueId);
     List<String> result = null;
     try {
-      result = ZKUtil.listChildrenNoWatch(this.zookeeper, znode);
-    } catch (KeeperException e) {
+      result = getLogsInQueue(ZKUtil.listChildrenNoWatch(this.zookeeper, znode), false);
+    } catch (KeeperException | IOException e) {
       this.abortable.abort("Failed to get list of wals for queueId=" + queueId, e);
     }
     return result;
+  }
+
+  /**
+   * Now we only store current consuming wal on zk, and only during the queue transfer process
+   * after RS crash, we need to use this method to recover the queue. Notice there is differences
+   * between ReplicationSyncUp and normal NodeFailoverWorker: For normal NodeFailoverWorker we only
+   * find wals in oldWALs, but for ReplicationSyncUp we need to find all related wal paths.
+   * @param currentNodes current nodes
+   * @param isSyncUp is ReplicationSyncUp
+   * @return queue list
+   * @throws IOException IOException
+   */
+  private List<String> getLogsInQueue(List<String> currentNodes, boolean isSyncUp)
+    throws IOException {
+    if (currentNodes == null || currentNodes.isEmpty()) {
+      return currentNodes;
+    }
+
+    // Try to find out every current consuming wal of each wal group on zk.
+    Map<String, String> currentConsumingWALMap = new HashMap<>();
+    currentNodes.forEach(node -> {
+      String serverNameAndGroupName = getWALServerNameAndGroupNameFromWALName(node);
+      String timestamp = getWALTimestampFromWALName(node);
+      if (!currentConsumingWALMap.containsKey(serverNameAndGroupName)) {
+        currentConsumingWALMap.put(serverNameAndGroupName, timestamp);
+      } else {
+        if (currentConsumingWALMap.get(serverNameAndGroupName).compareTo(timestamp) < 0) {
+          currentConsumingWALMap.put(serverNameAndGroupName, timestamp);
+        }
+      }
+    });
+
+    // Search wal path to find out all wals.
+    List<String> results = new ArrayList<>();
+    FileStatus[] allLogs = null;
+    if (!isSyncUp) {
+      allLogs = fs.listStatus(oldWALsDir);
+    } else {
+      Path walDir = new Path(this.walsDir, serverName);
+      if (fs.exists(walDir)) {
+        allLogs = fs.listStatus(walDir);
+      }
+      if (fs.exists(walDir.suffix("-splitting"))) {
+        allLogs = ArrayUtils.addAll(allLogs, fs.listStatus(walDir.suffix("-splitting")));
+      }
+      allLogs = ArrayUtils.addAll(allLogs, fs.listStatus(oldWALsDir));
+    }
+
+    // Filter out wals which timestamp bigger than current consuming wal,
+    // that means they are still in queue.
+    Arrays.stream(allLogs).forEach(file -> {
+      String fileName = file.getPath().getName();
+      if (!fileName.contains("meta")) {
+        String serverNameAndGroupName = getWALServerNameAndGroupNameFromWALName(fileName);
+        String timestamp = getWALTimestampFromWALName(fileName);
+        if (currentConsumingWALMap.containsKey(serverNameAndGroupName)) {
+          if (currentConsumingWALMap.get(serverNameAndGroupName).compareTo(timestamp) <= 0) {
+            results.add(fileName);
+          }
+        }
+      }
+    });
+    return results;
   }
 
   @Override
@@ -251,10 +368,16 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
   }
 
   @Override
-  public Pair<String, SortedSet<String>> claimQueue(String regionserver, String queueId) {
+  public Pair<String, SortedSet<String>> claimQueue(
+    String regionserver, String queueId, boolean isSyncUp) {
+    // As we cannot get all accurate wals through zk now,
+    // need to wait SCP done at first so we can get all wals in `oldWALs`.
+    if (!isSyncUp) {
+      waitingServerCrashProcedureDone(regionserver);
+    }
     if (conf.getBoolean(HConstants.ZOOKEEPER_USEMULTI, true)) {
       LOG.info("Atomically moving " + regionserver + "/" + queueId + "'s WALs to my queue");
-      return moveQueueUsingMulti(regionserver, queueId);
+      return moveQueueUsingMulti(regionserver, queueId, isSyncUp);
     } else {
       LOG.info("Moving " + regionserver + "/" + queueId + "'s wals to my queue");
       if (!lockOtherRS(regionserver)) {
@@ -263,12 +386,31 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
       }
       Pair<String, SortedSet<String>> newQueues;
       try {
-        newQueues = copyQueueFromLockedRS(regionserver, queueId);
+        newQueues = copyQueueFromLockedRS(regionserver, queueId, isSyncUp);
         removeQueueFromLockedRS(regionserver, queueId);
       } finally {
         unlockOtherRS(regionserver);
       }
       return newQueues;
+    }
+  }
+
+  private void waitingServerCrashProcedureDone(String deadServerName) {
+    final Path deadRsDir = new Path(walsDir.getParent(), deadServerName);
+    final Path deadRsSplitDir = deadRsDir.suffix("-splitting");
+    try {
+      while (true) {
+        if (!fs.exists(deadRsDir) && !fs.exists(deadRsSplitDir)) {
+          break;
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Waiting for SCP of " + deadServerName + "done...");
+        }
+        Thread.sleep(10 * 1000);
+      }
+    } catch (Exception e) {
+      LOG.error("Got an error when waiting " + deadServerName + " SCP done ", e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -386,7 +528,8 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
    * @param znode pertaining to the region server to copy the queues from
    * @peerId peerId pertaining to the queue need to be copied
    */
-  private Pair<String, SortedSet<String>> moveQueueUsingMulti(String znode, String peerId) {
+  private Pair<String, SortedSet<String>> moveQueueUsingMulti(
+    String znode, String peerId, boolean isSyncUp) {
     try {
       // hbase/replication/rs/deadrs
       String deadRSZnodePath = ZKUtil.joinZNode(this.queuesZNode, znode);
@@ -426,19 +569,19 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
           String newLogZnode = ZKUtil.joinZNode(newPeerZnode, wal);
           listOfOps.add(ZKUtilOp.createAndFailSilent(newLogZnode, logOffset));
           listOfOps.add(ZKUtilOp.deleteNodeFailSilent(oldWalZnode));
-          logQueue.add(wal);
         }
         // add delete op for peer
         listOfOps.add(ZKUtilOp.deleteNodeFailSilent(oldClusterZnode));
 
         if (LOG.isTraceEnabled())
           LOG.trace(" The multi list size is: " + listOfOps.size());
+        logQueue = new TreeSet<>(getLogsInQueue(wals, isSyncUp));
       }
       ZKUtil.multiOrSequential(this.zookeeper, listOfOps, false);
 
       LOG.info("Atomically moved " + znode + "/" + peerId + "'s WALs to my queue");
       return new Pair<>(newPeerId, logQueue);
-    } catch (KeeperException e) {
+    } catch (KeeperException | IOException e) {
       // Multi call failed; it looks like some other regionserver took away the logs.
       LOG.warn("Got exception in copyQueuesFromRSUsingMulti: ", e);
     } catch (InterruptedException e) {
@@ -454,7 +597,8 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
    * @param znode server names to copy
    * @return all wals for the peer of that cluster, null if an error occurred
    */
-  private Pair<String, SortedSet<String>> copyQueueFromLockedRS(String znode, String peerId) {
+  private Pair<String, SortedSet<String>> copyQueueFromLockedRS(
+    String znode, String peerId, boolean isSyncUp) {
     // TODO this method isn't atomic enough, we could start copying and then
     // TODO fail for some reason and we would end up with znodes we don't want.
     try {
@@ -479,7 +623,6 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
       }
       ZKUtil.createNodeIfNotExistsAndWatch(this.zookeeper, newClusterZnode,
           HConstants.EMPTY_BYTE_ARRAY);
-      SortedSet<String> logQueue = new TreeSet<>();
       for (String wal : wals) {
         String z = ZKUtil.joinZNode(clusterPath, wal);
         byte[] positionBytes = ZKUtil.getData(this.zookeeper, z);
@@ -488,17 +631,17 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
           position = ZKUtil.parseWALPositionFrom(positionBytes);
         } catch (DeserializationException e) {
           LOG.warn("Failed parse of wal position from the following znode: " + z
-              + ", Exception: " + e);
+            + ", Exception: " + e);
         }
         LOG.debug("Creating " + wal + " with data " + position);
         String child = ZKUtil.joinZNode(newClusterZnode, wal);
         // Position doesn't actually change, we are just deserializing it for
         // logging, so just use the already serialized version
         ZKUtil.createNodeIfNotExistsAndWatch(this.zookeeper, child, positionBytes);
-        logQueue.add(wal);
       }
+      SortedSet<String> logQueue = new TreeSet<>(getLogsInQueue(wals, isSyncUp));
       return new Pair<>(newCluster, logQueue);
-    } catch (KeeperException e) {
+    } catch (KeeperException | IOException e) {
       LOG.warn("Got exception in copyQueueFromLockedRS: "+
         " Possible problem: check if znode size exceeds jute.maxBuffer value. "
           + "If so, increase it for both client and server side." ,e);

@@ -118,6 +118,7 @@ public class ReplicationSourceManager implements ReplicationListener {
 
   private final Random rand;
   private final boolean replicationForBulkLoadDataEnabled;
+  private final boolean isSyncUp;
   // Map to record the online region count in this server for the tables in this
   private final Map<TableName, AtomicInteger> tableOnlineRegionCount;
   // The paths that need to be consumed for the source
@@ -152,7 +153,7 @@ public class ReplicationSourceManager implements ReplicationListener {
   public ReplicationSourceManager(final ReplicationQueues replicationQueues,
       final ReplicationPeers replicationPeers, final ReplicationTracker replicationTracker,
       final Configuration conf, final Server server, final FileSystem fs, final Path logDir,
-      final Path oldLogDir, final UUID clusterId) {
+      final Path oldLogDir, final UUID clusterId, final boolean isSyncUp) {
     // ConcurrentHashMap is thread-safe.
     // Generally, reading is more than modifying.
     this.sources = new ConcurrentHashMap<String, ReplicationSourceInterface>();
@@ -170,6 +171,7 @@ public class ReplicationSourceManager implements ReplicationListener {
     this.sleepBeforeFailover =
         conf.getLong("replication.sleep.before.failover", 30000); // 30 seconds
     this.clusterId = clusterId;
+    this.isSyncUp = isSyncUp;
     this.replicationTracker.registerListener(this);
     this.replicationPeers.getAllPeerIds();
     // It's preferable to failover 1 RS at a time, but with good zk servers
@@ -334,7 +336,7 @@ public class ReplicationSourceManager implements ReplicationListener {
           logs.add(name);
           walsByGroup.put(walPrefix, logs);
           try {
-            this.replicationQueues.addLog(id, name);
+            this.replicationQueues.initLog(id, name, walPrefix);
           } catch (ReplicationException e) {
             String message =
                 "Cannot add log to queue when creating a new source, queueId=" + id
@@ -458,7 +460,7 @@ public class ReplicationSourceManager implements ReplicationListener {
       for (ReplicationSourceInterface source : this.sources.values()) {
         String peerId = source.getPeerClusterZnode();
         try {
-          this.replicationQueues.addLog(peerId, logName);
+          this.replicationQueues.initLog(peerId, logName, logPrefix);
         } catch (ReplicationException e) {
           throw new IOException("Cannot add log to replication queue"
               + " when creating a new source, queueId=" + peerId + ", filename=" + logName, e);
@@ -576,8 +578,11 @@ public class ReplicationSourceManager implements ReplicationListener {
   private void transferQueues(String rsZnode) {
     NodeFailoverWorker transfer =
         new NodeFailoverWorker(rsZnode, this.replicationQueues, this.replicationPeers,
-            this.clusterId);
+            this.clusterId, this.isSyncUp);
     try {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Start up replication queues transfer of " + rsZnode);
+      }
       this.executor.execute(transfer);
     } catch (RejectedExecutionException ex) {
       CompatibilitySingletonFactory.getInstance(MetricsReplicationSourceFactory.class)
@@ -719,6 +724,7 @@ public class ReplicationSourceManager implements ReplicationListener {
    */
   class NodeFailoverWorker extends Thread {
 
+    private final boolean isSyncUp;
     private String rsZnode;
     private final ReplicationQueues rq;
     private final ReplicationPeers rp;
@@ -728,16 +734,18 @@ public class ReplicationSourceManager implements ReplicationListener {
      * @param rsZnode region server znode
      */
     public NodeFailoverWorker(String rsZnode) {
-      this(rsZnode, replicationQueues, replicationPeers, ReplicationSourceManager.this.clusterId);
+      this(rsZnode, replicationQueues, replicationPeers, ReplicationSourceManager.this.clusterId,
+        false);
     }
 
     public NodeFailoverWorker(String rsZnode, final ReplicationQueues replicationQueues,
-        final ReplicationPeers replicationPeers, final UUID clusterId) {
+        final ReplicationPeers replicationPeers, final UUID clusterId, final boolean isSyncUp) {
       super("Failover-for-"+rsZnode);
       this.rsZnode = rsZnode;
       this.rq = replicationQueues;
       this.rp = replicationPeers;
       this.clusterId = clusterId;
+      this.isSyncUp = isSyncUp;
     }
 
     @Override
@@ -761,9 +769,16 @@ public class ReplicationSourceManager implements ReplicationListener {
 
       Map<String, SortedSet<String>> newQueues = new HashMap<>();
       List<String> peers = rq.getUnClaimedQueueIds(rsZnode);
+      if (LOG.isDebugEnabled()) {
+        if (peers == null) {
+          LOG.debug("getUnClaimedQueueIds peers = null, rsZnode = " + rsZnode);
+        } else {
+          LOG.debug("getUnClaimedQueueIds peers.size = " + peers.size() + ", rsZnode = " + rsZnode);
+        }
+      }
       while (peers != null && !peers.isEmpty()) {
         Pair<String, SortedSet<String>> peer = this.rq.claimQueue(rsZnode,
-            peers.get(rand.nextInt(peers.size())));
+            peers.get(rand.nextInt(peers.size())), isSyncUp);
         long sleep = sleepBeforeFailover/2;
         if (peer != null) {
           newQueues.put(peer.getFirst(), peer.getSecond());

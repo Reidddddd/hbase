@@ -26,6 +26,8 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.ChoreService;
 import org.apache.hadoop.hbase.ClusterId;
 import org.apache.hadoop.hbase.CoordinatedStateManager;
@@ -35,6 +37,7 @@ import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZKClusterId;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
@@ -52,12 +55,14 @@ import org.junit.experimental.categories.Category;
 public class TestReplicationStateZKImpl extends TestReplicationStateBasic {
 
   private static final Log LOG = LogFactory.getLog(TestReplicationStateZKImpl.class);
-
-  private static Configuration conf;
   private static HBaseTestingUtility utility;
   private static ZooKeeperWatcher zkw;
   private static String replicationZNode;
+  private static Path oldLogDir;
   private ReplicationQueuesZKImpl rqZK;
+  private static Path rootDir;
+  private static FileSystem fs;
+  private static Path walRootDir;
 
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
@@ -70,6 +75,11 @@ public class TestReplicationStateZKImpl extends TestReplicationStateBasic {
     replicationZNode = ZKUtil.joinZNode(zkw.baseZNode, replicationZNodeName);
     KEY_ONE = initPeerClusterState("/hbase1");
     KEY_TWO = initPeerClusterState("/hbase2");
+
+    rootDir = FSUtils.getRootDir(conf);
+    fs = rootDir.getFileSystem(conf);
+    walRootDir = FSUtils.getWALRootDir(conf);
+    oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
   }
 
   private static String initPeerClusterState(String baseZKNode)
@@ -86,14 +96,14 @@ public class TestReplicationStateZKImpl extends TestReplicationStateBasic {
 
   @Before
   @Override
-  public void setUp() {
+  public void setUp() throws IOException {
     super.setUp();
     DummyServer ds1 = new DummyServer(server1);
     DummyServer ds2 = new DummyServer(server2);
     DummyServer ds3 = new DummyServer(server3);
-    rq1 = ReplicationFactory.getReplicationQueues(zkw, conf, ds1);
-    rq2 = ReplicationFactory.getReplicationQueues(zkw, conf, ds2);
-    rq3 = ReplicationFactory.getReplicationQueues(zkw, conf, ds3);
+    rq1 = ReplicationFactory.getReplicationQueues(zkw, conf, ds1, fs, oldLogDir);
+    rq2 = ReplicationFactory.getReplicationQueues(zkw, conf, ds2, fs, oldLogDir);
+    rq3 = ReplicationFactory.getReplicationQueues(zkw, conf, ds3, fs, oldLogDir);
     rqc = ReplicationFactory.getReplicationQueuesClient(zkw, conf, ds1);
     rp = ReplicationFactory.getReplicationPeers(zkw, conf, zkw);
     OUR_KEY = ZKConfig.getZooKeeperClusterKey(conf);

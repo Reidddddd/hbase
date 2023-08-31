@@ -40,7 +40,7 @@ public interface ReplicationService {
    * @throws IOException
    */
   void initialize(
-    Server rs, FileSystem fs, Path logdir, Path oldLogDir
+    Server rs, FileSystem fs, Path logdir, Path oldLogDir, final boolean isSyncUp
   ) throws IOException;
 
   /**

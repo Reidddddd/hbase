@@ -45,13 +45,14 @@ public interface ReplicationQueuesClient {
   List<String> getListOfReplicators() throws KeeperException;
 
   /**
-   * Get a list of all WALs in the given queue on the given region server.
+   * Get a list of all current consuming WALs in the given queue on the given region server.
    * @param serverName the server name of the region server that owns the queue
    * @param queueId a String that identifies the queue
    * @return a list of WALs, null if this region server is dead and has no outstanding queues
    * @throws KeeperException zookeeper exception
    */
-  List<String> getLogsInQueue(String serverName, String queueId) throws KeeperException;
+  List<String> getCurrentConsumingLogsInQueue(String serverName, String queueId)
+    throws KeeperException;
 
   /**
    * Get a list of all queues for the specified region server.

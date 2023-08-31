@@ -52,6 +52,7 @@ import org.apache.hadoop.hbase.replication.regionserver.Replication;
 import org.apache.hadoop.hbase.testclassification.MasterTests;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -89,10 +90,15 @@ public class TestReplicationHFileCleaner {
     rp = ReplicationFactory.getReplicationPeers(server.getZooKeeper(), conf, server);
     rp.init();
 
-    rq = ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server);
-    rq.init(server.getServerName().toString());
+    Path oldLogDir = new Path(TEST_UTIL.getDataTestDir(),
+      HConstants.HREGION_OLDLOGDIR_NAME);
+
     try {
       fs = FileSystem.get(conf);
+      rq = ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server, fs,
+        oldLogDir);
+      rq.init(server.getServerName().toString(), new Path(TEST_UTIL.getDataTestDir(),
+        DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
     } finally {
       if (fs != null) {
         fs.close();

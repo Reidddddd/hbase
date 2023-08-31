@@ -33,6 +33,7 @@ import org.apache.hadoop.hbase.io.WALLink;
 import org.apache.hadoop.hbase.procedure2.util.StringUtils;
 import org.apache.hadoop.hbase.replication.*;
 import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.util.Tool;
@@ -297,7 +298,11 @@ public class DumpReplicationQueues extends Configured implements Tool {
 
     queuesClient = ReplicationFactory.getReplicationQueuesClient(zkw, getConf(), connection);
     queuesClient.init();
-    replicationQueues = ReplicationFactory.getReplicationQueues(zkw, getConf(), connection);
+    FileSystem fs = FileSystem.get(getConf());
+    Path walRootDir = FSUtils.getWALRootDir(getConf());
+    Path oldWALsDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
+    replicationQueues = ReplicationFactory.getReplicationQueues(zkw, getConf(), connection, fs,
+      oldWALsDir);
     replicationPeers = ReplicationFactory.getReplicationPeers(zkw, getConf(), queuesClient, connection);
     replicationTracker = ReplicationFactory.getReplicationTracker(zkw, replicationPeers, getConf(),
       new WarnOnlyAbortable(), new WarnOnlyStoppable());
@@ -311,13 +316,14 @@ public class DumpReplicationQueues extends Configured implements Tool {
       }
       for (String regionserver : regionservers) {
         List<String> queueIds = queuesClient.getAllQueues(regionserver);
-        replicationQueues.init(regionserver);
+        Path walsDir = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(regionserver));
+        replicationQueues.init(regionserver, walsDir);
         if (!liveRegionServers.contains(regionserver)) {
           deadRegionServers.add(regionserver);
         }
         for (String queueId : queueIds) {
           ReplicationQueueInfo queueInfo = new ReplicationQueueInfo(queueId);
-          List<String> wals = queuesClient.getLogsInQueue(regionserver, queueId);
+          List<String> wals = queuesClient.getCurrentConsumingLogsInQueue(regionserver, queueId);
           Collections.sort(wals);
           if (!peerIds.contains(queueInfo.getPeerId())) {
             deletedQueues.add(regionserver + "/" + queueId);

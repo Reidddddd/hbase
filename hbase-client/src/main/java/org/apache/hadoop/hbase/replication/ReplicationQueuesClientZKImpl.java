@@ -33,7 +33,7 @@ public class ReplicationQueuesClientZKImpl extends ReplicationStateZKBase implem
     ReplicationQueuesClient {
 
   public ReplicationQueuesClientZKImpl(final ZooKeeperWatcher zk, Configuration conf,
-      Abortable abortable) {
+                                       Abortable abortable) {
     super(zk, conf, abortable);
   }
 
@@ -54,7 +54,8 @@ public class ReplicationQueuesClientZKImpl extends ReplicationStateZKBase implem
   }
 
   @Override
-  public List<String> getLogsInQueue(String serverName, String queueId) throws KeeperException {
+  public List<String> getCurrentConsumingLogsInQueue(String serverName, String queueId)
+    throws KeeperException {
     String znode = ZKUtil.joinZNode(this.queuesZNode, serverName);
     znode = ZKUtil.joinZNode(znode, queueId);
     List<String> result = null;

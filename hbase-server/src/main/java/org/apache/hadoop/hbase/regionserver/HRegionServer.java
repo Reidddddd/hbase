@@ -2828,7 +2828,7 @@ public class HRegionServer extends HasThread implements
     // create an instance of the replication object.
     ReplicationService service = (ReplicationService)
                               ReflectionUtils.newInstance(clazz, conf);
-    service.initialize(server, walFs, walDir, oldLogDir);
+    service.initialize(server, walFs, walDir, oldLogDir, false);
     return service;
   }
 
