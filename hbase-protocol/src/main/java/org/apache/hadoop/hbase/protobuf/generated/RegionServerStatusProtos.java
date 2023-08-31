@@ -91,6 +91,33 @@ public final class RegionServerStatusProtos {
      */
     com.google.protobuf.ByteString
         getUseThisHostnameInsteadBytes();
+
+    // optional string group_name = 5;
+    /**
+     * <code>optional string group_name = 5;</code>
+     *
+     * <pre>
+     ** rsgroup name for region server, optional 
+     * </pre>
+     */
+    boolean hasGroupName();
+    /**
+     * <code>optional string group_name = 5;</code>
+     *
+     * <pre>
+     ** rsgroup name for region server, optional 
+     * </pre>
+     */
+    java.lang.String getGroupName();
+    /**
+     * <code>optional string group_name = 5;</code>
+     *
+     * <pre>
+     ** rsgroup name for region server, optional 
+     * </pre>
+     */
+    com.google.protobuf.ByteString
+        getGroupNameBytes();
   }
   /**
    * Protobuf type {@code hbase.pb.RegionServerStartupRequest}
@@ -161,6 +188,11 @@ public final class RegionServerStatusProtos {
             case 34: {
               bitField0_ |= 0x00000008;
               useThisHostnameInstead_ = input.readBytes();
+              break;
+            }
+            case 42: {
+              bitField0_ |= 0x00000010;
+              groupName_ = input.readBytes();
               break;
             }
           }
@@ -330,11 +362,67 @@ public final class RegionServerStatusProtos {
       }
     }
 
+    // optional string group_name = 5;
+    public static final int GROUP_NAME_FIELD_NUMBER = 5;
+    private java.lang.Object groupName_;
+    /**
+     * <code>optional string group_name = 5;</code>
+     *
+     * <pre>
+     ** rsgroup name for region server, optional 
+     * </pre>
+     */
+    public boolean hasGroupName() {
+      return ((bitField0_ & 0x00000010) == 0x00000010);
+    }
+    /**
+     * <code>optional string group_name = 5;</code>
+     *
+     * <pre>
+     ** rsgroup name for region server, optional 
+     * </pre>
+     */
+    public java.lang.String getGroupName() {
+      java.lang.Object ref = groupName_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        if (bs.isValidUtf8()) {
+          groupName_ = s;
+        }
+        return s;
+      }
+    }
+    /**
+     * <code>optional string group_name = 5;</code>
+     *
+     * <pre>
+     ** rsgroup name for region server, optional 
+     * </pre>
+     */
+    public com.google.protobuf.ByteString
+        getGroupNameBytes() {
+      java.lang.Object ref = groupName_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        groupName_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
     private void initFields() {
       port_ = 0;
       serverStartCode_ = 0L;
       serverCurrentTime_ = 0L;
       useThisHostnameInstead_ = "";
+      groupName_ = "";
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -372,6 +460,9 @@ public final class RegionServerStatusProtos {
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         output.writeBytes(4, getUseThisHostnameInsteadBytes());
       }
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
+        output.writeBytes(5, getGroupNameBytes());
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -396,6 +487,10 @@ public final class RegionServerStatusProtos {
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(4, getUseThisHostnameInsteadBytes());
+      }
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(5, getGroupNameBytes());
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -440,6 +535,11 @@ public final class RegionServerStatusProtos {
         result = result && getUseThisHostnameInstead()
             .equals(other.getUseThisHostnameInstead());
       }
+      result = result && (hasGroupName() == other.hasGroupName());
+      if (hasGroupName()) {
+        result = result && getGroupName()
+            .equals(other.getGroupName());
+      }
       result = result &&
           getUnknownFields().equals(other.getUnknownFields());
       return result;
@@ -468,6 +568,10 @@ public final class RegionServerStatusProtos {
       if (hasUseThisHostnameInstead()) {
         hash = (37 * hash) + USE_THIS_HOSTNAME_INSTEAD_FIELD_NUMBER;
         hash = (53 * hash) + getUseThisHostnameInstead().hashCode();
+      }
+      if (hasGroupName()) {
+        hash = (37 * hash) + GROUP_NAME_FIELD_NUMBER;
+        hash = (53 * hash) + getGroupName().hashCode();
       }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
@@ -586,6 +690,8 @@ public final class RegionServerStatusProtos {
         bitField0_ = (bitField0_ & ~0x00000004);
         useThisHostnameInstead_ = "";
         bitField0_ = (bitField0_ & ~0x00000008);
+        groupName_ = "";
+        bitField0_ = (bitField0_ & ~0x00000010);
         return this;
       }
 
@@ -630,6 +736,10 @@ public final class RegionServerStatusProtos {
           to_bitField0_ |= 0x00000008;
         }
         result.useThisHostnameInstead_ = useThisHostnameInstead_;
+        if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
+          to_bitField0_ |= 0x00000010;
+        }
+        result.groupName_ = groupName_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -658,6 +768,11 @@ public final class RegionServerStatusProtos {
         if (other.hasUseThisHostnameInstead()) {
           bitField0_ |= 0x00000008;
           useThisHostnameInstead_ = other.useThisHostnameInstead_;
+          onChanged();
+        }
+        if (other.hasGroupName()) {
+          bitField0_ |= 0x00000010;
+          groupName_ = other.groupName_;
           onChanged();
         }
         this.mergeUnknownFields(other.getUnknownFields());
@@ -940,6 +1055,104 @@ public final class RegionServerStatusProtos {
   }
   bitField0_ |= 0x00000008;
         useThisHostnameInstead_ = value;
+        onChanged();
+        return this;
+      }
+
+      // optional string group_name = 5;
+      private java.lang.Object groupName_ = "";
+      /**
+       * <code>optional string group_name = 5;</code>
+       *
+       * <pre>
+       ** rsgroup name for region server, optional 
+       * </pre>
+       */
+      public boolean hasGroupName() {
+        return ((bitField0_ & 0x00000010) == 0x00000010);
+      }
+      /**
+       * <code>optional string group_name = 5;</code>
+       *
+       * <pre>
+       ** rsgroup name for region server, optional 
+       * </pre>
+       */
+      public java.lang.String getGroupName() {
+        java.lang.Object ref = groupName_;
+        if (!(ref instanceof java.lang.String)) {
+          java.lang.String s = ((com.google.protobuf.ByteString) ref)
+              .toStringUtf8();
+          groupName_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>optional string group_name = 5;</code>
+       *
+       * <pre>
+       ** rsgroup name for region server, optional 
+       * </pre>
+       */
+      public com.google.protobuf.ByteString
+          getGroupNameBytes() {
+        java.lang.Object ref = groupName_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          groupName_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>optional string group_name = 5;</code>
+       *
+       * <pre>
+       ** rsgroup name for region server, optional 
+       * </pre>
+       */
+      public Builder setGroupName(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000010;
+        groupName_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional string group_name = 5;</code>
+       *
+       * <pre>
+       ** rsgroup name for region server, optional 
+       * </pre>
+       */
+      public Builder clearGroupName() {
+        bitField0_ = (bitField0_ & ~0x00000010);
+        groupName_ = getDefaultInstance().getGroupName();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional string group_name = 5;</code>
+       *
+       * <pre>
+       ** rsgroup name for region server, optional 
+       * </pre>
+       */
+      public Builder setGroupNameBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000010;
+        groupName_ = value;
         onChanged();
         return this;
       }
@@ -9104,54 +9317,54 @@ public final class RegionServerStatusProtos {
   static {
     java.lang.String[] descriptorData = {
       "\n\030RegionServerStatus.proto\022\010hbase.pb\032\013HB" +
-      "ase.proto\032\023ClusterStatus.proto\"\205\001\n\032Regio" +
+      "ase.proto\032\023ClusterStatus.proto\"\231\001\n\032Regio" +
       "nServerStartupRequest\022\014\n\004port\030\001 \002(\r\022\031\n\021s" +
       "erver_start_code\030\002 \002(\004\022\033\n\023server_current" +
       "_time\030\003 \002(\004\022!\n\031use_this_hostname_instead" +
-      "\030\004 \001(\t\"L\n\033RegionServerStartupResponse\022-\n" +
-      "\013map_entries\030\001 \003(\0132\030.hbase.pb.NameString" +
-      "Pair\"e\n\031RegionServerReportRequest\022$\n\006ser" +
-      "ver\030\001 \002(\0132\024.hbase.pb.ServerName\022\"\n\004load\030" +
-      "\002 \001(\0132\024.hbase.pb.ServerLoad\"\034\n\032RegionSer",
-      "verReportResponse\"X\n\031ReportRSFatalErrorR" +
-      "equest\022$\n\006server\030\001 \002(\0132\024.hbase.pb.Server" +
-      "Name\022\025\n\rerror_message\030\002 \002(\t\"\034\n\032ReportRSF" +
-      "atalErrorResponse\"6\n\037GetLastFlushedSeque" +
-      "nceIdRequest\022\023\n\013region_name\030\001 \002(\014\"\207\001\n Ge" +
-      "tLastFlushedSequenceIdResponse\022 \n\030last_f" +
-      "lushed_sequence_id\030\001 \002(\004\022A\n\036store_last_f" +
-      "lushed_sequence_id\030\002 \003(\0132\031.hbase.pb.Stor" +
-      "eSequenceId\"\344\002\n\025RegionStateTransition\022G\n" +
-      "\017transition_code\030\001 \002(\0162..hbase.pb.Region",
-      "StateTransition.TransitionCode\022)\n\013region" +
-      "_info\030\002 \003(\0132\024.hbase.pb.RegionInfo\022\024\n\014ope" +
-      "n_seq_num\030\003 \001(\004\"\300\001\n\016TransitionCode\022\n\n\006OP" +
-      "ENED\020\000\022\017\n\013FAILED_OPEN\020\001\022\n\n\006CLOSED\020\002\022\022\n\016R" +
-      "EADY_TO_SPLIT\020\003\022\022\n\016READY_TO_MERGE\020\004\022\016\n\nS" +
-      "PLIT_PONR\020\005\022\016\n\nMERGE_PONR\020\006\022\t\n\005SPLIT\020\007\022\n" +
-      "\n\006MERGED\020\010\022\022\n\016SPLIT_REVERTED\020\t\022\022\n\016MERGE_" +
-      "REVERTED\020\n\"\177\n\"ReportRegionStateTransitio" +
-      "nRequest\022$\n\006server\030\001 \002(\0132\024.hbase.pb.Serv" +
-      "erName\0223\n\ntransition\030\002 \003(\0132\037.hbase.pb.Re",
-      "gionStateTransition\"<\n#ReportRegionState" +
-      "TransitionResponse\022\025\n\rerror_message\030\001 \001(" +
-      "\t2\260\004\n\031RegionServerStatusService\022b\n\023Regio" +
-      "nServerStartup\022$.hbase.pb.RegionServerSt" +
-      "artupRequest\032%.hbase.pb.RegionServerStar" +
-      "tupResponse\022_\n\022RegionServerReport\022#.hbas" +
-      "e.pb.RegionServerReportRequest\032$.hbase.p" +
-      "b.RegionServerReportResponse\022_\n\022ReportRS" +
-      "FatalError\022#.hbase.pb.ReportRSFatalError" +
-      "Request\032$.hbase.pb.ReportRSFatalErrorRes",
-      "ponse\022q\n\030GetLastFlushedSequenceId\022).hbas" +
-      "e.pb.GetLastFlushedSequenceIdRequest\032*.h" +
-      "base.pb.GetLastFlushedSequenceIdResponse" +
-      "\022z\n\033ReportRegionStateTransition\022,.hbase." +
-      "pb.ReportRegionStateTransitionRequest\032-." +
-      "hbase.pb.ReportRegionStateTransitionResp" +
-      "onseBN\n*org.apache.hadoop.hbase.protobuf" +
-      ".generatedB\030RegionServerStatusProtosH\001\210\001" +
-      "\001\240\001\001"
+      "\030\004 \001(\t\022\022\n\ngroup_name\030\005 \001(\t\"L\n\033RegionServ" +
+      "erStartupResponse\022-\n\013map_entries\030\001 \003(\0132\030" +
+      ".hbase.pb.NameStringPair\"e\n\031RegionServer" +
+      "ReportRequest\022$\n\006server\030\001 \002(\0132\024.hbase.pb" +
+      ".ServerName\022\"\n\004load\030\002 \001(\0132\024.hbase.pb.Ser",
+      "verLoad\"\034\n\032RegionServerReportResponse\"X\n" +
+      "\031ReportRSFatalErrorRequest\022$\n\006server\030\001 \002" +
+      "(\0132\024.hbase.pb.ServerName\022\025\n\rerror_messag" +
+      "e\030\002 \002(\t\"\034\n\032ReportRSFatalErrorResponse\"6\n" +
+      "\037GetLastFlushedSequenceIdRequest\022\023\n\013regi" +
+      "on_name\030\001 \002(\014\"\207\001\n GetLastFlushedSequence" +
+      "IdResponse\022 \n\030last_flushed_sequence_id\030\001" +
+      " \002(\004\022A\n\036store_last_flushed_sequence_id\030\002" +
+      " \003(\0132\031.hbase.pb.StoreSequenceId\"\344\002\n\025Regi" +
+      "onStateTransition\022G\n\017transition_code\030\001 \002",
+      "(\0162..hbase.pb.RegionStateTransition.Tran" +
+      "sitionCode\022)\n\013region_info\030\002 \003(\0132\024.hbase." +
+      "pb.RegionInfo\022\024\n\014open_seq_num\030\003 \001(\004\"\300\001\n\016" +
+      "TransitionCode\022\n\n\006OPENED\020\000\022\017\n\013FAILED_OPE" +
+      "N\020\001\022\n\n\006CLOSED\020\002\022\022\n\016READY_TO_SPLIT\020\003\022\022\n\016R" +
+      "EADY_TO_MERGE\020\004\022\016\n\nSPLIT_PONR\020\005\022\016\n\nMERGE" +
+      "_PONR\020\006\022\t\n\005SPLIT\020\007\022\n\n\006MERGED\020\010\022\022\n\016SPLIT_" +
+      "REVERTED\020\t\022\022\n\016MERGE_REVERTED\020\n\"\177\n\"Report" +
+      "RegionStateTransitionRequest\022$\n\006server\030\001" +
+      " \002(\0132\024.hbase.pb.ServerName\0223\n\ntransition",
+      "\030\002 \003(\0132\037.hbase.pb.RegionStateTransition\"" +
+      "<\n#ReportRegionStateTransitionResponse\022\025" +
+      "\n\rerror_message\030\001 \001(\t2\260\004\n\031RegionServerSt" +
+      "atusService\022b\n\023RegionServerStartup\022$.hba" +
+      "se.pb.RegionServerStartupRequest\032%.hbase" +
+      ".pb.RegionServerStartupResponse\022_\n\022Regio" +
+      "nServerReport\022#.hbase.pb.RegionServerRep" +
+      "ortRequest\032$.hbase.pb.RegionServerReport" +
+      "Response\022_\n\022ReportRSFatalError\022#.hbase.p" +
+      "b.ReportRSFatalErrorRequest\032$.hbase.pb.R",
+      "eportRSFatalErrorResponse\022q\n\030GetLastFlus" +
+      "hedSequenceId\022).hbase.pb.GetLastFlushedS" +
+      "equenceIdRequest\032*.hbase.pb.GetLastFlush" +
+      "edSequenceIdResponse\022z\n\033ReportRegionStat" +
+      "eTransition\022,.hbase.pb.ReportRegionState" +
+      "TransitionRequest\032-.hbase.pb.ReportRegio" +
+      "nStateTransitionResponseBN\n*org.apache.h" +
+      "adoop.hbase.protobuf.generatedB\030RegionSe" +
+      "rverStatusProtosH\001\210\001\001\240\001\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -9163,7 +9376,7 @@ public final class RegionServerStatusProtos {
           internal_static_hbase_pb_RegionServerStartupRequest_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_hbase_pb_RegionServerStartupRequest_descriptor,
-              new java.lang.String[] { "Port", "ServerStartCode", "ServerCurrentTime", "UseThisHostnameInstead", });
+              new java.lang.String[] { "Port", "ServerStartCode", "ServerCurrentTime", "UseThisHostnameInstead", "GroupName", });
           internal_static_hbase_pb_RegionServerStartupResponse_descriptor =
             getDescriptor().getMessageTypes().get(1);
           internal_static_hbase_pb_RegionServerStartupResponse_fieldAccessorTable = new
