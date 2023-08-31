@@ -18,8 +18,13 @@
 package org.apache.hadoop.hbase.rsgroup;
 
 import java.io.IOException;
+import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.MiniHBaseCluster;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
+import org.apache.hadoop.hbase.master.ServerManager;
+import org.apache.hadoop.hbase.master.snapshot.SnapshotManager;
 import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
@@ -40,7 +45,24 @@ public class TestRSGroupAutoMoving extends TestRSGroupsBase {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    setUpTestBeforeClass();
+    TEST_UTIL = new HBaseTestingUtility();
+    TEST_UTIL.getConfiguration().setBoolean("hbase.k8s.enabled", true);
+    TEST_UTIL.getConfiguration().setFloat(
+      "hbase.master.balancer.stochastic.tableSkewCost", 6000);
+    TEST_UTIL.getConfiguration().set(
+      HConstants.HBASE_MASTER_LOADBALANCER_CLASS,
+      RSGroupBasedLoadBalancer.class.getName());
+    TEST_UTIL.getConfiguration().set(CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY,
+      RSGroupAdminEndpoint.class.getName() + "," + CPMasterObserver.class.getName());
+    TEST_UTIL.getConfiguration().setBoolean(
+      HConstants.ZOOKEEPER_USEMULTI,
+      true);
+    TEST_UTIL.startMiniCluster(NUM_SLAVES_BASE - 1);
+    TEST_UTIL.getConfiguration().setInt(
+      ServerManager.WAIT_ON_REGIONSERVERS_MINTOSTART,
+      NUM_SLAVES_BASE - 1);
+    TEST_UTIL.getConfiguration().setBoolean(SnapshotManager.HBASE_SNAPSHOT_ENABLED, true);
+    initialize();
   }
 
   @AfterClass
@@ -72,7 +94,7 @@ public class TestRSGroupAutoMoving extends TestRSGroupsBase {
     RSGroupInfo rsGroupInfo = rsGroupAdmin.getRSGroupInfo(rsgroupName);
     ServerName serverName1 = server1.getServerName();
 
-    Address server1Address = Address.fromParts(serverName1.getHostname(), serverName1.getPort());
+    Address server1Address = serverName1.getAddress();
     Assert.assertTrue(rsGroupInfo.containsServer(server1Address));
 
     JVMClusterUtil.RegionServerThread rsThread2 = cluster.startRegionServer();
@@ -80,7 +102,7 @@ public class TestRSGroupAutoMoving extends TestRSGroupsBase {
 
     HRegionServer server2 = rsThread2.getRegionServer();
     ServerName serverName2 = server2.getServerName();
-    Address server2Address = Address.fromParts(serverName2.getHostname(), serverName2.getPort());
+    Address server2Address = serverName2.getAddress();
     rsGroupInfo = rsGroupAdmin.getRSGroupInfo(rsgroupName);
     Assert.assertTrue(rsGroupInfo.containsServer(server2Address));
 

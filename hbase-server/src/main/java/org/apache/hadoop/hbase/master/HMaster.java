@@ -21,6 +21,7 @@ package org.apache.hadoop.hbase.master;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Service;
 import javax.servlet.ServletException;
@@ -1020,9 +1021,9 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       // The new server will be added to the default group automatically.
       return;
     }
-    Set<Address> addressSet = new HashSet<>();
-    Address rsAddress = Address.fromParts(sn.getHostname(), sn.getPort());
-    addressSet.add(rsAddress);
+
+    Address rsAddress = sn.getAddress();
+    Set<Address> addressSet = Sets.newHashSet(rsAddress);
 
     RSGroupInfo rsGroupInfo = rsGroupAdminClient.getRSGroupInfo(groupName);
     if (rsGroupInfo == null) {
@@ -1032,7 +1033,7 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       } catch (IOException ioe) {
         if (ioe.getMessage().contains("Group already exists")) {
           // The rsgroup is created already, ignore the ioe here.
-          LOG.info("Tried to add an existing rsgroup " + rsGroupInfo.getName());
+          LOG.info("Tried to add an existing rsgroup " + groupName);
         } else {
           throw ioe;
         }
