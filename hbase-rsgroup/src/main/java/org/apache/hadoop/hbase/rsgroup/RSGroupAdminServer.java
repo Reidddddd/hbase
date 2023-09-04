@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.master.HMaster;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.constraint.ConstraintException;
 import org.apache.hadoop.hbase.master.AssignmentManager;
@@ -551,6 +552,12 @@ public class RSGroupAdminServer implements RSGroupAdmin {
    * @param servers servers to remove
    */
   private void checkForDeadOrOnlineServers(Set<Address> servers) throws ConstraintException {
+    // If the master is in k8s mode, the dead server will never come back.
+    boolean checkDeadServer = true;
+    if (this.master instanceof HMaster) {
+      checkDeadServer = !((HMaster) this.master).isK8sModeEnabled();
+    }
+
     // This uglyness is because we only have Address, not ServerName.
     Set<Address> onlineServers = new HashSet<>();
     for(ServerName server: master.getServerManager().getOnlineServers().keySet()) {
@@ -558,8 +565,10 @@ public class RSGroupAdminServer implements RSGroupAdmin {
     }
 
     Set<Address> deadServers = new HashSet<>();
-    for(ServerName server: master.getServerManager().getDeadServers().copyServerNames()) {
-      deadServers.add(server.getAddress());
+    if (checkDeadServer) {
+      for(ServerName server: master.getServerManager().getDeadServers().copyServerNames()) {
+        deadServers.add(server.getAddress());
+      }
     }
 
     for (Address address: servers) {
@@ -567,7 +576,7 @@ public class RSGroupAdminServer implements RSGroupAdmin {
         throw new ConstraintException(
             "Server " + address + " is an online server, not allowed to remove.");
       }
-      if (deadServers.contains(address)) {
+      if (checkDeadServer && deadServers.contains(address)) {
         throw new ConstraintException(
             "Server " + address + " is on the dead servers list,"
                 + " Maybe it will come back again, not allowed to remove.");
