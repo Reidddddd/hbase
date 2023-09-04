@@ -106,7 +106,14 @@ public class TestRSGroupAutoMoving extends TestRSGroupsBase {
     rsGroupInfo = rsGroupAdmin.getRSGroupInfo(rsgroupName);
     Assert.assertTrue(rsGroupInfo.containsServer(server2Address));
 
-    cluster.stopRegionServer(serverName1);
-    cluster.stopRegionServer(serverName2);
+    cluster.killRegionServer(serverName1);
+    cluster.killRegionServer(serverName2);
+
+    // Wait for the server expiration.
+    Thread.sleep(10000);
+
+    rsGroupInfo = rsGroupAdmin.getRSGroupInfo(rsgroupName);
+    Assert.assertFalse(rsGroupInfo.containsServer(server1Address));
+    Assert.assertFalse(rsGroupInfo.containsServer(server2Address));
   }
 }
