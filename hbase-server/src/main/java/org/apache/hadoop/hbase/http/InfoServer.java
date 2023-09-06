@@ -60,8 +60,8 @@ public class InfoServer {
       new org.apache.hadoop.hbase.http.HttpServer.Builder();
 
       builder.setName(name).addEndpoint(URI.create(httpConfig.getSchemePrefix() +
-        bindAddress + ":" +
-        port)).setAppDir(HBASE_APP_DIR).setFindPort(findPort).setConf(c);
+        bindAddress + ":" + port)).setAppDir(HBASE_APP_DIR).setFindPort(findPort).setConf(c);
+
       String logDir = System.getProperty("hbase.log.dir");
       if (logDir != null) {
         builder.setLogDir(logDir);

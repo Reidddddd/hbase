@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hbase.http;
 
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
@@ -62,6 +59,8 @@ import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -69,8 +68,6 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.Mockito;
 import org.mockito.internal.util.reflection.ReflectionMemberAccessor;
-import org.mortbay.jetty.Connector;
-import org.mortbay.util.ajax.JSON;
 
 @Category(SmallTests.class)
 public class TestHttpServer extends HttpServerFunctionalTest {
@@ -459,7 +456,7 @@ public class TestHttpServer extends HttpServerFunctionalTest {
 
   @SuppressWarnings("unchecked")
   private static Map<String, Object> parse(String jsonString) {
-    return (Map<String, Object>)JSON.parse(jsonString);
+    return (Map<String, Object>) JSON.parse(jsonString);
   }
 
   @Test public void testJersey() throws Exception {
@@ -566,8 +563,8 @@ public class TestHttpServer extends HttpServerFunctionalTest {
       ReflectionMemberAccessor accessor = new ReflectionMemberAccessor();
       List<?> listeners = (List<?>)
           accessor.get(server.getClass().getDeclaredField("listeners"), server);
-      Connector listener = (Connector)
-          accessor.get(listeners.get(0).getClass().getDeclaredField("listener"), listeners.get(0));
+      ServerConnector listener = (ServerConnector)
+        accessor.get(listeners.get(0).getClass().getDeclaredField("listener"), listeners.get(0));
 
       assertEquals(port, listener.getPort());
       // verify hostname is what was given
@@ -626,15 +623,4 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     assertEquals("DENY", conn.getHeaderField("X-Frame-Options"));
   }
 
-  /**
-   * HTTPServer.Builder should proceed if a external connector is available.
-   */
-  @Test
-  public void testHttpServerBuilderWithExternalConnector() throws Exception {
-    Connector c = mock(Connector.class);
-    doReturn("localhost").when(c).getHost();
-    HttpServer s = new HttpServer.Builder().setName("test").setConnector(c)
-        .build();
-    s.stop();
-  }
 }
