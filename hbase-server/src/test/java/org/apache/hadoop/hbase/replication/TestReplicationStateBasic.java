@@ -35,6 +35,7 @@ import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.apache.zookeeper.KeeperException;
 import org.junit.Before;
@@ -100,8 +101,8 @@ public abstract class TestReplicationStateBasic {
      * server2: zero queues
      */
     Path walRootDir = FSUtils.getWALRootDir(conf);
-    Path logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
-    Path logDir2 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server2));
+    Path logDir1 = new Path(walRootDir, WALUtils.getWALDirectoryName(server1));
+    Path logDir2 = new Path(walRootDir, WALUtils.getWALDirectoryName(server2));
     rq1.init(server1, logDir1);
     rq2.init(server2, logDir2);
     rq1.addLog("qId1", "trash");
@@ -133,9 +134,9 @@ public abstract class TestReplicationStateBasic {
 
   @Test
   public void testReplicationQueues() throws ReplicationException, IOException {
-    logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
-    logDir2 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server2));
-    logDir3 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server3));
+    logDir1 = new Path(walRootDir, WALUtils.getWALDirectoryName(server1));
+    logDir2 = new Path(walRootDir, WALUtils.getWALDirectoryName(server2));
+    logDir3 = new Path(walRootDir, WALUtils.getWALDirectoryName(server3));
     fs.mkdirs(logDir1);
     fs.mkdirs(logDir2);
     fs.mkdirs(logDir3);
@@ -233,7 +234,7 @@ public abstract class TestReplicationStateBasic {
     throws ReplicationException, KeeperException, IOException {
     rp.init();
     Path walRootDir = FSUtils.getWALRootDir(conf);
-    Path logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
+    Path logDir1 = new Path(walRootDir, WALUtils.getWALDirectoryName(server1));
     rq1.init(server1, logDir1);
     rqc.init();
 
@@ -266,7 +267,7 @@ public abstract class TestReplicationStateBasic {
   public void testRemovePeerForHFileRefs() throws ReplicationException, KeeperException,
     IOException {
     Path walRootDir = FSUtils.getWALRootDir(conf);
-    Path logDir1 = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(server1));
+    Path logDir1 = new Path(walRootDir, WALUtils.getWALDirectoryName(server1));
     rq1.init(server1, logDir1);
     rqc.init();
 

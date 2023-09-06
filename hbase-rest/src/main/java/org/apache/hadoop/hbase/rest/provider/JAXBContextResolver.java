@@ -44,9 +44,6 @@ import org.apache.hadoop.hbase.rest.model.TableRegionModel;
 import org.apache.hadoop.hbase.rest.model.TableSchemaModel;
 import org.apache.hadoop.hbase.rest.model.VersionModel;
 
-import com.sun.jersey.api.json.JSONConfiguration;
-import com.sun.jersey.api.json.JSONJAXBContext;
-
 /**
  * Plumbing for hooking up Jersey's JSON entity body encoding and decoding
  * support to JAXB. Modify how the context is created (by using e.g. a 
@@ -79,11 +76,9 @@ public class JAXBContextResolver implements ContextResolver<JAXBContext> {
     VersionModel.class
   };
 
-  @SuppressWarnings("unchecked")
   public JAXBContextResolver() throws Exception {
-    this.types = new HashSet(Arrays.asList(cTypes));
-    this.context = new JSONJAXBContext(JSONConfiguration.natural().build(),
-      cTypes);
+    this.types = new HashSet<>(Arrays.asList(cTypes));
+    this.context = JAXBContext.newInstance(cTypes);
   }
 
   @Override

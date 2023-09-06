@@ -35,6 +35,7 @@ import org.apache.hadoop.hbase.replication.ReplicationQueuesZKImpl;
 import org.apache.hadoop.hbase.testclassification.MasterTests;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -79,7 +80,7 @@ public class TestReplicationZKNodeCleaner {
   @Test
   public void testReplicationZKNodeCleaner() throws Exception {
     repQueues.init(SERVER_ONE, new Path(TEST_UTIL.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(SERVER_ONE)));
+      WALUtils.getWALDirectoryName(SERVER_ONE)));
     // add queue for ID_ONE which isn't exist
     repQueues.addLog(ID_ONE, "file1");
 
@@ -108,7 +109,7 @@ public class TestReplicationZKNodeCleaner {
   @Test
   public void testReplicationZKNodeCleanerChore() throws Exception {
     repQueues.init(SERVER_ONE, new Path(TEST_UTIL.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(SERVER_ONE)));
+      WALUtils.getWALDirectoryName(SERVER_ONE)));
     // add queue for ID_ONE which isn't exist
     repQueues.addLog(ID_ONE, "file1");
     // add a recovery queue for ID_TWO which isn't exist

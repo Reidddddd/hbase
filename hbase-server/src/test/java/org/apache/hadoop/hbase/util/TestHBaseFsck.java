@@ -123,6 +123,7 @@ import org.apache.hadoop.hbase.util.HBaseFsck.TableInfo;
 import org.apache.hadoop.hbase.util.hbck.HFileCorruptionChecker;
 import org.apache.hadoop.hbase.util.hbck.HbckTestingUtil;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZKAssign;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -2485,7 +2486,7 @@ public class TestHBaseFsck {
     FileSystem fs = FileSystem.get(conf);
     Path walRootDir = FSUtils.getWALRootDir(conf);
     Path oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
-    Path logDir = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName("server1"));
+    Path logDir = new Path(walRootDir, WALUtils.getWALDirectoryName("server1"));
     ReplicationQueues repQueues =
         ReplicationFactory.getReplicationQueues(zkw, conf, connection, fs, oldLogDir);
     repQueues.init("server1", logDir);

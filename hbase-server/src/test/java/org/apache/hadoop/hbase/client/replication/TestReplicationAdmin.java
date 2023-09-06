@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.replication.ReplicationQueuesZKImpl;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -159,7 +160,7 @@ public class TestReplicationAdmin {
     FileSystem fs = FileSystem.get(conf);
     Path walRootDir = FSUtils.getWALRootDir(conf);
     Path oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
-    Path logDir = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName("server1"));
+    Path logDir = new Path(walRootDir, WALUtils.getWALDirectoryName("server1"));
     ReplicationQueues repQueues =
         ReplicationFactory.getReplicationQueues(zkw, conf, null, fs, oldLogDir);
     repQueues.init("server1", logDir);

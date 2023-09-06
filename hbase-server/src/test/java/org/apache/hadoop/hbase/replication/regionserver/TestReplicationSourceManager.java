@@ -319,7 +319,7 @@ public class TestReplicationSourceManager {
     final Server server = new DummyServer("hostname0.example.org");
     String serverName = server.getServerName().toString();
     Path logDir0 = new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(serverName));
+      WALUtils.getWALDirectoryName(serverName));
     ReplicationQueues rq =
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
           server, fs, oldLogDir);
@@ -382,7 +382,7 @@ public class TestReplicationSourceManager {
     final Server server = new DummyServer("hostname1.example.org");
     String serverName = server.getServerName().toString();
     Path logDir0 = new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(serverName));
+      WALUtils.getWALDirectoryName(serverName));
     ReplicationQueues rq =
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
           server, fs, oldLogDir);
@@ -406,7 +406,7 @@ public class TestReplicationSourceManager {
         ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1, fs,
           oldLogDir);
     rq1.init(s1.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(s1.getServerName().toString())));
+      WALUtils.getWALDirectoryName(s1.getServerName().toString())));
     ReplicationPeers rp1 =
         ReplicationFactory.getReplicationPeers(s1.getZooKeeper(), s1.getConfiguration(), s1);
     rp1.init();
@@ -441,7 +441,7 @@ public class TestReplicationSourceManager {
     ReplicationQueues repQueues =
       ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server, fs, oldLogDir);
     repQueues.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
+      WALUtils.getWALDirectoryName(server.getServerName().toString())));
     // populate some znodes in the peer znode
     files.add("log.1");
     files.add("log.2");
@@ -459,7 +459,7 @@ public class TestReplicationSourceManager {
         ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1, fs,
           oldLogDir);
     rq1.init(s1.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(s1.getServerName().toString())));
+      WALUtils.getWALDirectoryName(s1.getServerName().toString())));
     String serverName = server.getServerName().getServerName();
     List<String> unclaimed = rq1.getUnClaimedQueueIds(serverName);
     rq1.claimQueue(serverName, unclaimed.get(0), false).getSecond();
@@ -469,7 +469,7 @@ public class TestReplicationSourceManager {
       ReplicationFactory.getReplicationQueues(s2.getZooKeeper(), s2.getConfiguration(), s2, fs,
         oldLogDir);
     rq2.init(s2.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(s2.getServerName().toString())));
+      WALUtils.getWALDirectoryName(s2.getServerName().toString())));
     serverName = s1.getServerName().getServerName();
     unclaimed = rq2.getUnClaimedQueueIds(serverName);
     rq2.claimQueue(serverName, unclaimed.get(0), false).getSecond();
@@ -478,7 +478,7 @@ public class TestReplicationSourceManager {
       ReplicationFactory.getReplicationQueues(s3.getZooKeeper(), s3.getConfiguration(), s3, fs,
         oldLogDir);
     rq3.init(s3.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(s3.getServerName().toString())));
+      WALUtils.getWALDirectoryName(s3.getServerName().toString())));
     serverName = s2.getServerName().getServerName();
     unclaimed = rq3.getUnClaimedQueueIds(serverName);
     String queue3 = rq3.claimQueue(serverName, unclaimed.get(0), false).getFirst();
@@ -503,7 +503,7 @@ public class TestReplicationSourceManager {
     ReplicationQueues repQueues =
         ReplicationFactory.getReplicationQueues(s0.getZooKeeper(), conf, s0, fs, oldLogDir);
     repQueues.init(s0.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(s0.getServerName().toString())));
+      WALUtils.getWALDirectoryName(s0.getServerName().toString())));
     // populate some znodes in the peer znode
     files.add("log.1");
     files.add("log.2");
@@ -516,7 +516,7 @@ public class TestReplicationSourceManager {
       ReplicationFactory.getReplicationQueues(s1.getZooKeeper(), s1.getConfiguration(), s1, fs,
         oldLogDir);
     rq1.init(s1.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(s1.getServerName().toString())));
+      WALUtils.getWALDirectoryName(s1.getServerName().toString())));
 
     ReplicationQueuesClient client =
         ReplicationFactory.getReplicationQueuesClient(s1.getZooKeeper(), s1.getConfiguration(), s1);
@@ -543,7 +543,7 @@ public class TestReplicationSourceManager {
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
           server, fs, oldLogDir);
     rq.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
+      WALUtils.getWALDirectoryName(server.getServerName().toString())));
     // populate some znodes in the peer znode
     // add log to an unknown peer
     String group = "testgroup";
@@ -615,7 +615,7 @@ public class TestReplicationSourceManager {
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
           server, fs, oldLogDir);
       rq.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
-        DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
+        WALUtils.getWALDirectoryName(server.getServerName().toString())));
       // Purposely fail ReplicationSourceManager.addSource() by causing ReplicationSourceInterface
       // initialization to throw an exception.
       conf.set("replication.replicationsource.implementation",
@@ -770,7 +770,7 @@ public class TestReplicationSourceManager {
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), server.getConfiguration(),
           server, fs, oldLogDir);
       rq.init(server.getServerName().toString(), new Path(utility.getDataTestDir(),
-        DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
+        WALUtils.getWALDirectoryName(server.getServerName().toString())));
     }
 
     @Override

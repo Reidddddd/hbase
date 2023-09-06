@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.procedure2.util.StringUtils;
 import org.apache.hadoop.hbase.replication.*;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.util.Tool;
@@ -316,7 +317,7 @@ public class DumpReplicationQueues extends Configured implements Tool {
       }
       for (String regionserver : regionservers) {
         List<String> queueIds = queuesClient.getAllQueues(regionserver);
-        Path walsDir = new Path(walRootDir, DefaultWALProvider.getWALDirectoryName(regionserver));
+        Path walsDir = new Path(walRootDir, WALUtils.getWALDirectoryName(regionserver));
         replicationQueues.init(regionserver, walsDir);
         if (!liveRegionServers.contains(regionserver)) {
           deadRegionServers.add(regionserver);

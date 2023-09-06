@@ -56,6 +56,7 @@ import org.apache.hadoop.hbase.replication.ReplicationQueuesClient;
 import org.apache.hadoop.hbase.replication.master.ReplicationLogCleaner;
 import org.apache.hadoop.hbase.replication.regionserver.Replication;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -109,7 +110,7 @@ public class TestLogsCleaner {
     ReplicationQueues repQueues =
         ReplicationFactory.getReplicationQueues(server.getZooKeeper(), conf, server, fs, oldLogDir);
     repQueues.init(server.getServerName().toString(), new Path(TEST_UTIL.getDataTestDir(),
-      DefaultWALProvider.getWALDirectoryName(server.getServerName().toString())));
+      WALUtils.getWALDirectoryName(server.getServerName().toString())));
     String fakeMachineName =
       URLEncoder.encode(server.getServerName().toString(), "UTF8");
 
