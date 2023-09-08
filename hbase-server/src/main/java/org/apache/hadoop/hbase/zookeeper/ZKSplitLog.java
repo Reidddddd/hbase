@@ -47,6 +47,13 @@ public class ZKSplitLog {
   private static final Log LOG = LogFactory.getLog(ZKSplitLog.class);
 
   /**
+   * This is a prefix for DistributedLog splitting.
+   * Used in {@link org.apache.hadoop.hbase.master.DistributedLogSplitManager} and
+   * {@link org.apache.hadoop.hbase.regionserver.DistributedLogSplitWorker}
+   */
+  public static final String TASK_PREFIX = "wals/";
+
+  /**
    * Gets the full path node name for the log file being split.
    * This method will url encode the filename.
    * @param zkw zk reference
