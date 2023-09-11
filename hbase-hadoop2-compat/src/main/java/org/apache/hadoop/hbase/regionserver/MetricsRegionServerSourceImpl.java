@@ -90,6 +90,7 @@ public class MetricsRegionServerSourceImpl
   private final MutableFastCounter warnPauseThresholdExceeded;
   private final MetricHistogram pausesWithGc;
   private final MetricHistogram pausesWithoutGc;
+  private final MutableFastCounter allcationStallCount;
 
   public MetricsRegionServerSourceImpl(MetricsRegionServerWrapper rsWrap) {
     this(METRICS_NAME, METRICS_DESCRIPTION, METRICS_CONTEXT, METRICS_JMX_CONTEXT, rsWrap);
@@ -179,6 +180,8 @@ public class MetricsRegionServerSourceImpl
       WARN_THRESHOLD_COUNT_DESC, 0L);
     pausesWithGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITH_GC_KEY);
     pausesWithoutGc = getMetricsRegistry().newTimeHistogram(PAUSE_TIME_WITHOUT_GC_KEY);
+    allcationStallCount = getMetricsRegistry().newCounter(GC_COUNT_CAUSED_BY_ALLOCATION_STALL_KEY,
+      GC_COUNT_CAUSED_BY_ALLOCATION_STALL_DESC, 0L);
   }
 
   @Override
@@ -603,6 +606,11 @@ public class MetricsRegionServerSourceImpl
   @Override
   public void updatePauseTimeWithoutGc(long t) {
     pausesWithoutGc.add(t);
+  }
+
+  @Override
+  public void incAllocationStallCount() {
+    allcationStallCount.incr();
   }
 
   @Override

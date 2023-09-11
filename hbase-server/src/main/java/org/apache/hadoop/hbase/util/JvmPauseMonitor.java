@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.util;
 
+import com.sun.management.GarbageCollectionNotificationInfo;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.util.List;
@@ -24,6 +25,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import javax.management.NotificationEmitter;
+import javax.management.NotificationListener;
+import javax.management.openmbean.CompositeData;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +91,32 @@ public class JvmPauseMonitor {
     monitorThread = new Thread(new Monitor(), "JvmPauseMonitor");
     monitorThread.setDaemon(true);
     monitorThread.start();
+    if (metricsSource != null) {
+      addGCListener();
+    }
+  }
+
+  private void addGCListener() {
+    List<GarbageCollectorMXBean> beans = ManagementFactory.getGarbageCollectorMXBeans();
+    for (GarbageCollectorMXBean gcBean : beans) {
+      NotificationEmitter emitter = (NotificationEmitter) gcBean;
+      NotificationListener listener = (notification, handback) -> {
+        if (notification.getType()
+          .equals(GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION)) {
+          GarbageCollectionNotificationInfo info = GarbageCollectionNotificationInfo
+            .from((CompositeData) notification.getUserData());
+          if (info.getGcCause().equals("Allocation Stall")) {
+            metricsSource.incAllocationStallCount();
+          }
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("GCListener: name = " + info.getGcName() + ", action = "
+              + info.getGcAction() + ", cause = " + info.getGcCause() + ", duration = "
+              + info.getGcInfo().getDuration() + "ms");
+          }
+        }
+      };
+      emitter.addNotificationListener(listener, null, null);
+    }
   }
 
   public void stop() {
@@ -204,21 +234,5 @@ public class JvmPauseMonitor {
 
   public void setMetricsSource(JvmPauseMonitorSource metricsSource) {
     this.metricsSource = metricsSource;
-  }
-
-  /**
-   * Simple 'main' to facilitate manual testing of the pause monitor.
-   * 
-   * This main function just leaks memory into a list. Running this class
-   * with a 1GB heap will very quickly go into "GC hell" and result in
-   * log messages about the GC pauses.
-   */
-  public static void main(String []args) throws Exception {
-    new JvmPauseMonitor(new Configuration()).start();
-    List<String> list = Lists.newArrayList();
-    int i = 0;
-    while (true) {
-      list.add(String.valueOf(i++));
-    }
   }
 }

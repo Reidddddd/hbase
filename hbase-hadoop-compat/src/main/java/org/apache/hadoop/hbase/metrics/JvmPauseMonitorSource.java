@@ -38,6 +38,10 @@ public interface JvmPauseMonitorSource  {
   String PAUSE_TIME_WITHOUT_GC_DESC =
       "Histogram for excessive pause times without GC activity detected";
 
+  String GC_COUNT_CAUSED_BY_ALLOCATION_STALL_KEY = "allocationStallCount";
+  String GC_COUNT_CAUSED_BY_ALLOCATION_STALL_DESC =
+    "Count of Allocation Stall, meaningful when use ZGC";
+
   /**
    * Increment the INFO level threshold exceeded count
    * @param count the count
@@ -63,4 +67,9 @@ public interface JvmPauseMonitorSource  {
    * @param t time it took
    */
   void updatePauseTimeWithoutGc(long t);
+
+  /**
+   * Increment the Allocation Stall count
+   */
+  void incAllocationStallCount();
 }
