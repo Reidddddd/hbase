@@ -4975,6 +4975,31 @@ public class TestFromClientSide {
   }
 
   @Test
+  public void testColumnExistenceWithCheckAndPut() throws Exception {
+    final byte [] value1 = Bytes.toBytes("aaaa");
+    final byte [] value2 = Bytes.toBytes("bbbb");
+    final byte [] value3 = Bytes.toBytes("cccc");
+    final byte [] value4 = Bytes.toBytes("dddd");
+
+    Table table = TEST_UTIL.createTable(
+        TableName.valueOf("testColumnExistenceWithCheckAndPut"), FAMILY);
+    TEST_UTIL.waitTableAvailable(
+        TableName.valueOf("testColumnExistenceWithCheckAndPut"), 10000);
+
+    Put put1 = new Put(ROW);
+    put1.add(FAMILY, QUALIFIER, value1);
+
+    Put put2 = new Put(ROW);
+    put2.add(FAMILY, QUALIFIER, value2);
+
+    // row doesn't exist, so using "null" to check for existence should be considered "match".
+    boolean ok = table.checkAndPut(ROW, FAMILY, QUALIFIER, null, put1);
+    assertTrue(ok);
+    ok = table.checkAndPut(ROW, FAMILY, QUALIFIER, null, put2);
+    assertFalse(ok);
+  }
+
+  @Test
   public void testCheckAndDeleteWithCompareOp() throws IOException, InterruptedException {
     final byte [] value1 = Bytes.toBytes("aaaa");
     final byte [] value2 = Bytes.toBytes("bbbb");
@@ -4993,7 +5018,7 @@ public class TestFromClientSide {
 
     Delete delete = new Delete(ROW);
     delete.deleteColumns(FAMILY, QUALIFIER);
-    
+
     // cell = "bbbb", using "aaaa" to compare only LESS/LESS_OR_EQUAL/NOT_EQUAL
     // turns out "match"
     boolean ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.GREATER, value1, delete);
@@ -5028,7 +5053,7 @@ public class TestFromClientSide {
     table.put(put3);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.NOT_EQUAL, value4, delete);
     assertEquals(ok, true);
-    
+
     // cell = "bbbb", using "bbbb" to compare only GREATER_OR_EQUAL/LESS_OR_EQUAL/EQUAL
     // turns out "match"
     table.put(put2);
@@ -5046,9 +5071,9 @@ public class TestFromClientSide {
     table.put(put2);
     ok = table.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareOp.EQUAL, value2, delete);
     assertEquals(ok, true);
-    
+
   }
-  
+
   /**
   * Test ScanMetrics
   * @throws Exception
