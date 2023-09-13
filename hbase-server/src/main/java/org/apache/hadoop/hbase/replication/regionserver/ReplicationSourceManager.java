@@ -36,6 +36,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -113,8 +114,10 @@ public class ReplicationSourceManager implements ReplicationListener {
   private final Path oldLogDir;
   // The number of ms that we wait before moving znodes, HBASE-3596
   private final long sleepBeforeFailover;
-  // Homemade executer service for replication
-  private final ThreadPoolExecutor executor;
+  // Homemade executor service for replication failover
+  private final ThreadPoolExecutor failoverExecutor;
+  // Homemade executor service for replication clean source
+  private final ThreadPoolExecutor cleanSourceExecutor;
 
   private final Random rand;
   private final boolean replicationForBulkLoadDataEnabled;
@@ -179,13 +182,24 @@ public class ReplicationSourceManager implements ReplicationListener {
     int nbWorkers = conf.getInt("replication.executor.workers", 1);
     // use a short 100ms sleep since this could be done inline with a RS startup
     // even if we fail, other region servers can take care of it
-    this.executor = new ThreadPoolExecutor(nbWorkers, nbWorkers,
+    this.failoverExecutor = new ThreadPoolExecutor(nbWorkers, nbWorkers,
         100, TimeUnit.MILLISECONDS,
-        new LinkedBlockingQueue<Runnable>());
-    ThreadFactoryBuilder tfb = new ThreadFactoryBuilder();
-    tfb.setNameFormat("ReplicationExecutor-%d");
-    tfb.setDaemon(true);
-    this.executor.setThreadFactory(tfb.build());
+        new LinkedBlockingQueue<Runnable>(),
+        new ThreadFactoryBuilder()
+            .setNameFormat("ReplicationFailoverExecutor-%d")
+            .setDaemon(true)
+            .build()
+    );
+    // CleanSourceExecutor is newFixedThreadPool with only 1 thread
+    // used to execute the cleanWaitingDrainSource tasks.
+    // Since there aren't many cleanWaitingDrainSource tasks,
+    // the corePoolSize and maximumPoolSize can be 1.
+    this.cleanSourceExecutor =  (ThreadPoolExecutor) Executors.newFixedThreadPool(1,
+        new ThreadFactoryBuilder()
+            .setNameFormat("ReplicationCleanSourceExecutor-%d")
+            .setDaemon(true)
+            .build()
+    );
     this.rand = new Random();
     this.latestPaths = Collections.synchronizedSet(new HashSet<Path>());
     replicationForBulkLoadDataEnabled =
@@ -258,7 +272,7 @@ public class ReplicationSourceManager implements ReplicationListener {
         }
       }
       if (isLogDrained) {
-        this.executor.execute(() -> cleanWaitingDrainSource(id));
+        this.cleanSourceExecutor.execute(() -> cleanWaitingDrainSource(id));
       }
     }
   }
@@ -367,7 +381,8 @@ public class ReplicationSourceManager implements ReplicationListener {
    * Terminate the replication on this region server
    */
   public void join() {
-    this.executor.shutdown();
+    this.failoverExecutor.shutdown();
+    this.cleanSourceExecutor.shutdown();
     if (this.sources.size() == 0) {
       this.replicationQueues.removeAllQueues();
     }
@@ -583,7 +598,7 @@ public class ReplicationSourceManager implements ReplicationListener {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Start up replication queues transfer of " + rsZnode);
       }
-      this.executor.execute(transfer);
+      this.failoverExecutor.execute(transfer);
     } catch (RejectedExecutionException ex) {
       CompatibilitySingletonFactory.getInstance(MetricsReplicationSourceFactory.class)
         .getGlobalSource().incrFailedRecoveryQueue();
