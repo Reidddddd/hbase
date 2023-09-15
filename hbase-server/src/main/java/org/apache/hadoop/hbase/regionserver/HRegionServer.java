@@ -1742,7 +1742,7 @@ public class HRegionServer extends HasThread implements
 
     // Instantiate replication manager if replication enabled.  Pass it the
     // log directories.
-    createNewReplicationInstance(conf, this, this.walFs, logDir, oldLogDir);
+    createNewReplicationInstance(conf, this, this.walFs, logDir, oldLogDir, configurationManager);
 
     // listeners the wal factory will add to wals it creates.
     final List<WALActionsListener> listeners = new ArrayList<WALActionsListener>();
@@ -2710,8 +2710,10 @@ public class HRegionServer extends HasThread implements
   /**
    * Load the replication service objects, if any
    */
-  static private void createNewReplicationInstance(Configuration conf,
-    HRegionServer server, FileSystem walFs, Path walDir, Path oldWALDir) throws IOException{
+  static private void createNewReplicationInstance(Configuration conf, HRegionServer server,
+                                                   FileSystem walFs, Path walDir, Path oldWALDir,
+                                                   ConfigurationManager configManager)
+    throws IOException{
 
     // If replication is not enabled, then return immediately.
     if (!conf.getBoolean(HConstants.REPLICATION_ENABLE_KEY,
@@ -2737,22 +2739,22 @@ public class HRegionServer extends HasThread implements
     if (sourceClassname.equals(sinkClassname)) {
       server.replicationSourceHandler = (ReplicationSourceService)
                                          newReplicationInstance(sourceClassname,
-                                         conf, server, walFs, walDir, oldWALDir);
+                                         conf, server, walFs, walDir, oldWALDir, configManager);
       server.replicationSinkHandler = (ReplicationSinkService)
                                          server.replicationSourceHandler;
     } else {
       server.replicationSourceHandler = (ReplicationSourceService)
                                          newReplicationInstance(sourceClassname,
-                                         conf, server, walFs, walDir, oldWALDir);
+                                         conf, server, walFs, walDir, oldWALDir, configManager);
       server.replicationSinkHandler = (ReplicationSinkService)
                                          newReplicationInstance(sinkClassname,
-                                         conf, server, walFs, walDir, oldWALDir);
+                                         conf, server, walFs, walDir, oldWALDir, configManager);
     }
   }
 
   static private ReplicationService newReplicationInstance(String classname,
     Configuration conf, HRegionServer server, FileSystem walFs, Path walDir,
-    Path oldLogDir) throws IOException{
+    Path oldLogDir, ConfigurationManager configManager) throws IOException{
 
     Class<?> clazz = null;
     try {
@@ -2765,7 +2767,7 @@ public class HRegionServer extends HasThread implements
     // create an instance of the replication object.
     ReplicationService service = (ReplicationService)
                               ReflectionUtils.newInstance(clazz, conf);
-    service.initialize(server, walFs, walDir, oldLogDir, false);
+    service.initialize(server, walFs, walDir, oldLogDir, false, configManager);
     return service;
   }
 

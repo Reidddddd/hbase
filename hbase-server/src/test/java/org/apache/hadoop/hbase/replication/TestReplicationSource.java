@@ -86,7 +86,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 @Category(MediumTests.class)
 public class TestReplicationSource {
