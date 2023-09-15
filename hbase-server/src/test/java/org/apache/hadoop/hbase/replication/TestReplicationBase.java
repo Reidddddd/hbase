@@ -103,6 +103,7 @@ public class TestReplicationBase {
     conf1.setInt("replication.source.maxretriesmultiplier", 10);
     conf1.setFloat("replication.source.ratio", 1.0f);
     conf1.setBoolean("replication.source.eof.autorecovery", true);
+    conf1.setBoolean("replication.source.rs.enable.failover", true);
 
     utility1 = new HBaseTestingUtility(conf1);
     utility1.startMiniZKCluster();

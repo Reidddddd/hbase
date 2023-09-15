@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.conf.ConfigurationManager;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.master.cleaner.HFileCleaner;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.WALEntry;
@@ -116,7 +117,7 @@ public class Replication extends WALActionsListener.Base implements
   public Replication(final Server server, final FileSystem fs,
                      final Path logDir, final Path oldLogDir, final boolean isSyncUp)
     throws IOException{
-    initialize(server, fs, logDir, oldLogDir, isSyncUp);
+    initialize(server, fs, logDir, oldLogDir, isSyncUp, null);
   }
 
   /**
@@ -125,8 +126,9 @@ public class Replication extends WALActionsListener.Base implements
   public Replication() {
   }
 
-  public void initialize(final Server server, final FileSystem fs,
-      final Path logDir, final Path oldLogDir, final boolean isSyncUp) throws IOException {
+  public void initialize(final Server server, final FileSystem fs, final Path logDir,
+                         final Path oldLogDir, final boolean isSyncUp,
+                         ConfigurationManager configManager) throws IOException {
     this.server = server;
     this.conf = this.server.getConfiguration();
     this.replication = isReplication(this.conf);
@@ -168,6 +170,9 @@ public class Replication extends WALActionsListener.Base implements
       this.replicationManager =
           new ReplicationSourceManager(replicationQueues, replicationPeers, replicationTracker,
               conf, this.server, fs, logDir, oldLogDir, clusterId, isSyncUp);
+      if (configManager != null) {
+        configManager.registerObserver(this.replicationManager);
+      }
       this.statsThreadPeriod =
           this.conf.getInt("replication.stats.thread.period.seconds", 5 * 60);
       LOG.debug("ReplicationStatisticsThread " + this.statsThreadPeriod);

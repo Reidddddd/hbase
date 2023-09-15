@@ -52,6 +52,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.RegionServerCoprocessorHost;
 import org.apache.hadoop.hbase.replication.ReplicationEndpoint;
@@ -85,9 +86,12 @@ import org.apache.yetus.audience.InterfaceAudience;
  * replication state.
  */
 @InterfaceAudience.Private
-public class ReplicationSourceManager implements ReplicationListener {
+public class ReplicationSourceManager implements ReplicationListener, ConfigurationObserver {
   private static final Log LOG =
       LogFactory.getLog(ReplicationSourceManager.class);
+  private static final String REPLICATION_ENABLE_FAILOVER_KEY =
+    "replication.source.rs.enable.failover";
+  private static final boolean REPLICATION_ENABLE_FAILOVER_DEFAULT_VALUE = true;
   // Map of all the sources that read this RS's logs
   private final Map<String, ReplicationSourceInterface> sources;
   // List of all the sources we got from died RSs
@@ -132,6 +136,23 @@ public class ReplicationSourceManager implements ReplicationListener {
   private final Map<String, PeerRunningStatus> sourcesPeerRunningStatus;
   // Map to record all the metrics for all the sources
   private final Map<String, MetricsSource> sourcesMetrics;
+  private volatile boolean enableFailover;
+
+  @Override
+  public void onConfigurationChange(Configuration conf) {
+    boolean currentEnableFailover = this.enableFailover;
+    this.enableFailover = conf.getBoolean(REPLICATION_ENABLE_FAILOVER_KEY,
+      REPLICATION_ENABLE_FAILOVER_DEFAULT_VALUE);
+    LOG.info("enableFailover changed from " + currentEnableFailover + " to " + enableFailover);
+    if (enableFailover && !currentEnableFailover) {
+      try {
+        tryHandleFailoverWork();
+      } catch (ReplicationException e) {
+        LOG.warn("Cannot get list of replicators, ", e);
+      }
+    }
+  }
+
   enum PeerRunningStatus {
     // When all the related table is offline and the waiting for drain log is consumed
     // then remove the source and related information mark the peer as not running
@@ -171,6 +192,8 @@ public class ReplicationSourceManager implements ReplicationListener {
     this.fs = fs;
     this.logDir = logDir;
     this.oldLogDir = oldLogDir;
+    this.enableFailover = conf.getBoolean(REPLICATION_ENABLE_FAILOVER_KEY,
+      REPLICATION_ENABLE_FAILOVER_DEFAULT_VALUE);
     this.sleepBeforeFailover =
         conf.getLong("replication.sleep.before.failover", 30000); // 30 seconds
     this.clusterId = clusterId;
@@ -306,13 +329,19 @@ public class ReplicationSourceManager implements ReplicationListener {
         this.peerReplicationTables.addAll(tableCFs.keySet());
       }
     }
+    if (enableFailover) {
+      tryHandleFailoverWork();
+    }
+  }
+
+  private void tryHandleFailoverWork() throws ReplicationException {
     List<String> currentReplicators = this.replicationQueues.getListOfReplicators();
     if (currentReplicators == null || currentReplicators.isEmpty()) {
       return;
     }
     List<String> otherRegionServers = replicationTracker.getListOfRegionServers();
     LOG.info("Current list of replicators: " + currentReplicators + " other RSs: "
-        + otherRegionServers);
+      + otherRegionServers);
 
     // Look if there's anything to process after a restart
     for (String rs : currentReplicators) {
@@ -690,7 +719,14 @@ public class ReplicationSourceManager implements ReplicationListener {
 
   @Override
   public void regionServerRemoved(String regionserver) {
-    transferQueues(regionserver);
+    if (enableFailover) {
+      transferQueues(regionserver);
+    } else {
+      LOG.info("RegionServer " + regionserver + " offline, " +
+        "because of we set enableFailover to false at " +
+        server.getServerName().toString() +
+        ", so it will not handle the failover task.");
+    }
   }
 
   @Override
