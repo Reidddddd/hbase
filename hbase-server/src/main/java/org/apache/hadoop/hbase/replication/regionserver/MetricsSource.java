@@ -387,6 +387,11 @@ public class MetricsSource implements BaseSource {
   public boolean isPeerRunning() {
     return singleSourceSource.getPeerRunningStatus() == 1;
   }
+  
+  public void incrWALReadingErrors() {
+    singleSourceSource.incrWALReadingErrors();
+    globalSourceSource.incrWALReadingErrors();
+  }
 
   @Override
   public String getMetricsContext() {

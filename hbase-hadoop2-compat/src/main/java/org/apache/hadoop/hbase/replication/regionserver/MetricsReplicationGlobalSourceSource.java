@@ -46,6 +46,7 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
   private final MutableFastCounter completedWAL;
   private final MutableFastCounter completedRecoveryQueue;
   private final MutableFastCounter failedRecoveryQueue;
+  private final MutableFastCounter walReadingErrors;
 
   public MetricsReplicationGlobalSourceSource(MetricsReplicationSourceImpl rms) {
     this.rms = rms;
@@ -85,6 +86,7 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
         rms.getMetricsRegistry().getCounter(SOURCE_COMPLETED_RECOVERY_QUEUES, 0L);
     failedRecoveryQueue = rms.getMetricsRegistry()
         .getCounter(SOURCE_FAILED_RECOVERY_QUEUES, 0L);
+    walReadingErrors = rms.getMetricsRegistry().getCounter(SOURCE_LOG_READING_ERRORS, 0L);
   }
 
   @Override public void setLastShippedAge(long age) {
@@ -226,6 +228,11 @@ public class MetricsReplicationGlobalSourceSource implements MetricsReplicationS
   public int getPeerRunningStatus() {
     // Not implemented
     return 0;
+  }
+  
+  @Override
+  public void incrWALReadingErrors() {
+    walReadingErrors.incr();
   }
 
   @Override
