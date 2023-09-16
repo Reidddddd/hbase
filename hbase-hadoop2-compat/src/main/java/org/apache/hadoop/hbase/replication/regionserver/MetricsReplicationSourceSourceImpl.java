@@ -62,6 +62,7 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
   private final String completedLogsKey;
   private final String completedRecoveryKey;
   private final String isPeerRunningKey;
+  private final String readingErrorsKey;
   private final MutableFastCounter unknownFileLengthForClosedWAL;
   private final MutableFastCounter uncleanlyClosedWAL;
   private final MutableFastCounter uncleanlyClosedSkippedBytes;
@@ -71,6 +72,7 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
   private final MutableFastCounter completedRecoveryQueue;
   private final MutableGaugeLong oldestWalAge;
   private final MutableGaugeLong isPeerRunning;
+  private final MutableFastCounter walReadingErrors;
 
   public MetricsReplicationSourceSourceImpl(MetricsReplicationSourceImpl rms, String id) {
     this.rms = rms;
@@ -136,6 +138,9 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
   
     isPeerRunningKey = this.keyPrefix + "isPeerRunning";
     isPeerRunning = rms.getMetricsRegistry().getGauge(isPeerRunningKey, 0L);
+  
+    readingErrorsKey = this.keyPrefix + "logReadingErrors";
+    walReadingErrors = rms.getMetricsRegistry().getCounter(readingErrorsKey, 0L);
   }
 
   @Override public void setLastShippedAge(long age) {
@@ -203,6 +208,7 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
     rms.removeMetric(completedRecoveryKey);
     rms.removeMetric(oldestWalAgeKey);
     rms.removeMetric(isPeerRunningKey);
+    rms.removeMetric(readingErrorsKey);
   }
 
   @Override
@@ -288,7 +294,12 @@ public class MetricsReplicationSourceSourceImpl implements MetricsReplicationSou
   @Override public int getPeerRunningStatus() {
     return (int) isPeerRunning.value();
   }
-
+  
+  @Override
+  public void incrWALReadingErrors() {
+    walReadingErrors.incr();
+  }
+  
   @Override
   public void init() {
     rms.init();

@@ -59,6 +59,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.Waiter;
+import org.apache.hadoop.hbase.Waiter.Predicate;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
@@ -72,7 +73,7 @@ import org.apache.hadoop.hbase.replication.regionserver.ReplicationSourceWALRead
 import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.testclassification.ReplicationTests;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.wal.DefaultWALProvider;
+import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
@@ -843,7 +844,8 @@ public class TestWALEntryStream {
     localConf.setBoolean("replication.source.eof.autorecovery", true);
 
     try (WALEntryStream entryStream =
-                 new WALEntryStream(logQueue, fs, localConf, logQueue.getMetrics(), fakeWalGroupId)) {
+                 new WALEntryStream(logQueue, fs, localConf,
+                     logQueue.getMetrics(), fakeWalGroupId)) {
       // Get the archived dir path for the first wal.
       Path archivePath = entryStream.getArchivedLog(emptyLogFile);
       // Make sure that the wal path is not the same as archived Dir path.
@@ -870,5 +872,67 @@ public class TestWALEntryStream {
         return logQueue.getQueueSize(fakeWalGroupId) == 1;
       }
     });
+  }
+  
+  /**
+   * Tests that we handle EOFException when we get wrong position.
+   * @throws Exception exception
+   */
+  @Test
+  public void testPositionEOFException() throws Exception {
+    assertEquals(1, logQueue.getQueueSize(fakeWalGroupId));
+    // a number that much larger than current file length
+    Path currentPath = logQueue.getQueue(fakeWalGroupId).peek();
+    long position = fs.exists(currentPath) ?
+        fs.getLength(currentPath) + 100000 : fs.getLength(getArchivedLog(currentPath)) + 100000;
+    try (WALEntryStream entryStream =
+             new WALEntryStream(logQueue, fs, conf, position,
+                 logQueue.getMetrics(), fakeWalGroupId)) {
+      entryStream.hasNext();
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Cannot seek after EOF"));
+    }
+    try (WALEntryStream entryStream =
+             new WALEntryStream(logQueue, fs, conf, -1L, logQueue.getMetrics(), fakeWalGroupId)) {
+      entryStream.hasNext();
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Cannot seek to negative offset"));
+    }
+    ReplicationSourceManager mockSourceManager = Mockito.mock(ReplicationSourceManager.class);
+    ReplicationSource source = Mockito.mock(ReplicationSource.class);
+    when(source.isPeerEnabled()).thenReturn(true);
+  
+    ReplicationSourceWALReaderThread largerPosition =
+        new ReplicationSourceWALReaderThread(mockSourceManager, getQueueInfo(), logQueue, position,
+            fs, conf, getDummyFilter(), logQueue.getMetrics(), source, fakeWalGroupId);
+    largerPosition.start();
+    Waiter.waitFor(conf, 10000, (Predicate<Exception>) () ->
+        (largerPosition.getLastReadPosition() <=
+            (fs.exists(currentPath) ? fs.getLength(currentPath) :
+                fs.getLength(getArchivedLog(currentPath)))
+        ) &&
+            largerPosition.getLastReadPosition() >= 0);
+  
+    ReplicationSourceWALReaderThread negativePosition =
+        new ReplicationSourceWALReaderThread(mockSourceManager, getQueueInfo(), logQueue, -1,
+            fs, conf, getDummyFilter(), logQueue.getMetrics(), source, fakeWalGroupId);
+    negativePosition.start();
+    Waiter.waitFor(conf, 10000, (Predicate<Exception>) () ->
+        (negativePosition.getLastReadPosition() <=
+            (fs.exists(currentPath) ? fs.getLength(currentPath) :
+                fs.getLength(getArchivedLog(currentPath)))
+        ) &&
+            negativePosition.getLastReadPosition() >= 0);
+  }
+  
+  Path getArchivedLog(Path path) throws IOException {
+    Path rootDir = FSUtils.getRootDir(conf);
+    Path oldLogDir = new Path(rootDir, HConstants.HREGION_OLDLOGDIR_NAME);
+    Path archivedLogLocation = new Path(oldLogDir, path.getName());
+    if (fs.exists(archivedLogLocation)) {
+      return archivedLogLocation;
+    } else {
+      return path;
+    }
   }
 }

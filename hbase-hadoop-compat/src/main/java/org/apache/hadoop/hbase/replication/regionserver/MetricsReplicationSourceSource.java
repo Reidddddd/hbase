@@ -50,6 +50,7 @@ public interface MetricsReplicationSourceSource extends BaseSource {
   public static final String SOURCE_COMPLETED_LOGS = "source.completedLogs";
   public static final String SOURCE_COMPLETED_RECOVERY_QUEUES = "source.completedRecoverQueues";
   public static final String SOURCE_FAILED_RECOVERY_QUEUES = "source.failedRecoverQueues";
+  public static final String SOURCE_LOG_READING_ERRORS = "source.logReadingErrors";
   /* Used to track the age of oldest wal in ms since its creation time */
   String OLDEST_WAL_AGE = "source.oldestWalAge";
   String IS_SOURCE_CONSUMING = "source.isSourceConsuming";
@@ -84,4 +85,5 @@ public interface MetricsReplicationSourceSource extends BaseSource {
   // and running = 1 means the PeerRunningStatus is RUNNING.
   void setPeerRunningStatus(long running);
   int getPeerRunningStatus();
+  void incrWALReadingErrors();
 }

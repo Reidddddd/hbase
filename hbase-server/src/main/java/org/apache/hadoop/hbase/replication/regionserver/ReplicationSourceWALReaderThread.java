@@ -26,7 +26,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -34,8 +33,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.BulkLoadDescriptor;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.StoreDescriptor;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
@@ -45,6 +42,8 @@ import org.apache.hadoop.hbase.replication.regionserver.WALEntryStream.WALEntryS
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.Entry;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 /**
  * Reads and filters WAL entries, groups the filtered entries into batches,
@@ -133,6 +132,7 @@ public class ReplicationSourceWALReaderThread extends Thread {
             new WALEntryStream(logQueue, fs, conf, lastReadPosition, metrics, walGroupId);
     try {
       while (isReaderRunning()) { // we only loop back here if something fatal happens to stream
+        Exception walReadException = null;
         try {
           entryStream = new WALEntryStream(logQueue, fs, conf,
                   lastReadPosition, metrics, walGroupId);
@@ -169,6 +169,7 @@ public class ReplicationSourceWALReaderThread extends Thread {
             }
           }
         } catch (IOException | WALEntryStreamRuntimeException e) { // stream related
+          walReadException = e;
           if (handleEofException(e, entryStream, batch)) {
             sleepMultiplier = 1;
           } else {
@@ -183,7 +184,11 @@ public class ReplicationSourceWALReaderThread extends Thread {
         } catch (InterruptedException e) {
           LOG.trace("Interrupted while sleeping between WAL reads");
           Thread.currentThread().interrupt();
+        } catch (Exception e) {
+          walReadException = e;
+          throw e;
         } finally {
+          printLogAndResetPosition(entryStream, walReadException);
           entryStream.close();
         }
       }
@@ -198,6 +203,43 @@ public class ReplicationSourceWALReaderThread extends Thread {
     } catch (InterruptedException e) {
       LOG.trace("Interrupted while sleeping between WAL reads");
       Thread.currentThread().interrupt();
+    }
+  }
+  
+  private void printLogAndResetPosition(WALEntryStream entryStream, Exception walReadException) {
+    if (walReadException != null) {
+      long fileLength = Long.MAX_VALUE;
+      try {
+        fileLength = this.fs.exists(getCurrentPath()) ?
+            this.fs.getFileStatus(getCurrentPath()).getLen() :
+            fs.getFileStatus(entryStream.getArchivedLog(getCurrentPath())).getLen();
+      } catch (Exception e) {
+        LOG.info(e);
+      }
+      boolean errorLogPrint = false;
+      long lastReadPositionPrint = lastReadPosition;
+      if (walReadException instanceof IOException ||
+          walReadException instanceof WALEntryStreamRuntimeException) {
+        if ((walReadException.getMessage().contains("Cannot seek after EOF") ||
+            walReadException.getMessage().contains("Cannot seek to negative offset"))
+            && (lastReadPosition < 0 || lastReadPosition > fileLength)) {
+          errorLogPrint = true;
+          lastReadPosition = 0;
+        }
+      } else {
+        errorLogPrint = true;
+      }
+      if (errorLogPrint) {
+        LOG.info("Exception happens when read WALs " +
+            "entryStream position:[" + entryStream.getPosition() + "] " +
+            "entryStream path:[" + entryStream.getCurrentPath() + "] " +
+            "lastReadPosition:[" + lastReadPositionPrint + "] " +
+            "lastReadPath:[" + lastReadPath + "] " +
+            "currentPath:[" + getCurrentPath() + "] " +
+            "currentPathFileLength:[" + fileLength + "]");
+        LOG.info("Replication WALs reading error happens: ", walReadException);
+        metrics.incrWALReadingErrors();
+      }
     }
   }
 
