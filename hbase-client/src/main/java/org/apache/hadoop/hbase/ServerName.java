@@ -32,6 +32,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -83,6 +84,17 @@ public class ServerName implements Comparable<ServerName>, Serializable {
     Pattern.compile("[^" + SERVERNAME_SEPARATOR + "]+" +
       SERVERNAME_SEPARATOR + Addressing.VALID_PORT_REGEX +
       SERVERNAME_SEPARATOR + Addressing.VALID_PORT_REGEX + "$");
+
+  public static final Comparator<ServerName> INTERNAL_SERVERNAME_COMPARATOR = (sn1, sn2) -> {
+    if (sn1.getInternalHostName() == null || sn2.getInternalHostName() == null) {
+      return sn1.compareTo(sn2);
+    }
+    int compare = sn1.getInternalHostName().compareToIgnoreCase(sn2.getInternalHostName());
+    if (compare == 0) {
+      compare = sn1.compareTo(sn2);
+    }
+    return compare;
+  };
 
   /**
    * What to use if server name is unknown.
