@@ -1187,7 +1187,9 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         conf.get("hbase." + masterOrRS + ".dns.interface", "default"),
         conf.get("hbase." + masterOrRS + ".dns.nameserver", "default")));
     } else {
-      LOG.info("hostname is configured to be " + hostname);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("hostname is configured to be " + hostname);
+      }
       return hostname;
     }
   }
