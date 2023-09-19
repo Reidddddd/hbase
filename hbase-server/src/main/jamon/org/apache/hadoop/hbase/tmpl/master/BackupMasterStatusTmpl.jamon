@@ -39,7 +39,7 @@ MasterAddressTracker masterAddressTracker = master.getMasterAddressTracker();
     </%java>
     <div class="row inner_header">
         <div class="page-header">
-            <h1>Backup Master <small><% master.getServerName().getHostname() %></small></h1>
+            <h1>Backup Master <small><% master.getServerName().getInternalHostName() %></small></h1>
         </div>
     </div>
     <h4>Current Active Master: <a href="//<% active_master.getHostname() %>:<% infoPort %>/master-status"

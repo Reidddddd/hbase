@@ -3372,4 +3372,15 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
   public LoadBalancer getLoadBalancer() {
     return balancer;
   }
+
+  @Override
+  protected void initServerName() {
+    InetSocketAddress address = rpcServices.getSocketAddress();
+    // We directly use IP address as the hostname to do network communication.
+    String hostName = address.getHostName();
+
+    serverName = ServerName.valueOf(hostName, address.getPort(), startcode);
+    LOG.info("Startup with hostname: " + hostName + " internal hostname: "
+      + serverName.getInternalHostName());
+  }
 }

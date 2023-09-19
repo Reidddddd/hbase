@@ -118,6 +118,24 @@ public final class RegionServerStatusProtos {
      */
     com.google.protobuf.ByteString
         getGroupNameBytes();
+
+    // optional bool k8s_mode_enabled = 6;
+    /**
+     * <code>optional bool k8s_mode_enabled = 6;</code>
+     *
+     * <pre>
+     ** whether region server in k8s mode, optional *
+     * </pre>
+     */
+    boolean hasK8SModeEnabled();
+    /**
+     * <code>optional bool k8s_mode_enabled = 6;</code>
+     *
+     * <pre>
+     ** whether region server in k8s mode, optional *
+     * </pre>
+     */
+    boolean getK8SModeEnabled();
   }
   /**
    * Protobuf type {@code hbase.pb.RegionServerStartupRequest}
@@ -193,6 +211,11 @@ public final class RegionServerStatusProtos {
             case 42: {
               bitField0_ |= 0x00000010;
               groupName_ = input.readBytes();
+              break;
+            }
+            case 48: {
+              bitField0_ |= 0x00000020;
+              k8SModeEnabled_ = input.readBool();
               break;
             }
           }
@@ -417,12 +440,37 @@ public final class RegionServerStatusProtos {
       }
     }
 
+    // optional bool k8s_mode_enabled = 6;
+    public static final int K8S_MODE_ENABLED_FIELD_NUMBER = 6;
+    private boolean k8SModeEnabled_;
+    /**
+     * <code>optional bool k8s_mode_enabled = 6;</code>
+     *
+     * <pre>
+     ** whether region server in k8s mode, optional *
+     * </pre>
+     */
+    public boolean hasK8SModeEnabled() {
+      return ((bitField0_ & 0x00000020) == 0x00000020);
+    }
+    /**
+     * <code>optional bool k8s_mode_enabled = 6;</code>
+     *
+     * <pre>
+     ** whether region server in k8s mode, optional *
+     * </pre>
+     */
+    public boolean getK8SModeEnabled() {
+      return k8SModeEnabled_;
+    }
+
     private void initFields() {
       port_ = 0;
       serverStartCode_ = 0L;
       serverCurrentTime_ = 0L;
       useThisHostnameInstead_ = "";
       groupName_ = "";
+      k8SModeEnabled_ = false;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -463,6 +511,9 @@ public final class RegionServerStatusProtos {
       if (((bitField0_ & 0x00000010) == 0x00000010)) {
         output.writeBytes(5, getGroupNameBytes());
       }
+      if (((bitField0_ & 0x00000020) == 0x00000020)) {
+        output.writeBool(6, k8SModeEnabled_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -491,6 +542,10 @@ public final class RegionServerStatusProtos {
       if (((bitField0_ & 0x00000010) == 0x00000010)) {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(5, getGroupNameBytes());
+      }
+      if (((bitField0_ & 0x00000020) == 0x00000020)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(6, k8SModeEnabled_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -540,6 +595,11 @@ public final class RegionServerStatusProtos {
         result = result && getGroupName()
             .equals(other.getGroupName());
       }
+      result = result && (hasK8SModeEnabled() == other.hasK8SModeEnabled());
+      if (hasK8SModeEnabled()) {
+        result = result && (getK8SModeEnabled()
+            == other.getK8SModeEnabled());
+      }
       result = result &&
           getUnknownFields().equals(other.getUnknownFields());
       return result;
@@ -572,6 +632,10 @@ public final class RegionServerStatusProtos {
       if (hasGroupName()) {
         hash = (37 * hash) + GROUP_NAME_FIELD_NUMBER;
         hash = (53 * hash) + getGroupName().hashCode();
+      }
+      if (hasK8SModeEnabled()) {
+        hash = (37 * hash) + K8S_MODE_ENABLED_FIELD_NUMBER;
+        hash = (53 * hash) + hashBoolean(getK8SModeEnabled());
       }
       hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
@@ -692,6 +756,8 @@ public final class RegionServerStatusProtos {
         bitField0_ = (bitField0_ & ~0x00000008);
         groupName_ = "";
         bitField0_ = (bitField0_ & ~0x00000010);
+        k8SModeEnabled_ = false;
+        bitField0_ = (bitField0_ & ~0x00000020);
         return this;
       }
 
@@ -740,6 +806,10 @@ public final class RegionServerStatusProtos {
           to_bitField0_ |= 0x00000010;
         }
         result.groupName_ = groupName_;
+        if (((from_bitField0_ & 0x00000020) == 0x00000020)) {
+          to_bitField0_ |= 0x00000020;
+        }
+        result.k8SModeEnabled_ = k8SModeEnabled_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -774,6 +844,9 @@ public final class RegionServerStatusProtos {
           bitField0_ |= 0x00000010;
           groupName_ = other.groupName_;
           onChanged();
+        }
+        if (other.hasK8SModeEnabled()) {
+          setK8SModeEnabled(other.getK8SModeEnabled());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -1153,6 +1226,55 @@ public final class RegionServerStatusProtos {
   }
   bitField0_ |= 0x00000010;
         groupName_ = value;
+        onChanged();
+        return this;
+      }
+
+      // optional bool k8s_mode_enabled = 6;
+      private boolean k8SModeEnabled_ ;
+      /**
+       * <code>optional bool k8s_mode_enabled = 6;</code>
+       *
+       * <pre>
+       ** whether region server in k8s mode, optional *
+       * </pre>
+       */
+      public boolean hasK8SModeEnabled() {
+        return ((bitField0_ & 0x00000020) == 0x00000020);
+      }
+      /**
+       * <code>optional bool k8s_mode_enabled = 6;</code>
+       *
+       * <pre>
+       ** whether region server in k8s mode, optional *
+       * </pre>
+       */
+      public boolean getK8SModeEnabled() {
+        return k8SModeEnabled_;
+      }
+      /**
+       * <code>optional bool k8s_mode_enabled = 6;</code>
+       *
+       * <pre>
+       ** whether region server in k8s mode, optional *
+       * </pre>
+       */
+      public Builder setK8SModeEnabled(boolean value) {
+        bitField0_ |= 0x00000020;
+        k8SModeEnabled_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional bool k8s_mode_enabled = 6;</code>
+       *
+       * <pre>
+       ** whether region server in k8s mode, optional *
+       * </pre>
+       */
+      public Builder clearK8SModeEnabled() {
+        bitField0_ = (bitField0_ & ~0x00000020);
+        k8SModeEnabled_ = false;
         onChanged();
         return this;
       }
@@ -9317,54 +9439,55 @@ public final class RegionServerStatusProtos {
   static {
     java.lang.String[] descriptorData = {
       "\n\030RegionServerStatus.proto\022\010hbase.pb\032\013HB" +
-      "ase.proto\032\023ClusterStatus.proto\"\231\001\n\032Regio" +
+      "ase.proto\032\023ClusterStatus.proto\"\263\001\n\032Regio" +
       "nServerStartupRequest\022\014\n\004port\030\001 \002(\r\022\031\n\021s" +
       "erver_start_code\030\002 \002(\004\022\033\n\023server_current" +
       "_time\030\003 \002(\004\022!\n\031use_this_hostname_instead" +
-      "\030\004 \001(\t\022\022\n\ngroup_name\030\005 \001(\t\"L\n\033RegionServ" +
-      "erStartupResponse\022-\n\013map_entries\030\001 \003(\0132\030" +
-      ".hbase.pb.NameStringPair\"e\n\031RegionServer" +
-      "ReportRequest\022$\n\006server\030\001 \002(\0132\024.hbase.pb" +
-      ".ServerName\022\"\n\004load\030\002 \001(\0132\024.hbase.pb.Ser",
-      "verLoad\"\034\n\032RegionServerReportResponse\"X\n" +
-      "\031ReportRSFatalErrorRequest\022$\n\006server\030\001 \002" +
-      "(\0132\024.hbase.pb.ServerName\022\025\n\rerror_messag" +
-      "e\030\002 \002(\t\"\034\n\032ReportRSFatalErrorResponse\"6\n" +
-      "\037GetLastFlushedSequenceIdRequest\022\023\n\013regi" +
-      "on_name\030\001 \002(\014\"\207\001\n GetLastFlushedSequence" +
-      "IdResponse\022 \n\030last_flushed_sequence_id\030\001" +
-      " \002(\004\022A\n\036store_last_flushed_sequence_id\030\002" +
-      " \003(\0132\031.hbase.pb.StoreSequenceId\"\344\002\n\025Regi" +
-      "onStateTransition\022G\n\017transition_code\030\001 \002",
-      "(\0162..hbase.pb.RegionStateTransition.Tran" +
-      "sitionCode\022)\n\013region_info\030\002 \003(\0132\024.hbase." +
-      "pb.RegionInfo\022\024\n\014open_seq_num\030\003 \001(\004\"\300\001\n\016" +
-      "TransitionCode\022\n\n\006OPENED\020\000\022\017\n\013FAILED_OPE" +
-      "N\020\001\022\n\n\006CLOSED\020\002\022\022\n\016READY_TO_SPLIT\020\003\022\022\n\016R" +
-      "EADY_TO_MERGE\020\004\022\016\n\nSPLIT_PONR\020\005\022\016\n\nMERGE" +
-      "_PONR\020\006\022\t\n\005SPLIT\020\007\022\n\n\006MERGED\020\010\022\022\n\016SPLIT_" +
-      "REVERTED\020\t\022\022\n\016MERGE_REVERTED\020\n\"\177\n\"Report" +
-      "RegionStateTransitionRequest\022$\n\006server\030\001" +
-      " \002(\0132\024.hbase.pb.ServerName\0223\n\ntransition",
-      "\030\002 \003(\0132\037.hbase.pb.RegionStateTransition\"" +
-      "<\n#ReportRegionStateTransitionResponse\022\025" +
-      "\n\rerror_message\030\001 \001(\t2\260\004\n\031RegionServerSt" +
-      "atusService\022b\n\023RegionServerStartup\022$.hba" +
-      "se.pb.RegionServerStartupRequest\032%.hbase" +
-      ".pb.RegionServerStartupResponse\022_\n\022Regio" +
-      "nServerReport\022#.hbase.pb.RegionServerRep" +
-      "ortRequest\032$.hbase.pb.RegionServerReport" +
-      "Response\022_\n\022ReportRSFatalError\022#.hbase.p" +
-      "b.ReportRSFatalErrorRequest\032$.hbase.pb.R",
-      "eportRSFatalErrorResponse\022q\n\030GetLastFlus" +
-      "hedSequenceId\022).hbase.pb.GetLastFlushedS" +
-      "equenceIdRequest\032*.hbase.pb.GetLastFlush" +
-      "edSequenceIdResponse\022z\n\033ReportRegionStat" +
-      "eTransition\022,.hbase.pb.ReportRegionState" +
-      "TransitionRequest\032-.hbase.pb.ReportRegio" +
-      "nStateTransitionResponseBN\n*org.apache.h" +
-      "adoop.hbase.protobuf.generatedB\030RegionSe" +
-      "rverStatusProtosH\001\210\001\001\240\001\001"
+      "\030\004 \001(\t\022\022\n\ngroup_name\030\005 \001(\t\022\030\n\020k8s_mode_e" +
+      "nabled\030\006 \001(\010\"L\n\033RegionServerStartupRespo" +
+      "nse\022-\n\013map_entries\030\001 \003(\0132\030.hbase.pb.Name" +
+      "StringPair\"e\n\031RegionServerReportRequest\022" +
+      "$\n\006server\030\001 \002(\0132\024.hbase.pb.ServerName\022\"\n",
+      "\004load\030\002 \001(\0132\024.hbase.pb.ServerLoad\"\034\n\032Reg" +
+      "ionServerReportResponse\"X\n\031ReportRSFatal" +
+      "ErrorRequest\022$\n\006server\030\001 \002(\0132\024.hbase.pb." +
+      "ServerName\022\025\n\rerror_message\030\002 \002(\t\"\034\n\032Rep" +
+      "ortRSFatalErrorResponse\"6\n\037GetLastFlushe" +
+      "dSequenceIdRequest\022\023\n\013region_name\030\001 \002(\014\"" +
+      "\207\001\n GetLastFlushedSequenceIdResponse\022 \n\030" +
+      "last_flushed_sequence_id\030\001 \002(\004\022A\n\036store_" +
+      "last_flushed_sequence_id\030\002 \003(\0132\031.hbase.p" +
+      "b.StoreSequenceId\"\344\002\n\025RegionStateTransit",
+      "ion\022G\n\017transition_code\030\001 \002(\0162..hbase.pb." +
+      "RegionStateTransition.TransitionCode\022)\n\013" +
+      "region_info\030\002 \003(\0132\024.hbase.pb.RegionInfo\022" +
+      "\024\n\014open_seq_num\030\003 \001(\004\"\300\001\n\016TransitionCode" +
+      "\022\n\n\006OPENED\020\000\022\017\n\013FAILED_OPEN\020\001\022\n\n\006CLOSED\020" +
+      "\002\022\022\n\016READY_TO_SPLIT\020\003\022\022\n\016READY_TO_MERGE\020" +
+      "\004\022\016\n\nSPLIT_PONR\020\005\022\016\n\nMERGE_PONR\020\006\022\t\n\005SPL" +
+      "IT\020\007\022\n\n\006MERGED\020\010\022\022\n\016SPLIT_REVERTED\020\t\022\022\n\016" +
+      "MERGE_REVERTED\020\n\"\177\n\"ReportRegionStateTra" +
+      "nsitionRequest\022$\n\006server\030\001 \002(\0132\024.hbase.p",
+      "b.ServerName\0223\n\ntransition\030\002 \003(\0132\037.hbase" +
+      ".pb.RegionStateTransition\"<\n#ReportRegio" +
+      "nStateTransitionResponse\022\025\n\rerror_messag" +
+      "e\030\001 \001(\t2\260\004\n\031RegionServerStatusService\022b\n" +
+      "\023RegionServerStartup\022$.hbase.pb.RegionSe" +
+      "rverStartupRequest\032%.hbase.pb.RegionServ" +
+      "erStartupResponse\022_\n\022RegionServerReport\022" +
+      "#.hbase.pb.RegionServerReportRequest\032$.h" +
+      "base.pb.RegionServerReportResponse\022_\n\022Re" +
+      "portRSFatalError\022#.hbase.pb.ReportRSFata",
+      "lErrorRequest\032$.hbase.pb.ReportRSFatalEr" +
+      "rorResponse\022q\n\030GetLastFlushedSequenceId\022" +
+      ").hbase.pb.GetLastFlushedSequenceIdReque" +
+      "st\032*.hbase.pb.GetLastFlushedSequenceIdRe" +
+      "sponse\022z\n\033ReportRegionStateTransition\022,." +
+      "hbase.pb.ReportRegionStateTransitionRequ" +
+      "est\032-.hbase.pb.ReportRegionStateTransiti" +
+      "onResponseBN\n*org.apache.hadoop.hbase.pr" +
+      "otobuf.generatedB\030RegionServerStatusProt" +
+      "osH\001\210\001\001\240\001\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -9376,7 +9499,7 @@ public final class RegionServerStatusProtos {
           internal_static_hbase_pb_RegionServerStartupRequest_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_hbase_pb_RegionServerStartupRequest_descriptor,
-              new java.lang.String[] { "Port", "ServerStartCode", "ServerCurrentTime", "UseThisHostnameInstead", "GroupName", });
+              new java.lang.String[] { "Port", "ServerStartCode", "ServerCurrentTime", "UseThisHostnameInstead", "GroupName", "K8SModeEnabled", });
           internal_static_hbase_pb_RegionServerStartupResponse_descriptor =
             getDescriptor().getMessageTypes().get(1);
           internal_static_hbase_pb_RegionServerStartupResponse_fieldAccessorTable = new

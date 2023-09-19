@@ -585,17 +585,9 @@ public class HRegionServer extends HasThread implements
         }
       }
     }
-    // We directly use IP address as the hostname to do network communication.
-    String hostName = rpcServices.isa.getAddress().getHostAddress();
-    // Internal hostname use customised first and use the local hostname for default.
-    String internalHostName = shouldUseThisHostnameInstead() ? useThisHostnameInstead
-       : rpcServices.isa.getHostName();
 
-    serverName = ServerName.valueOf(hostName, rpcServices.isa.getPort(), startcode,
-      internalHostName);
-    LOG.info("Startup with hostname: " + hostName + " internal hostname: "
-      + serverName.getInternalHostName());
-
+    initServerName();
+    String hostName = serverName.getHostname();
     rpcControllerFactory = RpcControllerFactory.instantiate(this.conf);
     rpcRetryingCallerFactory = RpcRetryingCallerFactory.instantiate(this.conf);
 
@@ -670,6 +662,20 @@ public class HRegionServer extends HasThread implements
     this.compactedFileDischarger =
         new CompactedHFilesDischarger(cleanerInterval, (Stoppable)this, (RegionServerServices)this);
     choreService.scheduleChore(compactedFileDischarger);
+  }
+
+  protected void initServerName() {
+    InetSocketAddress address = rpcServices.getSocketAddress();
+    // We directly use IP address as the hostname to do network communication.
+    String hostName = isK8sModeEnabled() ? address.getAddress().getHostAddress() :
+      address.getHostName();
+    // Internal hostname use customised first and use the local hostname for default.
+    String internalHostName = shouldUseThisHostnameInstead() ? useThisHostnameInstead
+      : address.getHostName();
+
+    serverName = ServerName.valueOf(hostName, address.getPort(), startcode, internalHostName);
+    LOG.info("Startup with hostname: " + hostName + " internal hostname: "
+      + serverName.getInternalHostName());
   }
 
   private void initializeFileSystem() throws IOException {
@@ -2427,6 +2433,7 @@ public class HRegionServer extends HasThread implements
       request.setUseThisHostnameInstead(this.serverName.getInternalHostName());
       if (isK8sModeEnabled()) {
         request.setGroupName(this.conf.get(RS_GROUP_KEY, DEFAULT_RSGROUP));
+        request.setK8SModeEnabled(true);
       }
       result = this.rssStub.regionServerStartup(null, request.build());
     } catch (ServiceException se) {

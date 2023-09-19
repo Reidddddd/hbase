@@ -94,8 +94,8 @@ public class TestRegionServerHostname {
         if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isMulticastAddress()) {
           continue;
         }
-        // Here we should get ip address after SPDI-99533
-        String hostName = addr.getHostAddress();
+
+        String hostName = addr.getHostName();
         LOG.info("Found " + hostName + " on " + ni);
 
         TEST_UTIL.getConfiguration().set(HRegionServer.RS_HOSTNAME_KEY, hostName);
