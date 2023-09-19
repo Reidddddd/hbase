@@ -272,7 +272,10 @@ public class ServerManager {
     // in, it should have been removed from serverAddressToServerInfo and queued
     // for processing by ProcessServerShutdown.
 
-    final String hostname = ia.getHostAddress();
+    // If region server is running on k8s, the hostname from ia may be unknown.
+    // We use the IP address as the server name instead.
+    boolean rsK8sMode = request.hasK8SModeEnabled() && request.getK8SModeEnabled();
+    final String hostname = rsK8sMode ? ia.getHostAddress() : ia.getHostName();
     final String internalHostname = request.hasUseThisHostnameInstead() ?
       request.getUseThisHostnameInstead() : null;
 
@@ -285,6 +288,8 @@ public class ServerManager {
       LOG.warn("THIS SHOULD NOT HAPPEN, RegionServerStartup"
         + " could not record the server: " + sn);
     }
+    LOG.info("Recorded regionserver: " + hostname + " with internal hostname: "
+      + internalHostname);
     return sn;
   }
 

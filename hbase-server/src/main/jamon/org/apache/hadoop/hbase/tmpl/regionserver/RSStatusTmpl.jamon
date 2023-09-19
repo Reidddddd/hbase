@@ -98,7 +98,13 @@ org.apache.hadoop.hbase.zookeeper.MasterAddressTracker;
   <div class="container-fluid content">
     <div class="row inner_header">
         <div class="page-header">
-            <h1>RegionServer <small><% serverName.getInternalServerName() + " (" + serverName.getHostname() + ")" %></small></h1>
+            <h1>RegionServer <small>
+            <%if regionServer.isK8sModeEnabled() %>
+            <% serverName.getInternalServerName() + " (" + serverName.getHostname() + ") " %>
+            <%else>
+            <% serverName.getInternalServerName() %>
+            </%if>
+            </small></h1>
         </div>
     </div>
     <div class="row">
