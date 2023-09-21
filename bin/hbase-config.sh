@@ -159,8 +159,33 @@ EOF
     exit 1
 fi
 
-version=$($JAVA_HOME/bin/java -version 2>&1 | awk -F '"' '/version/ {print $2}')
-if [[ "$version" > "11" ]]; then
+function read_java_version() {
+  properties="$("${JAVA_HOME}/bin/java" -XshowSettings:properties -version 2>&1)"
+  echo "${properties}" | grep java.runtime.version | head -1 | sed -e 's/.* = \([^ ]*\)/\1/'
+}
+
+# Inspect the system properties exposed by this JVM to identify the major
+# version number. Normalize on the popular version number, thus consider JDK
+# 1.8 as version "8".
+function parse_java_major_version() {
+  complete_version=$1
+  # split off suffix version info like '-b10' or '+10' or '_10'
+  # careful to not use GNU Sed extensions
+  version="$(echo "$complete_version" | sed -e 's/+/_/g' -e 's/-/_/g' | cut -d'_' -f1)"
+  case "$version" in
+  1.*)
+    echo "$version" | cut -d'.' -f2
+    ;;
+  *)
+    echo "$version" | cut -d'.' -f1
+    ;;
+  esac
+}
+
+version="$(read_java_version)"
+major_version_number="$(parse_java_major_version "$version")"
+
+if [[ "$major_version_number" -ge "11" ]]; then
   # Uncomment the following line to enable warnings of further illegal reflective access operations
   # HBASE_OPTS="$HBASE_OPTS --illegal-access=warn"
 
