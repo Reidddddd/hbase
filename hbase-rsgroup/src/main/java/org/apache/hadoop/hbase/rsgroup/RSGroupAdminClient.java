@@ -19,9 +19,12 @@ package org.apache.hadoop.hbase.rsgroup;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -251,5 +254,32 @@ public class RSGroupAdminClient implements RSGroupAdmin {
 
   @Override
   public void close() throws IOException {
+  }
+
+  public List<String> cleanDeadServersGroup(String rsgroup) throws IOException {
+    RSGroupInfo rsGroupInfo = getRSGroupInfo(rsgroup);
+    if (rsGroupInfo == null) {
+      throw new IOException("Invalid rsgroup name: " + rsgroup);
+    }
+    Set<Address> currentServers = rsGroupInfo.getServers();
+
+    Set<Address> onlineServers = admin.getClusterStatus().getServers().stream()
+      .map(ServerName::getAddress).collect(Collectors.toSet());
+
+    Set<Address> deadServers = admin.listDeadServers().stream().map(ServerName::getAddress).collect(
+      Collectors.toSet());
+    Set<Address> toClean = new HashSet<>();
+
+    for (Address server : currentServers) {
+      if (onlineServers.contains(server) || deadServers.contains(server)) {
+        continue;
+      }
+      toClean.add(server);
+    }
+    if (toClean.isEmpty()) {
+      throw new IOException("No dead server to clean.");
+    }
+    removeServers(toClean);
+    return toClean.stream().map(Address::toString).collect(Collectors.toList());
   }
 }

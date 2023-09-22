@@ -471,5 +471,6 @@ Shell.load_command_group(
     get_table_rsgroup
     remove_servers_rsgroup
     rename_rsgroup
+    clean_dead_servers_rsgroup
   ]
 )
