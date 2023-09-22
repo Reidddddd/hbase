@@ -64,7 +64,6 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.constraint.ConstraintException;
 import org.apache.hadoop.hbase.coprocessor.MultiRowMutationEndpoint;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
-import org.apache.hadoop.hbase.master.HMaster;
 import org.apache.hadoop.hbase.master.MasterServices;
 import org.apache.hadoop.hbase.master.RegionState;
 import org.apache.hadoop.hbase.master.ServerListener;
@@ -493,15 +492,13 @@ public class RSGroupInfoManagerImpl implements RSGroupInfoManager, ServerListene
 
   @Override
   public void serverRemoved(ServerName serverName) {
-    if (this.master instanceof HMaster) {
-      if (((HMaster) this.master).isK8sModeEnabled()) {
-        try {
-          removeServers(Sets.newHashSet(serverName.getAddress()));
-          LOG.info("Removed server: " + serverName + " from rsgroup");
-        } catch (IOException ioe) {
-          LOG.warn("Failed remove server: " + serverName
-            + " from rsgroup. Need manual clean up.");
-        }
+    if (this.master.getServerManager().isPodServer(serverName)) {
+      try {
+        removeServers(Sets.newHashSet(serverName.getAddress()));
+        LOG.info("Removed pod server: " + serverName + " from rsgroup");
+      } catch (IOException ioe) {
+        LOG.warn("Failed remove server: " + serverName
+          + " from rsgroup. Need manual clean up.");
       }
     }
     defaultServerUpdater.serverChanged();

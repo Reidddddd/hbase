@@ -377,7 +377,7 @@ public class MasterRpcServices extends RSRpcServices
       // then use it instead of doing a reverse DNS lookup
       ServerName rs = master.serverManager.regionServerStartup(request, ia);
 
-      if (master.isK8sModeEnabled() && request.hasGroupName()) {
+      if (request.hasGroupName()) {
         String rsgroupName = request.getGroupName();
         if (!rsgroupName.isEmpty()) {
           master.moveServerToTargetGroup(rs, rsgroupName);

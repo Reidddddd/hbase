@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -171,6 +172,8 @@ public class ServerManager {
   private final RetryCounterFactory pingRetryCounterFactory;
   private final RpcControllerFactory rpcControllerFactory;
 
+  private final ConcurrentMap<ServerName, Integer> podInstances = new ConcurrentHashMap<>();
+
   /**
    * Set of region servers which are dead but not processed immediately. If one
    * server died before master enables ServerShutdownHandler, the server will be
@@ -290,6 +293,10 @@ public class ServerManager {
     }
     LOG.info("Recorded regionserver: " + hostname + " with internal hostname: "
       + internalHostname);
+
+    if (rsK8sMode) {
+      podInstances.put(sn, 0);
+    }
     return sn;
   }
 
@@ -662,6 +669,8 @@ public class ServerManager {
         listener.serverRemoved(serverName);
       }
     }
+
+    podInstances.remove(serverName);
   }
 
   @VisibleForTesting
@@ -1335,5 +1344,9 @@ public class ServerManager {
     for (HRegionInfo hri: regions) {
       removeRegion(hri);
     }
+  }
+
+  public boolean isPodServer(ServerName serverName) {
+    return this.podInstances.containsKey(serverName);
   }
 }
