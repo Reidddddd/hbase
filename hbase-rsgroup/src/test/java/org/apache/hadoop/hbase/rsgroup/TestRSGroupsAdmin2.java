@@ -447,4 +447,20 @@ public class TestRSGroupsAdmin2 extends TestRSGroupsBase {
     assertTrue(observer.postMoveServersAndTables);
   }
 
+  @Test
+  public void testCleanDeadServerForRSGroup() throws IOException {
+    RSGroupAdminClient rsClient = new RSGroupAdminClient(TEST_UTIL.getConnection());
+    try {
+      rsClient.cleanDeadServersGroup(RSGroupInfo.DEFAULT_GROUP);
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("No dead server to clean"));
+    }
+
+    try {
+      rsClient.cleanDeadServersGroup("A_nonexistent_group");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Invalid rsgroup name"));
+    }
+  }
+
 }

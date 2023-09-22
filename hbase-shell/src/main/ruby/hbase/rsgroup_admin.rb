@@ -177,5 +177,11 @@ module Hbase
     def rename_rsgroup(oldname, newname)
       @admin.renameRSGroup(oldname, newname)
     end
+
+    #--------------------------------------------------------------------------
+    # rename rsgroup
+    def clean_dead_servers_rsgroup(rsgroup)
+      @admin.cleanDeadServersGroup(rsgroup)
+    end
   end
 end
