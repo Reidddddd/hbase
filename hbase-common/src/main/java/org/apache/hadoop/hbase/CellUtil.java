@@ -1006,4 +1006,47 @@ public final class CellUtil {
   public static boolean matchingType(Cell a, Cell b) {
     return a.getTypeByte() == b.getTypeByte();
   }
+
+  // The purpose of this method is to avoid RuntimeException caused by dirty data in advance.
+  // Does not guarantee the value is correct.
+  public static boolean cellSanityCheck(Cell cell) {
+    try {
+      return checkRowLength(cell) && checkFamilyLength(cell) && checkQualifierLength(cell)
+        && checkValueLength(cell);
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
+  private static boolean checkRowLength(Cell e) {
+    int rowLength = e.getRowLength();
+    if (rowLength <= 0 || rowLength > e.getRowArray().length) {
+      return false;
+    }
+    return rowLength == e.getFamilyOffset() - e.getRowOffset() - 1;
+  }
+
+  private static boolean checkFamilyLength(Cell e) {
+    byte familyLength = e.getFamilyLength();
+    if (familyLength < 0 || familyLength > e.getFamilyArray().length) {
+      return false;
+    }
+    return familyLength == e.getQualifierOffset() - e.getFamilyOffset();
+  }
+
+  private static boolean checkQualifierLength(Cell e) {
+    int qualifierLength = e.getQualifierLength();
+    if (qualifierLength < 0 || qualifierLength > e.getQualifierArray().length) {
+      return false;
+    }
+    // 9 bytes consist of timestamp (8 bytes) + type byte (1 byte)
+    return qualifierLength == e.getValueOffset() - 9 - e.getQualifierOffset();
+  }
+
+  private static boolean checkValueLength(Cell e) {
+    int valueLength = e.getValueLength();
+    return valueLength >= 0 && valueLength <= e.getValueArray().length - e.getRowLength() -
+      e.getFamilyLength() - e.getQualifierLength() - 9;
+  }
+
 }

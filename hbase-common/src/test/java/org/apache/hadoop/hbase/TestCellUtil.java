@@ -19,6 +19,8 @@
 package org.apache.hadoop.hbase;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -310,22 +312,22 @@ public class TestCellUtil {
     Assert.assertTrue(CellUtil.overlappingKeys(empty, empty, a, b));
 
     // non overlaps
-    Assert.assertFalse(CellUtil.overlappingKeys(a, b, c, d));
-    Assert.assertFalse(CellUtil.overlappingKeys(c, d, a, b));
+    assertFalse(CellUtil.overlappingKeys(a, b, c, d));
+    assertFalse(CellUtil.overlappingKeys(c, d, a, b));
 
-    Assert.assertFalse(CellUtil.overlappingKeys(b, c, c, d));
-    Assert.assertFalse(CellUtil.overlappingKeys(b, c, c, empty));
-    Assert.assertFalse(CellUtil.overlappingKeys(b, c, d, empty));
-    Assert.assertFalse(CellUtil.overlappingKeys(c, d, b, c));
-    Assert.assertFalse(CellUtil.overlappingKeys(c, empty, b, c));
-    Assert.assertFalse(CellUtil.overlappingKeys(d, empty, b, c));
+    assertFalse(CellUtil.overlappingKeys(b, c, c, d));
+    assertFalse(CellUtil.overlappingKeys(b, c, c, empty));
+    assertFalse(CellUtil.overlappingKeys(b, c, d, empty));
+    assertFalse(CellUtil.overlappingKeys(c, d, b, c));
+    assertFalse(CellUtil.overlappingKeys(c, empty, b, c));
+    assertFalse(CellUtil.overlappingKeys(d, empty, b, c));
 
-    Assert.assertFalse(CellUtil.overlappingKeys(b, c, a, b));
-    Assert.assertFalse(CellUtil.overlappingKeys(b, c, empty, b));
-    Assert.assertFalse(CellUtil.overlappingKeys(b, c, empty, a));
-    Assert.assertFalse(CellUtil.overlappingKeys(a,b, b, c));
-    Assert.assertFalse(CellUtil.overlappingKeys(empty, b, b, c));
-    Assert.assertFalse(CellUtil.overlappingKeys(empty, a, b, c));
+    assertFalse(CellUtil.overlappingKeys(b, c, a, b));
+    assertFalse(CellUtil.overlappingKeys(b, c, empty, b));
+    assertFalse(CellUtil.overlappingKeys(b, c, empty, a));
+    assertFalse(CellUtil.overlappingKeys(a,b, b, c));
+    assertFalse(CellUtil.overlappingKeys(empty, b, b, c));
+    assertFalse(CellUtil.overlappingKeys(empty, a, b, c));
   }
 
   @Test
@@ -384,7 +386,7 @@ public class TestCellUtil {
   @Test
   public void testToString() {
     byte [] row = Bytes.toBytes("row");
-    long ts = 123l;
+    long ts = 123L;
     // Make a KeyValue and a Cell and see if same toString result.
     KeyValue kv = new KeyValue(row, HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY,
         ts, KeyValue.Type.Minimum, HConstants.EMPTY_BYTE_ARRAY);
@@ -435,5 +437,35 @@ public class TestCellUtil {
       verbose);
 
     // TODO: test with tags
+  }
+
+  @Test
+  public void testCellSanityCheck(){
+    byte [] row = Bytes.toBytes("row");
+    long ts = 123L;
+    // Make a KeyValue and a Cell and see if same toString result.
+    KeyValue kv = new KeyValue(row, HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY,
+      ts, KeyValue.Type.Minimum, HConstants.EMPTY_BYTE_ARRAY);
+    assertTrue(CellUtil.cellSanityCheck(kv));
+
+    byte[] underlying = kv.bytes;
+
+    int idx = kv.getRowOffset() - 1;
+    byte value = underlying[idx];
+    underlying[idx] = -1;
+    assertFalse(CellUtil.cellSanityCheck(kv));
+    underlying[idx] = value;
+
+    idx = kv.getFamilyOffset() - 1;
+    value = underlying[idx];
+    underlying[idx] = -1;
+    assertFalse(CellUtil.cellSanityCheck(kv));
+    underlying[idx] = value;
+
+    idx = kv.getQualifierOffset() - 1;
+    value = underlying[idx];
+    underlying[idx] = -1;
+    assertFalse(CellUtil.cellSanityCheck(kv));
+    underlying[idx] = value;
   }
 }

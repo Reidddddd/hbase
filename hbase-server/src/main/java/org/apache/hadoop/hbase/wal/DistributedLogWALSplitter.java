@@ -338,35 +338,6 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
     return in;
   }
 
-  static private Entry getNextLogLine(Reader in, String logName, boolean skipErrors)
-    throws CorruptedLogFileException, IOException {
-    try {
-      return in.next();
-    } catch (EOFException eof) {
-      // truncated files are expected if a RS crashes (see HBASE-2643)
-      LOG.info("EOF from wal " + logName + ".  continuing");
-      return null;
-    } catch (IOException e) {
-      // If the IOE resulted from bad file format,
-      // then this problem is idempotent and retrying won't help
-      if (e.getCause() != null &&
-        (e.getCause() instanceof ParseException ||
-          e.getCause() instanceof org.apache.hadoop.fs.ChecksumException)) {
-        LOG.warn("Parse exception " + e.getCause().toString() + " from wal "
-          + logName + ".  continuing");
-        return null;
-      }
-      if (!skipErrors) {
-        throw e;
-      }
-      CorruptedLogFileException t =
-        new CorruptedLogFileException("skipErrors=true Ignoring exception" +
-          " while parsing wal " + logName + ". Marking as corrupted");
-      t.initCause(e);
-      throw t;
-    }
-  }
-
   // A wrapper to split all sublogs of one node using the method used by distributed
   // log splitting. Used by tools and unit tests. It should be package private.
   // It is public only because UpgradeTo96 and TestWALObserver are in different packages,

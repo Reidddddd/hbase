@@ -19,10 +19,12 @@
 package org.apache.hadoop.hbase.wal;
 
 
+import java.io.IOException;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.testclassification.LargeTests;
 import org.apache.hadoop.hbase.testclassification.RegionServerTests;
 import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 @Category({RegionServerTests.class, LargeTests.class})
@@ -32,5 +34,11 @@ public class TestWALSplitCompressed extends TestWALSplit {
   public static void setUpBeforeClass() throws Exception {
     TestWALSplit.setUpBeforeClass();
     TEST_UTIL.getConfiguration().setBoolean(HConstants.ENABLE_WAL_COMPRESSION, true);
+  }
+
+  @Override
+  @Test
+  public void testWriteWithCorruptedCell() throws IOException {
+    // This case does not for this class.
   }
 }

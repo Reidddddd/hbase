@@ -465,35 +465,6 @@ public class WALSplitter extends AbstractWALSplitter {
     return in;
   }
 
-  static private Entry getNextLogLine(Reader in, Path path, boolean skipErrors)
-  throws CorruptedLogFileException, IOException {
-    try {
-      return in.next();
-    } catch (EOFException eof) {
-      // truncated files are expected if a RS crashes (see HBASE-2643)
-      LOG.info("EOF from wal " + path + ".  continuing");
-      return null;
-    } catch (IOException e) {
-      // If the IOE resulted from bad file format,
-      // then this problem is idempotent and retrying won't help
-      if (e.getCause() != null &&
-          (e.getCause() instanceof ParseException ||
-           e.getCause() instanceof org.apache.hadoop.fs.ChecksumException)) {
-        LOG.warn("Parse exception " + e.getCause().toString() + " from wal "
-           + path + ".  continuing");
-        return null;
-      }
-      if (!skipErrors) {
-        throw e;
-      }
-      CorruptedLogFileException t =
-        new CorruptedLogFileException("skipErrors=true Ignoring exception" +
-            " while parsing wal " + path + ". Marking as corrupted");
-      t.initCause(e);
-      throw t;
-    }
-  }
-
   /**
    * Create a new {@link Writer} for writing log splits.
    * @return a new Writer instance, caller should close

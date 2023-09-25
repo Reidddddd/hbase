@@ -18,7 +18,9 @@
  */
 package org.apache.hadoop.hbase.wal;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -63,6 +65,8 @@ public abstract class AbstractWALSplitter {
   /** By default we retry errors in splitting, rather than skipping. */
   public static final String SPLIT_SKIP_ERRORS = "hbase.hlog.split.skip.errors";
   public static final boolean SPLIT_SKIP_ERRORS_DEFAULT = false;
+  public static final String SPLIT_SANITY_CHECK = "hbase.split.sanity.check";
+  public static final boolean DEFAULT_SPLIT_SANITY_CHECK = false;
   public final static String SPLIT_WRITER_CREATION_BOUNDED = "hbase.split.writer.creation.bounded";
 
   protected final Configuration conf;
@@ -96,6 +100,8 @@ public abstract class AbstractWALSplitter {
   // Number of writer threads
   protected final int numWriterThreads;
 
+  private final boolean sanityCheck;
+
   protected AbstractWALSplitter(Configuration conf, WALFactory walFactory,
       LastSequenceId sequenceIdChecker, CoordinatedStateManager csm, RecoveryMode mode) {
     this.conf = HBaseConfiguration.create(conf);
@@ -112,6 +118,7 @@ public abstract class AbstractWALSplitter {
     entryBuffers = new EntryBuffers(controller,
       this.conf.getInt("hbase.regionserver.hlog.splitlog.buffersize",
         128*1024*1024), splitWriterCreationBounded);
+    sanityCheck = this.conf.getBoolean(SPLIT_SANITY_CHECK, DEFAULT_SPLIT_SANITY_CHECK);
   }
 
   /**
@@ -229,5 +236,34 @@ public abstract class AbstractWALSplitter {
     }
 
     return mutations;
+  }
+
+  protected static Entry getNextLogLine(Reader in, Object logName, boolean skipErrors)
+    throws CorruptedLogFileException, IOException {
+    try {
+      return in.next();
+    } catch (EOFException eof) {
+      // truncated files are expected if a RS crashes (see HBASE-2643)
+      LOG.info("EOF from wal " + logName + ".  continuing");
+      return null;
+    } catch (IOException e) {
+      // If the IOE resulted from bad file format,
+      // then this problem is idempotent and retrying won't help
+      if (e.getCause() != null &&
+        (e.getCause() instanceof ParseException ||
+          e.getCause() instanceof org.apache.hadoop.fs.ChecksumException)) {
+        LOG.warn("Parse exception " + e.getCause().toString() + " from wal "
+          + logName + ".  continuing");
+        return null;
+      }
+      if (!skipErrors) {
+        throw e;
+      }
+      CorruptedLogFileException t =
+        new CorruptedLogFileException("skipErrors=true Ignoring exception" +
+          " while parsing wal " + logName + ". Marking as corrupted");
+      t.initCause(e);
+      throw t;
+    }
   }
 }
