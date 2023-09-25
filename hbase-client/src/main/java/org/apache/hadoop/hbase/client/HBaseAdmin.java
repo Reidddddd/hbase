@@ -60,6 +60,7 @@ import org.apache.hadoop.hbase.NamespaceNotFoundException;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.ProcedureInfo;
 import org.apache.hadoop.hbase.RegionLocations;
+import org.apache.hadoop.hbase.SchemaTableAccessor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableName;
@@ -67,6 +68,7 @@ import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownRegionException;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -5023,4 +5025,14 @@ public class HBaseAdmin implements Admin {
       throw ProtobufUtil.handleRemoteException(e);
     }
   }
+
+  @Override
+  public Schema getSchemaOf(TableName table) throws IOException {
+    if (!SchemaTableAccessor.isSchemaServiceRunning(connection)) {
+      LOG.info("Schema service is off");
+    }
+    return SchemaTableAccessor.checkSchemaExistence(connection, table) ?
+           SchemaTableAccessor.getSchemaOf(table, connection) : null;
+  }
+
 }

@@ -40,6 +40,7 @@ import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.zookeeper.ZNodeInfo;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -718,7 +719,7 @@ public interface Admin extends Abortable, Closeable {
    * @return True if balancer ran, false otherwise.
    */
   boolean balancer(boolean force) throws IOException;
-  
+
   /**
    * Query the current state of the balancer
    *
@@ -1473,7 +1474,7 @@ public interface Admin extends Abortable, Closeable {
    * @throws IOException if a remote or network exception occurs
    */
   void deleteSnapshots(final Pattern pattern) throws IOException;
-  
+
   /**
    * Delete all existing snapshots matching the given table name regular expression and snapshot
    * name regular expression.
@@ -1637,4 +1638,14 @@ public interface Admin extends Abortable, Closeable {
    */
   void clearCompactionQueues(final ServerName sn, final Set<String> queues)
           throws IOException, InterruptedException;
+
+  /**
+   * Get schema of a given table.
+   * Will get a null if table doesn't exist, or table has no data in it yet.
+   *
+   * @param table table name
+   * @return schema of given table
+   */
+  Schema getSchemaOf(TableName table) throws IOException;
+
 }
