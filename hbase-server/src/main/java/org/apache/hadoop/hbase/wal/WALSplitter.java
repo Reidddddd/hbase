@@ -141,6 +141,10 @@ public class WALSplitter {
   /** By default we retry errors in splitting, rather than skipping. */
   public static final boolean SPLIT_SKIP_ERRORS_DEFAULT = false;
 
+  public static final String SPLIT_SANITY_CHECK = "hbase.split.sanity.check";
+
+  public static final boolean DEFAULT_SPLIT_SANITY_CHECK = false;
+
   // Parameters for split process
   protected final Path walDir;
   protected final FileSystem walFS;
@@ -182,6 +186,8 @@ public class WALSplitter {
 
   // Min batch size when replay WAL edits
   private final int minBatchSize;
+
+  private final boolean sanityCheck;
 
   // the file being split currently
   private FileStatus fileBeingSplit;
@@ -227,6 +233,7 @@ public class WALSplitter {
         outputSink = new LogRecoveredEditsOutputSink(controller, entryBuffers, numWriterThreads);
       }
     }
+    sanityCheck = this.conf.getBoolean(SPLIT_SANITY_CHECK, DEFAULT_SPLIT_SANITY_CHECK);
 
   }
 
@@ -343,6 +350,15 @@ public class WALSplitter {
       ServerName serverName = DefaultWALProvider.getServerNameFromWALDirectoryName(logPath);
       failedServerName = (serverName == null) ? "" : serverName.getServerName();
       while ((entry = getNextLogLine(in, logPath, skipErrors)) != null) {
+        if (this.sanityCheck) {
+          if (!checkWALEntrySanity(entry)) {
+            // We have broken data here. Mark this as corrupted.
+            ZKSplitLog.markCorrupted(walDir, logfile.getPath().getName(), walFS);
+            progress_failed = true;
+            isCorrupted = true;
+            throw new CorruptedLogFileException("Read broken cell, corrupted log file " + logPath);
+          }
+        }
         byte[] region = entry.getKey().getEncodedRegionName();
         String encodedRegionNameAsStr = Bytes.toString(region);
         lastFlushedSequenceId = lastFlushedSequenceIds.get(encodedRegionNameAsStr);
@@ -408,8 +424,10 @@ public class WALSplitter {
       throw iie;
     } catch (CorruptedLogFileException e) {
       LOG.warn("Could not parse, corrupted log file " + logPath, e);
-      csm.getSplitLogWorkerCoordination().markCorrupted(walDir,
-        logfile.getPath().getName(), walFS);
+      if (csm != null) {
+        csm.getSplitLogWorkerCoordination().markCorrupted(walDir, logfile.getPath().getName(),
+          walFS);
+      }
       isCorrupted = true;
     } catch (IOException e) {
       e = RemoteExceptionHandler.checkIOException(e);
@@ -442,6 +460,16 @@ public class WALSplitter {
       }
     }
     return !progress_failed;
+  }
+
+  private boolean checkWALEntrySanity(Entry entry) {
+    List<Cell> cells = entry.getEdit().getCells();
+    for (Cell cell : cells) {
+      if (!CellUtil.cellSanityCheck(cell)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

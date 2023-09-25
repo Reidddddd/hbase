@@ -213,4 +213,9 @@ public class SplitLogWorker implements Runnable {
   public int getTaskReadySeq() {
     return coordination.getTaskReadySeq();
   }
+
+  // For hot update.
+  public Configuration getConf() {
+    return conf;
+  }
 }

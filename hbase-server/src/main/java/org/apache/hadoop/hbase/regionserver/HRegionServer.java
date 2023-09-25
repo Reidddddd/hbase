@@ -181,6 +181,7 @@ import org.apache.hadoop.hbase.util.VersionInfo;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
+import org.apache.hadoop.hbase.wal.WALSplitter;
 import org.apache.hadoop.hbase.zookeeper.ClusterStatusTracker;
 import org.apache.hadoop.hbase.zookeeper.MasterAddressTracker;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
@@ -3527,6 +3528,8 @@ public class HRegionServer extends HasThread implements
       old.stop("configuration change");
     }
     this.flushThroughputController = FlushThroughputControllerFactory.create(this, newConf);
+    this.splitLogWorker.getConf().setBoolean(WALSplitter.SPLIT_SANITY_CHECK,
+      newConf.getBoolean(WALSplitter.SPLIT_SANITY_CHECK, WALSplitter.DEFAULT_SPLIT_SANITY_CHECK));
   }
 
   @Override
