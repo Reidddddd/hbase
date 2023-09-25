@@ -73,6 +73,11 @@ import org.apache.yetus.audience.InterfaceAudience;
  * 1. avoid fat row or fat cell
  * 2. scalable with more qualifiers, e.g, put the type of a column into the value
  * 3. Easy to achieve a table's information with prefix scan
+ *
+ * Note, this coprocessor service is bind to a RS at region level.
+ * Its lifecycle follows RS's.
+ * So even a region moved or offline, it can't be shutdown until RS dead.
+ * TODO: find an elegantly way to shutdown this service
  */
 @InterfaceAudience.Private
 public class SchemaService extends BaseMasterAndRegionObserver {

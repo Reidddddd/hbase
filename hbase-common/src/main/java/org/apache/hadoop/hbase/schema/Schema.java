@@ -19,9 +19,7 @@
 package org.apache.hadoop.hbase.schema;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +32,7 @@ import org.apache.yetus.audience.InterfaceStability;
 
 @InterfaceStability.Evolving
 @InterfaceAudience.Public
-public class Schema implements Iterable<byte[]> {
+public class Schema implements Iterable<Column> {
 
   private final Map<Famy, Set<Qualy>> columns = new ConcurrentHashMap<>();
 
@@ -80,61 +78,62 @@ public class Schema implements Iterable<byte[]> {
     return columns.get(family).add(qualifier);
   }
 
-  public void clear() {
-    columns.clear();
+  public TableName getTable() {
+    return table;
   }
 
+  /**
+   * A column = family + qualifier
+   * It will iterate all columns in ascending order
+   */
   @Override
-  public Iterator<byte[]> iterator() {
-    return new SchemaIterator(table, columns.values());
+  public Iterator<Column> iterator() {
+    return new SchemaIterator(columns);
   }
 
-  private class SchemaIterator implements Iterator<byte[]> {
+  private class SchemaIterator implements Iterator<Column> {
+    private final Map<Famy, Set<Qualy>> columns;
+    private final List<Famy> families;
+    private int familyIndex = 0;
+    private Famy currentFamily;
+    private Iterator<Qualy> columnIter = null;
 
-    private final List<Qualy> qualifiers;
-    private final byte[] table;
-    private int index = 0;
-    private boolean useTableNameAsRow = false;
-
-    public SchemaIterator(TableName table, Collection<Set<Qualy>> values) {
-      this.table = table.getName();
-
-      Set<Qualy> set = new HashSet<>();
-      for (Set<Qualy> value : values) {
-        for (Qualy qualy : value) {
-          set.add(qualy);
-        }
-      }
-      this.qualifiers = new ArrayList<>(set);
-      Collections.sort(qualifiers);
+    public SchemaIterator(Map<Famy, Set<Qualy>> columns) {
+      this.columns = columns;
+      families = new ArrayList<>(columns.keySet());
+      Collections.sort(families);
     }
 
     @Override
     public boolean hasNext() {
-      return index != qualifiers.size();
+      if (columnIter != null) {
+        if (columnIter.hasNext()) {
+          return true;
+        } // else, finish iterating this family, iterate next family if any
+      }
+
+      if (familyIndex >= families.size()) {
+        // finished all families, just return false
+        return false;
+      }
+
+      currentFamily = families.get(familyIndex++);
+      columnIter = columns.get(currentFamily).iterator();
+      return columnIter.hasNext();
     }
 
     @Override
-    public byte[] next() {
-      if (!useTableNameAsRow) {
-        useTableNameAsRow = true;
-        return table;
-      }
-      byte[] qualy = qualifiers.get(index++).getQualifier();
-      byte[] rowkey = new byte[table.length + qualy.length];
-      System.arraycopy(table, 0, rowkey, 0, table.length);
-      System.arraycopy(qualy, 0, rowkey, table.length, qualy.length);
-      return rowkey;
+    public Column next() {
+      return new Column(currentFamily, columnIter.next());
     }
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("table: ").append(this.table.toString()).append("\n");
-    for (Map.Entry<Famy, Set<Qualy>> entry : columns.entrySet()) {
-      sb.append("family: ").append(entry.getKey().toString()).append("\t").append("qualifier: ")
-        .append(entry.getValue().toString()).append("\n");
+    sb.append("table: ").append(this.table.toString());
+    for (Column column : this) {
+      sb.append("\n").append(column);
     }
     return sb.toString();
   }

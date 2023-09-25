@@ -26,6 +26,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
@@ -174,6 +175,44 @@ public class TestSchema {
 
     // end
     Assert.assertFalse(iterator.hasNext());
+  }
+
+  @Test
+  public void TestSchemaViaAdminAPI() throws Exception {
+    TableName tableName = TableName.valueOf("TestSchemaViaAdminAPI");
+    byte[][] families = new byte[3][];
+    families[0] = TEST_FAMILY_1;
+    families[1] = TEST_FAMILY_2;
+    families[2] = TEST_FAMILY_3;
+    Table table = UTIL.createTable(tableName, families);
+    UTIL.waitTableAvailable(tableName);
+    Put put = new Put(TEST_ROW);
+    put.addColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE, TEST_VALUE);
+    table.put(put);
+    Put put2 = new Put(TEST_ROW);
+    put2.addColumn(TEST_FAMILY_2, TEST_QUALIFIER_TWO, TEST_VALUE);
+    table.put(put2);
+    Increment increment1 = new Increment(TEST_ROW);
+    increment1.addColumn(TEST_FAMILY_3, TEST_QUALIFIER_THREE, 1);
+    table.increment(increment1);
+    Append append1 = new Append(TEST_ROW);
+    append1.add(TEST_FAMILY_3, TEST_QUALIFIER_THREE, APPEND_DATA);
+    table.append(append1);
+
+    // Slightly waiting for records being processed.
+    Thread.sleep(1000);
+
+    Admin admin = UTIL.getHBaseAdmin();
+    Schema schema = admin.getSchemaOf(tableName);
+    Assert.assertTrue(schema.containFamily(TEST_FAMILY_1));
+    Assert.assertTrue(schema.containFamily(TEST_FAMILY_2));
+    Assert.assertTrue(schema.containFamily(TEST_FAMILY_3));
+    Assert.assertFalse(schema.containFamily(Bytes.toBytes("no_such_family")));
+
+    Assert.assertTrue(schema.containColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE));
+    Assert.assertTrue(schema.containColumn(TEST_FAMILY_2, TEST_QUALIFIER_TWO));
+    Assert.assertTrue(schema.containColumn(TEST_FAMILY_3, TEST_QUALIFIER_THREE));
+    Assert.assertFalse(schema.containColumn(TEST_FAMILY_3, Bytes.toBytes("no_such_column")));
   }
 
   @Test

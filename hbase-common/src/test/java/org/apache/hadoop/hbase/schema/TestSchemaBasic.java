@@ -62,31 +62,41 @@ public class TestSchemaBasic {
   public void testSchemaIterator() {
     TableName table = TableName.valueOf("test:iterator");
     Schema schema = new Schema(table);
+    Famy fa = new Famy(Bytes.toBytes("fa"));
+    Famy fb = new Famy(Bytes.toBytes("fb"));
+    Famy ga = new Famy(Bytes.toBytes("ga"));
+    Famy gb = new Famy(Bytes.toBytes("gb"));
+
     // Add columns
-    schema.addColumn(Bytes.toBytes("fa"), Bytes.toBytes("c"));
-    schema.addColumn(Bytes.toBytes("fa"), Bytes.toBytes("d"));
-    schema.addColumn(Bytes.toBytes("fa"), Bytes.toBytes("a"));
-    schema.addColumn(Bytes.toBytes("fa"), Bytes.toBytes("e"));
-    schema.addColumn(Bytes.toBytes("fb"), Bytes.toBytes("b"));
-    schema.addColumn(Bytes.toBytes("ga"), Bytes.toBytes("f"));
-    schema.addColumn(Bytes.toBytes("gb"), Bytes.toBytes("g"));
-    // Iterate over it
-    Iterator<byte[]> rowkeyIterator = schema.iterator();
-    byte[] previous = null;
-    byte[] current;
-    while (rowkeyIterator.hasNext()) {
-      if (previous == null) {
-        previous = rowkeyIterator.next();
-        LOG.info("Row key: " + Bytes.toString(previous));
-        // The first one should be table name
-        Assert.assertTrue(Bytes.equals(previous, table.getName()));
-        continue;
-      }
-      current = rowkeyIterator.next();
-      Assert.assertTrue(Bytes.compareTo(previous, current) < 0);
-      LOG.info("Row key: " + Bytes.toString(current));
-      previous = current;
-    }
+    schema.addColumn(fa.getFamily(), Bytes.toBytes("c"));
+    schema.addColumn(fa.getFamily(), Bytes.toBytes("d"));
+    schema.addColumn(fa.getFamily(), Bytes.toBytes("a"));
+    schema.addColumn(fa.getFamily(), Bytes.toBytes("e"));
+    schema.addColumn(fb.getFamily(), Bytes.toBytes("b"));
+    schema.addColumn(ga.getFamily(), Bytes.toBytes("f"));
+    schema.addColumn(gb.getFamily(), Bytes.toBytes("g"));
+
+    // Iterate over it, the sequence is
+    // fa:a, fa:c, fa:d, fa:e,
+    // fb:b,
+    // ga:f,
+    // gb:g
+    Iterator<Column> columnIt = schema.iterator();
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(fa, new Qualy(Bytes.toBytes("a"))), columnIt.next());
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(fa, new Qualy(Bytes.toBytes("c"))), columnIt.next());
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(fa, new Qualy(Bytes.toBytes("d"))), columnIt.next());
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(fa, new Qualy(Bytes.toBytes("e"))), columnIt.next());
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(fb, new Qualy(Bytes.toBytes("b"))), columnIt.next());
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(ga, new Qualy(Bytes.toBytes("f"))), columnIt.next());
+    Assert.assertTrue(columnIt.hasNext());
+    Assert.assertEquals(new Column(gb, new Qualy(Bytes.toBytes("g"))), columnIt.next());
+    Assert.assertFalse(columnIt.hasNext());
   }
 
 }
