@@ -241,6 +241,7 @@ public class ZKTableStateManager implements TableStateManager {
         LOG.warn("Moving table " + tableName + " state to deleted but was already deleted");
       }
       try {
+        LOG.info("Delete zk node of : " + tableName);
         ZKUtil.deleteNodeFailSilent(this.watcher,
           ZKUtil.joinZNode(this.watcher.tableZNode, tableName.getNameAsString()));
       } catch (KeeperException e) {
