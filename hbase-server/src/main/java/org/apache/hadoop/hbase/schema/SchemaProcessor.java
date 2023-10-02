@@ -23,11 +23,12 @@ import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_KEY;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_CF;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -45,15 +46,15 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.schema.SchemaService.Operation;
 import org.apache.yetus.audience.InterfaceAudience;
 
+@SuppressWarnings("UnstableApiUsage")
 @InterfaceAudience.Private
 public class SchemaProcessor {
-
   // Thread pool access the schema table.
   private FastPathExecutor updateExecutor;
   // Thread pool to dispatch tasks.
   private FastPathExecutor taskAcceptor;
 
-  private Map<TableName, Schema> schemaCache;
+  private Cache<TableName, Schema> schemaCache;
 
   private AsyncConnection connection;
   private RawAsyncTable schemaTable;
@@ -78,8 +79,7 @@ public class SchemaProcessor {
     updateExecutor.start();
     taskAcceptor = new FastPathExecutor(numHandlers, environment + "SchemaProcessHandler");
     taskAcceptor.start();
-
-    schemaCache = new ConcurrentHashMap<>();
+    schemaCache = CacheBuilder.newBuilder().expireAfterAccess(2, TimeUnit.HOURS).build();
 
     try {
       connection = ConnectionFactory.createAsyncConnection(conf).get();
@@ -117,11 +117,22 @@ public class SchemaProcessor {
         case INCREMENT:
         case APPEND:
         case PUT: {
-          Schema cacheSchema = schemaCache.putIfAbsent(table, new Schema(table));
-          if (cacheSchema == null) {
-            cacheSchema = schemaCache.get(table);
+          Schema cachedSchema = null;
+          try {
+            // Get schema by table name.
+            // Create a new schema object, cache it and return it if the given table name does not
+            // have a schema.
+            cachedSchema = schemaCache.get(table, () -> new Schema(table));
+          } catch (ExecutionException e) {
+            // Skip this we will never get exception here.
           }
-          final Schema schema = cacheSchema;
+          if (cachedSchema == null) {
+            // We should never arrive here.
+            // This null check is just for safety and pass ide static check.
+            return;
+          }
+
+          final Schema schema = cachedSchema;
           if (schema.containColumn(family, qualifier)) {
             return;
           }
@@ -152,7 +163,7 @@ public class SchemaProcessor {
           // Only one case can enter this case:
           // a table is disabled, and related Deletes are sent to hbase:schema
           // so RS's schemaCache should remove the cache of dropped/truncated table
-          schemaCache.remove(table);
+          schemaCache.invalidate(table);
           break;
         }
         case TRUNCATE:
@@ -194,7 +205,7 @@ public class SchemaProcessor {
 
   @VisibleForTesting
   public boolean isTableCleaned(TableName tableName) {
-    return !schemaCache.containsKey(tableName);
+    return !schemaCache.asMap().containsKey(tableName);
   }
 
 }
