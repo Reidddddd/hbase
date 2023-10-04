@@ -172,7 +172,7 @@ public class ServerManager {
   private final RetryCounterFactory pingRetryCounterFactory;
   private final RpcControllerFactory rpcControllerFactory;
 
-  private final ConcurrentMap<ServerName, Integer> podInstances = new ConcurrentHashMap<>();
+  private final Set<ServerName> podInstances = ConcurrentHashMap.newKeySet();
 
   /**
    * Set of region servers which are dead but not processed immediately. If one
@@ -295,7 +295,7 @@ public class ServerManager {
       + internalHostname);
 
     if (rsK8sMode) {
-      podInstances.put(sn, 0);
+      addPodServer(sn);
     }
     return sn;
   }
@@ -1347,6 +1347,10 @@ public class ServerManager {
   }
 
   public boolean isPodServer(ServerName serverName) {
-    return this.podInstances.containsKey(serverName);
+    return this.podInstances.contains(serverName);
+  }
+
+  public void addPodServer(ServerName serverName) {
+    this.podInstances.add(serverName);
   }
 }

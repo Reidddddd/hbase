@@ -1236,6 +1236,7 @@ public class HRegionServer extends HasThread implements
         this.serverName.getVersionedBytes(), this.serverName.getInternalHostName());
       request.setServer(ProtobufUtil.toServerName(sn));
       request.setLoad(sl);
+      request.setK8SModeEnabled(isK8sModeEnabled());
       rss.regionServerReport(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);
