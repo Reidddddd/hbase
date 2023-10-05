@@ -48,6 +48,7 @@ import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.BulkLoadDescriptor;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.StoreDescriptor;
+import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.regionserver.RSRpcServices;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.replication.ChainWALEntryFilter;
@@ -296,7 +297,11 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
       }
     }
 
-    if (!this.isSourceActive()) {
+    if (!this.isSourceActive() ||
+      // As we could support independent replication consumer now, we also add a config to control
+      // whether RS should replicate data to sinker. Default is false, means RS will replicate data.
+      (this.stopper instanceof HRegionServer
+        && conf.getBoolean("replication.source.only.produce", false))) {
       return;
     }
 

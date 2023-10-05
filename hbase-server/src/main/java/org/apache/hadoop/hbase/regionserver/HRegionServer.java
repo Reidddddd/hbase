@@ -164,6 +164,7 @@ import org.apache.hadoop.hbase.regionserver.throttle.FlushThroughputControllerFa
 import org.apache.hadoop.hbase.regionserver.throttle.ThroughputController;
 import org.apache.hadoop.hbase.regionserver.wal.MetricsWAL;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.hadoop.hbase.replication.ReplicationType;
 import org.apache.hadoop.hbase.replication.regionserver.Replication;
 import org.apache.hadoop.hbase.replication.regionserver.ReplicationLoad;
 import org.apache.hadoop.hbase.security.Superusers;
@@ -2850,7 +2851,8 @@ public class HRegionServer extends HasThread implements
     // create an instance of the replication object.
     ReplicationService service = (ReplicationService)
                               ReflectionUtils.newInstance(clazz, conf);
-    service.initialize(server, walFs, walDir, oldLogDir, false, configManager);
+    service.initialize(server, walFs, walDir, oldLogDir,
+      ReplicationType.BASE_ON_REGIONSERVER, configManager);
     return service;
   }
 

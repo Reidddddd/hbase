@@ -60,6 +60,7 @@ import org.apache.hadoop.hbase.replication.ReplicationFactory;
 import org.apache.hadoop.hbase.replication.ReplicationPeers;
 import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.replication.ReplicationTracker;
+import org.apache.hadoop.hbase.replication.ReplicationType;
 import org.apache.hadoop.hbase.replication.master.ReplicationHFileCleaner;
 import org.apache.hadoop.hbase.replication.master.ReplicationLogCleaner;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -102,7 +103,7 @@ public class Replication extends WALActionsListener.Base implements
    */
   public Replication(final Server server, final FileSystem fs,
                      final Path logDir, final Path oldLogDir) throws IOException{
-    this(server, fs, logDir, oldLogDir, false);
+    this(server, fs, logDir, oldLogDir, ReplicationType.BASE_ON_REGIONSERVER);
   }
 
   /**
@@ -111,13 +112,13 @@ public class Replication extends WALActionsListener.Base implements
    * @param fs handle to the filesystem
    * @param logDir directory of wal
    * @param oldLogDir directory where logs are archived
-   * @param isSyncUp true if this is from ReplicationSyncUp
+   * @param replicationType replication type
    * @throws IOException IOException
    */
   public Replication(final Server server, final FileSystem fs,
-                     final Path logDir, final Path oldLogDir, final boolean isSyncUp)
+                     final Path logDir, final Path oldLogDir, ReplicationType replicationType)
     throws IOException{
-    initialize(server, fs, logDir, oldLogDir, isSyncUp, null);
+    initialize(server, fs, logDir, oldLogDir, replicationType, null);
   }
 
   /**
@@ -127,7 +128,7 @@ public class Replication extends WALActionsListener.Base implements
   }
 
   public void initialize(final Server server, final FileSystem fs, final Path logDir,
-                         final Path oldLogDir, final boolean isSyncUp,
+                         final Path oldLogDir, ReplicationType replicationType,
                          ConfigurationManager configManager) throws IOException {
     this.server = server;
     this.conf = this.server.getConfiguration();
@@ -167,9 +168,24 @@ public class Replication extends WALActionsListener.Base implements
       } catch (KeeperException ke) {
         throw new IOException("Could not read cluster id", ke);
       }
-      this.replicationManager =
-          new ReplicationSourceManager(replicationQueues, replicationPeers, replicationTracker,
-              conf, this.server, fs, logDir, oldLogDir, clusterId, isSyncUp);
+      switch (replicationType) {
+        case INDEPENDENT:
+          this.replicationManager =
+            new ReplicationIndependentSourceManager(replicationQueues, replicationPeers,
+              replicationTracker, conf, this.server, fs, logDir, oldLogDir, clusterId);
+          break;
+        case SYNCUP_TOOL:
+          this.replicationManager =
+            new ReplicationSourceManager(replicationQueues, replicationPeers, replicationTracker,
+              conf, this.server, fs, logDir, oldLogDir, clusterId, true);
+          break;
+        case BASE_ON_REGIONSERVER:
+        default:
+          this.replicationManager =
+            new ReplicationSourceManager(replicationQueues, replicationPeers, replicationTracker,
+              conf, this.server, fs, logDir, oldLogDir, clusterId, false);
+          break;
+      }
       if (configManager != null) {
         configManager.registerObserver(this.replicationManager);
       }

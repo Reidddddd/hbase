@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.conf.ConfigurationManager;
+import org.apache.hadoop.hbase.replication.ReplicationType;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.replication.regionserver.ReplicationLoad;
 import org.apache.hadoop.fs.FileSystem;
@@ -41,7 +42,7 @@ public interface ReplicationService {
    * @throws IOException
    */
   void initialize(
-    Server rs, FileSystem fs, Path logdir, Path oldLogDir, final boolean isSyncUp,
+    Server rs, FileSystem fs, Path logdir, Path oldLogDir, ReplicationType replicationType,
     ConfigurationManager configManager) throws IOException;
 
   /**

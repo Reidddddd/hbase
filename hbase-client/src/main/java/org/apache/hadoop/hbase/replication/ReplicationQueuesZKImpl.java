@@ -18,7 +18,10 @@
  */
 package org.apache.hadoop.hbase.replication;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -26,15 +29,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import com.google.common.annotations.VisibleForTesting;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Abortable;
 import org.apache.hadoop.hbase.HConstants;
@@ -44,8 +45,10 @@ import org.apache.hadoop.hbase.protobuf.generated.ZooKeeperProtos;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
-import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil.ZKUtilOp;
+import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 
 /**
@@ -72,6 +75,8 @@ import org.apache.zookeeper.KeeperException;
 @InterfaceAudience.Private
 public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements ReplicationQueues {
 
+  private ReplicationType replicationType;
+
   /** Znode containing all replication queues for this region server. */
   private String myQueuesZnode;
   private String serverName;
@@ -93,6 +98,15 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
     super(zk, conf, abortable);
     this.fs = fs;
     this.oldWALsDir = oldWALsDir;
+  }
+
+  public ReplicationQueuesZKImpl(final ZooKeeperWatcher zk, Configuration conf,
+                                 Abortable abortable, FileSystem fs, Path oldWALsDir,
+                                 ReplicationType replicationType) {
+    super(zk, conf, abortable);
+    this.fs = fs;
+    this.oldWALsDir = oldWALsDir;
+    this.replicationType = replicationType;
   }
 
   @Override
@@ -265,6 +279,21 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
       result = getLogsInQueue(ZKUtil.listChildrenNoWatch(this.zookeeper, znode), false);
     } catch (KeeperException | IOException e) {
       this.abortable.abort("Failed to get list of wals for queueId=" + queueId, e);
+    }
+    return result;
+  }
+
+  @Override
+  public List<String> getCurrentConsumingLogsInQueue(String queueId)
+    throws KeeperException {
+    String znode = ZKUtil.joinZNode(this.myQueuesZnode, queueId);
+    List<String> result = null;
+    try {
+      result = ZKUtil.listChildrenNoWatch(this.zookeeper, znode);
+    } catch (KeeperException e) {
+      this.abortable.abort("Failed to get list of wals for queueId=" + queueId
+        + " and serverName=" + serverName, e);
+      throw e;
     }
     return result;
   }
@@ -443,7 +472,19 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
    * @return true if the lock was acquired, false in every other cases
    */
   @VisibleForTesting
+  @Override
   public boolean lockOtherRS(String znode) {
+    return lockOtherRS(znode, CreateMode.PERSISTENT);
+  }
+
+  /**
+   * Try to set a lock in another region server's znode.
+   * @param znode the server names of the other server
+   * @return true if the lock was acquired, false in every other cases
+   */
+  @VisibleForTesting
+  @Override
+  public boolean lockOtherRS(String znode, CreateMode createMode) {
     try {
       String parent = ZKUtil.joinZNode(this.queuesZNode, znode);
       if (parent.equals(this.myQueuesZnode)) {
@@ -451,8 +492,16 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
         return false;
       }
       String p = ZKUtil.joinZNode(parent, RS_LOCK_ZNODE);
-      ZKUtil.createAndWatch(this.zookeeper, p, lockToByteArray(this.myQueuesZnode));
-    } catch (KeeperException e) {
+      if (runningIndependentReplicationConsumer()) {
+        // Under normal circumstances, myQueuesZnode is assigned during init,
+        // but for ReplicationIndependentConsumer, we need to use this method to obtain the lock
+        // before init.
+        String hostname = InetAddress.getLocalHost().getHostAddress();
+        ZKUtil.createAndWatch(this.zookeeper, p, lockToByteArray(hostname), createMode);
+      } else {
+        ZKUtil.createAndWatch(this.zookeeper, p, lockToByteArray(this.myQueuesZnode), createMode);
+      }
+    } catch (KeeperException | UnknownHostException e) {
       // This exception will pop up if the znode under which we're trying to
       // create the lock is already deleted by another region server, meaning
       // that the transfer already occurred.
@@ -470,6 +519,11 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
     return true;
   }
 
+  private boolean runningIndependentReplicationConsumer() {
+    return replicationType != null &&
+      replicationType == ReplicationType.INDEPENDENT;
+  }
+
   public String getLockZNode(String znode) {
     return this.queuesZNode + "/" + znode + "/" + RS_LOCK_ZNODE;
   }
@@ -479,7 +533,7 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
     return ZKUtil.checkExists(zookeeper, getLockZNode(znode)) >= 0;
   }
 
-  private void unlockOtherRS(String znode){
+  public void unlockOtherRS(String znode){
     String parent = ZKUtil.joinZNode(this.queuesZNode, znode);
     String p = ZKUtil.joinZNode(parent, RS_LOCK_ZNODE);
     try {
@@ -711,6 +765,28 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
     } catch (KeeperException e) {
       LOG.error("Failed to remove hfile reference znode=" + e.getPath(), e);
     }
+  }
+
+  @Override
+  public List<Path> getLogsInPath() throws IOException {
+    Path walDir = new Path(this.walsDir, serverName);
+    FileStatus[] allLogs = null;
+    if (fs.exists(walDir)) {
+      allLogs = fs.listStatus(walDir);
+    }
+    if (fs.exists(walDir.suffix("-splitting"))) {
+      allLogs = ArrayUtils.addAll(allLogs, fs.listStatus(walDir.suffix("-splitting")));
+    }
+    allLogs = ArrayUtils.addAll(allLogs, fs.listStatus(oldWALsDir,
+      path -> {
+        if (!path.getName().contains("meta") &&
+          path.getName().contains(serverName.split(",")[0])) {
+          return true;
+        }
+        return false;
+      }));
+    return Arrays.stream(allLogs).map(fileStatus -> fileStatus.getPath())
+      .collect(Collectors.toList());
   }
 
   @Override

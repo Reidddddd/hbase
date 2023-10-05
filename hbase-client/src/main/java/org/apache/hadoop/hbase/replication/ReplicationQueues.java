@@ -18,13 +18,16 @@
  */
 package org.apache.hadoop.hbase.replication;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.List;
-import java.util.SortedMap;
 import java.util.SortedSet;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 
 /**
  * This provides an interface for maintaining a region server's replication queues. These queues
@@ -98,6 +101,14 @@ public interface ReplicationQueues {
   List<String> getLogsInQueue(String queueId);
 
   /**
+   * Get a list of all WALs which are consuming by now in the given queue.
+   * @param queueId a String that identifies the queue
+   * @return a list of WALs, null if this region server is dead and has no outstanding queues
+   */
+  List<String> getCurrentConsumingLogsInQueue(String queueId)
+    throws KeeperException;
+
+  /**
    * Get a list of all queues for this region server.
    * @return a list of queueIds, null if this region server is dead and has no outstanding queues
    */
@@ -159,6 +170,11 @@ public interface ReplicationQueues {
    */
   void removePeerFromHFileRefs(String peerId);
 
+  @VisibleForTesting
+  boolean lockOtherRS(String znode);
+
+  boolean lockOtherRS(String znode, CreateMode createMode);
+
   /**
    * Add new hfile references to the queue.
    * @param peerId peer cluster id to which the hfiles need to be replicated
@@ -174,4 +190,8 @@ public interface ReplicationQueues {
    * @param files list of hfile references to be removed
    */
   void removeHFileRefs(String peerId, List<String> files);
+
+  List<Path> getLogsInPath() throws IOException;
+
+  void unlockOtherRS(String consumeRS);
 }

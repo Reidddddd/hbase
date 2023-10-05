@@ -96,16 +96,16 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
   private final Map<String, ReplicationSourceInterface> sources;
   // List of all the sources we got from died RSs
   private final List<ReplicationSourceInterface> oldsources;
-  private final ReplicationQueues replicationQueues;
+  protected final ReplicationQueues replicationQueues;
   private final ReplicationTracker replicationTracker;
-  private final ReplicationPeers replicationPeers;
+  protected final ReplicationPeers replicationPeers;
   // UUID for this cluster
   private final UUID clusterId;
   // All about stopping
-  private final Server server;
+  protected final Server server;
   // All logs we are currently tracking
   // Index structure of the map is: peer_id->logPrefix/logGroup->logs
-  private final Map<String, Map<String, SortedSet<String>>> walsById;
+  protected final Map<String, Map<String, SortedSet<String>>> walsById;
   // Logs for recovered sources we are currently tracking
   private final Map<String, Map<String, SortedSet<String>>> walsByIdRecoveredQueues;
   private final Configuration conf;
@@ -133,10 +133,10 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
   // Map to record all the peer replication table
   private final Set<TableName> peerReplicationTables;
   // Map to record all the peer consume status for all the sources
-  private final Map<String, PeerRunningStatus> sourcesPeerRunningStatus;
+  protected final Map<String, PeerRunningStatus> sourcesPeerRunningStatus;
   // Map to record all the metrics for all the sources
-  private final Map<String, MetricsSource> sourcesMetrics;
-  private volatile boolean enableFailover;
+  protected final Map<String, MetricsSource> sourcesMetrics;
+  protected volatile boolean enableFailover;
 
   @Override
   public void onConfigurationChange(Configuration conf) {
@@ -334,7 +334,7 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
     }
   }
 
-  private void tryHandleFailoverWork() throws ReplicationException {
+  protected void tryHandleFailoverWork() throws ReplicationException {
     List<String> currentReplicators = this.replicationQueues.getListOfReplicators();
     if (currentReplicators == null || currentReplicators.isEmpty()) {
       return;
@@ -984,7 +984,7 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
     return this.latestPaths;
   }
   
-  private void addPeerSource(String id, MetricsSource metrics) throws ReplicationException,
+  protected void addPeerSource(String id, MetricsSource metrics) throws ReplicationException,
       IOException {
     addSource(id, metrics);
     if (replicationForBulkLoadDataEnabled) {

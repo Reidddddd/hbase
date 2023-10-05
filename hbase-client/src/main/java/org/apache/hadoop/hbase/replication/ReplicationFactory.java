@@ -38,6 +38,13 @@ public class ReplicationFactory {
     return new ReplicationQueuesZKImpl(zk, conf, abortable, fs, oldWALsDir);
   }
 
+  public static ReplicationQueues getReplicationQueues(final ZooKeeperWatcher zk,
+                                                       Configuration conf, Abortable abortable,
+                                                       FileSystem fs, Path oldWALsDir,
+                                                       ReplicationType replicationType) {
+    return new ReplicationQueuesZKImpl(zk, conf, abortable, fs, oldWALsDir, replicationType);
+  }
+
   public static ReplicationQueuesClient getReplicationQueuesClient(final ZooKeeperWatcher zk,
       Configuration conf, Abortable abortable) {
     return new ReplicationQueuesClientZKImpl(zk, conf, abortable);

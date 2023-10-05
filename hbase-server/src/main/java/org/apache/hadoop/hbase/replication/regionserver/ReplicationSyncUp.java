@@ -31,6 +31,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.replication.ReplicationType;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -100,7 +101,8 @@ public class ReplicationSyncUp extends Configured implements Tool {
     logDir = new Path(walRootDir, HConstants.HREGION_LOGDIR_NAME);
 
     System.out.println("Start Replication Server start");
-    replication = new Replication(new DummyServer(zkw), fs, logDir, oldLogDir, true);
+    replication = new Replication(
+      new DummyServer(zkw), fs, logDir, oldLogDir, ReplicationType.SYNCUP_TOOL);
     manager = replication.getReplicationManager();
     manager.init();
 
