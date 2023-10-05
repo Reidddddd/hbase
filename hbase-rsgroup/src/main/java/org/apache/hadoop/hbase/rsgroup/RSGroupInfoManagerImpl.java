@@ -492,15 +492,6 @@ public class RSGroupInfoManagerImpl implements RSGroupInfoManager, ServerListene
 
   @Override
   public void serverRemoved(ServerName serverName) {
-    if (this.master.getServerManager().isPodServer(serverName)) {
-      try {
-        removeServers(Sets.newHashSet(serverName.getAddress()));
-        LOG.info("Removed pod server: " + serverName + " from rsgroup");
-      } catch (IOException ioe) {
-        LOG.warn("Failed remove server: " + serverName
-          + " from rsgroup. Need manual clean up.");
-      }
-    }
     defaultServerUpdater.serverChanged();
   }
 

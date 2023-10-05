@@ -66,7 +66,7 @@ public abstract class TestRSGroupsBase {
   protected final static Random rand = new Random();
 
   //shared, cluster type specific
-  protected static HBaseTestingUtility TEST_UTIL;
+  protected static HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
   protected static HBaseAdmin admin;
   protected static HBaseCluster cluster;
   protected static RSGroupAdmin rsGroupAdmin;
@@ -79,7 +79,6 @@ public abstract class TestRSGroupsBase {
   public final static int NUM_SLAVES_BASE = 4; //number of slaves for the smallest cluster
 
   public static void setUpTestBeforeClass() throws Exception {
-    TEST_UTIL = new HBaseTestingUtility();
     TEST_UTIL.getConfiguration().setFloat(
             "hbase.master.balancer.stochastic.tableSkewCost", 6000);
     TEST_UTIL.getConfiguration().set(
