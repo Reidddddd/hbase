@@ -141,7 +141,7 @@ public class TestSchema {
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_2));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_3));
-    Assert.assertTrue(Bytes.equals(EMPTY_BYTE_ARRAY,
+    Assert.assertTrue(Bytes.equals(ColumnType.NONE.getCode(),
                                    res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1)));
     byte[] x = res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_3);
 
@@ -156,7 +156,7 @@ public class TestSchema {
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_2));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_3));
-    Assert.assertTrue(Bytes.equals(EMPTY_BYTE_ARRAY,
+    Assert.assertTrue(Bytes.equals(ColumnType.NONE.getCode(),
                                    res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_2)));
 
     // the fourth row is tableNameBytesTEST_QUALIFIER_THREE, under family TEST_FAMILY_3
@@ -170,8 +170,8 @@ public class TestSchema {
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_2));
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_3));
-    Assert.assertTrue(Bytes.equals(EMPTY_BYTE_ARRAY,
-                      res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_3)));
+    Assert.assertTrue(Bytes.equals(ColumnType.NONE.getCode(),
+                                   res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_3)));
 
     // end
     Assert.assertFalse(iterator.hasNext());
@@ -256,7 +256,7 @@ public class TestSchema {
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertEquals(1,
         res.getColumnCells(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1).size());
-    Assert.assertTrue(Bytes.equals(EMPTY_BYTE_ARRAY,
+    Assert.assertTrue(Bytes.equals(ColumnType.NONE.getCode(),
                                    res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1)));
 
     // delete the table, the schema will be cleaned
@@ -314,7 +314,7 @@ public class TestSchema {
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertEquals(1,
         res.getColumnCells(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1).size());
-    Assert.assertTrue(Bytes.equals(EMPTY_BYTE_ARRAY,
+    Assert.assertTrue(Bytes.equals(ColumnType.NONE.getCode(),
                                    res.getValue(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1)));
 
     UTIL.truncateTable(tableName);
@@ -327,6 +327,54 @@ public class TestSchema {
     Assert.assertFalse(iterator.hasNext());
 
     checkCacheCleaned(tableName);
+  }
+
+  @Test
+  public void TestUpdateColumnTypeOnClientSide() throws IOException, InterruptedException {
+    // Init
+    TableName tableName = TableName.valueOf("TestUpdateColumnTypeOnClientSide");
+    byte[][] families = new byte[1][];
+    families[0] = TEST_FAMILY_1;
+    Table table = UTIL.createTable(tableName, families);
+    UTIL.waitTableAvailable(tableName);
+
+    // Put data
+    Put put = new Put(TEST_ROW);
+    put.addColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE, TEST_VALUE);
+    table.put(put);
+    Put put2 = new Put(TEST_ROW);
+    put2.addColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO, TEST_VALUE);
+    table.put(put2);
+    // Wait for the schema recording.
+    Thread.sleep(1000);
+
+    // Get schema via API and did some simple verification
+    Admin admin = UTIL.getHBaseAdmin();
+    Schema schema = admin.getSchemaOf(tableName);
+    Assert.assertTrue(schema.containFamily(TEST_FAMILY_1));
+    Assert.assertTrue(schema.containColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE));
+    Assert.assertTrue(schema.containColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO));
+    Column column1 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE);
+    Assert.assertTrue(Bytes.equals(TEST_FAMILY_1, column1.getFamy().getFamily()));
+    Assert.assertTrue(Bytes.equals(TEST_QUALIFIER_ONE, column1.getQualy().getQualifier()));
+    Assert.assertEquals(ColumnType.NONE, column1.getType());
+    Column column2 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO);
+    Assert.assertTrue(Bytes.equals(TEST_FAMILY_1, column2.getFamy().getFamily()));
+    Assert.assertTrue(Bytes.equals(TEST_QUALIFIER_TWO, column2.getQualy().getQualifier()));
+    Assert.assertEquals(ColumnType.NONE, column2.getType());
+
+    // Update schema
+    column1.updateType(ColumnType.INT);
+    column2.updateType(ColumnType.STRING);
+    admin.publishSchema(schema);
+    // Wait for the update.
+    Thread.sleep(1000);
+    // Get schema via API and check again
+    schema = admin.getSchemaOf(tableName);
+    column1 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE);
+    Assert.assertEquals(ColumnType.INT, column1.getType());
+    column2 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO);
+    Assert.assertEquals(ColumnType.STRING, column2.getType());
   }
 
   private static void checkCacheCleaned(TableName tableName) {

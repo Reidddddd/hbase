@@ -5028,11 +5028,21 @@ public class HBaseAdmin implements Admin {
 
   @Override
   public Schema getSchemaOf(TableName table) throws IOException {
-    if (!SchemaTableAccessor.isSchemaServiceRunning(connection)) {
+    if (SchemaTableAccessor.schemaServiceIsOff(connection)) {
       LOG.info("Schema service is off");
+      return null;
     }
     return SchemaTableAccessor.checkSchemaExistence(connection, table) ?
            SchemaTableAccessor.getSchemaOf(table, connection) : null;
+  }
+
+  @Override
+  public void publishSchema(Schema schema) throws IOException {
+    if (SchemaTableAccessor.schemaServiceIsOff(connection)) {
+      LOG.info("Schema service is off");
+      return;
+    }
+    SchemaTableAccessor.publishSchema(schema, connection);
   }
 
 }

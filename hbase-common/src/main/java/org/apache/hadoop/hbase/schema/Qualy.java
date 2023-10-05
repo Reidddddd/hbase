@@ -29,20 +29,33 @@ public class Qualy implements Comparable<Qualy>, Comparator<Qualy> {
 
   private final byte[] qualifier;
 
+  // we ignore this parameter for any comparison and hashcode on purpose
+  private ColumnType type;
+
   public Qualy(String qual) {
-    qualifier = Bytes.toBytes(qual);
+    this(Bytes.toBytes(qual));
   }
 
   public Qualy(byte[] qual) {
     qualifier = qual;
+    type = ColumnType.NONE;
   }
 
   public byte[] getQualifier() {
     return qualifier;
   }
 
+  public void updateType(ColumnType type) {
+    this.type = type;
+  }
+
+  public ColumnType getType() {
+    return type;
+  }
+
   @Override
   public int hashCode() {
+    // can't add type for hash calculation
     return Bytes.hashCode(qualifier);
   }
 
@@ -67,12 +80,12 @@ public class Qualy implements Comparable<Qualy>, Comparator<Qualy> {
 
   @Override
   public int compare(Qualy o1, Qualy o2) {
-    return Bytes.compareTo(o1.qualifier, o2.qualifier);
+    return o1.compareTo(o2);
   }
 
   @Override
   public String toString() {
-    return Bytes.toString(qualifier);
+    return Bytes.toString(qualifier) + ": " + type.name();
   }
 
 }

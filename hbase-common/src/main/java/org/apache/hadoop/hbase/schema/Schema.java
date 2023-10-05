@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.schema;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 
@@ -37,6 +39,8 @@ public class Schema implements Iterable<Column> {
   private final Map<Famy, Set<Qualy>> columns = new ConcurrentHashMap<>();
 
   private final TableName table;
+
+  protected Set<Column> typeUpdatedColumns = new HashSet<>();
 
   public Schema(TableName table) {
     this.table = table;
@@ -55,10 +59,7 @@ public class Schema implements Iterable<Column> {
   }
 
   public boolean containColumn(Famy family, Qualy qualifier) {
-    if (!containFamily(family)) {
-      return false;
-    }
-    return columns.get(family).contains(qualifier);
+    return containFamily(family) && columns.get(family).contains(qualifier);
   }
 
   public boolean addFamily(byte[] family) {
@@ -80,6 +81,33 @@ public class Schema implements Iterable<Column> {
 
   public TableName getTable() {
     return table;
+  }
+
+  /**
+   * Get a column with a specified family and a qualifier
+   * @return can return null if specified column doesn't exist
+   */
+  public Column getColumn(Famy family, Qualy qualifier) {
+    if (!containColumn(family, qualifier)) {
+      return null;
+    }
+    Set<Qualy> qualies = columns.get(family);
+    Qualy qualy = qualies.stream()
+                         .filter(q -> Bytes.equals(q.getQualifier(), qualifier.getQualifier()))
+                         .findAny().get();
+    return new MutableColumn(this, family, qualy);
+  }
+
+  /**
+   * Get a column with specified family and qualifier
+   * @return can return null if specified column doesn't exist
+   */
+  public Column getColumn(byte[] family, byte[] qualifier) {
+    return getColumn(new Famy(family), new Qualy(qualifier));
+  }
+
+  public Set<Column> getUpdatedColumns() {
+    return typeUpdatedColumns;
   }
 
   /**
