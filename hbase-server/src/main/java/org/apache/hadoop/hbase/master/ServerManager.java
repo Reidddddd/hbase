@@ -292,10 +292,10 @@ public class ServerManager {
         + " could not record the server: " + sn);
     }
     LOG.info("Recorded regionserver: " + hostname + " with internal hostname: "
-      + internalHostname);
+      + internalHostname + " is pod instance: " + rsK8sMode);
 
     if (rsK8sMode) {
-      addPodServer(sn);
+      addPodInstance(sn);
     }
     return sn;
   }
@@ -669,7 +669,9 @@ public class ServerManager {
         listener.serverRemoved(serverName);
       }
     }
+  }
 
+  public void evictPodInstance(ServerName serverName) {
     podInstances.remove(serverName);
   }
 
@@ -1346,11 +1348,11 @@ public class ServerManager {
     }
   }
 
-  public boolean isPodServer(ServerName serverName) {
+  public boolean isPodInstance(ServerName serverName) {
     return this.podInstances.contains(serverName);
   }
 
-  public void addPodServer(ServerName serverName) {
+  public void addPodInstance(ServerName serverName) {
     this.podInstances.add(serverName);
   }
 }

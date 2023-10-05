@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -130,6 +131,7 @@ import org.apache.hadoop.hbase.master.procedure.MasterProcedureUtil;
 import org.apache.hadoop.hbase.master.procedure.ModifyTableProcedure;
 import org.apache.hadoop.hbase.master.procedure.ProcedurePrepareLatch;
 import org.apache.hadoop.hbase.master.procedure.ProcedureSyncWait;
+import org.apache.hadoop.hbase.master.procedure.ServerCrashProcedure;
 import org.apache.hadoop.hbase.master.procedure.TruncateTableProcedure;
 import org.apache.hadoop.hbase.master.snapshot.SnapshotManager;
 import org.apache.hadoop.hbase.monitoring.MemoryBoundedLogMessageBuffer;
@@ -140,6 +142,7 @@ import org.apache.hadoop.hbase.master.normalizer.NormalizationPlan.PlanType;
 import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.procedure.MasterProcedureManagerHost;
 import org.apache.hadoop.hbase.procedure.flush.MasterFlushTableProcedureManager;
+import org.apache.hadoop.hbase.procedure2.Procedure;
 import org.apache.hadoop.hbase.procedure2.ProcedureExecutor;
 import org.apache.hadoop.hbase.procedure2.store.wal.WALProcedureStore;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.RegionServerInfo;
@@ -1422,6 +1425,41 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     procedureStore.registerListener(new MasterProcedureEnv.MasterProcedureStoreListener(this));
     procedureExecutor = new ProcedureExecutor(conf, procEnv, procedureStore,
         procEnv.getProcedureQueue());
+    procedureExecutor.registerListener(new ProcedureExecutor.ProcedureExecutorListener() {
+      private final Map<Long, ServerName> crashedServers = new ConcurrentHashMap<>();
+
+      @Override
+      public void procedureLoaded(long procId) {
+
+      }
+
+      @Override
+      public void procedureAdded(long procId) {
+        try {
+          Procedure procedure = procedureExecutor.getProcedure(procId);
+          if (procedure instanceof ServerCrashProcedure) {
+            crashedServers.put(procId, ((ServerCrashProcedure) procedure).getServerName());
+          }
+        } catch (Exception e) {
+          // We should not block here for any reason, just leave a log.
+          LOG.warn("Failed get procedure: " + procId, e);
+        }
+      }
+
+      @Override
+      public void procedureFinished(long procId) {
+        // We cannot get the procedure directly here. The produce is already cleaned in this stage.
+        try {
+          ServerName serverName = crashedServers.remove(procId);
+          if (serverName != null) {
+            cleanPodInstanceAfterCrash(serverName);
+          }
+        } catch (Exception e) {
+          // We should not block here for any reason, just leave a log.
+          LOG.warn("Failed clean procedure: " + procId, e);
+        }
+      }
+    });
 
     final int numThreads = conf.getInt(MasterProcedureConstants.MASTER_PROCEDURE_THREADS,
         Math.max(Runtime.getRuntime().availableProcessors(),
@@ -3382,5 +3420,20 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
     serverName = ServerName.valueOf(hostName, address.getPort(), startcode);
     LOG.info("Startup with hostname: " + hostName + " internal hostname: "
       + serverName.getInternalHostName());
+  }
+
+  // Only invoked after pod crash.
+  public void cleanPodInstanceAfterCrash(ServerName serverName) {
+    if (!serverManager.isPodInstance(serverName) || rsGroupAdminClient == null) {
+      return;
+    }
+    try {
+      LOG.info("Cleaning crashed pod instance: " + serverName);
+      serverManager.getDeadServers().removeDeadServer(serverName);
+      rsGroupAdminClient.removeServers(Sets.newHashSet(serverName.getAddress()));
+      serverManager.evictPodInstance(serverName);
+    } catch (IOException ioe) {
+      LOG.warn("Failed clean pod instance: " + serverName + " skip.", ioe);
+    }
   }
 }

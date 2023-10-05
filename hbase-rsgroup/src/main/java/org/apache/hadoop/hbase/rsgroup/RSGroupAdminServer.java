@@ -559,7 +559,7 @@ public class RSGroupAdminServer implements RSGroupAdmin {
 
     Set<Address> deadServers = new HashSet<>();
     for(ServerName server: master.getServerManager().getDeadServers().copyServerNames()) {
-      if (master.getServerManager().isPodServer(server)) {
+      if (master.getServerManager().isPodInstance(server)) {
         continue;
       }
       deadServers.add(server.getAddress());

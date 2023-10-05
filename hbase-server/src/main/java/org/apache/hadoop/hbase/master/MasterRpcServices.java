@@ -360,7 +360,7 @@ public class MasterRpcServices extends RSRpcServices
             - (oldLoad != null ? oldLoad.getTotalNumberOfRequests() : 0));
       }
       if (request.hasK8SModeEnabled() && request.getK8SModeEnabled()) {
-        master.serverManager.addPodServer(serverName);
+        master.serverManager.addPodInstance(serverName);
       }
     } catch (IOException ioe) {
       throw new ServiceException(ioe);
