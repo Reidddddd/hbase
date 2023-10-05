@@ -1188,6 +1188,40 @@ public class ZKUtil {
   }
 
   /**
+   * Creates the specified node with the specified data and watches it.
+   *
+   * <p>Throws an exception if the node already exists.
+   *
+   * <p>The node created is persistent and open access.
+   *
+   * <p>Returns the version number of the created node if successful.
+   *
+   * @param zkw zk reference
+   * @param znode path of node to create
+   * @param data data of node to create
+   * @return version of node created
+   * @throws KeeperException if unexpected zookeeper exception
+   * @throws KeeperException.NodeExistsException if node already exists
+   */
+  public static int createAndWatch(ZooKeeperWatcher zkw,
+                                   String znode, byte [] data, CreateMode createMode)
+    throws KeeperException, KeeperException.NodeExistsException {
+    try {
+      zkw.getRecoverableZooKeeper().create(znode, data, createACL(zkw, znode), createMode);
+      Stat stat = zkw.getRecoverableZooKeeper().exists(znode, zkw);
+      if (stat == null){
+        // Likely a race condition. Someone deleted the znode.
+        throw KeeperException.create(KeeperException.Code.SYSTEMERROR,
+          "ZK.exists returned null (i.e.: znode does not exist) for znode=" + znode);
+      }
+      return stat.getVersion();
+    } catch (InterruptedException e) {
+      zkw.interruptedException(e);
+      return -1;
+    }
+  }
+
+  /**
    * Async creates the specified node with the specified data.
    *
    * <p>Throws an exception if the node already exists.
