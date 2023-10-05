@@ -19,13 +19,20 @@
 package org.apache.hadoop.hbase;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.schema.Column;
+import org.apache.hadoop.hbase.schema.ColumnType;
+import org.apache.hadoop.hbase.schema.Famy;
+import org.apache.hadoop.hbase.schema.Qualy;
 import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -35,9 +42,9 @@ import org.apache.yetus.audience.InterfaceAudience;
  * Row key               |    q      |
  *                       | a | b | c |
  * table_name            | _ | _ |   |
- * table_nameQualifier_1 | _ |   |   |
- * table_nameQualifier_2 |   | _     |
- * table_name1           |   |   | _ |
+ * table_nameQualifier_1 | 1 |   |   |
+ * table_nameQualifier_2 |   | 2     |
+ * table_name1           |   |   | 3 |
  *
  * First of all, the family char is q in hbase:schema.
  * Qualifier will be families of each table, value is no need here.
@@ -48,25 +55,28 @@ import org.apache.yetus.audience.InterfaceAudience;
  * then 'table_name' has a 'Qualifier_1' which under family 'a',
  * and 'Qualifier_2' under family 'b'.
  *
- * The value of each cell will be type of a column in the future. For example:
- * string/int/long, can be put into the value to indicate the type
+ * The value of each cell is a byte code which represent its type,
+ * except for the table row whose cell values are empty.
+ * Byte code's details can be referred from {@link ColumnType}
  *
  * With design, we can:
  * 1. avoid fat row or fat cell
  * 2. scalable with more qualifiers, e.g, put the type of a column into the value
- * 3. Easy to achieve a table's information with prefix scan
+ * 3. Easy to achieve a table's information with prefix scan or start/stop row scan
  */
 @InterfaceAudience.Private
 public final class SchemaTableAccessor {
+
+  private static final byte[] SCHEMA_TABLE_CF = Bytes.toBytes("q");
 
   private SchemaTableAccessor() {}
 
   /**
    * Check whether schema service is on
    */
-  public static boolean isSchemaServiceRunning(Connection connection) throws IOException {
+  public static boolean schemaServiceIsOff(Connection connection) throws IOException {
     try (Admin admin = connection.getAdmin()) {
-      return admin.isTableAvailable(TableName.SCHEMA_TABLE_NAME);
+      return !admin.isTableAvailable(TableName.SCHEMA_TABLE_NAME);
     }
   }
 
@@ -94,6 +104,42 @@ public final class SchemaTableAccessor {
         parseResult(schema, res);
       }
       return schema;
+    }
+  }
+
+  public static void publishSchema(Schema schema, Connection connection) throws IOException {
+    try (Table schemaTable = connection.getTable(TableName.SCHEMA_TABLE_NAME)) {
+      byte[] t = schema.getTable().getName();
+      List<Put> puts = new ArrayList<>();
+
+      for (Column column : schema.getUpdatedColumns()) {
+        if (puts.size() == 0) {
+          // add this table row at the beginning for easier ACL check
+          puts.add(new Put(t).addColumn(SCHEMA_TABLE_CF,
+                                        column.getFamy().getFamily(),
+                                        HConstants.EMPTY_BYTE_ARRAY));
+        }
+
+        byte[] qualifier = column.getQualy().getQualifier();
+        byte[] row = new byte[t.length + qualifier.length];
+        System.arraycopy(t, 0, row, 0, t.length);
+        System.arraycopy(qualifier, 0, row, t.length, qualifier.length);
+        Put put = new Put(row);
+        put.addColumn(SCHEMA_TABLE_CF,
+                      column.getFamy().getFamily(),
+                      column.getType().getCode());
+        puts.add(put);
+
+        if (puts.size() == 100) {
+          schemaTable.put(puts);
+          puts = new ArrayList<>();
+        }
+      }
+
+      // flush remaining
+      if (puts.size() > 0) {
+        schemaTable.put(puts);
+      }
     }
   }
 
@@ -133,7 +179,11 @@ public final class SchemaTableAccessor {
       CellScanner cells = res.cellScanner();
       while (cells.advance()) {
         Cell cell = cells.current();
-        schema.addColumn(CellUtil.cloneQualifier(cell), qualifier);
+
+        Famy famy = new Famy(CellUtil.cloneQualifier(cell));
+        Qualy qualy = new Qualy(qualifier);
+        qualy.updateType(ColumnType.parseType(CellUtil.cloneValue(cell)));
+        schema.addColumn(famy, qualy);
       }
     }
   }

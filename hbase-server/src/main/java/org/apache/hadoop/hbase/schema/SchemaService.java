@@ -60,9 +60,9 @@ import org.apache.zookeeper.KeeperException;
  * Row key               |    q      |
  *                       | a | b | c |
  * table_name            | _ | _ |   |
- * table_nameQualifier_1 | _ |   |   |
- * table_nameQualifier_2 |   | _     |
- * table_name1           |   |   | _ |
+ * table_nameQualifier_1 | 1 |   |   |
+ * table_nameQualifier_2 |   | 2     |
+ * table_name1           |   |   | 3 |
  *
  * First of all, the family char is q in hbase:schema.
  * Qualifier will be families of each table, value is no need here.
@@ -73,13 +73,14 @@ import org.apache.zookeeper.KeeperException;
  * then 'table_name' has a 'Qualifier_1' which under family 'a',
  * and 'Qualifier_2' under family 'b'.
  *
- * The value of each cell will be type of a column in the future. For example:
- * string/int/long, can be put into the value to indicate the type
+ * The value of each cell is a byte code which represent its type,
+ * except for the table row whose cell values are empty.
+ * Byte code's details can be referred from {@link ColumnType}
  *
  * With design, we can:
  * 1. avoid fat row or fat cell
  * 2. scalable with more qualifiers, e.g, put the type of a column into the value
- * 3. Easy to achieve a table's information with prefix scan
+ * 3. Easy to achieve a table's information with prefix scan or start/stop row scan
  *
  * Note, this coprocessor service is bind to a RS at region level.
  * Its lifecycle follows RS's.
