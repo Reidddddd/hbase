@@ -29,6 +29,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -141,16 +142,18 @@ public class SchemaService extends BaseMasterAndRegionObserver {
       RegionCoprocessorEnvironment regionEnv = (RegionCoprocessorEnvironment) e;
       TableName tableName = regionEnv.getRegionInfo().getTable();
 
+      if (tableName.isSystemTable()) {
+        return;
+      }
+
       if (watchedTables.add(tableName.getNameAsString())) {
         ZooKeeperWatcher watcher = regionEnv.getRegionServerServices().getZooKeeper();
 
         try {
           if (watcher != null) {
-            if (!tableName.isSystemTable()) {
-              String tableNode = ZKUtil.joinZNode(watcher.tableZNode, tableName.getNameAsString());
-              ZKUtil.setWatchIfNodeExists(watcher, tableNode);
-              initListener(watcher);
-            }
+            String tableNode = ZKUtil.joinZNode(watcher.tableZNode, tableName.getNameAsString());
+            ZKUtil.setWatchIfNodeExists(watcher, tableNode);
+            initListener(watcher);
           }
         } catch (KeeperException ke) {
           throw new IOException(ke);
@@ -178,6 +181,8 @@ public class SchemaService extends BaseMasterAndRegionObserver {
     }
 
     HTableDescriptor desc = new HTableDescriptor(TableName.SCHEMA_TABLE_NAME);
+    desc.addCoprocessor(SchemaAccessChecker.class.getName(), null,
+                 Coprocessor.PRIORITY_SYSTEM / 2, null);
     desc.addFamily(new HColumnDescriptor(SCHEMA_TABLE_CF)
         .setMaxVersions(1)
         .setInMemory(true)
