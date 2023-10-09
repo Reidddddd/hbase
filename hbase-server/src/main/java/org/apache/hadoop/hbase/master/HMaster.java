@@ -996,10 +996,6 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
       // We are not initialized or the rsGroupAdminClient is not initialized. Skip this move.
       return;
     }
-    if (groupName.equals(RSGroupInfo.DEFAULT_GROUP)) {
-      // The new server will be added to the default group automatically.
-      return;
-    }
 
     Address rsAddress = sn.getAddress();
     Set<Address> addressSet = Sets.newHashSet(rsAddress);
