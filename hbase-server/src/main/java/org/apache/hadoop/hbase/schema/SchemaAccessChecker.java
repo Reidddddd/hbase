@@ -41,6 +41,7 @@ import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.MiniBatchOperationInProgress;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.security.AccessDeniedException;
 import org.apache.hadoop.hbase.security.Superusers;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.access.AccessChecker;
@@ -78,6 +79,8 @@ public class SchemaAccessChecker extends BaseRegionObserver {
 
   private Admin admin;
 
+  private boolean authorizationEnabled;
+
   @Override
   public void start(CoprocessorEnvironment e) throws IOException {
     LOG.info("Starting SchemaAccessChecker");
@@ -86,6 +89,7 @@ public class SchemaAccessChecker extends BaseRegionObserver {
     admin = ConnectionFactory.createConnection(regionEnv.getConfiguration()).getAdmin();
     aclChecker = new AccessChecker(regionEnv.getConfiguration(),
                                    regionEnv.getRegionServerServices().getZooKeeper());
+    authorizationEnabled = AccessChecker.isAuthorizationSupported(regionEnv.getConfiguration());
   }
 
   @Override
@@ -100,22 +104,39 @@ public class SchemaAccessChecker extends BaseRegionObserver {
     if (Superusers.isSuperUser(user)) {
       return exists;
     }
+    assert user != null;
 
-    TableName table;
+    TableName table = null;
     try {
       table = TableName.valueOf(get.getRow());
     } catch (Throwable t) {
       // like invalid table name, unexpected call to preExists
+      auditFailure(user, "checkTableSchemaExistence",
+                   Bytes.toString(get.getRow()), MESSAGE.INVALID_TABLE);
       return exists;
     }
-    if (!admin.isTableAvailable(table) || table.isSystemTable()) {
-      // valid name, but not an existed table
+    if (!admin.isTableAvailable(table)) {
+      auditFailure(user, "checkTableSchemaExistence",
+                   table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
+      return exists;
+    }
+    if (table.isSystemTable()) {
+      auditFailure(user, "checkTableSchemaExistence",
+                   table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
       return exists;
     }
 
-    // in schema region, AccessChecker must not be null
-    aclChecker.requirePermission(user, "checkTableSchemaExistence", table,
-        null, null, Permission.Action.READ);
+    try {
+      // in schema region, AccessChecker must not be null
+      aclChecker.requirePermission(user, "checkTableSchemaExistence", table,
+          null, null, Permission.Action.READ);
+    } catch (IOException ioe) {
+      auditFailure(user, "checkTableSchemaExistence",
+                   table.getNameAsString(), MESSAGE.READ_ACCESS_DENIED);
+      throw ioe;
+    }
+    auditSuccess(user, "checkTableSchemaExistence",
+                 table.getNameAsString(), MESSAGE.NA);
     // short circuit, no need to execute AccessController, it will fail otherwise
     passedACL.set(true);
     e.complete();
@@ -127,6 +148,10 @@ public class SchemaAccessChecker extends BaseRegionObserver {
       throws IOException {
     if (passedACL.get()) {
       e.complete();
+    } else {
+      User user = RpcServer.getRequestUser();
+      auditFailure(user, "checkTableSchemaExistence",
+                   Bytes.toString(get.getRow()), MESSAGE.MALFORMED_REQUEST);
     }
   }
 
@@ -144,21 +169,40 @@ public class SchemaAccessChecker extends BaseRegionObserver {
     if (Superusers.isSuperUser(user)) {
       return s;
     }
+    assert user != null;
 
-    TableName table;
+    TableName table = null;
     try {
       table = TableName.valueOf(scan.getStartRow());
     } catch (Throwable t) {
       // like invalid table name, unexpected call
+      auditFailure(user, "getTableSchema",
+                   Bytes.toString(scan.getStartRow()), MESSAGE.INVALID_TABLE);
       return s;
     }
-    if (!admin.isTableAvailable(table) || table.isSystemTable()) {
-      // valid name, but not an existed table
+    if (!admin.isTableAvailable(table)) {
+      auditFailure(user, "getTableSchema",
+                   table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
+      return s;
+    }
+    if (table.isSystemTable()) {
+      auditFailure(user, "getTableSchema",
+                   table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
       return s;
     }
 
-    aclChecker.requirePermission(user, "getTableSchema", table,
-        null, null, Permission.Action.READ);
+    try {
+      // in schema region, AccessChecker must not be null
+      aclChecker.requirePermission(user, "getTableSchema", table,
+          null, null, Permission.Action.READ);
+    } catch (IOException ioe) {
+      auditFailure(user, "getTableSchema",
+                   table.getNameAsString(), MESSAGE.READ_ACCESS_DENIED);
+      throw ioe;
+    }
+    auditSuccess(user, "getTableSchema",
+                 table.getNameAsString(), MESSAGE.NA);
+
     // short circuit, no need to execute AccessController, it will fail otherwise
     passedACL.set(true);
     e.complete();
@@ -185,6 +229,7 @@ public class SchemaAccessChecker extends BaseRegionObserver {
     if (Superusers.isSuperUser(user)) {
       return;
     }
+    assert user != null;
 
     if (passedACL.get()) {
       if (Bytes.startsWith(put.getRow(), passedTable.get())) {
@@ -192,24 +237,43 @@ public class SchemaAccessChecker extends BaseRegionObserver {
         e.complete();
         return;
       }
-      // probably problematic call, pass it to next coprocessor, don't bypass it
+      // probably a problematic call
+      auditFailure(user, "updateTableSchema",
+                   Bytes.toString(put.getRow()), MESSAGE.MALFORMED_REQUEST);
       return;
     }
 
-    TableName table;
+    TableName table = null;
     try {
       table = TableName.valueOf(put.getRow());
     } catch (Throwable t) {
-      // like invalid table name, unexpected call
+      // like invalid table name, unexpected callMESSAGE
+      auditFailure(user, "updateTableSchema",
+                   Bytes.toString(put.getRow()), MESSAGE.INVALID_TABLE);
       return;
     }
-    if (!admin.isTableAvailable(table) || table.isSystemTable()) {
-      // valid name, but not an existed table
+    if (!admin.isTableAvailable(table)) {
+      auditFailure(user, "updateTableSchema",
+                   table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
+      return;
+    }
+    if (table.isSystemTable()) {
+      auditFailure(user, "updateTableSchema",
+                   table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
       return;
     }
 
-    aclChecker.requirePermission(user, "updateTableSchema", table,
-        null, null, Permission.Action.WRITE);
+    try {
+      // in schema region, AccessChecker must not be null
+      aclChecker.requirePermission(user, "updateTableSchema", table,
+          null, null, Permission.Action.WRITE);
+    } catch (IOException ioe) {
+      auditFailure(user, "updateTableSchema",
+                   table.getNameAsString(), MESSAGE.WRITE_ACCESS_DENIED);
+      throw ioe;
+    }
+    auditSuccess(user, "updateTableSchema",
+                 table.getNameAsString(), MESSAGE.NA);
 
     // short circuit, no need to execute AccessController, it will fail otherwise
     e.complete();
@@ -232,6 +296,37 @@ public class SchemaAccessChecker extends BaseRegionObserver {
       passedACL.set(false);
       passedTable.set(EMPTY_BYTE_ARRAY);
     }
+  }
+
+
+  private final String AUDIT_FORMAT =
+      "user: %s, action: %s, target_table: %s, access_check: %s, error_msg: %s";
+
+  private enum MESSAGE {
+    NA("n/a"),
+    INVALID_TABLE("invalid table name"),
+    TABLE_NOT_AVAILABLE("table is not available"),
+    SYSTEM_TABLE("it is a system table"),
+    READ_ACCESS_DENIED("access denied, need READ permission"),
+    WRITE_ACCESS_DENIED("access denied, need WRITE permission"),
+    MALFORMED_REQUEST("malformed request");
+
+    private String msg;
+    MESSAGE(String msg) {
+      this.msg = msg;
+    }
+  }
+
+  private void auditFailure(User user, String action, String table, MESSAGE error)
+      throws AccessDeniedException {
+    LOG.info(String.format(AUDIT_FORMAT, user, action, table, "fail", error.msg));
+    if (authorizationEnabled) {
+      throw new AccessDeniedException(user + " operates " + action + " with error: " + error.msg);
+    }
+  }
+
+  private void auditSuccess(User user, String action, String table, MESSAGE error) {
+    LOG.info(String.format(AUDIT_FORMAT, user, action, table, "pass", error.msg));
   }
 
 }

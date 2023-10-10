@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
@@ -53,6 +56,8 @@ import org.junit.experimental.categories.Category;
 
 @Category(SmallTests.class)
 public class TestSchemaAccessChecker {
+  private static final Log LOG = LogFactory.getLog(TestSchemaAccessChecker.class);
+
   private static final HBaseTestingUtility UTIL = new HBaseTestingUtility();
   private static final byte[] TEST_ROW = Bytes.toBytes("testRow");
   private static final byte[] TEST_VALUE = Bytes.toBytes("testValue");
@@ -71,6 +76,7 @@ public class TestSchemaAccessChecker {
     UTIL.getConfiguration().setInt("hbase.schema.updater.threads", 1);
     UTIL.getConfiguration().setBoolean(HBASE_SECURITY_AUTHORIZATION_CONF_KEY, true);
     UTIL.getConfiguration().set(SUPERUSER_CONF_KEY, User.getCurrent().getShortName());
+    UTIL.getConfiguration().setBoolean("hbase.client.log.scanner.activity", true);
 
     UTIL.startMiniCluster();
     // Wait until all initialized.
@@ -200,6 +206,7 @@ public class TestSchemaAccessChecker {
         table.get(new Get(tableName.getName()));
         fail("Expected exception was not thrown for user '" + foo.getShortName() + "'");
       } catch (IOException e) {
+        LOG.info(e.getMessage());
         assertTrue(e instanceof AccessDeniedException);
       }
       // 2. Try to get a non-existed table directly via Get API
@@ -207,6 +214,7 @@ public class TestSchemaAccessChecker {
         table.get(new Get(Bytes.toBytes("not_exist_table_name")).setCheckExistenceOnly(true));
         fail("Expected exception was not thrown for user '" + foo.getShortName() + "'");
       } catch (IOException e) {
+        LOG.info(e.getMessage());
         assertTrue(e instanceof AccessDeniedException);
       }
       // 3. Try to get a system table directly via Get API
@@ -214,6 +222,7 @@ public class TestSchemaAccessChecker {
         table.get(new Get(Bytes.toBytes("hbase:acl")).setCheckExistenceOnly(true));
         fail("Expected exception was not thrown for user '" + foo.getShortName() + "'");
       } catch (IOException e) {
+        LOG.info(e.getMessage());
         assertTrue(e instanceof AccessDeniedException);
       }
       // 4. Try to scan directly via API
@@ -221,8 +230,11 @@ public class TestSchemaAccessChecker {
         Scan scan = new Scan();
         scan.withStartRow(tableName.getName());
         scan.setFilter(new PrefixFilter(tableName.getName()));
-        table.getScanner(scan);
+        ResultScanner scanner = table.getScanner(scan);
+        scanner.next();
+        fail("Expected exception was not thrown for user '" + foo.getShortName() + "'");
       } catch (IOException e) {
+        LOG.info(e.getMessage());
         assertTrue(e instanceof AccessDeniedException);
       }
       // 5. Try to scan directly via API, but not a valid table
@@ -231,7 +243,11 @@ public class TestSchemaAccessChecker {
         scan.withStartRow(Bytes.toBytes("not_exist_table_name"));
         scan.setFilter(new PrefixFilter(Bytes.toBytes("not_exist_table_name")));
         table.getScanner(scan);
+        ResultScanner scanner = table.getScanner(scan);
+        scanner.next();
+        fail("Expected exception was not thrown for user '" + foo.getShortName() + "'");
       } catch (IOException e) {
+        LOG.info(e.getMessage());
         assertTrue(e instanceof AccessDeniedException);
       }
       return null;
