@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.coprocessor.BaseMasterAndRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
+import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.master.MasterServices;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.regionserver.MiniBatchOperationInProgress;
@@ -110,8 +111,6 @@ public class SchemaService extends BaseMasterAndRegionObserver {
 
   @Override
   public void start(CoprocessorEnvironment e) throws IOException {
-    LOG.info("Starting Schema Service");
-    LOG.info("Is Master enviroment: " + (e instanceof MasterCoprocessorEnvironment));
     Configuration conf = e.getConfiguration();
 
     boolean masterEnv = e instanceof MasterCoprocessorEnvironment;
@@ -121,6 +120,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
     if (masterEnv) {
       // if running on HMaster
       MasterCoprocessorEnvironment mEnv = (MasterCoprocessorEnvironment) e;
+      LOG.info("Starting SchemaService on Master");
       new Thread(() -> {
         LOG.info("Waiting for the cluster connection built");
         while (mEnv.getMasterServices().getConnection() == null) {
@@ -146,6 +146,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
         return;
       }
 
+      LOG.info("Starting SchemaService for region " + regionEnv.getRegionInfo());
       if (watchedTables.add(tableName.getNameAsString())) {
         ZooKeeperWatcher watcher = regionEnv.getRegionServerServices().getZooKeeper();
 
@@ -189,6 +190,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
         .setBlockCacheEnabled(true)
         .setBlocksize(8 * 1024)
         .setBloomFilterType(BloomType.ROW)
+        .setDataBlockEncoding(DataBlockEncoding.FAST_DIFF)
     );
     masterServices.createSystemTable(desc);
   }
