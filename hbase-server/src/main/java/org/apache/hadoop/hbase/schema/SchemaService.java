@@ -59,44 +59,58 @@ import org.apache.zookeeper.KeeperException;
 
 /**
  * The hbase:schema architecture is:
- * Row key               |    q      |
- *                       | a | b | c |
- * table_name            | _ | _ |   |
- * table_nameQualifier_1 | 1 |   |   |
- * table_nameQualifier_2 |   | 2     |
- * table_name1           |   |   | 3 |
- *
+ * Row key               |    q      |   m   |
+ *                       | a | b | c |   n   |
+ * table_name            | _ | _ |   |   3   |
+ * table_nameQualifier_1 | 1 |   |   |       |
+ * table_nameQualifier_2 |   | 2     |       |
+ * table_name1           |   |   | 3 |       |
+ * <p>
  * First of all, the family char is q in hbase:schema.
  * Qualifier will be families of each table, value is no need here.
  * Row key will be table name of a table or table_name + qualifier of a table.
- *
+ * </p>
+ * <p>
  * For example, from above, we can tell:
  * Table 'table_name' has two families, one is 'a', the other is 'b',
  * then 'table_name' has a 'Qualifier_1' which under family 'a',
  * and 'Qualifier_2' under family 'b'.
- *
+ * </p>
+ * <p>
  * The value of each cell is a byte code which represent its type,
  * except for the table row whose cell values are empty.
  * Byte code's details can be referred from {@link ColumnType}
- *
+ * </p>
+ * <p>
+ * The cf 'm' stores other information of the table. We currently record the number of columns
+ * with qualifier 'n' and a marker whether record the table's schema (for infinite growth case).
+ * </p>
+ * <p>
  * With design, we can:
- * 1. avoid fat row or fat cell
- * 2. scalable with more qualifiers, e.g, put the type of a column into the value
+ * 1. Avoid fat row or fat cell
+ * 2. Scalable with more qualifiers, e.g, put the type of a column into the value
  * 3. Easy to achieve a table's information with prefix scan or start/stop row scan
- *
+ * 4. The meta column family support further functional extensions.
+ * </p>
+ * <p>
  * Note, this coprocessor service is bind to a RS at region level.
  * Its lifecycle follows RS's.
  * So even a region moved or offline, it can't be shutdown until RS dead.
  * TODO: find an elegantly way to shutdown this service
+ * </p>
  */
 @InterfaceAudience.Private
 public class SchemaService extends BaseMasterAndRegionObserver {
   private static final Log LOG = LogFactory.getLog(SchemaService.class);
   static final String NUM_THREADS_KEY = "hbase.schema.updater.threads";
+  static final String SOFT_MAX_COLUMNS_PER_TABLE = "hbase.schema.soft.max.columns.per.table";
   static final int NUM_THREADS_DEFAULT = 5;
+  static final int MAX_COLUMNS_PER_TABLE_DEFAULT = 1000;
 
   // q for qolumn
   static final byte[] SCHEMA_TABLE_CF = Bytes.toBytes("q");
+  static final byte[] SCHEMA_TABLE_META_CF = Bytes.toBytes("m");
+  static final byte[] SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER = Bytes.toBytes("c");
 
   static final AtomicReference<TableStateListener> tableStateListener = new AtomicReference<>();
 
@@ -142,8 +156,16 @@ public class SchemaService extends BaseMasterAndRegionObserver {
       RegionCoprocessorEnvironment regionEnv = (RegionCoprocessorEnvironment) e;
       TableName tableName = regionEnv.getRegionInfo().getTable();
 
-      if (tableName.isSystemTable()) {
+      if (tableName.isSystemTable() || isWideTable(tableName)) {
         return;
+      }
+
+      try {
+        long current = processor.getColumnCount(tableName);
+        processor.invalidateCacheIfColumnExceedThreshold(tableName, current);
+      } catch (Exception ex) {
+        // Only make a log here and continue.
+        LOG.warn("Failed checking column number of table: " + tableName, ex);
       }
 
       LOG.info("Starting SchemaService for region " + regionEnv.getRegionInfo());
@@ -192,44 +214,62 @@ public class SchemaService extends BaseMasterAndRegionObserver {
         .setBloomFilterType(BloomType.ROW)
         .setDataBlockEncoding(DataBlockEncoding.FAST_DIFF)
     );
+    desc.addFamily(new HColumnDescriptor(SCHEMA_TABLE_META_CF)
+        .setMaxVersions(1)
+        .setInMemory(true)
+        .setBlockCacheEnabled(true)
+        .setBlocksize(8 * 1024)
+        .setBloomFilterType(BloomType.ROW)
+        .setDataBlockEncoding(DataBlockEncoding.FAST_DIFF)
+    );
     masterServices.createSystemTable(desc);
   }
 
   @Override
   public void postDeleteTable(ObserverContext<MasterCoprocessorEnvironment> ctx,
       TableName tableName) throws IOException {
+    if (tableName.isSystemTable()) {
+      return;
+    }
     sendTask(tableName, Operation.DROP);
   }
 
   @Override
   public void postTruncateTable(ObserverContext<MasterCoprocessorEnvironment> ctx,
       TableName tableName) throws IOException {
+    if (tableName.isSystemTable()) {
+      return;
+    }
     sendTask(tableName, Operation.TRUNCATE);
   }
 
   @Override
   public Result postIncrement(final ObserverContext<RegionCoprocessorEnvironment> e,
       final Increment increment, final Result result) throws IOException {
-    sendTask(e.getEnvironment().getRegionInfo().getTable(),
-             Operation.INCREMENT,
-             increment.getFamilyCellMap());
+    TableName table = e.getEnvironment().getRegionInfo().getTable();
+    if (!isWideTable(table) && !table.isSystemTable()) {
+      sendTask(table, Operation.INCREMENT, increment.getFamilyCellMap());
+    }
     return result;
   }
 
   @Override
   public void postPut(final ObserverContext<RegionCoprocessorEnvironment> e,
       final Put put, final WALEdit edit, final Durability durability) throws IOException {
-    sendTask(e.getEnvironment().getRegionInfo().getTable(),
-             Operation.PUT,
-             put.getFamilyCellMap());
+    TableName table = e.getEnvironment().getRegionInfo().getTable();
+    if (isWideTable(table) || table.isSystemTable()) {
+      return;
+    }
+    sendTask(table, Operation.PUT, put.getFamilyCellMap());
   }
 
   @Override
   public Result postAppend(ObserverContext<RegionCoprocessorEnvironment> e, Append append,
       Result result) throws IOException {
-    sendTask(e.getEnvironment().getRegionInfo().getTable(),
-             Operation.APPEND,
-             append.getFamilyCellMap());
+    TableName table = e.getEnvironment().getRegionInfo().getTable();
+    if (!isWideTable(table) && !table.isSystemTable()) {
+      sendTask(table, Operation.APPEND, append.getFamilyCellMap());
+    }
     return result;
   }
 
@@ -237,7 +277,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
   public void postBatchMutate(final ObserverContext<RegionCoprocessorEnvironment> e,
     final MiniBatchOperationInProgress<Mutation> miniBatchOp) throws IOException {
     TableName table = e.getEnvironment().getRegionInfo().getTable();
-    if (table.isSystemTable()) {
+    if (table.isSystemTable() || isWideTable(table)) {
       return;
     }
 
@@ -259,9 +299,6 @@ public class SchemaService extends BaseMasterAndRegionObserver {
 
   private void sendTask(TableName table, Operation operation,
       NavigableMap<byte [], List<Cell>> cellMap) {
-    if (table.isSystemTable()) {
-      return;
-    }
 
     if (cellMap == null) {
       processor.acceptTask(processor.createProcessor(table, operation, null));
@@ -273,6 +310,10 @@ public class SchemaService extends BaseMasterAndRegionObserver {
         processor.acceptTask(processor.createProcessor(table, operation, cell));
       }
     }
+  }
+
+  private boolean isWideTable(TableName table) {
+    return processor.isWideTable(table);
   }
 
   static class TableStateListener extends ZooKeeperListener {
