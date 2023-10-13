@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hbase.schema;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -164,5 +165,14 @@ public class Schema implements Iterable<Column> {
       sb.append("\n").append(column);
     }
     return sb.toString();
+  }
+
+  @VisibleForTesting
+  public int numberOfColumns() {
+    int result = 0;
+    for (Set<Qualy> set : columns.values()) {
+      result += set.size();
+    }
+    return result;
   }
 }

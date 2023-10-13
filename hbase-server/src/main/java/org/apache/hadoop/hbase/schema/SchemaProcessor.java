@@ -18,16 +18,24 @@
 
 package org.apache.hadoop.hbase.schema;
 
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_COLUMNS_PER_TABLE_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_KEY;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_CF;
+import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_META_CF;
+import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER;
+import static org.apache.hadoop.hbase.schema.SchemaService.SOFT_MAX_COLUMNS_PER_TABLE;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -39,26 +47,32 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.AsyncConnection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.RawAsyncTable;
 import org.apache.hadoop.hbase.client.RawScanResultConsumer;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.schema.SchemaService.Operation;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @SuppressWarnings("UnstableApiUsage")
 @InterfaceAudience.Private
 public class SchemaProcessor {
+  private static final Log LOG = LogFactory.getLog(SchemaProcessor.class);
+
   // Thread pool access the schema table.
   private FastPathExecutor updateExecutor;
   // Thread pool to dispatch tasks.
   private FastPathExecutor taskAcceptor;
 
   private Cache<TableName, Schema> schemaCache;
+  private Set<TableName> wideTableSet;
 
   private AsyncConnection connection;
   private RawAsyncTable schemaTable;
   private boolean inited = false;
+  private int maxColumn;
 
   private static class Processor {
     private static final SchemaProcessor SINGLETON = new SchemaProcessor();
@@ -75,11 +89,13 @@ public class SchemaProcessor {
 
     String environment = env ? "Master-" : "RegionServer-";
     int numHandlers = conf.getInt(NUM_THREADS_KEY, NUM_THREADS_DEFAULT);
+    maxColumn = conf.getInt(SOFT_MAX_COLUMNS_PER_TABLE, MAX_COLUMNS_PER_TABLE_DEFAULT);
     updateExecutor = new FastPathExecutor(numHandlers, environment + "SchemaUpdateHandler");
     updateExecutor.start();
     taskAcceptor = new FastPathExecutor(numHandlers, environment + "SchemaProcessHandler");
     taskAcceptor.start();
     schemaCache = CacheBuilder.newBuilder().expireAfterAccess(2, TimeUnit.HOURS).build();
+    wideTableSet = ConcurrentHashMap.newKeySet();
 
     try {
       connection = ConnectionFactory.createAsyncConnection(conf).get();
@@ -113,6 +129,9 @@ public class SchemaProcessor {
 
     @Override
     public void process() {
+      if (isWideTable(table)) {
+        return;
+      }
       switch (operation) {
         case INCREMENT:
         case APPEND:
@@ -154,7 +173,50 @@ public class SchemaProcessor {
               System.arraycopy(qualifier, 0, row, t.length, qualifier.length);
               Put put = new Put(row);
               put.addColumn(SCHEMA_TABLE_CF, family, ColumnType.NONE.getCode());
-              schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family, null, put);
+              schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family, null, put)
+                .whenComplete((succeeded, exception) -> {
+                  String errorMsg = "Failed increment column count for table: " + table;
+                  if (exception != null) {
+                    LOG.warn(errorMsg, exception);
+                    return;
+                  }
+                  if (isWideTable(table)) {
+                    return;
+                  }
+                  if (succeeded) {
+                    schemaTable.incrementColumnValue(t, SCHEMA_TABLE_META_CF,
+                      SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER, 1)
+                      .whenComplete((currentSize, error) -> {
+                        if (error != null) {
+                          LOG.warn(errorMsg, error);
+                          return;
+                        }
+                        try {
+                          if (invalidateCacheIfColumnExceedThreshold(table, currentSize)) {
+                            if (LOG.isTraceEnabled()) {
+                              LOG.trace("Turned off schema service for table: " + table);
+                            }
+                            // Revert the column count and delete the new added row.
+                            Delete delete = new Delete(row);
+                            schemaTable.delete(delete);
+                            schemaTable.incrementColumnValue(t, SCHEMA_TABLE_META_CF,
+                              SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER, -1);
+                          }
+                        } catch (Exception e) {
+                          LOG.warn("Failed check column count for table: " + table, e);
+                        }
+                      });
+                  } else {
+                    // We failed to add a new row in schema table.
+                    // Need to check the col count here to remove invalid table in time.
+                    try {
+                      long current = getColumnCount(table);
+                      invalidateCacheIfColumnExceedThreshold(table, current);
+                    } catch (Exception e) {
+                      LOG.warn("Failed turn off schema service for table: " + table, e);
+                    }
+                  }
+                });
             });
           }
           break;
@@ -206,6 +268,32 @@ public class SchemaProcessor {
   @VisibleForTesting
   public boolean isTableCleaned(TableName tableName) {
     return !schemaCache.asMap().containsKey(tableName);
+  }
+
+  /**
+   * @return true if we disabled schema service for table
+   */
+  boolean invalidateCacheIfColumnExceedThreshold(TableName table, long current) {
+    if (current > maxColumn) {
+      // Turn off marker.
+      wideTableSet.add(table);
+      schemaCache.invalidate(table);
+      return true;
+    }
+    return false;
+  }
+
+  long getColumnCount(TableName table) throws ExecutionException, InterruptedException {
+    byte[] t = table.getName();
+    Get get = new Get(t);
+    get.addColumn(SCHEMA_TABLE_META_CF, SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER);
+    Result result = schemaTable.get(get).get();
+    byte[] value = result.getValue(SCHEMA_TABLE_META_CF, SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER);
+    return value == null ? 0 : Bytes.toLong(value);
+  }
+
+  public boolean isWideTable(TableName tableName) {
+    return wideTableSet.contains(tableName);
   }
 
 }
