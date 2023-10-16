@@ -146,10 +146,13 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public void preGetOp(ObserverContext<RegionCoprocessorEnvironment> e, Get get, List<Cell> results)
       throws IOException {
+    User user = RpcServer.getRequestUser();
+    if (Superusers.isSuperUser(user)) {
+      return;
+    }
     if (passedACL.get()) {
       e.complete();
     } else {
-      User user = RpcServer.getRequestUser();
       auditFailure(user, "checkTableSchemaExistence",
                    Bytes.toString(get.getRow()), MESSAGE.MALFORMED_REQUEST);
     }
