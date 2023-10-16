@@ -402,13 +402,21 @@ public class TestSchema {
 
     Table schemaTable = UTIL.getConnection().getTable(TableName.SCHEMA_TABLE_NAME);
     schemaTable.get(get);
-    Assert.assertTrue(1000 <=
-      Bytes.toLong(schemaTable.get(get).getValue(metaFamily, countQualifier)));
 
-    // Check we have only recorded the max size columns.
+    // Check we have recorded more than the soft upper limit columns.
     Admin admin = UTIL.getHBaseAdmin();
     Schema schema = admin.getSchemaOf(tableName);
-    Assert.assertEquals(1000, schema.numberOfColumns());
+    Assert.assertTrue(schema.numberOfColumns() >= 1000);
+
+    // Put some new columns.
+    for (int i = 1005; i < 1010; i++) {
+      Put put = new Put(TEST_ROW);
+      put.addColumn(TEST_FAMILY_1, Bytes.toBytes(i), EMPTY_BYTE_ARRAY);
+      table.put(put);
+    }
+
+    Schema newSchema = admin.getSchemaOf(tableName);
+    Assert.assertEquals(schema.numberOfColumns(), newSchema.numberOfColumns());
   }
 
   private static void checkCacheCleaned(TableName tableName) {
