@@ -131,27 +131,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
     processor = SchemaProcessor.getInstance();
     processor.init(masterEnv, conf);
 
-    if (masterEnv) {
-      // if running on HMaster
-      MasterCoprocessorEnvironment mEnv = (MasterCoprocessorEnvironment) e;
-      LOG.info("Starting SchemaService on Master");
-      new Thread(() -> {
-        LOG.info("Waiting for the cluster connection built");
-        while (mEnv.getMasterServices().getConnection() == null) {
-          try {
-            wait(1000);
-          } catch (InterruptedException ex) {
-            LOG.warn("Failed to create schema table: ", ex);
-          }
-        }
-
-        try {
-          createSchemaTableIfNotExist(mEnv.getMasterServices());
-        } catch (IOException ex) {
-          LOG.warn("Failed to create schema table: ", ex);
-        }
-      }).start();
-    } else if (e instanceof RegionCoprocessorEnvironment) {
+    if (e instanceof RegionCoprocessorEnvironment) {
       // Init zk hook for RS.
       RegionCoprocessorEnvironment regionEnv = (RegionCoprocessorEnvironment) e;
       TableName tableName = regionEnv.getRegionInfo().getTable();
@@ -363,6 +343,29 @@ public class SchemaService extends BaseMasterAndRegionObserver {
         }
       }
     }
+  }
+
+  @Override
+  public void postStartMaster(ObserverContext<MasterCoprocessorEnvironment> ctx)
+    throws IOException {
+    LOG.info("Starting SchemaService on Master");
+    MasterCoprocessorEnvironment mEnv = ctx.getEnvironment();
+    new Thread(() -> {
+      LOG.info("Waiting for the cluster connection built");
+      while (mEnv.getMasterServices().getConnection() == null) {
+        try {
+          wait(1000);
+        } catch (InterruptedException ex) {
+          LOG.warn("Failed to create schema table: ", ex);
+        }
+      }
+
+      try {
+        createSchemaTableIfNotExist(mEnv.getMasterServices());
+      } catch (IOException ex) {
+        LOG.warn("Failed to create schema table: ", ex);
+      }
+    }).start();
   }
 
 }
