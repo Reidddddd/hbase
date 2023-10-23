@@ -80,6 +80,10 @@ public final class SchemaTableAccessor {
     }
   }
 
+  public static boolean schemaServiceIsOn(Connection connection) throws IOException {
+    return !schemaServiceIsOff(connection);
+  }
+
   /**
    * If table has data, and schema service is on, it must contain a row 'tablename',
    * otherwise, it has no data
