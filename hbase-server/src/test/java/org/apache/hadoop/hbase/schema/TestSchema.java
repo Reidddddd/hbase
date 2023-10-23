@@ -393,7 +393,7 @@ public class TestSchema {
       table.put(put);
     }
 
-    Thread.sleep(1000);
+    Thread.sleep(3000);
 
     byte[] metaFamily = Bytes.toBytes("m");
     byte[] countQualifier = Bytes.toBytes("c");

@@ -24,16 +24,19 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.MetaTableAccessor;
+import org.apache.hadoop.hbase.SchemaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Durability;
@@ -116,6 +119,9 @@ public class SchemaService extends BaseMasterAndRegionObserver {
 
   // A static map to guarantee we do not duplicate zk node watching.
   static final Set<String> watchedTables = ConcurrentHashMap.newKeySet();
+  // An independent thread to do a wide table check to not block normal region opening.
+  static final ExecutorService preCheckWorker = Executors.newSingleThreadExecutor();
+  static final AtomicBoolean schemaServiceOn = new AtomicBoolean();
 
   private SchemaProcessor processor;
 
@@ -125,52 +131,11 @@ public class SchemaService extends BaseMasterAndRegionObserver {
 
   @Override
   public void start(CoprocessorEnvironment e) throws IOException {
-    Configuration conf = e.getConfiguration();
-
-    boolean masterEnv = e instanceof MasterCoprocessorEnvironment;
     processor = SchemaProcessor.getInstance();
-    processor.init(masterEnv, conf);
-
-    if (e instanceof RegionCoprocessorEnvironment) {
-      // Init zk hook for RS.
-      RegionCoprocessorEnvironment regionEnv = (RegionCoprocessorEnvironment) e;
-      TableName tableName = regionEnv.getRegionInfo().getTable();
-
-      if (tableName.isSystemTable() || isWideTable(tableName)) {
-        return;
-      }
-
-      try {
-        long current = processor.getColumnCount(tableName);
-        processor.invalidateCacheIfColumnExceedThreshold(tableName, current);
-      } catch (Exception ex) {
-        // Only make a log here and continue.
-        LOG.warn("Failed checking column number of table: " + tableName, ex);
-      }
-
-      LOG.info("Starting SchemaService for region " + regionEnv.getRegionInfo());
-      if (watchedTables.add(tableName.getNameAsString())) {
-        ZooKeeperWatcher watcher = regionEnv.getRegionServerServices().getZooKeeper();
-
-        try {
-          if (watcher != null) {
-            String tableNode = ZKUtil.joinZNode(watcher.tableZNode, tableName.getNameAsString());
-            ZKUtil.setWatchIfNodeExists(watcher, tableNode);
-            initListener(watcher);
-          }
-        } catch (KeeperException ke) {
-          throw new IOException(ke);
-        } catch (InterruptedException ex) {
-          throw new RuntimeException(ex);
-        }
-      }
-
-    }
   }
 
   // Only init once.
-  private synchronized void initListener(ZooKeeperWatcher watcher)
-    throws InterruptedException, KeeperException {
+  private synchronized void initListener(ZooKeeperWatcher watcher) {
     if (tableStateListener.get() == null) {
       tableStateListener.compareAndSet(null, new TableStateListener(watcher, this));
       watcher.registerListener(tableStateListener.get());
@@ -227,7 +192,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
   public Result postIncrement(final ObserverContext<RegionCoprocessorEnvironment> e,
       final Increment increment, final Result result) throws IOException {
     TableName table = e.getEnvironment().getRegionInfo().getTable();
-    if (!isWideTable(table) && !table.isSystemTable()) {
+    if (shouldSendTask(table)) {
       sendTask(table, Operation.INCREMENT, increment.getFamilyCellMap());
     }
     return result;
@@ -237,17 +202,16 @@ public class SchemaService extends BaseMasterAndRegionObserver {
   public void postPut(final ObserverContext<RegionCoprocessorEnvironment> e,
       final Put put, final WALEdit edit, final Durability durability) throws IOException {
     TableName table = e.getEnvironment().getRegionInfo().getTable();
-    if (isWideTable(table) || table.isSystemTable()) {
-      return;
+    if (shouldSendTask(table)) {
+      sendTask(table, Operation.PUT, put.getFamilyCellMap());
     }
-    sendTask(table, Operation.PUT, put.getFamilyCellMap());
   }
 
   @Override
   public Result postAppend(ObserverContext<RegionCoprocessorEnvironment> e, Append append,
       Result result) throws IOException {
     TableName table = e.getEnvironment().getRegionInfo().getTable();
-    if (!isWideTable(table) && !table.isSystemTable()) {
+    if (shouldSendTask(table)) {
       sendTask(table, Operation.APPEND, append.getFamilyCellMap());
     }
     return result;
@@ -257,7 +221,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
   public void postBatchMutate(final ObserverContext<RegionCoprocessorEnvironment> e,
     final MiniBatchOperationInProgress<Mutation> miniBatchOp) throws IOException {
     TableName table = e.getEnvironment().getRegionInfo().getTable();
-    if (table.isSystemTable() || isWideTable(table)) {
+    if (!shouldSendTask(table)) {
       return;
     }
 
@@ -350,6 +314,8 @@ public class SchemaService extends BaseMasterAndRegionObserver {
     throws IOException {
     LOG.info("Starting SchemaService on Master");
     MasterCoprocessorEnvironment mEnv = ctx.getEnvironment();
+    processor.init(true, mEnv.getConfiguration(), mEnv.getMasterServices().getConnection());
+
     new Thread(() -> {
       LOG.info("Waiting for the cluster connection built");
       while (mEnv.getMasterServices().getConnection() == null) {
@@ -368,4 +334,58 @@ public class SchemaService extends BaseMasterAndRegionObserver {
     }).start();
   }
 
+  @Override
+  public void postOpen(final ObserverContext<RegionCoprocessorEnvironment> c) {
+    RegionCoprocessorEnvironment regionEnv= c.getEnvironment();
+    TableName tableName = regionEnv.getRegionInfo().getTable();
+    if (tableName.isSystemTable()) {
+      return;
+    }
+    try {
+      // Update once when each region opens.
+      schemaServiceOn.set(
+        SchemaTableAccessor.schemaServiceIsOn(regionEnv.getRegionServerServices().getConnection())
+      );
+    } catch (IOException e) {
+      LOG.warn("Failed get the status of schema table: ", e);
+    }
+    if (!shouldSendTask(tableName)) {
+      return;
+    }
+    processor.init(false, regionEnv.getConfiguration(),
+      regionEnv.getRegionServerServices().getConnection());
+
+    preCheckWorker.submit(() -> {
+      try {
+        if (shouldSendTask(tableName)) {
+          long current = processor.getColumnCount(tableName);
+          processor.invalidateCacheIfColumnExceedThreshold(tableName, current);
+        }
+      } catch (Exception ex) {
+        // Only make a log here and continue.
+        LOG.warn("Failed checking column number of table: " + tableName, ex);
+      }
+
+      if (watchedTables.add(tableName.getNameAsString())) {
+        ZooKeeperWatcher watcher = regionEnv.getRegionServerServices().getZooKeeper();
+
+        try {
+          if (watcher != null) {
+            String tableNode = ZKUtil.joinZNode(watcher.tableZNode, tableName.getNameAsString());
+            ZKUtil.setWatchIfNodeExists(watcher, tableNode);
+            initListener(watcher);
+          }
+        } catch (Exception e) {
+          LOG.warn("Failed add remove hook for table: " + tableName);
+        }
+      }
+    });
+    LOG.info("Finished starting SchemaService for region " + regionEnv.getRegionInfo());
+  }
+
+  // Used for region hooks to not send task for system, wide tables and for the case where schema
+  // table is unavailable.
+  private boolean shouldSendTask(TableName table) {
+    return schemaServiceOn.get() && !table.isSystemTable() && !isWideTable(table);
+  }
 }
