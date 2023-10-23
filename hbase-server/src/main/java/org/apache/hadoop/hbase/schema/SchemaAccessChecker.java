@@ -100,6 +100,9 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public boolean preExists(ObserverContext<RegionCoprocessorEnvironment> e,
       Get get, boolean exists) throws IOException {
+    if (!RpcServer.isInRpcCallContext()) {
+      return exists;
+    }
     User user = RpcServer.getRequestUser();
     if (Superusers.isSuperUser(user)) {
       return exists;
@@ -146,6 +149,9 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public void preGetOp(ObserverContext<RegionCoprocessorEnvironment> e, Get get, List<Cell> results)
       throws IOException {
+    if (!RpcServer.isInRpcCallContext()) {
+      return;
+    }
     User user = RpcServer.getRequestUser();
     if (Superusers.isSuperUser(user)) {
       return;
@@ -168,6 +174,9 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public RegionScanner preScannerOpen(ObserverContext<RegionCoprocessorEnvironment> e, Scan scan,
       RegionScanner s) throws IOException {
+    if (!RpcServer.isInRpcCallContext()) {
+      return s;
+    }
     User user = RpcServer.getRequestUser();
     if (Superusers.isSuperUser(user)) {
       return s;
@@ -228,6 +237,9 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public void prePut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit,
       Durability durability) throws IOException {
+    if (!RpcServer.isInRpcCallContext()) {
+      return;
+    }
     User user = RpcServer.getRequestUser();
     if (Superusers.isSuperUser(user)) {
       return;
@@ -287,6 +299,9 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public void preBatchMutate(ObserverContext<RegionCoprocessorEnvironment> c,
       MiniBatchOperationInProgress<Mutation> miniBatchOp) throws IOException {
+    if (!RpcServer.isInRpcCallContext()) {
+      return;
+    }
     if (passedACL.get()) {
       c.complete();
     }
