@@ -1168,8 +1168,7 @@ public class TestWALReplay {
       int index) throws IOException {
     FSWALEntry entry =
         new FSWALEntry(sequence, createWALKey(htd.getTableName(), hri, mvcc), createWALEdit(
-          rowName, family, ee, index), htd, hri, true);
-    entry.stampRegionSequenceId(mvcc.begin());
+          rowName, family, ee, index), htd, hri, true, mvcc.begin());
     return entry;
   }
 

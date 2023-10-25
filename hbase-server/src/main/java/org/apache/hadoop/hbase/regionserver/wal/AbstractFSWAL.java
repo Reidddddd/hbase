@@ -915,15 +915,13 @@ public abstract class AbstractFSWAL<W> implements WAL {
       throw new IOException(
               "Cannot append; log is closed, regionName = " + hri.getRegionNameAsString());
     }
-    TraceScope scope = Trace.startSpan(getClass().getSimpleName() + ".append");
     MutableLong txidHolder = new MutableLong();
     MultiVersionConcurrencyControl.WriteEntry we = key.getMvcc().begin(() -> {
       txidHolder.setValue(ringBuffer.next());
     });
     long txid = txidHolder.longValue();
     try {
-      FSWALEntry entry = new FSWALEntry(txid, key, edits, htd, hri, inMemstore);
-      entry.stampRegionSequenceId(we);
+      FSWALEntry entry = new FSWALEntry(txid, key, edits, htd, hri, inMemstore, we);
       ringBuffer.get(txid).load(entry);
     } finally {
       ringBuffer.publish(txid);
