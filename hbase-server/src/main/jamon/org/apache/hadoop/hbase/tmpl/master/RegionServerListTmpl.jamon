@@ -85,6 +85,9 @@ Arrays.sort(serverNames, ServerName.INTERNAL_SERVERNAME_COMPARATOR);
 <thead>
 <tr>
     <th>ServerName</th>
+    <%if master.getServerManager().hasPodInstance() %>
+      <th>IP</th>
+    </%if>
     <th>Start time</th>
     <th>Last contact</th>
     <th>Version</th>
@@ -126,6 +129,13 @@ Arrays.sort(serverNames, ServerName.INTERNAL_SERVERNAME_COMPARATOR);
 </%java>
 <tr>
     <td><& serverNameLink; serverName=serverName; serverLoad = sl; &></td>
+    <%if master.getServerManager().hasPodInstance() %>
+      <%if master.getServerManager().isPodInstance(serverName) %>
+        <td><% serverName.getHostname() %></td>
+      <%else>
+        <td><% ServerName.resolveHostName(serverName) %></td>
+      </%if>
+    </%if>
     <td><% new Date(startcode) %></td>
     <td><% TraditionalBinaryPrefix.long2String(lastContact, "s", 1) %></td>
     <td><% version %></td>
@@ -140,6 +150,9 @@ Arrays.sort(serverNames, ServerName.INTERNAL_SERVERNAME_COMPARATOR);
 </%java>
 </tbody> 
 <tr><td>Total:<% servers.size() %></td>
+<%if master.getServerManager().hasPodInstance() %>
+  <td></td>
+</%if>
 <td></td>
 <td></td>
 <%if inconsistentNodeNum > 0%>
@@ -149,6 +162,10 @@ Arrays.sort(serverNames, ServerName.INTERNAL_SERVERNAME_COMPARATOR);
 </%if>
 <td><% totalRequests %></td>
 <td><% totalRegions %></td>
+<%if master.getMasterCoprocessorHost().findCoprocessor("RSGroupAdminEndpoint") != null %>
+   <td></td>
+</%if>
+
 </tr>
 </table>
 </%def>

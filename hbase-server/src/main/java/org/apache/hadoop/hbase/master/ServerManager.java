@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -1350,6 +1349,10 @@ public class ServerManager {
 
   public boolean isPodInstance(ServerName serverName) {
     return this.podInstances.contains(serverName);
+  }
+
+  public boolean hasPodInstance() {
+    return !this.podInstances.isEmpty();
   }
 
   public void addPodInstance(ServerName serverName) {
