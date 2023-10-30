@@ -181,6 +181,14 @@ public class DistributedLogWALSplitter extends AbstractWALSplitter {
         WALUtils.getServerNameFromWALDirectoryName(logPath, logPath.depth() > 1);
       failedServerName = (serverName == null) ? "" : serverName.getServerName();
       while ((entry = getNextLogLine(in, logNameWithParent, skipErrors)) != null) {
+        if (this.sanityCheck) {
+          if (!checkWALEntrySanity(entry)) {
+            // We have broken data here. Mark this as corrupted.
+            progressFailed = true;
+            isCorrupted = true;
+            throw new CorruptedLogFileException("Read broken cell, corrupted log file " + logPath);
+          }
+        }
         byte[] region = entry.getKey().getEncodedRegionName();
         String encodedRegionNameAsStr = Bytes.toString(region);
         lastFlushedSequenceId = lastFlushedSequenceIds.get(encodedRegionNameAsStr);

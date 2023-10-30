@@ -100,7 +100,7 @@ public abstract class AbstractWALSplitter {
   // Number of writer threads
   protected final int numWriterThreads;
 
-  private final boolean sanityCheck;
+  protected final boolean sanityCheck;
 
   protected AbstractWALSplitter(Configuration conf, WALFactory walFactory,
       LastSequenceId sequenceIdChecker, CoordinatedStateManager csm, RecoveryMode mode) {
@@ -152,6 +152,16 @@ public abstract class AbstractWALSplitter {
    */
   protected Reader getReader(Path curLogFile, CancelableProgressable reporter) throws IOException {
     return WALUtils.createReader(null, curLogFile, reporter, conf);
+  }
+
+  protected boolean checkWALEntrySanity(Entry entry) {
+    List<Cell> cells = entry.getEdit().getCells();
+    for (Cell cell : cells) {
+      if (!CellUtil.cellSanityCheck(cell)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

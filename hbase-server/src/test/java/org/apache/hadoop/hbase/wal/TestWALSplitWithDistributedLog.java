@@ -375,8 +375,12 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
    * @param leaveOpen index to leave un-closed. -1 to close all.
    * @return the writer that's still open, or null if all were closed.
    */
-  private Writer generateWALs(int writers, int entries, int leaveOpen, int regionEvents)
-    throws IOException {
+  private Writer generateWALs(int writers, int entries, int leaveOpen, int regionEvents) throws IOException {
+    return generateWALs(writers, entries, leaveOpen, regionEvents, false);
+  }
+
+  private Writer generateWALs(int writers, int entries, int leaveOpen, int regionEvents,
+    boolean withCorruptedCell) throws IOException {
     Writer [] ws = new Writer[writers];
     int seq = 0;
     int numRegionEventsAdded = 0;
@@ -386,17 +390,21 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
         int prefix = 0;
         for (String region : REGIONS) {
           String row_key = region + prefix++ + i + j;
-          appendEntry(ws[i], TABLE_NAME, region.getBytes(), row_key.getBytes(), FAMILY, QUALIFIER,
-            VALUE, seq++);
+          if (withCorruptedCell) {
+            appendEntry(ws[i], TABLE_NAME, region.getBytes(), row_key.getBytes(), FAMILY, QUALIFIER,
+              VALUE, seq++, true);
+            // Only corrupt one cell.
+            withCorruptedCell = false;
+          } else {
+            appendEntry(ws[i], TABLE_NAME, region.getBytes(), row_key.getBytes(), FAMILY, QUALIFIER,
+              VALUE, seq++);
+          }
 
           if (numRegionEventsAdded < regionEvents) {
             numRegionEventsAdded ++;
             appendRegionEvent(ws[i], region);
           }
         }
-      }
-      if (ws[i] instanceof DistributedLogWriter) {
-        ((DistributedLogWriter) ws[i]).force();
       }
       if (i != leaveOpen) {
         ws[i].close();
@@ -411,20 +419,41 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
 
   public static long appendEntry(Writer writer, TableName table, byte[] region, byte[] row,
       byte[] family, byte[] qualifier, byte[] value, long seq) throws IOException {
+    return appendEntry(writer, table, region, row, family, qualifier, value, seq, false);
+  }
+
+  public static long appendEntry(Writer writer, TableName table, byte[] region,
+    byte[] row, byte[] family, byte[] qualifier,
+    byte[] value, long seq, boolean corrupted)
+    throws IOException {
     LOG.info(Thread.currentThread().getName() + " append");
-    writer.append(createTestEntry(table, region, row, family, qualifier, value, seq));
+    writer.append(createTestEntry(table, region, row, family, qualifier, value, seq, corrupted));
     LOG.info(Thread.currentThread().getName() + " sync");
     writer.sync();
     return seq;
   }
 
+
   private static Entry createTestEntry(TableName table, byte[] region, byte[] row, byte[] family,
-      byte[] qualifier, byte[] value, long seq) {
+      byte[] qualifier, byte[] value, long seq, boolean corrupted) {
     long time = System.nanoTime();
     seq++;
     final KeyValue cell = new KeyValue(row, family, qualifier, time, KeyValue.Type.Put, value);
+    if (corrupted) {
+      // This return the backing array of the whole kv.
+      byte[] rawBytes = cell.getQualifierArray();
+      // Corrupted the family length with a bigger value.
+      rawBytes[cell.getFamilyOffset() - 1] = (byte) -1;
+    }
+
     WALEdit edit = new WALEdit();
-    edit.add(cell);
+    if (corrupted) {
+      edit.getCells().add(cell);
+    } else {
+      // The family is cloned once in this case.
+      edit.add(cell);
+    }
+
     return new Entry(new WALKey(region, table, seq, time,
       HConstants.DEFAULT_CLUSTER_ID), edit);
   }
@@ -653,6 +682,15 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
   @Test (timeout=300000)
   public void testEmptyLogFiles() throws IOException {
     testEmptyLogFiles(true);
+  }
+
+  @Test (timeout=300000)
+  public void testWriteWithCorruptedCell() throws IOException {
+    conf.setBoolean("hbase.split.sanity.check", true);
+    generateWALs(NUM_WRITERS, ENTRIES, -1, 0, true);
+    // One writer will fail.
+    splitAndCount(NUM_WRITERS - 1, (NUM_WRITERS - 1) * ENTRIES);
+    conf.setBoolean("hbase.split.sanity.check", false);
   }
 
   @Test (timeout=300000)
@@ -1262,7 +1300,7 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
 
             Entry ret = createTestEntry(TABLE_NAME, region,
               Bytes.toBytes((int)(index / regions.size())),
-              FAMILY, QUALIFIER, VALUE, index);
+              FAMILY, QUALIFIER, VALUE, index, false);
             index++;
             return ret;
           }
