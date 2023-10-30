@@ -127,8 +127,8 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.shopee.data-infra.hbase</groupId>
-        <artifactId>hbase-bookkeeper-shaded</artifactId>
+        <groupId>org.apache.distributedlog</groupId>
+        <artifactId>distributedlog-core-shaded</artifactId>
         <version>${distributedlog.version}</version>
         <exclusions>
           <exclusion>
@@ -158,8 +158,8 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.shopee.data-infra.hbase</groupId>
-        <artifactId>hbase-bookkeeper-shaded</artifactId>
+        <groupId>org.apache.distributedlog</groupId>
+        <artifactId>distributedlog-core-shaded</artifactId>
         <version>${distributedlog.version}</version>
         <exclusions>
           <exclusion>

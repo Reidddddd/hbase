@@ -621,9 +621,21 @@
       <artifactId>hbase-storage</artifactId>
       <version>${project.version}</version>
     </dependency>
+
     <dependency>
-      <artifactId>hbase-bookkeeper-shaded</artifactId>
-      <groupId>com.shopee.data-infra.hbase</groupId>
+      <groupId>org.apache.distributedlog</groupId>
+      <artifactId>distributedlog-core-shaded</artifactId>
+      <version>${distributedlog.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.distributedlog</groupId>
+      <artifactId>distributedlog-core-shaded</artifactId>
       <version>${distributedlog.version}</version>
       <scope>test</scope>
       <type>test-jar</type>
@@ -634,6 +646,7 @@
         </exclusion>
       </exclusions>
     </dependency>
+
   </dependencies>
   <profiles>
     <!-- Needs to make the profile in apache parent pom -->
