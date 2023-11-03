@@ -250,7 +250,7 @@ public class HMaster extends HRegionServer implements MasterServices {
 
   private static final Logger LOG = LoggerFactory.getLogger(HMaster.class);
 
-  private final MasterProcedureSubmitter procedureSubmitter = new MasterProcedureSubmitter();
+  private final MasterProcedureSubmitter procedureSubmitter;
 
   // MASTER is name of the webapp and the attribute name used stuffing this
   //instance into web context.
@@ -480,6 +480,8 @@ public class HMaster extends HRegionServer implements MasterServices {
           getChoreService().scheduleChore(clusterStatusPublisherChore);
         }
       }
+
+      this.procedureSubmitter = new MasterProcedureSubmitter(conf);
 
       this.metaRegionLocationCache = new MetaRegionLocationCache(this.zooKeeper);
       this.activeMasterManager = createActiveMasterManager(zooKeeper, serverName, this);

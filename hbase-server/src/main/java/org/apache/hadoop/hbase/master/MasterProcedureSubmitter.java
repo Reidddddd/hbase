@@ -19,7 +19,10 @@
 package org.apache.hadoop.hbase.master;
 
 import java.io.IOException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.master.procedure.MasterProcedureUtil;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -35,14 +38,25 @@ import org.slf4j.LoggerFactory;
 public class MasterProcedureSubmitter {
   private static final Logger LOG = LoggerFactory.getLogger(MasterProcedureSubmitter.class);
 
-  private final TableLocker tableLocker;
+  private static final String DDL_PARALLELISM_KEY = "hbase.master.ddl.parallelism";
+  private static final int DEFAULT_DDL_PARALLELISM = 3;
+  private static final String DDL_SEMAPHORE_TIMEOUT = "hbase.master.ddl.semaphore.timeout";
+  private static final int DEFAULT_DDL_SEMAPHORE_TIMEOUT = 60000; // in Milliseconds.
 
-  public MasterProcedureSubmitter() {
+  private final TableLocker tableLocker;
+  private final Semaphore signal;
+  private final int semaphoreTimeout;
+
+  public MasterProcedureSubmitter(Configuration conf) {
     this.tableLocker = new TableLocker();
+    this.signal = new Semaphore(conf.getInt(DDL_PARALLELISM_KEY, DEFAULT_DDL_PARALLELISM));
+    this.semaphoreTimeout = conf.getInt(DDL_SEMAPHORE_TIMEOUT, DEFAULT_DDL_SEMAPHORE_TIMEOUT);
   }
 
-  public MasterProcedureSubmitter(TableLocker tableLocker) {
+  public MasterProcedureSubmitter(TableLocker tableLocker, int parallelism, int timeout) {
     this.tableLocker = tableLocker;
+    this.signal = new Semaphore(parallelism);
+    this.semaphoreTimeout = timeout;
   }
 
   /**
@@ -56,8 +70,19 @@ public class MasterProcedureSubmitter {
     ReentrantLock lock = tableLocker.getLock(tableName);
     if (lock.tryLock()) {
       try {
-        // This is running synchronously.
-        return MasterProcedureUtil.submitProcedure(task);
+        if (signal.tryAcquire(this.semaphoreTimeout, TimeUnit.MILLISECONDS)) {
+          try {
+            // This is running synchronously.
+            return MasterProcedureUtil.submitProcedure(task);
+          } finally {
+            signal.release();
+          }
+        } else {
+          throw new IOException("Failed acquire master execution signal with timeout : "
+            + this.semaphoreTimeout + " ms, master is busy.");
+        }
+      } catch (InterruptedException e) {
+        throw new IOException(e);
       } finally {
         lock.unlock();
       }
