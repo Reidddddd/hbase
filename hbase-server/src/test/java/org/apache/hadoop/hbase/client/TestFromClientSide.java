@@ -19,11 +19,11 @@ package org.apache.hadoop.hbase.client;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1940,6 +1940,29 @@ public class TestFromClientSide extends FromClientSideBase {
         assertTrue(result.isEmpty());
       }
     }
+  }
+
+  @Test
+  public void testColumnExistenceWithCheckAndPut() throws Exception {
+    final byte [] value1 = Bytes.toBytes("aaaa");
+    final byte [] value2 = Bytes.toBytes("bbbb");
+
+    Table table = TEST_UTIL.createTable(
+      TableName.valueOf("testColumnExistenceWithCheckAndPut"), FAMILY);
+    TEST_UTIL.waitTableAvailable(
+      TableName.valueOf("testColumnExistenceWithCheckAndPut"), 10000);
+
+    Put put1 = new Put(ROW);
+    put1.addColumn(FAMILY, QUALIFIER, value1);
+
+    Put put2 = new Put(ROW);
+    put2.addColumn(FAMILY, QUALIFIER, value2);
+
+    // row doesn't exist, so using "null" to check for existence should be considered "match".
+    boolean ok = table.checkAndPut(ROW, FAMILY, QUALIFIER, null, put1);
+    assertTrue(ok);
+    ok = table.checkAndPut(ROW, FAMILY, QUALIFIER, null, put2);
+    assertFalse(ok);
   }
 }
 
