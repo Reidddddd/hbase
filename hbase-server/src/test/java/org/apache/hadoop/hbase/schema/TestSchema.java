@@ -379,8 +379,8 @@ public class TestSchema {
   }
 
   @Test
-  public void testMaxColumnConstrain() throws Exception {
-    TableName tableName = TableName.valueOf("testMaxColumnConstrain");
+  public void testMaxColumnConstraint() throws Exception {
+    TableName tableName = TableName.valueOf("testMaxColumnConstraint");
     byte[][] families = new byte[1][];
     families[0] = TEST_FAMILY_1;
     Table table = UTIL.createTable(tableName, families);
@@ -405,6 +405,8 @@ public class TestSchema {
 
     // Check we have recorded more than the soft upper limit columns.
     Admin admin = UTIL.getHBaseAdmin();
+    // Wait for the schema table update.
+    Thread.sleep(5000);
     Schema schema = admin.getSchemaOf(tableName);
     Assert.assertTrue(schema.numberOfColumns() >= 1000);
 
