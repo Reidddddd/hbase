@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.quotas.SpaceQuotaSnapshot;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.security.access.GetUserPermissionsRequest;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.UserPermission;
@@ -857,5 +858,10 @@ class AsyncHBaseAdmin implements AsyncAdmin {
       String logType, ServerType serverType, int limit,
       Map<String, Object> filterParams) {
     return wrap(rawAdmin.getLogEntries(serverNames, logType, serverType, limit, filterParams));
+  }
+
+  @Override
+  public CompletableFuture<Schema> getSchemaOf(TableName table) {
+    return wrap(rawAdmin.getSchemaOf(table));
   }
 }

@@ -58,6 +58,7 @@ import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
 import org.apache.hadoop.hbase.replication.ReplicationException;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.security.access.GetUserPermissionsRequest;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.UserPermission;
@@ -3270,4 +3271,13 @@ public interface Admin extends Abortable, Closeable {
    */
   List<LogEntry> getLogEntries(Set<ServerName> serverNames, String logType,
     ServerType serverType, int limit, Map<String, Object> filterParams) throws IOException;
+
+  /**
+   * Get schema of a given table.
+   * Will get a null if table doesn't exist, or table has no data in it yet.
+   *
+   * @param table table name
+   * @return schema of given table
+   */
+  Schema getSchemaOf(TableName table) throws IOException;
 }

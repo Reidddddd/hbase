@@ -32,6 +32,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.FastPathExecutor;
 import org.apache.hadoop.hbase.FastPathProcessable;
+import org.apache.hadoop.hbase.SchemaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.AdvancedScanResultConsumer;
 import org.apache.hadoop.hbase.client.AsyncConnection;
@@ -40,15 +41,11 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.schema.SchemaService.Operation;
 import org.apache.yetus.audience.InterfaceAudience;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Private
 public class SchemaProcessor {
-  private static final Logger LOG = LoggerFactory.getLogger(SchemaProcessor.class);
 
   // Thread pool access the schema table.
   private FastPathExecutor updateExecutor;
@@ -154,35 +151,31 @@ public class SchemaProcessor {
         }
         case TRUNCATE:
         case DROP: {
+          // drop and truncate happens on master side only,
+          // so schemaCache won't have any data about a table schema which is stored in RS side
+          // from very beginning
           updateExecutor.accept(() -> {
-            Scan scan = new Scan();
-            byte[] startRow = table.getName();
-            byte[] stopRow = new byte[startRow.length];
-            System.arraycopy(startRow, 0, stopRow, 0, startRow.length);
-            stopRow[stopRow.length - 1]++;
-            scan.withStartRow(startRow);
-            scan.withStopRow(stopRow);
-            scan.setCacheBlocks(false);
-            scan.setBatch(100);
-
-            schemaTable.scan(scan, new AdvancedScanResultConsumer() {
-              @Override
-              public void onNext(Result[] results, ScanController controller) {
-                List<Delete> deletes = new ArrayList<>(results.length);
-                for (Result result : results) {
-                  deletes.add(new Delete(result.getRow()));
+            schemaTable.scan(
+              SchemaTableAccessor.createSchemaScanFor(table),
+              new AdvancedScanResultConsumer() {
+                @Override
+                public void onNext(Result[] results, ScanController controller) {
+                  List<Delete> deletes = new ArrayList<>(results.length);
+                  for (Result result : results) {
+                    deletes.add(new Delete(result.getRow()));
+                  }
+                  schemaTable.delete(deletes);
                 }
-                schemaTable.delete(deletes);
-              }
 
-              @Override
-              public void onError(Throwable error) {}
-
-              @Override
-              public void onComplete() {
-                schemaCache.remove(table);
-              }
-            });
+                @Override
+                public void onError(Throwable error) {}
+                @Override
+                public void onComplete() {
+                  // useless in fact as comments above,
+                  // execute it for safe and UT (master and rs share the same instance in UT)
+                  schemaCache.remove(table);
+                }
+              });
           });
           break;
         }

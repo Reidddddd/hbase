@@ -62,6 +62,7 @@ import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.quotas.SpaceQuotaSnapshot;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.security.access.GetUserPermissionsRequest;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.UserPermission;
@@ -1444,5 +1445,10 @@ public class ThriftAdmin implements Admin {
       ServerType serverType, int limit, Map<String, Object> filterParams)
       throws IOException {
     throw new NotImplementedException("getLogEntries not supported in ThriftAdmin");
+  }
+
+  @Override
+  public Schema getSchemaOf(TableName table) throws IOException {
+    throw new NotImplementedException("getSchemaOf not supported in ThriftAdmin");
   }
 }

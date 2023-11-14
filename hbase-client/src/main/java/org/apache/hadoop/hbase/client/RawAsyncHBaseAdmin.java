@@ -85,6 +85,7 @@ import org.apache.hadoop.hbase.quotas.SpaceQuotaSnapshot;
 import org.apache.hadoop.hbase.replication.ReplicationException;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.security.access.GetUserPermissionsRequest;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.ShadedAccessControlUtil;
@@ -4006,5 +4007,11 @@ class RawAsyncHBaseAdmin implements AsyncAdmin {
       default:
         return CompletableFuture.completedFuture(Collections.emptyList());
     }
+  }
+
+  @Override
+  public CompletableFuture<Schema> getSchemaOf(TableName table) {
+    // TODO Implement this async API
+    return null;
   }
 }

@@ -66,6 +66,7 @@ import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.RegionLocations;
 import org.apache.hadoop.hbase.RegionMetrics;
 import org.apache.hadoop.hbase.RegionMetricsBuilder;
+import org.apache.hadoop.hbase.SchemaTableAccessor;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableName;
@@ -88,6 +89,7 @@ import org.apache.hadoop.hbase.quotas.SpaceQuotaSnapshot;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.security.access.GetUserPermissionsRequest;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.ShadedAccessControlUtil;
@@ -4480,6 +4482,15 @@ public class HBaseAdmin implements Admin {
         return ProtobufUtil.toClearSlowLogPayload(clearSlowLogResponses);
       }
     });
+  }
+
+  @Override
+  public Schema getSchemaOf(TableName table) throws IOException {
+    if (!SchemaTableAccessor.isSchemaServiceRunning(connection)) {
+      LOG.info("Schema service is off");
+    }
+    return SchemaTableAccessor.checkSchemaExistence(connection, table) ?
+      SchemaTableAccessor.getSchemaOf(table, connection) : null;
   }
 
 }

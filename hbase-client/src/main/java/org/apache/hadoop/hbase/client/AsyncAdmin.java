@@ -18,7 +18,6 @@
 package org.apache.hadoop.hbase.client;
 
 import static org.apache.hadoop.hbase.util.FutureUtils.addListener;
-
 import com.google.protobuf.RpcChannel;
 import java.util.Arrays;
 import java.util.Collection;
@@ -46,11 +45,11 @@ import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.quotas.SpaceQuotaSnapshotView;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
+import org.apache.hadoop.hbase.schema.Schema;
 import org.apache.hadoop.hbase.security.access.GetUserPermissionsRequest;
 import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.UserPermission;
 import org.apache.yetus.audience.InterfaceAudience;
-
 import org.apache.hbase.thirdparty.com.google.common.collect.ImmutableList;
 
 /**
@@ -1611,4 +1610,13 @@ public interface AsyncAdmin {
    */
   CompletableFuture<List<LogEntry>> getLogEntries(Set<ServerName> serverNames, String logType,
     ServerType serverType, int limit, Map<String, Object> filterParams);
+
+  /**
+   * Get schema of a given table.
+   * Will get a null if table doesn't exist, or table has no data in it yet.
+   *
+   * @param table table name
+   * @return schema of given table
+   */
+  CompletableFuture<Schema> getSchemaOf(TableName table);
 }
