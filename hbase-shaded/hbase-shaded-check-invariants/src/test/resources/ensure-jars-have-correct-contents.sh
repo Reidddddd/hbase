@@ -44,6 +44,11 @@ allowed_expr+="|^[^-]*-default.xml$"
 allowed_expr+="|^[^-]*-version-info.properties$"
 #   * Hadoop's application classloader properties file.
 allowed_expr+="|^org.apache.hadoop.application-classloader.properties$"
+#   * classes and dependencies in packages start with org.glassfish
+allowed_expr+="|^org/glassfish/"
+allowed_expr+="|^javax/"
+allowed_expr+="|^org/jvnet/"
+allowed_expr+="|^javassist/"
 # public suffix list used by httpcomponents
 allowed_expr+="|^mozilla/$"
 allowed_expr+="|^mozilla/public-suffix-list.txt$"
@@ -51,6 +56,8 @@ allowed_expr+="|^mozilla/public-suffix-list.txt$"
 allowed_expr+="|^digesterRules.xml$"
 allowed_expr+="|^properties.dtd$"
 allowed_expr+="|^PropertyList-1.0.dtd$"
+# unknown source
+allowed_expr+="|^.keep"
 
 
 allowed_expr+=")"
