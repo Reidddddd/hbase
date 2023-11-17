@@ -3090,6 +3090,18 @@
     </plugins>
   </reporting>
   <distributionManagement>
+    <repository>
+      <id>data-infra-release</id>
+      <name>Shopee Data Infra Release Repository</name>
+      <url>https://nexus-repo.data-infra.shopee.io/repository/maven-release/</url>
+    </repository>
+
+    <snapshotRepository>
+      <id>data-infra-snapshot</id>
+      <name>Shopee Data Infra Snapshot Repository</name>
+      <url>https://nexus-repo.data-infra.shopee.io/repository/maven-snapshot/</url>
+    </snapshotRepository>
+
     <site>
       <id>hbase.apache.org</id>
       <name>HBase Website at hbase.apache.org</name>
