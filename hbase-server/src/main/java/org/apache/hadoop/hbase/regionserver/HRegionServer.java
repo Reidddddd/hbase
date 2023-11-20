@@ -369,6 +369,10 @@ public class HRegionServer extends Thread implements
   private static final String PERIOD_FLUSH = "hbase.regionserver.flush.check.period";
   private final int flushCheckFrequency;
 
+  private static final String K8S_MODE_ENABLED = "hbase.k8s.enabled";
+  private static final boolean K8S_MODE_ENABLED_DEFAULT = false;
+  private final boolean k8sModeEnabled;
+
   // Stub to do region server status calls against the master.
   private volatile RegionServerStatusService.BlockingInterface rssStub;
   private volatile LockService.BlockingInterface lockStub;
@@ -586,6 +590,7 @@ public class HRegionServer extends Thread implements
     super("RegionServer");  // thread name
     TraceUtil.initTracer(conf);
     try {
+      this.k8sModeEnabled = conf.getBoolean(K8S_MODE_ENABLED, K8S_MODE_ENABLED_DEFAULT);
       this.startcode = System.currentTimeMillis();
       this.conf = conf;
       this.dataFsOk = true;
@@ -622,10 +627,8 @@ public class HRegionServer extends Thread implements
       initNamedQueueRecorder(conf);
       rpcServices = createRpcServices();
       useThisHostnameInstead = getUseThisHostnameInstead(conf);
-      String hostName =
-          StringUtils.isBlank(useThisHostnameInstead) ? this.rpcServices.isa.getHostName()
-              : this.useThisHostnameInstead;
-      serverName = ServerName.valueOf(hostName, this.rpcServices.isa.getPort(), this.startcode);
+      initServerName();
+      String hostName = serverName.getHostname();
 
       rpcControllerFactory = RpcControllerFactory.instantiate(this.conf);
       rpcRetryingCallerFactory = RpcRetryingCallerFactory.instantiate(this.conf);
@@ -752,6 +755,20 @@ public class HRegionServer extends Thread implements
     NettyRpcClientConfigHelper.setEventLoopConfig(conf, nelgc.group(), nelgc.clientChannelClass());
     NettyAsyncFSWALConfigHelper.setEventLoopConfig(conf, nelgc.group(), nelgc.clientChannelClass());
     return nelgc;
+  }
+
+  protected void initServerName() {
+    InetSocketAddress address = rpcServices.getSocketAddress();
+    // We directly use IP address as the hostname to do network communication.
+    String hostName = isK8sModeEnabled() ? address.getAddress().getHostAddress() :
+      address.getHostName();
+    // Internal hostname use customised first and use the local hostname for default.
+    String internalHostName = !StringUtils.isBlank(useThisHostnameInstead) ? useThisHostnameInstead
+      : address.getHostName();
+
+    serverName = ServerName.valueOf(hostName, address.getPort(), startcode, internalHostName);
+    LOG.info("Startup with hostname: " + hostName + " internal hostname: "
+      + serverName.getInternalHostName());
   }
 
   private void initializeFileSystem() throws IOException {
@@ -1272,6 +1289,7 @@ public class HRegionServer extends Thread implements
       RegionServerReportRequest.Builder request = RegionServerReportRequest.newBuilder();
       request.setServer(ProtobufUtil.toServerName(this.serverName));
       request.setLoad(sl);
+      request.setK8SModeEnabled(isK8sModeEnabled());
       rss.regionServerReport(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);
@@ -2194,6 +2212,10 @@ public class HRegionServer extends Thread implements
     configurationManager.registerObserver(this);
   }
 
+  public boolean isK8sModeEnabled() {
+    return this.k8sModeEnabled;
+  }
+
   /**
    * Puts up the webui.
    */
@@ -2852,6 +2874,7 @@ public class HRegionServer extends Thread implements
       request.setPort(port);
       request.setServerStartCode(this.startcode);
       request.setServerCurrentTime(now);
+      request.setK8SModeEnabled(isK8sModeEnabled());
       result = rss.regionServerStartup(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);

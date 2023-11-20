@@ -569,6 +569,9 @@ public class MasterRpcServices extends RSRpcServices implements
         master.metricsMaster.incrementRequests(
           sl.getTotalNumberOfRequests() - (oldLoad != null ? oldLoad.getRequestCount() : 0));
       }
+      if (request.hasK8SModeEnabled() && request.getK8SModeEnabled()) {
+        master.getServerManager().addPodInstance(serverName);
+      }
     } catch (IOException ioe) {
       throw new ServiceException(ioe);
     }

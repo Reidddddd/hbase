@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -147,6 +148,8 @@ public class ServerManager {
 
   private final RpcControllerFactory rpcControllerFactory;
 
+  private final Set<ServerName> podInstances = ConcurrentHashMap.newKeySet();
+
   /** Listeners that are called on server events. */
   private List<ServerListener> listeners = new CopyOnWriteArrayList<>();
 
@@ -197,14 +200,24 @@ public class ServerManager {
     // in, it should have been removed from serverAddressToServerInfo and queued
     // for processing by ProcessServerShutdown.
 
-    final String hostname =
-      request.hasUseThisHostnameInstead() ? request.getUseThisHostnameInstead() : ia.getHostName();
-    ServerName sn = ServerName.valueOf(hostname, request.getPort(), request.getServerStartCode());
+    // If region server is running on k8s, the hostname from ia may be unknown.
+    // We use the IP address as the server name instead.
+    boolean rsK8sMode = request.hasK8SModeEnabled() && request.getK8SModeEnabled();
+    final String hostname = rsK8sMode ? ia.getHostAddress() : ia.getHostName();
+    final String internalHostname = request.hasUseThisHostnameInstead() ?
+      request.getUseThisHostnameInstead() : null;
+
+    ServerName sn = ServerName.valueOf(hostname, request.getPort(), request.getServerStartCode(),
+      internalHostname);
     checkClockSkew(sn, request.getServerCurrentTime());
     checkIsDead(sn, "STARTUP");
     if (!checkAndRecordNewServer(sn, ServerMetricsBuilder.of(sn, versionNumber, version))) {
       LOG.warn(
         "THIS SHOULD NOT HAPPEN, RegionServerStartup" + " could not record the server: " + sn);
+    }
+
+    if (rsK8sMode) {
+      addPodInstance(sn);
     }
     return sn;
   }
@@ -1028,5 +1041,21 @@ public class ServerManager {
   public int getInfoPort(ServerName serverName) {
     ServerMetrics serverMetrics = onlineServers.get(serverName);
     return serverMetrics != null ? serverMetrics.getInfoServerPort() : 0;
+  }
+
+  public boolean isPodInstance(ServerName serverName) {
+    return this.podInstances.contains(serverName);
+  }
+
+  public boolean hasPodInstance() {
+    return !this.podInstances.isEmpty();
+  }
+
+  public void addPodInstance(ServerName serverName) {
+    this.podInstances.add(serverName);
+  }
+
+  public void evictPodInstance(ServerName serverName) {
+    podInstances.remove(serverName);
   }
 }

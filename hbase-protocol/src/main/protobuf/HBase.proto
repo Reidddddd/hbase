@@ -245,4 +245,5 @@ message VersionInfo {
 message RegionServerInfo {
   optional int32 infoPort = 1;
   optional VersionInfo version_info = 2;
+  optional string internal_hostname = 3;
 }

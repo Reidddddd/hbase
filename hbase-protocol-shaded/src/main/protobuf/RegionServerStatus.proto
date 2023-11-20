@@ -42,6 +42,9 @@ message RegionServerStartupRequest {
 
   /** hostname for region server, optional */
   optional string use_this_hostname_instead = 4;
+
+  /** whether region server in k8s mode, optional **/
+  optional bool k8s_mode_enabled = 5;
 }
 
 message RegionServerStartupResponse {
@@ -58,6 +61,9 @@ message RegionServerReportRequest {
 
   /** load the server is under */
   optional ServerLoad load = 2;
+
+  /** whether the server is a pod */
+  optional bool k8s_mode_enabled = 3;
 }
 
 message RegionServerReportResponse {
