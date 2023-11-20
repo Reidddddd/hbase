@@ -198,11 +198,16 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    * a shared immutable object as an internal optimization.
    */
   public static ServerName valueOf(final String serverName) {
+    return valueOf(serverName, null);
+  }
+
+  public static ServerName valueOf(final String serverName, final String internalHostName) {
     final String hostname = serverName.substring(0, serverName.indexOf(SERVERNAME_SEPARATOR));
     final int port = Integer.parseInt(serverName.split(SERVERNAME_SEPARATOR)[1]);
     final long statuscode =
       Long.parseLong(serverName.substring(serverName.lastIndexOf(SERVERNAME_SEPARATOR) + 1));
-    return INTERN_POOL.intern(new ServerName(hostname, port, statuscode));
+    return INTERN_POOL.intern(new ServerName(Address.fromParts(hostname, port), statuscode,
+      internalHostName));
   }
 
   /**
@@ -212,6 +217,12 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    */
   public static ServerName valueOf(final String hostAndPort, final long startCode) {
     return INTERN_POOL.intern(new ServerName(hostAndPort, startCode));
+  }
+
+  public static ServerName valueOf(final String hostAndPort, final long startCode,
+      final String internalHostName) {
+    return INTERN_POOL.intern(new ServerName(Address.fromString(hostAndPort), startCode,
+      internalHostName));
   }
 
   /**
@@ -258,6 +269,10 @@ public class ServerName implements Comparable<ServerName>, Serializable {
 
   public String getServerName() {
     return servername;
+  }
+
+  public String getInternalServerName() {
+    return getServerName(internalHostName, getPort(), getStartcode());
   }
 
   public String getHostname() {
@@ -435,8 +450,12 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    * @return A ServerName instance.
    */
   public static ServerName parseServerName(final String str) {
-    return SERVERNAME_PATTERN.matcher(str).matches()? valueOf(str) :
-        valueOf(str, NON_STARTCODE);
+    return parseServerName(str, null);
+  }
+
+  public static ServerName parseServerName(final String str, final String internalHostName) {
+    return SERVERNAME_PATTERN.matcher(str).matches()? valueOf(str, internalHostName) :
+      valueOf(str, NON_STARTCODE, internalHostName);
   }
 
   /**

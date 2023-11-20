@@ -80,7 +80,7 @@ public class RegionServerTracker extends ZKListener {
 
   private Pair<ServerName, RegionServerInfo> getServerInfo(String name)
       throws KeeperException, IOException {
-    ServerName serverName = ServerName.parseServerName(name);
+    ServerName serverName = null;
     String nodePath = ZNodePaths.joinZNode(watcher.getZNodePaths().rsZNode, name);
     byte[] data;
     try {
@@ -92,17 +92,21 @@ public class RegionServerTracker extends ZKListener {
       // we should receive a children changed event later and then we will expire it, so we still
       // need to add it to the region server set.
       LOG.warn("Server node {} does not exist, already dead?", name);
+      serverName = ServerName.parseServerName(name);
       return Pair.newPair(serverName, null);
     }
     if (data.length == 0 || !ProtobufUtil.isPBMagicPrefix(data)) {
       // this should not happen actually, unless we have bugs or someone has messed zk up.
       LOG.warn("Invalid data for region server node {} on zookeeper, data length = {}", name,
         data.length);
+      serverName = ServerName.parseServerName(name);
       return Pair.newPair(serverName, null);
     }
     RegionServerInfo.Builder builder = RegionServerInfo.newBuilder();
     int magicLen = ProtobufUtil.lengthOfPBMagic();
     ProtobufUtil.mergeFrom(builder, data, magicLen, data.length - magicLen);
+    RegionServerInfo rsInfo = builder.build();
+    serverName = ServerName.parseServerName(name, rsInfo.getInternalHostname());
     return Pair.newPair(serverName, builder.build());
   }
 

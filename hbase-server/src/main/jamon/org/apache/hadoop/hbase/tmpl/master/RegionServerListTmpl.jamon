@@ -497,7 +497,7 @@ if  (totalCompactingCells > 0) {
         </%java>
 
         <%if infoPort > 0%>
-            <a href="<% url %>"><% serverName.getServerName() %></a>
+            <a href="<% url %>"><% serverName.getInternalServerName() %></a>
         <%else>
             <% serverName.getServerName() %>
         </%if>

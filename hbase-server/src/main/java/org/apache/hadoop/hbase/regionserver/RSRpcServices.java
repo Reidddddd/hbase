@@ -1225,7 +1225,9 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
       initialIsa = new InetSocketAddress(hostname, port);
       bindAddress = new InetSocketAddress(conf.get("hbase.master.ipc.address", hostname), port);
     } else {
-      String hostname = DNS.getHostname(conf, DNS.ServerType.REGIONSERVER);
+      // If we are a k8s pod, use the IP address as hostName.
+      String hostname = rs.isK8sModeEnabled() ? InetAddress.getLocalHost().getHostAddress() :
+        DNS.getHostname(conf, DNS.ServerType.REGIONSERVER);
       int port = conf.getInt(HConstants.REGIONSERVER_PORT,
         HConstants.DEFAULT_REGIONSERVER_PORT);
       // Creation of a HSA will force a resolve.

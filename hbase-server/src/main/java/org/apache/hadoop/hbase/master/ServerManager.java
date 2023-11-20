@@ -415,7 +415,8 @@ public class ServerManager {
    * @param serverName The remote servers name.
    */
   void recordNewServerWithLock(final ServerName serverName, final ServerMetrics sl) {
-    LOG.info("Registering regionserver=" + serverName);
+    LOG.info("Registering regionserver=" + serverName + " with internal hostname: "
+      + serverName.getInternalHostName());
     this.onlineServers.put(serverName, sl);
     this.rsAdmins.remove(serverName);
   }

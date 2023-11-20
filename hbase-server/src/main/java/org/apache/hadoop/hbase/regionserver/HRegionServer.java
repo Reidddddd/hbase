@@ -1596,9 +1596,9 @@ public class HRegionServer extends Thread implements
           this.serverName = ServerName.valueOf(hostnameFromMasterPOV, rpcServices.isa.getPort(),
               this.startcode);
           if (!StringUtils.isBlank(useThisHostnameInstead) &&
-              !hostnameFromMasterPOV.equals(useThisHostnameInstead)) {
+              !hostnameFromMasterPOV.equals(this.serverName.getHostname())) {
             String msg = "Master passed us a different hostname to use; was=" +
-                this.useThisHostnameInstead + ", but now=" + hostnameFromMasterPOV;
+              this.serverName.getHostname() + ", but now=" + hostnameFromMasterPOV;
             LOG.error(msg);
             throw new IOException(msg);
           }
@@ -1714,6 +1714,7 @@ public class HRegionServer extends Thread implements
     RegionServerInfo.Builder rsInfo = RegionServerInfo.newBuilder();
     rsInfo.setInfoPort(infoServer != null ? infoServer.getPort() : -1);
     rsInfo.setVersionInfo(ProtobufUtil.getVersionInfo());
+    rsInfo.setInternalHostname(serverName.getInternalHostName());
     byte[] data = ProtobufUtil.prependPBMagic(rsInfo.build().toByteArray());
     ZKUtil.createEphemeralNodeAndWatch(this.zooKeeper, getMyEphemeralNodePath(), data);
   }
