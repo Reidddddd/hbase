@@ -147,6 +147,7 @@ message ServerName {
   required string host_name = 1;
   optional uint32 port = 2;
   optional uint64 start_code = 3;
+  optional string internal_hostname = 4;
 }
 
 // Comment data structures

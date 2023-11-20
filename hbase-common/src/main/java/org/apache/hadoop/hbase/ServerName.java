@@ -86,6 +86,7 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    */
   public static final String UNKNOWN_SERVERNAME = "#unknown#";
 
+  private final String internalHostName;
   private final String servername;
   private final long startcode;
   private transient Address address;
@@ -105,19 +106,21 @@ public class ServerName implements Comparable<ServerName>, Serializable {
   private static final Interner<ServerName> INTERN_POOL = Interners.newWeakInterner();
 
   protected ServerName(final String hostname, final int port, final long startcode) {
-    this(Address.fromParts(hostname, port), startcode);
+    this(Address.fromParts(hostname, port), startcode, null);
   }
 
-  private ServerName(final Address address, final long startcode) {
+  private ServerName(final Address address, final long startcode, final String internalHostName) {
     // Use HostAndPort to host port and hostname. Does validation and can do ipv6
     this.address = address;
     this.startcode = startcode;
     this.servername = getServerName(this.address.getHostname(),
         this.address.getPort(), startcode);
+    // If the internalHostName is not specified, we just use the given hostname as before.
+    this.internalHostName = internalHostName == null ? this.servername : internalHostName;
   }
 
   private ServerName(final String hostAndPort, final long startCode) {
-    this(Address.fromString(hostAndPort), startCode);
+    this(Address.fromString(hostAndPort), startCode, null);
   }
 
   /**
@@ -180,7 +183,13 @@ public class ServerName implements Comparable<ServerName>, Serializable {
    * a shared immutable object as an internal optimization.
    */
   public static ServerName valueOf(final String hostname, final int port, final long startcode) {
-    return INTERN_POOL.intern(new ServerName(hostname, port, startcode));
+    return valueOf(hostname, port, startcode, null);
+  }
+
+  public static ServerName valueOf(final String hostname, final int port, final long startcode,
+      final String internalHostName) {
+    return INTERN_POOL.intern(new ServerName(Address.fromParts(hostname, port),
+      startcode, internalHostName));
   }
 
   /**
@@ -257,6 +266,10 @@ public class ServerName implements Comparable<ServerName>, Serializable {
 
   public String getHostnameLowerCase() {
     return this.address.getHostname().toLowerCase(Locale.ROOT);
+  }
+
+  public String getInternalHostName() {
+    return internalHostName;
   }
 
   public int getPort() {

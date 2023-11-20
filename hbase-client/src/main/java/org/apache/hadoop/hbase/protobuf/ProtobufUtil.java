@@ -293,17 +293,20 @@ public final class ProtobufUtil {
    * @return the converted protocol buffer ServerName
    * @see #toServerName(org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.ServerName)
    */
-  public static HBaseProtos.ServerName
-      toServerName(final ServerName serverName) {
-    if (serverName == null) return null;
-    HBaseProtos.ServerName.Builder builder =
-      HBaseProtos.ServerName.newBuilder();
+  public static HBaseProtos.ServerName toServerName(final ServerName serverName) {
+    if (serverName == null) {
+      return null;
+    }
+    HBaseProtos.ServerName.Builder builder = HBaseProtos.ServerName.newBuilder();
     builder.setHostName(serverName.getHostname());
     if (serverName.getPort() >= 0) {
       builder.setPort(serverName.getPort());
     }
     if (serverName.getStartcode() >= 0) {
       builder.setStartCode(serverName.getStartcode());
+    }
+    if (serverName.getInternalHostName() != null) {
+      builder.setInternalHostname(serverName.getInternalHostName());
     }
     return builder.build();
   }
@@ -324,6 +327,9 @@ public final class ProtobufUtil {
     }
     if (proto.hasStartCode()) {
       startCode = proto.getStartCode();
+    }
+    if (proto.hasInternalHostname()) {
+      return ServerName.valueOf(hostName, port, startCode, proto.getInternalHostname());
     }
     return ServerName.valueOf(hostName, port, startCode);
   }
