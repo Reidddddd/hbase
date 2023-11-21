@@ -18,6 +18,8 @@
 package org.apache.hadoop.hbase;
 
 import java.io.Serializable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -484,5 +486,13 @@ public class ServerName implements Comparable<ServerName>, Serializable {
       return false;
     }
     return SERVERNAME_PATTERN.matcher(str).matches();
+  }
+
+  public static String resolveHostName(ServerName serverName) {
+    try {
+      return InetAddress.getByName(serverName.getHostname()).getHostAddress();
+    } catch (UnknownHostException e) {
+      return "unknown";
+    }
   }
 }
