@@ -43,8 +43,11 @@ message RegionServerStartupRequest {
   /** hostname for region server, optional */
   optional string use_this_hostname_instead = 4;
 
+  /** rsgroup name for region server, optional */
+  optional string group_name = 5;
+
   /** whether region server in k8s mode, optional **/
-  optional bool k8s_mode_enabled = 5;
+  optional bool k8s_mode_enabled = 6;
 }
 
 message RegionServerStartupResponse {

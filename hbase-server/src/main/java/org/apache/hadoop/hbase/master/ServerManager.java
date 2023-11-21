@@ -43,6 +43,7 @@ import org.apache.hadoop.hbase.RegionMetrics;
 import org.apache.hadoop.hbase.ServerMetrics;
 import org.apache.hadoop.hbase.ServerMetricsBuilder;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.ServerNameWithAttributes;
 import org.apache.hadoop.hbase.YouAreDeadException;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.RegionInfo;
@@ -207,8 +208,15 @@ public class ServerManager {
     final String internalHostname = request.hasUseThisHostnameInstead() ?
       request.getUseThisHostnameInstead() : null;
 
-    ServerName sn = ServerName.valueOf(hostname, request.getPort(), request.getServerStartCode(),
-      internalHostname);
+    ServerName sn = rsK8sMode ?
+      new ServerNameWithAttributes(hostname, request.getPort(), request.getServerStartCode(),
+        internalHostname).setAttribute("group", request.getGroupName()) :
+      ServerName.valueOf(hostname, request.getPort(), request.getServerStartCode(),
+        internalHostname);
+    if (rsK8sMode) {
+      addPodInstance(sn);
+    }
+
     checkClockSkew(sn, request.getServerCurrentTime());
     checkIsDead(sn, "STARTUP");
     if (!checkAndRecordNewServer(sn, ServerMetricsBuilder.of(sn, versionNumber, version))) {
@@ -216,9 +224,6 @@ public class ServerManager {
         "THIS SHOULD NOT HAPPEN, RegionServerStartup" + " could not record the server: " + sn);
     }
 
-    if (rsK8sMode) {
-      addPodInstance(sn);
-    }
     return sn;
   }
 

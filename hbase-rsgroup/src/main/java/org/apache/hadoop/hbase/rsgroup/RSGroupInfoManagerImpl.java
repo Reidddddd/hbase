@@ -38,6 +38,7 @@ import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.ServerNameWithAttributes;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
@@ -136,6 +137,7 @@ final class RSGroupInfoManagerImpl implements RSGroupInfoManager {
   private Set<String> prevRSGroups = new HashSet<>();
   private final ServerEventsListenerThread serverEventsListenerThread =
     new ServerEventsListenerThread();
+  private final K8SRegionServerGroupHelper k8sHelper;
 
   /** Get rsgroup table mapping script */
   RSGroupMappingScript script;
@@ -184,11 +186,13 @@ final class RSGroupInfoManagerImpl implements RSGroupInfoManager {
     this.conn = masterServices.getConnection();
     this.rsGroupStartupWorker = new RSGroupStartupWorker();
     script = new RSGroupMappingScript(masterServices.getConfiguration());
+    k8sHelper = new K8SRegionServerGroupHelper(this);
   }
 
   private synchronized void init() throws IOException {
     refresh();
     serverEventsListenerThread.start();
+    k8sHelper.start();
     masterServices.getServerManager().registerListener(serverEventsListenerThread);
   }
 
@@ -766,11 +770,22 @@ final class RSGroupInfoManagerImpl implements RSGroupInfoManager {
     @Override
     public void serverAdded(ServerName serverName) {
       serverChanged();
+      if (masterServices.getServerManager().isPodInstance(serverName)) {
+        if (serverName instanceof ServerNameWithAttributes) {
+          String targetGroup =
+            (String) ((ServerNameWithAttributes) serverName).getAttribute("group");
+          k8sHelper.dispatch(serverName.getAddress(), targetGroup);
+          LOG.info("Dispatched sever: " + serverName + " to " + targetGroup);
+        }
+      }
     }
 
     @Override
     public void serverRemoved(ServerName serverName) {
       serverChanged();
+      if (masterServices.getServerManager().isPodInstance(serverName)) {
+        k8sHelper.remove(serverName.getAddress());
+      }
     }
 
     private synchronized void serverChanged() {

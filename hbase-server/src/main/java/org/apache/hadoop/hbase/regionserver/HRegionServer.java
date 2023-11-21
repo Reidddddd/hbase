@@ -252,6 +252,9 @@ public class HRegionServer extends Thread implements
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value="MS_SHOULD_BE_FINAL")
   public static boolean TEST_SKIP_REPORTING_TRANSITION = false;
 
+  private static final String RS_GROUP_KEY = "hbase.regionserver.group";
+  private static final String DEFAULT_RSGROUP = "default";
+
   /**
    * A map from RegionName to current action in progress. Boolean value indicates:
    * true - if open region action in progress
@@ -2876,6 +2879,9 @@ public class HRegionServer extends Thread implements
       request.setServerStartCode(this.startcode);
       request.setServerCurrentTime(now);
       request.setK8SModeEnabled(isK8sModeEnabled());
+      if (isK8sModeEnabled()) {
+        request.setGroupName(conf.get(RS_GROUP_KEY, DEFAULT_RSGROUP));
+      }
       result = rss.regionServerStartup(null, request.build());
     } catch (ServiceException se) {
       IOException ioe = ProtobufUtil.getRemoteException(se);

@@ -109,6 +109,11 @@ public class ServerName implements Comparable<ServerName>, Serializable {
     this(Address.fromParts(hostname, port), startcode, null);
   }
 
+  protected ServerName(final String hostname, final int port, final long startcode,
+      final String internalHostName) {
+    this(Address.fromParts(hostname, port), startcode, internalHostName);
+  }
+
   private ServerName(final Address address, final long startcode, final String internalHostName) {
     // Use HostAndPort to host port and hostname. Does validation and can do ipv6
     this.address = address;
