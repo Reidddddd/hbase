@@ -1058,7 +1058,9 @@ public class ServerManager {
   }
 
   public void addPodInstance(ServerName serverName) {
-    this.podInstances.add(serverName);
+    if (!podInstances.contains(serverName)) {
+      this.podInstances.add(serverName);
+    }
   }
 
   public void evictPodInstance(ServerName serverName) {

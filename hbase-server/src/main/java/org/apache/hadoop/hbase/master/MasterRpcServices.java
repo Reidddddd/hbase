@@ -562,6 +562,9 @@ public class MasterRpcServices extends RSRpcServices implements
       ServerMetrics newLoad =
         ServerMetricsBuilder.toServerMetrics(serverName, versionNumber, version, sl);
       master.getServerManager().regionServerReport(serverName, newLoad);
+      if (request.hasK8SModeEnabled() && request.getK8SModeEnabled()) {
+        master.getServerManager().addPodInstance(serverName);
+      }
       master.getAssignmentManager().reportOnlineRegions(serverName,
         newLoad.getRegionMetrics().keySet());
       if (sl != null && master.metricsMaster != null) {
