@@ -44,7 +44,7 @@ HMaster master;
 
 <%java>
 ServerName [] serverNames = servers.toArray(new ServerName[servers.size()]);
-Arrays.sort(serverNames);
+Arrays.sort(serverNames, ServerName.INTERNAL_SERVERNAME_COMPARATOR);
 </%java>
 
 <div class="tabbable">
