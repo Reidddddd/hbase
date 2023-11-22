@@ -275,6 +275,8 @@ public class TestSchema {
     scanner = schemaTable.getScanner(scan);
     iterator = scanner.iterator();
     Assert.assertFalse(iterator.hasNext());
+
+    checkCacheCleaned(tableName);
   }
 
   @Test
@@ -329,6 +331,12 @@ public class TestSchema {
     scanner = schemaTable.getScanner(scan);
     iterator = scanner.iterator();
     Assert.assertFalse(iterator.hasNext());
+
+    checkCacheCleaned(tableName);
   }
 
+  private static void checkCacheCleaned(TableName tableName) {
+    SchemaProcessor schemaProcessor = SchemaProcessor.getInstance();
+    Assert.assertTrue(schemaProcessor.isTableCleaned(tableName));
+  }
 }

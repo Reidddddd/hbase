@@ -149,6 +149,13 @@ public class SchemaProcessor {
           }
           break;
         }
+        case DELETE: {
+          // Only one case can enter this case:
+          // a table is disabled, and related Deletes are sent to hbase:schema
+          // so RS's schemaCache should remove the cache of dropped/truncated table
+          schemaCache.remove(table);
+          break;
+        }
         case TRUNCATE:
         case DROP: {
           // drop and truncate happens on master side only,
@@ -173,7 +180,7 @@ public class SchemaProcessor {
                 public void onComplete() {
                   // useless in fact as comments above,
                   // execute it for safe and UT (master and rs share the same instance in UT)
-                  schemaCache.remove(table);
+                  // Do nothing here, we will clean cache by watching the table zk nodes.
                 }
               });
           });
@@ -185,4 +192,7 @@ public class SchemaProcessor {
     }
   }
 
+  public boolean isTableCleaned(TableName tableName) {
+    return !schemaCache.containsKey(tableName);
+  }
 }

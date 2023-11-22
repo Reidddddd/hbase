@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
@@ -38,6 +41,7 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.coprocessor.CoreCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.HasMasterServices;
+import org.apache.hadoop.hbase.coprocessor.HasRegionServerServices;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.MasterObserver;
@@ -50,7 +54,12 @@ import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.regionserver.MiniBatchOperationInProgress;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.wal.WALEdit;
+import org.apache.hadoop.hbase.zookeeper.ZKListener;
+import org.apache.hadoop.hbase.zookeeper.ZKUtil;
+import org.apache.hadoop.hbase.zookeeper.ZKWatcher;
+import org.apache.hadoop.hbase.zookeeper.ZNodePaths;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,11 +104,15 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
 
   // q for qolumn
   static final byte[] SCHEMA_TABLE_CF = Bytes.toBytes("q");
+  static final AtomicReference<TableStateListener> tableStateListener = new AtomicReference<>();
+
+  // A static map to guarantee we do not duplicate zk node watching.
+  static final Set<String> watchedTables = ConcurrentHashMap.newKeySet();
 
   private SchemaProcessor processor;
 
   enum Operation {
-    PUT, INCREMENT, APPEND, TRUNCATE, DROP
+    PUT, INCREMENT, APPEND, DELETE, TRUNCATE, DROP
   }
 
   @Override
@@ -143,6 +156,37 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
           }
         }).start();
       }
+    } else if (e instanceof RegionCoprocessorEnvironment) {
+      // Init zk hook for RS.
+      RegionCoprocessorEnvironment regionEnv = (RegionCoprocessorEnvironment) e;
+      TableName tableName = regionEnv.getRegionInfo().getTable();
+
+      if (watchedTables.add(tableName.getNameAsString())) {
+        ZKWatcher watcher = ((HasRegionServerServices) e).getRegionServerServices().getZooKeeper();
+
+        try {
+          if (watcher != null) {
+            if (!tableName.isSystemTable()) {
+              String tableNode = ZNodePaths.joinZNode(watcher.getZNodePaths().tableZNode,
+                tableName.getNameAsString());
+              ZKUtil.setWatchIfNodeExists(watcher, tableNode);
+              initListener(watcher);
+            }
+          }
+        } catch (KeeperException ke) {
+          throw new IOException(ke);
+        } catch (InterruptedException ex) {
+          throw new RuntimeException(ex);
+        }
+      }
+    }
+  }
+
+  private synchronized void initListener(ZKWatcher watcher)
+    throws InterruptedException, KeeperException {
+    if (tableStateListener.get() == null) {
+      tableStateListener.compareAndSet(null, new TableStateListener(watcher, this));
+      watcher.registerListener(tableStateListener.get());
     }
   }
 
@@ -244,4 +288,52 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
     }
   }
 
+  static class TableStateListener extends ZKListener {
+    private final SchemaService schemaService;
+
+    /**
+     * Construct a ZooKeeper event listener.
+     */
+    public TableStateListener(ZKWatcher watcher, SchemaService schemaService) {
+      super(watcher);
+      this.schemaService = schemaService;
+    }
+
+    @Override
+    public void nodeCreated(String path) {
+      // If we get this event, we need to re-watch the path
+      String parent = ZKUtil.getParent(path);
+      if (parent != null && parent.equals(watcher.getZNodePaths().tableZNode)) {
+        try {
+          ZKUtil.setWatchIfNodeExists(watcher, path);
+        } catch (KeeperException e) {
+          LOG.warn("Failed watch node: " + path);
+        }
+      }
+    }
+
+    @Override
+    public void nodeDeleted(String path) {
+      String parent = ZKUtil.getParent(path);
+      if (parent != null && parent.equals(watcher.getZNodePaths().tableZNode)) {
+        TableName tableName = TableName.valueOf(ZKUtil.getNodeName(path));
+        if (watchedTables.remove(tableName.getNameAsString())) {
+          schemaService.sendTask(tableName, Operation.DELETE);
+        }
+      }
+    }
+
+    @Override
+    public void nodeDataChanged(String path) {
+      // If we get this event, we need to re-watch the path
+      String parent = ZKUtil.getParent(path);
+      if (parent != null && parent.equals(watcher.getZNodePaths().tableZNode)) {
+        try {
+          ZKUtil.setWatchIfNodeExists(watcher, path);
+        } catch (KeeperException e) {
+          LOG.warn("Failed watch node: " + path);
+        }
+      }
+    }
+  }
 }
