@@ -584,6 +584,9 @@ AssignmentManager assignmentManager = master.getAssignmentManager();
         } else if (tableName.equals(TableName.valueOf("hbase:replication"))) {
             description = "The hbase:replication table tracks cross cluster replication through " +
             "WAL file offsets.";
+        } else if (tableName.equals(TableName.valueOf("hbase:schema"))) {
+            description = "The hbase:schema table holds the user tables' column names" +
+            " and types.";
         }
     </%java>
     <td><% description %></td>
