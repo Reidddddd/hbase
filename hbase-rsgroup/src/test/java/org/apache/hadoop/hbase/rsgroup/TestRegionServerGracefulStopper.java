@@ -19,19 +19,31 @@
 
 package org.apache.hadoop.hbase.rsgroup;
 
+import org.apache.hadoop.hbase.HBaseClassTestRule;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.regionserver.HRegionServer;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hbase.thirdparty.com.google.common.collect.Sets;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.TestName;
+
+import org.apache.hbase.thirdparty.com.google.common.collect.Sets;
 
 @Category({ MediumTests.class })
 public class TestRegionServerGracefulStopper extends TestRSGroupsBase {
+
+  @ClassRule
+  public static final HBaseClassTestRule CLASS_RULE =
+    HBaseClassTestRule.forClass(TestRegionServerGracefulStopper.class);
+
+  @Rule
+  public TestName testName = new TestName();
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {

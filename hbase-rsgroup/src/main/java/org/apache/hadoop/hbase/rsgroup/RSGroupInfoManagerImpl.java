@@ -785,7 +785,6 @@ final class RSGroupInfoManagerImpl implements RSGroupInfoManager {
       serverChanged();
       if (masterServices.getServerManager().isPodInstance(serverName)) {
         k8sHelper.remove(serverName.getAddress());
-        masterServices.getServerManager().evictPodInstance(serverName);
       }
     }
 

@@ -22,10 +22,11 @@ import java.io.IOException;
 import java.util.Optional;
 import org.apache.hadoop.hbase.rsgroup.RSGroupAdminClient;
 import org.apache.hadoop.hbase.rsgroup.RSGroupInfo;
-import org.apache.hbase.thirdparty.com.google.common.collect.Sets;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.apache.hbase.thirdparty.com.google.common.collect.Sets;
 
 /**
  * A coprocessor to move the RS to a backup rsgroup and wait all the regions on it moved away.

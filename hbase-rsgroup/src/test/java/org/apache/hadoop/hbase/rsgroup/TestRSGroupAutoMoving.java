@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.rsgroup;
 
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseClassTestRule;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.MiniHBaseCluster;
 import org.apache.hadoop.hbase.ServerName;
@@ -31,14 +32,24 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.TestName;
 
 /**
  * Test the rsgroup auto moving at the regionserver startup.
  */
 @Category({ MediumTests.class })
 public class TestRSGroupAutoMoving extends TestRSGroupsBase {
+
+  @ClassRule
+  public static final HBaseClassTestRule CLASS_RULE =
+    HBaseClassTestRule.forClass(TestRSGroupAutoMoving.class);
+
+  @Rule
+  public TestName testName = new TestName();
 
   @BeforeClass
   public static void setUp() throws Exception {

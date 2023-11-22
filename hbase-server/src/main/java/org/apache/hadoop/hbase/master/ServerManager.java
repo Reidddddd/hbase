@@ -142,7 +142,16 @@ public class ServerManager {
   private final MasterServices master;
   private final ClusterConnection connection;
 
-  private final DeadServer deadservers = new DeadServer();
+  private final DeadServer deadservers = new DeadServer() {
+    @Override
+    public synchronized void finish(ServerName sn) {
+      super.finish(sn);
+      if (isPodInstance(sn)) {
+        deadservers.removeDeadServer(sn);
+        evictPodInstance(sn);
+      }
+    }
+  };
 
   private final long maxSkew;
   private final long warningSkew;
