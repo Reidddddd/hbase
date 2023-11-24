@@ -20,14 +20,19 @@ package org.apache.hadoop.hbase.schema;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY;
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.REGION_COPROCESSOR_CONF_KEY;
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM;
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM_DEFAULT;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.concurrent.Semaphore;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.FastPathProcessable;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Append;
+import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
@@ -419,6 +424,36 @@ public class TestSchema {
 
     Schema newSchema = admin.getSchemaOf(tableName);
     Assert.assertEquals(schema.numberOfColumns(), newSchema.numberOfColumns());
+  }
+
+  @Test
+  public void testTaskCountLimit() throws IOException, InterruptedException {
+    SchemaProcessor processor = SchemaProcessor.getInstance();
+    processor.init(false, UTIL.getConfiguration(), (ClusterConnection) UTIL.getConnection());
+    int limit = UTIL.getConfiguration().getInt(MAX_TASK_NUM, MAX_TASK_NUM_DEFAULT);
+    Assert.assertTrue(processor.isAvailable());
+    for (int i = 0; i < limit + 1; i++) {
+      processor.acceptTask(new DummyTask());
+    }
+    Assert.assertFalse(processor.isAvailable());
+
+    DummyTask.signal.release();
+    Thread.sleep(100);
+    Assert.assertTrue(processor.isAvailable());
+    DummyTask.signal.release(limit);
+  }
+
+  static class DummyTask implements FastPathProcessable {
+    static Semaphore signal = new Semaphore(0);
+
+    @Override
+    public void process() {
+      try {
+        signal.acquire();
+      } catch (Exception e) {
+        // Do nothing.
+      }
+    }
   }
 
   private static void checkCacheCleaned(TableName tableName) {

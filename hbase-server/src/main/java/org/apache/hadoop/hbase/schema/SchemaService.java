@@ -107,6 +107,8 @@ public class SchemaService extends BaseMasterAndRegionObserver {
   private static final Log LOG = LogFactory.getLog(SchemaService.class);
   static final String NUM_THREADS_KEY = "hbase.schema.updater.threads";
   static final String SOFT_MAX_COLUMNS_PER_TABLE = "hbase.schema.soft.max.columns.per.table";
+  static final String MAX_TASK_NUM = "hbase.schema.max.tasks.num";
+  static final int MAX_TASK_NUM_DEFAULT = 10000;
   static final int NUM_THREADS_DEFAULT = 5;
   static final int MAX_COLUMNS_PER_TABLE_DEFAULT = 1000;
 
@@ -243,7 +245,9 @@ public class SchemaService extends BaseMasterAndRegionObserver {
 
   private void sendTask(TableName table, Operation operation,
       NavigableMap<byte [], List<Cell>> cellMap) {
-
+    if (!processor.isAvailable()) {
+      return;
+    }
     if (cellMap == null) {
       processor.acceptTask(processor.createProcessor(table, operation, null));
       return;
