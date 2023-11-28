@@ -104,4 +104,40 @@ public class TestSchemaBasic {
     Assert.assertFalse(columnIt.hasNext());
   }
 
+  @Test
+  public void testSchemaUpdateColumnType() {
+    TableName table = TableName.valueOf("test:column_type");
+    Schema schema = new Schema(table);
+    Famy f = new Famy(Bytes.toBytes("family"));
+    Qualy q = new Qualy(Bytes.toBytes("column_type"));
+    schema.addColumn(f, q);
+    Assert.assertTrue(schema.containFamily(f));
+    Assert.assertTrue(schema.containColumn(f, q));
+
+    Column c = schema.getColumn(f, q);
+    Assert.assertEquals(f, c.getFamy());
+    Assert.assertEquals(q, c.getQualy());
+    Assert.assertEquals(ColumnType.NONE, c.getType());
+
+    // Update type
+    c.updateType(ColumnType.BYTE);
+    Assert.assertEquals(ColumnType.BYTE, c.getType());
+    c.updateType(ColumnType.SHORT);
+    Assert.assertEquals(ColumnType.SHORT, c.getType());
+    c.updateType(ColumnType.INT);
+    Assert.assertEquals(ColumnType.INT, c.getType());
+    c.updateType(ColumnType.LONG);
+    Assert.assertEquals(ColumnType.LONG, c.getType());
+    c.updateType(ColumnType.FLOAT);
+    Assert.assertEquals(ColumnType.FLOAT, c.getType());
+    c.updateType(ColumnType.DOUBLE);
+    Assert.assertEquals(ColumnType.DOUBLE, c.getType());
+    c.updateType(ColumnType.BOOL);
+    Assert.assertEquals(ColumnType.BOOL, c.getType());
+    c.updateType(ColumnType.CHAR);
+    Assert.assertEquals(ColumnType.CHAR, c.getType());
+    c.updateType(ColumnType.STRING);
+    Assert.assertEquals(ColumnType.STRING, c.getType());
+  }
+
 }

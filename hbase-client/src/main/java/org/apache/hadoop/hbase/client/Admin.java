@@ -3280,4 +3280,9 @@ public interface Admin extends Abortable, Closeable {
    * @return schema of given table
    */
   Schema getSchemaOf(TableName table) throws IOException;
+
+  /**
+   * Publish a updated schema whose update shoule be all about type of columns
+   */
+  void publishSchema(Schema schema) throws IOException;
 }

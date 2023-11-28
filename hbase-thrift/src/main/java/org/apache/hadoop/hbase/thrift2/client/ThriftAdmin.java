@@ -1451,4 +1451,9 @@ public class ThriftAdmin implements Admin {
   public Schema getSchemaOf(TableName table) throws IOException {
     throw new NotImplementedException("getSchemaOf not supported in ThriftAdmin");
   }
+
+  @Override
+  public void publishSchema(Schema schema) throws IOException {
+    throw new NotImplementedException("publishSchema not supported in ThriftAdmin");
+  }
 }

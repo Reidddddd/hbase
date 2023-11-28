@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hbase.schema;
 
-import static org.apache.hadoop.hbase.HConstants.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_KEY;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_CF;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.FastPathExecutor;
 import org.apache.hadoop.hbase.FastPathProcessable;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.SchemaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.AdvancedScanResultConsumer;
@@ -139,7 +139,7 @@ public class SchemaProcessor {
             updateExecutor.accept(() -> {
               byte[] row = table.getName();
               Put put = new Put(row);
-              put.addColumn(SCHEMA_TABLE_CF, family, EMPTY_BYTE_ARRAY);
+              put.addColumn(SCHEMA_TABLE_CF, family, HConstants.EMPTY_BYTE_ARRAY);
               schemaTable.checkAndMutate(row, SCHEMA_TABLE_CF).qualifier(family).ifNotExists()
                 .thenPut(put);
             });
@@ -152,7 +152,7 @@ public class SchemaProcessor {
               System.arraycopy(t, 0, row, 0, t.length);
               System.arraycopy(qualifier, 0, row, t.length, qualifier.length);
               Put put = new Put(row);
-              put.addColumn(SCHEMA_TABLE_CF, family, EMPTY_BYTE_ARRAY);
+              put.addColumn(SCHEMA_TABLE_CF, family, ColumnType.NONE.getCode());
               schemaTable.checkAndMutate(row, SCHEMA_TABLE_CF).qualifier(family).ifNotExists()
                 .thenPut(put);
             });

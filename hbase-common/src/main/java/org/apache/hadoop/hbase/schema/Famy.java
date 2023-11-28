@@ -67,7 +67,7 @@ public class Famy implements Comparable<Famy>, Comparator<Famy> {
 
   @Override
   public int compare(Famy o1, Famy o2) {
-    return Bytes.compareTo(o1.family, o2.family);
+    return o1.compareTo(o2);
   }
 
   @Override

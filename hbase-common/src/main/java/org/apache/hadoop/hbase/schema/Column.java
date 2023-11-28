@@ -23,6 +23,19 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 
+/**
+ * Part of Schema Service. A column is comprised of a family and a qualifier.
+ * <p>
+ * Any change of this object on client side has no effect on server side but updating column type.
+ * Need to call as following in order to make it take effect:
+ * <pre>
+ *   Schema schema = admin.getSchemaOf(TableName);
+ *   Column column = schema.getColumn(Famy, Qualy);
+ *   column.updateType(ColumnType.ANY_TYPE);
+ *   admin.publishSchema(Schema);
+ *   ...
+ * </pre>
+ */
 @InterfaceStability.Evolving
 @InterfaceAudience.Public
 public class Column implements Comparable<Column>, Comparator<Column> {
@@ -50,6 +63,14 @@ public class Column implements Comparable<Column>, Comparator<Column> {
 
   public Qualy getQualy() {
     return qualifier;
+  }
+
+  public void updateType(ColumnType type) {
+    qualifier.updateType(type);
+  }
+
+  public ColumnType getType() {
+    return qualifier.getType();
   }
 
   @Override
@@ -91,7 +112,9 @@ public class Column implements Comparable<Column>, Comparator<Column> {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("column: {family: ").append(Bytes.toString(family.getFamily())).append(", ")
-      .append("qualifier: ").append(Bytes.toString(qualifier.getQualifier())).append("}");
+      .append("qualifier: ").append(Bytes.toString(qualifier.getQualifier())).append(", ")
+      .append("type: ").append(qualifier.getType().name())
+      .append("}");
     return sb.toString();
   }
 
