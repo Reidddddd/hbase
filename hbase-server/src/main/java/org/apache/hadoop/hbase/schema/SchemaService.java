@@ -49,6 +49,7 @@ import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.RegionObserver;
+import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
 import org.apache.hadoop.hbase.master.MasterServices;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.regionserver.MiniBatchOperationInProgress;
@@ -128,8 +129,6 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
 
   @Override
   public void start(CoprocessorEnvironment e) throws IOException {
-    LOG.info("Starting Schema Service");
-    LOG.info("Is Master enviroment: " + (e instanceof MasterCoprocessorEnvironment));
     Configuration conf = e.getConfiguration();
 
     boolean masterEnv = e instanceof MasterCoprocessorEnvironment;
@@ -139,6 +138,7 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
     if (masterEnv) {
       // if running on HMaster
       MasterCoprocessorEnvironment mEnv = (MasterCoprocessorEnvironment) e;
+      LOG.info("Starting SchemaService on Master");
       if (mEnv instanceof HasMasterServices) {
         new Thread(() -> {
           LOG.info("Waiting for the cluster connection built");
@@ -162,17 +162,20 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
       RegionCoprocessorEnvironment regionEnv = (RegionCoprocessorEnvironment) e;
       TableName tableName = regionEnv.getRegionInfo().getTable();
 
+      if (tableName.isSystemTable()) {
+        return;
+      }
+
+      LOG.info("Starting SchemaService for region " + regionEnv.getRegionInfo());
       if (watchedTables.add(tableName.getNameAsString())) {
         ZKWatcher watcher = ((HasRegionServerServices) e).getRegionServerServices().getZooKeeper();
 
         try {
           if (watcher != null) {
-            if (!tableName.isSystemTable()) {
-              String tableNode = ZNodePaths.joinZNode(watcher.getZNodePaths().tableZNode,
-                tableName.getNameAsString());
-              ZKUtil.setWatchIfNodeExists(watcher, tableNode);
-              initListener(watcher);
-            }
+            String tableNode = ZNodePaths.joinZNode(watcher.getZNodePaths().tableZNode,
+              tableName.getNameAsString());
+            ZKUtil.setWatchIfNodeExists(watcher, tableNode);
+            initListener(watcher);
           }
         } catch (KeeperException ke) {
           throw new IOException(ke);
@@ -205,6 +208,7 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
         .setBlockCacheEnabled(true)
         .setBlocksize(8 * 1024)
         .setBloomFilterType(BloomType.ROW)
+        .setDataBlockEncoding(DataBlockEncoding.FAST_DIFF)
     );
     masterServices.createSystemTable(desc);
   }
