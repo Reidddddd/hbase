@@ -160,6 +160,7 @@ public final class SchemaTableAccessor {
     stopRow[stopRow.length - 1]++;
     scan.withStartRow(startRow);
     scan.withStopRow(stopRow);
+    scan.addFamily(SCHEMA_TABLE_CF);
     scan.setCacheBlocks(false);
     scan.setBatch(100);
     return scan;
