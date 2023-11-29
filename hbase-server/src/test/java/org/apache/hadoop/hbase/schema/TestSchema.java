@@ -217,6 +217,7 @@ public class TestSchema {
 
     Admin admin = UTIL.getHBaseAdmin();
     Schema schema = admin.getSchemaOf(tableName);
+    Assert.assertFalse(schema.containFamily(Bytes.toBytes("c")));
     Assert.assertTrue(schema.containFamily(TEST_FAMILY_1));
     Assert.assertTrue(schema.containFamily(TEST_FAMILY_2));
     Assert.assertTrue(schema.containFamily(TEST_FAMILY_3));
