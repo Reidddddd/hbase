@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hbase.Cell;
@@ -243,16 +244,16 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
       return;
     }
 
-    for (int i = 0; i < miniBatchOp.size(); i++) {
-      Mutation mutation = miniBatchOp.getOperation(i);
-      if (mutation instanceof Put) {
-        sendTask(table, Operation.PUT, mutation.getFamilyCellMap());
-      } else if (mutation instanceof Append) {
-        sendTask(table, Operation.APPEND, mutation.getFamilyCellMap());
-      } else if (mutation instanceof Increment) {
-        sendTask(table, Operation.INCREMENT, mutation.getFamilyCellMap());
-      } // no need to process Delete
-    }
+    // Hand over the consistency to the law of large numbers.
+    int randomIdx = ThreadLocalRandom.current().nextInt(0, miniBatchOp.size());
+    Mutation mutation = miniBatchOp.getOperation(randomIdx);
+    if (mutation instanceof Put) {
+      sendTask(table, Operation.PUT, mutation.getFamilyCellMap());
+    } else if (mutation instanceof Append) {
+      sendTask(table, Operation.APPEND, mutation.getFamilyCellMap());
+    } else if (mutation instanceof Increment) {
+      sendTask(table, Operation.INCREMENT, mutation.getFamilyCellMap());
+    } // no need to process Delete
   }
 
   private void sendTask(TableName table, Operation operation) {
@@ -269,10 +270,14 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
       return;
     }
 
+    // For batch put, we only pick one cell randomly once.
+    // This will reduce large amount tasks under batch mutate request to boost the processing and
+    // cut memory cost.
+    // According to the law of large numbers, the schema will finally be completed.
     for (Map.Entry<byte[], List<Cell>> entry : cellMap.entrySet()) {
-      for (Cell cell : entry.getValue()) {
-        processor.acceptTask(processor.createProcessor(table, operation, cell));
-      }
+      int randomIdx = ThreadLocalRandom.current().nextInt(0, entry.getValue().size());
+      processor.acceptTask(processor.createProcessor(table, operation,
+        entry.getValue().get(randomIdx)));
     }
   }
 
