@@ -68,13 +68,13 @@ public class TestSchemaBasic {
     Famy gb = new Famy(Bytes.toBytes("gb"));
 
     // Add columns
-    schema.addColumn(fa.getFamily(), Bytes.toBytes("c"));
-    schema.addColumn(fa.getFamily(), Bytes.toBytes("d"));
-    schema.addColumn(fa.getFamily(), Bytes.toBytes("a"));
-    schema.addColumn(fa.getFamily(), Bytes.toBytes("e"));
-    schema.addColumn(fb.getFamily(), Bytes.toBytes("b"));
-    schema.addColumn(ga.getFamily(), Bytes.toBytes("f"));
-    schema.addColumn(gb.getFamily(), Bytes.toBytes("g"));
+    schema.addColumn(fa.cloneContent(), Bytes.toBytes("c"));
+    schema.addColumn(fa.cloneContent(), Bytes.toBytes("d"));
+    schema.addColumn(fa.cloneContent(), Bytes.toBytes("a"));
+    schema.addColumn(fa.cloneContent(), Bytes.toBytes("e"));
+    schema.addColumn(fb.cloneContent(), Bytes.toBytes("b"));
+    schema.addColumn(ga.cloneContent(), Bytes.toBytes("f"));
+    schema.addColumn(gb.cloneContent(), Bytes.toBytes("g"));
 
     // Iterate over it, the sequence is
     // fa:a, fa:c, fa:d, fa:e,

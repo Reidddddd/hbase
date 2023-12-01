@@ -42,7 +42,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.FastPathExecutor;
 import org.apache.hadoop.hbase.FastPathProcessable;
 import org.apache.hadoop.hbase.HConstants;
@@ -122,14 +121,16 @@ public class SchemaProcessor {
   class ActionProcessor implements FastPathProcessable {
     final TableName table;
     final Operation operation;
-    final byte[] family;
-    final byte[] qualifier;
+    final Famy family;
+    final Qualy qualifier;
 
     ActionProcessor(TableName table, Operation operation, Cell cell) {
       this.table = table;
       this.operation = operation;
-      this.family = cell == null ? null : CellUtil.cloneFamily(cell);
-      this.qualifier = cell == null ? null : CellUtil.cloneQualifier(cell);
+      this.family = cell == null ? null : new Famy(cell.getFamilyArray(), cell.getFamilyOffset(),
+        cell.getFamilyLength());
+      this.qualifier = cell == null ? null : new Qualy(cell.getQualifierArray(),
+        cell.getQualifierOffset(), cell.getQualifierLength());
     }
 
     @Override
@@ -167,9 +168,9 @@ public class SchemaProcessor {
               updateExecutor.accept(() -> {
                 byte[] row = table.getName();
                 Put put = new Put(row);
-                put.addColumn(SCHEMA_TABLE_CF, family, HConstants.EMPTY_BYTE_ARRAY);
+                put.addColumn(SCHEMA_TABLE_CF, family.cloneContent(), HConstants.EMPTY_BYTE_ARRAY);
                 try {
-                  schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family, null, put);
+                  schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family.cloneContent(), null, put);
                 } catch (IOException e) {
                   // If we have IOException, that means the check and put is failed.
                   // In this case, we need to invalidate the schemaCache to let the executor retry.
@@ -182,14 +183,16 @@ public class SchemaProcessor {
             if (!schema.containColumn(family, qualifier) && schema.addColumn(family, qualifier)) {
               updateExecutor.accept(() -> {
                 byte[] t = table.getName();
-                byte[] row = new byte[t.length + qualifier.length];
+                byte[] row = new byte[t.length + qualifier.getLength()];
                 System.arraycopy(t, 0, row, 0, t.length);
-                System.arraycopy(qualifier, 0, row, t.length, qualifier.length);
+                System.arraycopy(qualifier.getBytes(), qualifier.getOffset(), row, t.length,
+                  qualifier.getLength());
                 Put put = new Put(row);
-                put.addColumn(SCHEMA_TABLE_CF, family, ColumnType.NONE.getCode());
+                put.addColumn(SCHEMA_TABLE_CF, family.cloneContent(), ColumnType.NONE.getCode());
                 boolean succeeded = false;
                 try {
-                  succeeded = schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family, null, put);
+                  succeeded = schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family.cloneContent(),
+                    null, put);
                 } catch (IOException e) {
                   // The put is exceptionally, we need to invalidate the corresponding cache to
                   // let it try to put it again.

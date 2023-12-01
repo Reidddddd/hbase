@@ -120,17 +120,18 @@ public final class SchemaTableAccessor {
         if (puts.size() == 0) {
           // add this table row at the beginning for easier ACL check
           puts.add(new Put(t).addColumn(SCHEMA_TABLE_CF,
-                                        column.getFamy().getFamily(),
+                                        column.getFamy().cloneContent(),
                                         HConstants.EMPTY_BYTE_ARRAY));
         }
 
-        byte[] qualifier = column.getQualy().getQualifier();
+        byte[] qualifier = column.getQualy().cloneContent();
         byte[] row = new byte[t.length + qualifier.length];
         System.arraycopy(t, 0, row, 0, t.length);
-        System.arraycopy(qualifier, 0, row, t.length, qualifier.length);
+        System.arraycopy(qualifier, column.getQualy().getOffset(), row, t.length,
+          column.getQualy().getLength());
         Put put = new Put(row);
         put.addColumn(SCHEMA_TABLE_CF,
-                      column.getFamy().getFamily(),
+                      column.getFamy().cloneContent(),
                       column.getType().getCode());
         puts.add(put);
 

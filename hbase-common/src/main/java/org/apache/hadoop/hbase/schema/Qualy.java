@@ -18,16 +18,14 @@
 
 package org.apache.hadoop.hbase.schema;
 
-import java.util.Comparator;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 
 @InterfaceStability.Evolving
 @InterfaceAudience.Public
-public class Qualy implements Comparable<Qualy>, Comparator<Qualy> {
+public class Qualy extends AbstractSchemaComponent {
 
-  private final byte[] qualifier;
 
   // we ignore this parameter for any comparison and hashcode on purpose
   private ColumnType type;
@@ -37,12 +35,12 @@ public class Qualy implements Comparable<Qualy>, Comparator<Qualy> {
   }
 
   public Qualy(byte[] qual) {
-    qualifier = qual;
-    type = ColumnType.NONE;
+    this(qual, 0, qual.length);
   }
 
-  public byte[] getQualifier() {
-    return qualifier;
+  public Qualy(byte[] qual, int offset, int length) {
+    super(qual, offset, length);
+    type = ColumnType.NONE;
   }
 
   public void updateType(ColumnType type) {
@@ -54,38 +52,8 @@ public class Qualy implements Comparable<Qualy>, Comparator<Qualy> {
   }
 
   @Override
-  public int hashCode() {
-    // can't add type for hash calculation
-    return Bytes.hashCode(qualifier);
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (this == other) {
-      return true;
-    }
-    if (!(other instanceof Qualy)) {
-      return false;
-    }
-    return Bytes.equals(qualifier, ((Qualy) other).qualifier);
-  }
-
-  @Override
-  public int compareTo(Qualy other) {
-    if (this == other) {
-      return 0;
-    }
-    return Bytes.compareTo(qualifier, other.qualifier);
-  }
-
-  @Override
-  public int compare(Qualy o1, Qualy o2) {
-    return o1.compareTo(o2);
-  }
-
-  @Override
   public String toString() {
-    return Bytes.toString(qualifier) + ": " + type.name();
+    return super.toString() + ": " + type.name();
   }
 
 }
