@@ -24,7 +24,7 @@ import org.apache.yetus.audience.InterfaceStability;
 
 @InterfaceStability.Evolving
 @InterfaceAudience.Public
-public class Famy extends AbstractSchemaComponent {
+public class Famy extends BytesWithOffsetAndLen {
 
   public Famy(String famy) {
     this(Bytes.toBytes(famy));

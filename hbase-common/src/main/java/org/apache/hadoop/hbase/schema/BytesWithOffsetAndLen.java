@@ -22,13 +22,13 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
-public abstract class AbstractSchemaComponent implements Comparable<AbstractSchemaComponent>,
-    Comparator<AbstractSchemaComponent> {
+public abstract class BytesWithOffsetAndLen implements Comparable<BytesWithOffsetAndLen>,
+    Comparator<BytesWithOffsetAndLen> {
   private final byte[] bytes;
   private final int offset;
   private final int length;
 
-  AbstractSchemaComponent(byte[] bytes, int offset, int length) {
+  BytesWithOffsetAndLen(byte[] bytes, int offset, int length) {
     this.bytes = bytes;
     this.offset = offset;
     this.length = length;
@@ -51,16 +51,16 @@ public abstract class AbstractSchemaComponent implements Comparable<AbstractSche
     if (this == other) {
       return true;
     }
-    if (!(other instanceof AbstractSchemaComponent)) {
+    if (!(other instanceof BytesWithOffsetAndLen)) {
       return false;
     }
-    AbstractSchemaComponent otherComponent = (AbstractSchemaComponent) other;
+    BytesWithOffsetAndLen otherComponent = (BytesWithOffsetAndLen) other;
     return Bytes.equals(bytes, offset, length, otherComponent.bytes, otherComponent.offset,
       otherComponent.length);
   }
 
   @Override
-  public int compareTo(AbstractSchemaComponent other) {
+  public int compareTo(BytesWithOffsetAndLen other) {
     if (this == other) {
       return 0;
     }
@@ -68,7 +68,7 @@ public abstract class AbstractSchemaComponent implements Comparable<AbstractSche
   }
 
   @Override
-  public int compare(AbstractSchemaComponent o1, AbstractSchemaComponent o2) {
+  public int compare(BytesWithOffsetAndLen o1, BytesWithOffsetAndLen o2) {
     return o1.compareTo(o2);
   }
 
@@ -84,7 +84,7 @@ public abstract class AbstractSchemaComponent implements Comparable<AbstractSche
     return Bytes.toString(bytes, offset, length);
   }
 
-  public byte[] cloneContent() {
+  public byte[] extractContent() {
     byte[] replica = new byte[length];
     System.arraycopy(bytes, offset, replica, 0, length);
     return replica;

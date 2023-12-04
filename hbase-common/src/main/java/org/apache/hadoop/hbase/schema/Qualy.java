@@ -24,7 +24,7 @@ import org.apache.yetus.audience.InterfaceStability;
 
 @InterfaceStability.Evolving
 @InterfaceAudience.Public
-public class Qualy extends AbstractSchemaComponent {
+public class Qualy extends BytesWithOffsetAndLen {
 
 
   // we ignore this parameter for any comparison and hashcode on purpose

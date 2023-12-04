@@ -168,9 +168,9 @@ public class SchemaProcessor {
               updateExecutor.accept(() -> {
                 byte[] row = table.getName();
                 Put put = new Put(row);
-                put.addColumn(SCHEMA_TABLE_CF, family.cloneContent(), HConstants.EMPTY_BYTE_ARRAY);
+                put.addColumn(SCHEMA_TABLE_CF, family.extractContent(), HConstants.EMPTY_BYTE_ARRAY);
                 try {
-                  schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family.cloneContent(), null, put);
+                  schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family.extractContent(), null, put);
                 } catch (IOException e) {
                   // If we have IOException, that means the check and put is failed.
                   // In this case, we need to invalidate the schemaCache to let the executor retry.
@@ -188,10 +188,10 @@ public class SchemaProcessor {
                 System.arraycopy(qualifier.getBytes(), qualifier.getOffset(), row, t.length,
                   qualifier.getLength());
                 Put put = new Put(row);
-                put.addColumn(SCHEMA_TABLE_CF, family.cloneContent(), ColumnType.NONE.getCode());
+                put.addColumn(SCHEMA_TABLE_CF, family.extractContent(), ColumnType.NONE.getCode());
                 boolean succeeded = false;
                 try {
-                  succeeded = schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family.cloneContent(),
+                  succeeded = schemaTable.checkAndPut(row, SCHEMA_TABLE_CF, family.extractContent(),
                     null, put);
                 } catch (IOException e) {
                   // The put is exceptionally, we need to invalidate the corresponding cache to
