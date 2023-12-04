@@ -316,7 +316,7 @@ public class SchemaProcessor {
 
   // A check to confirm whether we keep accept tasks according to the ongoing tasks.
   // For preventing OOM.
-  public boolean isAvailable() {
+  public boolean reachedMaxTasks() {
     return taskAcceptor.numTasksInQueue() + updateExecutor.numTasksInQueue() < maxTasks;
   }
 
