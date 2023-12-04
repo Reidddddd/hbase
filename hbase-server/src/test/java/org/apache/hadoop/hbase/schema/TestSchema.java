@@ -20,6 +20,7 @@ package org.apache.hadoop.hbase.schema;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY;
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.REGION_COPROCESSOR_CONF_KEY;
+import static org.apache.hadoop.hbase.schema.SchemaService.SOFT_MAX_COLUMNS_PER_TABLE;
 import java.io.IOException;
 import java.util.Iterator;
 import org.apache.hadoop.hbase.HBaseClassTestRule;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Append;
+import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -69,6 +71,7 @@ public class TestSchema {
       SchemaService.class.getName());
     UTIL.getConfiguration().set(MASTER_COPROCESSOR_CONF_KEY,
       SchemaService.class.getName());
+    UTIL.getConfiguration().setInt(SOFT_MAX_COLUMNS_PER_TABLE, 10);
     UTIL.getConfiguration().setInt("hbase.schema.updater.threads", 1);
 
     UTIL.startMiniCluster();
@@ -381,6 +384,40 @@ public class TestSchema {
     Assert.assertEquals(ColumnType.INT, column1.getType());
     column2 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO);
     Assert.assertEquals(ColumnType.STRING, column2.getType());
+  }
+
+  @Test
+  public void testMaxColumnConstrain() throws Exception {
+    TableName tableName = TableName.valueOf("testMaxColumnConstrain");
+    byte[][] families = new byte[1][];
+    families[0] = TEST_FAMILY_1;
+    Table table = UTIL.createTable(tableName, families);
+    UTIL.waitTableAvailable(tableName);
+
+    // Upper bound is 10.
+    for (int i = 0; i < 20; i++) {
+      Put put = new Put(TEST_ROW);
+      put.addColumn(TEST_FAMILY_1, Bytes.toBytes(i), EMPTY_BYTE_ARRAY);
+      table.put(put);
+    }
+
+    Thread.sleep(1000);
+
+    byte[] metaFamily = Bytes.toBytes("m");
+    byte[] countQualifier = Bytes.toBytes("c");
+    Get get = new Get(tableName.getName());
+    get.addColumn(metaFamily, countQualifier);
+
+    Table schemaTable = UTIL.getConnection().getTable(TableName.SCHEMA_TABLE_NAME);
+    schemaTable.get(get);
+    long count = Bytes.toLong(schemaTable.get(get).getValue(metaFamily, countQualifier));
+    LOG.debug("--- q count = " + count);
+    Assert.assertTrue(10 <= count);
+
+    // Check we have only recorded the max size columns.
+    Admin admin = UTIL.getHBaseAdmin();
+    Schema schema = admin.getSchemaOf(tableName);
+    Assert.assertTrue(10 <= schema.numberOfColumns());
   }
 
   private static void checkCacheCleaned(TableName tableName) {

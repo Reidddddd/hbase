@@ -18,7 +18,7 @@
 package org.apache.hadoop.hbase.client;
 
 import com.google.protobuf.RpcChannel;
-
+import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -863,5 +863,10 @@ class AsyncHBaseAdmin implements AsyncAdmin {
   @Override
   public CompletableFuture<Schema> getSchemaOf(TableName table) {
     return wrap(rawAdmin.getSchemaOf(table));
+  }
+
+  @Override
+  public CompletableFuture<Void> publishSchema(Schema schema) throws IOException {
+    return wrap(rawAdmin.publishSchema(schema));
   }
 }

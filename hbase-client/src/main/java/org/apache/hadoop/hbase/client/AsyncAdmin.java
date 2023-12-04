@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.client;
 
 import static org.apache.hadoop.hbase.util.FutureUtils.addListener;
 import com.google.protobuf.RpcChannel;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -1619,4 +1620,9 @@ public interface AsyncAdmin {
    * @return schema of given table
    */
   CompletableFuture<Schema> getSchemaOf(TableName table);
+
+  /**
+   * Publish a updated schema whose update shoule be all about type of columns
+   */
+  CompletableFuture<Void> publishSchema(Schema schema) throws IOException;
 }

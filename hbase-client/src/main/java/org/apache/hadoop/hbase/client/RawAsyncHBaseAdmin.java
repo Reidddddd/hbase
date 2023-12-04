@@ -4014,4 +4014,10 @@ class RawAsyncHBaseAdmin implements AsyncAdmin {
     // TODO Implement this async API
     return null;
   }
+
+  @Override
+  public CompletableFuture<Void> publishSchema(Schema schema) throws IOException {
+    // TODO Implement this async API
+    return null;
+  }
 }

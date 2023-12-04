@@ -35,7 +35,6 @@ import org.apache.yetus.audience.InterfaceStability;
 @InterfaceStability.Evolving
 @InterfaceAudience.Public
 public class Schema implements Iterable<Column> {
-
   private final Map<Famy, Set<Qualy>> columns = new ConcurrentHashMap<>();
 
   private final TableName table;
@@ -164,5 +163,13 @@ public class Schema implements Iterable<Column> {
       sb.append("\n").append(column);
     }
     return sb.toString();
+  }
+
+  public int numberOfColumns() {
+    int result = 0;
+    for (Set<Qualy> set : columns.values()) {
+      result += set.size();
+    }
+    return result;
   }
 }
