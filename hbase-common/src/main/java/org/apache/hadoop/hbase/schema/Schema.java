@@ -69,7 +69,7 @@ public class Schema implements Iterable<Column> {
 
   public boolean addFamily(Famy family) {
     if (!columns.containsKey(family)) {
-      Famy actualKey = new Famy(family.cloneContent());
+      Famy actualKey = new Famy(family.extractContent());
       return columns.putIfAbsent(actualKey, new ConcurrentSkipListSet<>()) == null;
     }
     return false;
@@ -83,7 +83,7 @@ public class Schema implements Iterable<Column> {
   public boolean addColumn(Famy family, Qualy qualifier) {
     addFamily(family);
     if (!columns.get(family).contains(qualifier)) {
-      Qualy actualKey = new Qualy(qualifier.cloneContent());
+      Qualy actualKey = new Qualy(qualifier.extractContent());
       actualKey.updateType(qualifier.getType());
       return columns.get(family).add(actualKey);
     }
