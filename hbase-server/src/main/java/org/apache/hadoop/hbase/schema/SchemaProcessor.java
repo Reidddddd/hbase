@@ -23,6 +23,7 @@ import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM;
 import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_KEY;
+import static org.apache.hadoop.hbase.schema.SchemaService.QUALIFIER_DELIMITER_BYTES;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_CF;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_META_CF;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER;
@@ -183,10 +184,13 @@ public class SchemaProcessor {
             if (!schema.containColumn(family, qualifier) && schema.addColumn(family, qualifier)) {
               updateExecutor.accept(() -> {
                 byte[] t = table.getName();
-                byte[] row = new byte[t.length + qualifier.getLength()];
+                byte[] row = new byte[t.length + qualifier.getLength() +
+                  QUALIFIER_DELIMITER_BYTES.length];
                 System.arraycopy(t, 0, row, 0, t.length);
-                System.arraycopy(qualifier.getBytes(), qualifier.getOffset(), row, t.length,
-                  qualifier.getLength());
+                System.arraycopy(QUALIFIER_DELIMITER_BYTES, 0, row, t.length,
+                  QUALIFIER_DELIMITER_BYTES.length);
+                System.arraycopy(qualifier.getBytes(), qualifier.getOffset(), row,
+                  t.length + QUALIFIER_DELIMITER_BYTES.length, qualifier.getLength());
                 Put put = new Put(row);
                 put.addColumn(SCHEMA_TABLE_CF, family.extractContent(), ColumnType.NONE.getCode());
                 boolean succeeded = false;

@@ -39,12 +39,12 @@ import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The hbase:schema architecture is:
- * Row key               |    q      |
- *                       | a | b | c |
- * table_name            | _ | _ |   |
- * table_nameQualifier_1 | 1 |   |   |
- * table_nameQualifier_2 |   | 2     |
- * table_name1           |   |   | 3 |
+ * Row key                |    q      |
+ *                        | a | b | c |
+ * table_name             | _ | _ |   |
+ * table_name&Qualifier_1 | 1 |   |   |
+ * table_name&Qualifier_2 |   | 2     |
+ * table_name1            |   |   | 3 |
  *
  * First of all, the family char is q in hbase:schema.
  * Qualifier will be families of each table, value is no need here.
@@ -68,6 +68,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 public final class SchemaTableAccessor {
 
   private static final byte[] SCHEMA_TABLE_CF = Bytes.toBytes("q");
+  private static final byte[] QUALIFIER_DELIMITER_BYTES = Bytes.toBytes("&");
 
   private SchemaTableAccessor() {}
 
@@ -124,11 +125,13 @@ public final class SchemaTableAccessor {
                                         HConstants.EMPTY_BYTE_ARRAY));
         }
 
-        byte[] qualifier = column.getQualy().extractContent();
-        byte[] row = new byte[t.length + qualifier.length];
+        Qualy qualifier = column.getQualy();
+        byte[] row = new byte[t.length + qualifier.getLength() + QUALIFIER_DELIMITER_BYTES.length];
         System.arraycopy(t, 0, row, 0, t.length);
-        System.arraycopy(qualifier, column.getQualy().getOffset(), row, t.length,
-          column.getQualy().getLength());
+        System.arraycopy(QUALIFIER_DELIMITER_BYTES, 0, row, t.length,
+          QUALIFIER_DELIMITER_BYTES.length);
+        System.arraycopy(qualifier.getBytes(), qualifier.getOffset(), row,
+          t.length + QUALIFIER_DELIMITER_BYTES.length, qualifier.getLength());
         Put put = new Put(row);
         put.addColumn(SCHEMA_TABLE_CF,
                       column.getFamy().extractContent(),
