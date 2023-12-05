@@ -181,10 +181,11 @@ public final class SchemaTableAccessor {
         schema.addFamily(CellUtil.cloneQualifier(cell));
       }
     } else {
-      // this is a tablequalifier row
+      // this is a table qualifier row, we need to handle the delimiter.
       byte[] row = res.getRow();
-      byte[] qualifier = new byte[row.length - table.length];
-      System.arraycopy(row, table.length, qualifier, 0, qualifier.length);
+      byte[] qualifier = new byte[row.length - table.length - QUALIFIER_DELIMITER_BYTES.length];
+      System.arraycopy(row, table.length + QUALIFIER_DELIMITER_BYTES.length, qualifier, 0,
+        qualifier.length);
       CellScanner cells = res.cellScanner();
       while (cells.advance()) {
         Cell cell = cells.current();
