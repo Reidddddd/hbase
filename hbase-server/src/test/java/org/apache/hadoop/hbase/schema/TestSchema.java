@@ -69,6 +69,7 @@ public class TestSchema {
   private static final byte[] TEST_QUALIFIER_TWO = Bytes.toBytes("q2");
   private static final byte[] TEST_QUALIFIER_THREE = Bytes.toBytes("q3");
   private static final byte[] APPEND_DATA = Bytes.toBytes("I am data");
+  private static final byte[] CQ_DELIMITER = Bytes.toBytes("&");
 
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
@@ -146,10 +147,12 @@ public class TestSchema {
     // the second row is tableNameBytesTEST_QUALIFIER_ONE, under family TEST_FAMILY_1
     Assert.assertTrue(iterator.hasNext());
     res = iterator.next();
-    byte[] secondRow = new byte[tableNameBytes.length + TEST_QUALIFIER_ONE.length];
+    byte[] secondRow = new byte[tableNameBytes.length + TEST_QUALIFIER_ONE.length
+      + CQ_DELIMITER.length];
     System.arraycopy(tableNameBytes, 0, secondRow, 0, tableNameBytes.length);
+    System.arraycopy(CQ_DELIMITER, 0, secondRow, tableNameBytes.length, CQ_DELIMITER.length);
     System.arraycopy(TEST_QUALIFIER_ONE, 0, secondRow,
-        tableNameBytes.length, TEST_QUALIFIER_ONE.length);
+        tableNameBytes.length + CQ_DELIMITER.length, TEST_QUALIFIER_ONE.length);
     LOG.info("Row key of Result" + Bytes.toString(res.getRow()));
     Assert.assertTrue(Bytes.equals(secondRow, res.getRow()));
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
@@ -162,10 +165,12 @@ public class TestSchema {
     // the third row is tableNameBytesTEST_QUALIFIER_TWO, under family TEST_FAMILY_2
     Assert.assertTrue(iterator.hasNext());
     res = iterator.next();
-    byte[] thirdRow = new byte[tableNameBytes.length + TEST_QUALIFIER_TWO.length];
+    byte[] thirdRow = new byte[tableNameBytes.length + TEST_QUALIFIER_TWO.length +
+      CQ_DELIMITER.length];
     System.arraycopy(tableNameBytes, 0, thirdRow, 0, tableNameBytes.length);
+    System.arraycopy(CQ_DELIMITER, 0, thirdRow, tableNameBytes.length, CQ_DELIMITER.length);
     System.arraycopy(TEST_QUALIFIER_TWO, 0, thirdRow,
-        tableNameBytes.length, TEST_QUALIFIER_TWO.length);
+        tableNameBytes.length + CQ_DELIMITER.length, TEST_QUALIFIER_TWO.length);
     Assert.assertTrue(Bytes.equals(thirdRow, res.getRow()));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_2));
@@ -176,10 +181,12 @@ public class TestSchema {
     // the fourth row is tableNameBytesTEST_QUALIFIER_THREE, under family TEST_FAMILY_3
     Assert.assertTrue(iterator.hasNext());
     res = iterator.next();
-    byte[] fourthRow = new byte[tableNameBytes.length + TEST_QUALIFIER_THREE.length];
+    byte[] fourthRow = new byte[tableNameBytes.length + TEST_QUALIFIER_THREE.length
+      + CQ_DELIMITER.length];
     System.arraycopy(tableNameBytes, 0, fourthRow, 0, tableNameBytes.length);
+    System.arraycopy(CQ_DELIMITER, 0, fourthRow, tableNameBytes.length, CQ_DELIMITER.length);
     System.arraycopy(TEST_QUALIFIER_THREE, 0, fourthRow,
-      tableNameBytes.length, TEST_QUALIFIER_THREE.length);
+      tableNameBytes.length + CQ_DELIMITER.length, TEST_QUALIFIER_THREE.length);
     Assert.assertTrue(Bytes.equals(fourthRow, res.getRow()));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertFalse(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_2));
@@ -263,10 +270,12 @@ public class TestSchema {
     // the second row is tableNameBytesTEST_QUALIFIER_ONE, under family TEST_FAMILY_1
     Assert.assertTrue(iterator.hasNext());
     res = iterator.next();
-    byte[] secondRow = new byte[tableNameBytes.length + TEST_QUALIFIER_ONE.length];
+    byte[] secondRow = new byte[tableNameBytes.length + TEST_QUALIFIER_ONE.length
+      + CQ_DELIMITER.length];
     System.arraycopy(tableNameBytes, 0, secondRow, 0, tableNameBytes.length);
+    System.arraycopy(CQ_DELIMITER, 0, secondRow, tableNameBytes.length, CQ_DELIMITER.length);
     System.arraycopy(TEST_QUALIFIER_ONE, 0, secondRow,
-        tableNameBytes.length, TEST_QUALIFIER_ONE.length);
+        tableNameBytes.length + CQ_DELIMITER.length, TEST_QUALIFIER_ONE.length);
     Assert.assertTrue(Bytes.equals(secondRow, res.getRow()));
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertEquals(1,
@@ -321,10 +330,12 @@ public class TestSchema {
     // the second row is tableNameBytesTEST_QUALIFIER_ONE, under family TEST_FAMILY_1
     Assert.assertTrue(iterator.hasNext());
     res = iterator.next();
-    byte[] secondRow = new byte[tableNameBytes.length + TEST_QUALIFIER_ONE.length];
+    byte[] secondRow = new byte[tableNameBytes.length + TEST_QUALIFIER_ONE.length
+      + CQ_DELIMITER.length];
     System.arraycopy(tableNameBytes, 0, secondRow, 0, tableNameBytes.length);
+    System.arraycopy(CQ_DELIMITER, 0, secondRow, tableNameBytes.length, CQ_DELIMITER.length);
     System.arraycopy(TEST_QUALIFIER_ONE, 0, secondRow,
-        tableNameBytes.length, TEST_QUALIFIER_ONE.length);
+        tableNameBytes.length + CQ_DELIMITER.length, TEST_QUALIFIER_ONE.length);
     Assert.assertTrue(Bytes.equals(secondRow, res.getRow()));
     Assert.assertTrue(res.containsColumn(SchemaService.SCHEMA_TABLE_CF, TEST_FAMILY_1));
     Assert.assertEquals(1,
