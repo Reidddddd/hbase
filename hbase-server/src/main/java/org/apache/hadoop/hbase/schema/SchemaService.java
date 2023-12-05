@@ -63,12 +63,12 @@ import org.apache.zookeeper.KeeperException;
 
 /**
  * The hbase:schema architecture is:
- * Row key               |    q      |   m   |
- *                       | a | b | c |   n   |
- * table_name            | _ | _ |   |   3   |
- * table_nameQualifier_1 | 1 |   |   |       |
- * table_nameQualifier_2 |   | 2     |       |
- * table_name1           |   |   | 3 |       |
+ * Row key                |    q      |   m   |
+ *                        | a | b | c |   n   |
+ * table_name             | _ | _ |   |   3   |
+ * table_name&Qualifier_1 | 1 |   |   |       |
+ * table_name&Qualifier_2 |   | 2     |       |
+ * table_name1            |   |   | 3 |       |
  * <p>
  * First of all, the family char is q in hbase:schema.
  * Qualifier will be families of each table, value is no need here.
@@ -117,6 +117,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
   static final byte[] SCHEMA_TABLE_CF = Bytes.toBytes("q");
   static final byte[] SCHEMA_TABLE_META_CF = Bytes.toBytes("m");
   static final byte[] SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER = Bytes.toBytes("c");
+  static final byte[] QUALIFIER_DELIMITER_BYTES = Bytes.toBytes("&");
 
   static final AtomicReference<TableStateListener> tableStateListener = new AtomicReference<>();
 
