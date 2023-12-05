@@ -73,8 +73,8 @@ import org.slf4j.LoggerFactory;
  * Row key               |    q      |   m   |
  *                       | a | b | c |   c   |
  * table_name            | _ | _ |   |   3   |
- * table_nameQualifier_1 | 1 |   |   |       |
- * table_nameQualifier_2 |   | 2     |       |
+ * table_name&Qualifier_1 | 1 |   |   |       |
+ * table_name&Qualifier_2 |   | 2     |       |
  * table_name1           |   |   | 3 |       |
  * <p>
  * First of all, the family char is q in hbase:schema.
@@ -126,6 +126,8 @@ public class SchemaService implements MasterCoprocessor, RegionCoprocessor,
   static final byte[] SCHEMA_TABLE_CF = Bytes.toBytes("q");
   static final byte[] SCHEMA_TABLE_META_CF = Bytes.toBytes("m");
   static final byte[] SCHEMA_TABLE_META_COLUMN_COUNT_QUALIFIER = Bytes.toBytes("c");
+  static final byte[] QUALIFIER_DELIMITER_BYTES = Bytes.toBytes("&");
+
   static final AtomicReference<TableStateListener> tableStateListener = new AtomicReference<>();
 
   // A static map to guarantee we do not duplicate zk node watching.
