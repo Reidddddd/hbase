@@ -32,6 +32,7 @@ import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Append;
+import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
@@ -416,7 +417,6 @@ public class TestSchema {
     Table schemaTable = UTIL.getConnection().getTable(TableName.SCHEMA_TABLE_NAME);
     schemaTable.get(get);
     long count = Bytes.toLong(schemaTable.get(get).getValue(metaFamily, countQualifier));
-    LOG.debug("--- q count = " + count);
     Assert.assertTrue(10 <= count);
 
     // Check we have only recorded the max size columns.
@@ -428,7 +428,7 @@ public class TestSchema {
   @Test
   public void testTaskCountLimit() throws IOException, InterruptedException {
     SchemaProcessor processor = SchemaProcessor.getInstance();
-    processor.init(false, UTIL.getConfiguration());
+    processor.init(false, UTIL.getConfiguration(), (ClusterConnection) UTIL.getConnection());
     int limit = UTIL.getConfiguration().getInt(MAX_TASK_NUM, MAX_TASK_NUM_DEFAULT);
     Assert.assertFalse(processor.reachedMaxTasks());
     for (int i = 0; i < limit + 1; i++) {

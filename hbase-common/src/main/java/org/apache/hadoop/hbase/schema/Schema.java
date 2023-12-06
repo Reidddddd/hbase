@@ -82,6 +82,16 @@ public class Schema implements Iterable<Column> {
     return table;
   }
 
+  public void removeColumn(Famy family, Qualy qualy) {
+    if (containColumn(family, qualy)) {
+      columns.get(family).remove(qualy);
+    }
+  }
+
+  public void removeColumn(byte[] family, byte[] qualifier) {
+    removeColumn(new Famy(family), new Qualy(qualifier));
+  }
+
   /**
    * Get a column with a specified family and a qualifier
    * @return can return null if specified column doesn't exist
@@ -171,5 +181,13 @@ public class Schema implements Iterable<Column> {
       result += set.size();
     }
     return result;
+  }
+
+  public void removeFamily(byte[] family) {
+    removeFamily(new Famy(family));
+  }
+
+  public void removeFamily(Famy family) {
+    columns.remove(family);
   }
 }
