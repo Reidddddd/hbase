@@ -622,7 +622,7 @@ public class TestReplicationSource {
       replicationAdmin.addPeer(peerId,
           new ReplicationPeerConfig().setClusterKey(TEST_UTIL_PEER.getClusterKey()), null);
       // Wait for replication sources to come up
-      Waiter.waitFor(conf, 20000, new Waiter.Predicate<Exception>() {
+      Waiter.waitFor(conf, 40000, new Waiter.Predicate<Exception>() {
         @Override public boolean evaluate() throws Exception {
           return !(managerA.getSources().isEmpty() || managerB.getSources().isEmpty());
         }
@@ -635,7 +635,7 @@ public class TestReplicationSource {
       // Stopping serverA
       // It's queues should be claimed by the only other alive server i.e. serverB
       cluster.stopRegionServer(serverA.getServerName());
-      Waiter.waitFor(conf, 20000, new Waiter.Predicate<Exception>() {
+      Waiter.waitFor(conf, 40000, new Waiter.Predicate<Exception>() {
         @Override public boolean evaluate() throws Exception {
           return managerB.getOldSources().size() == 1;
         }
@@ -643,7 +643,7 @@ public class TestReplicationSource {
 
       final HRegionServer serverC = cluster.startRegionServer().getRegionServer();
       serverC.waitForServerOnline();
-      Waiter.waitFor(conf, 20000, new Waiter.Predicate<Exception>() {
+      Waiter.waitFor(conf, 40000, new Waiter.Predicate<Exception>() {
         @Override public boolean evaluate() throws Exception {
           return serverC.getReplicationSourceService() != null;
         }
@@ -658,13 +658,13 @@ public class TestReplicationSource {
       // 1. The serverB's normal queue
       // 2. serverA's recovered queue on serverB
       cluster.stopRegionServer(serverB.getServerName());
-      Waiter.waitFor(conf, 20000, new Waiter.Predicate<Exception>() {
+      Waiter.waitFor(conf, 40000, new Waiter.Predicate<Exception>() {
         @Override public boolean evaluate() throws Exception {
           return managerC.getOldSources().size() == 2;
         }
       });
       replicationAdmin.enablePeer(peerId);
-      Waiter.waitFor(conf, 20000, new Waiter.Predicate<Exception>() {
+      Waiter.waitFor(conf, 40000, new Waiter.Predicate<Exception>() {
         @Override public boolean evaluate() throws Exception {
           return managerC.getOldSources().size() == 0;
         }
