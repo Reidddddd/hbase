@@ -19,6 +19,8 @@
 package org.apache.hadoop.hbase.schema;
 
 import static org.apache.hadoop.hbase.schema.SchemaService.MAX_COLUMNS_PER_TABLE_DEFAULT;
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM;
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.NUM_THREADS_KEY;
 import static org.apache.hadoop.hbase.schema.SchemaService.SCHEMA_TABLE_CF;
@@ -71,6 +73,7 @@ public class SchemaProcessor {
   private AsyncTable<AdvancedScanResultConsumer> schemaTable;
   private boolean inited = false;
   private int maxColumn;
+  private int maxTasks;
 
   private final static class Processor {
     private static final SchemaProcessor SINGLETON = new SchemaProcessor();
@@ -88,6 +91,7 @@ public class SchemaProcessor {
     String environment = env ? "Master-" : "RegionServer-";
     int numHandlers = conf.getInt(NUM_THREADS_KEY, NUM_THREADS_DEFAULT);
     maxColumn = conf.getInt(SOFT_MAX_COLUMNS_PER_TABLE, MAX_COLUMNS_PER_TABLE_DEFAULT);
+    maxTasks = conf.getInt(MAX_TASK_NUM, MAX_TASK_NUM_DEFAULT);
     updateExecutor = new FastPathExecutor(numHandlers, environment + "SchemaUpdateHandler");
     updateExecutor.start();
     taskAcceptor = new FastPathExecutor(numHandlers, environment + "SchemaProcessHandler");
@@ -298,4 +302,11 @@ public class SchemaProcessor {
   public boolean isWideTable(TableName tableName) {
     return wideTableSet.contains(tableName);
   }
+
+  // A check to confirm whether we keep accept tasks according to the ongoing tasks.
+  // For preventing OOM.
+  public boolean reachedMaxTasks() {
+    return taskAcceptor.numTasksInQueue() + updateExecutor.numTasksInQueue() >= maxTasks;
+  }
+
 }

@@ -20,9 +20,13 @@ package org.apache.hadoop.hbase.schema;
 import static org.apache.hadoop.hbase.HConstants.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY;
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.REGION_COPROCESSOR_CONF_KEY;
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM;
+import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM_DEFAULT;
 import static org.apache.hadoop.hbase.schema.SchemaService.SOFT_MAX_COLUMNS_PER_TABLE;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.concurrent.Semaphore;
+import org.apache.hadoop.hbase.FastPathProcessable;
 import org.apache.hadoop.hbase.HBaseClassTestRule;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
@@ -418,6 +422,36 @@ public class TestSchema {
     Admin admin = UTIL.getHBaseAdmin();
     Schema schema = admin.getSchemaOf(tableName);
     Assert.assertTrue(10 <= schema.numberOfColumns());
+  }
+
+  @Test
+  public void testTaskCountLimit() throws IOException, InterruptedException {
+    SchemaProcessor processor = SchemaProcessor.getInstance();
+    processor.init(false, UTIL.getConfiguration());
+    int limit = UTIL.getConfiguration().getInt(MAX_TASK_NUM, MAX_TASK_NUM_DEFAULT);
+    Assert.assertFalse(processor.reachedMaxTasks());
+    for (int i = 0; i < limit + 1; i++) {
+      processor.acceptTask(new DummyTask());
+    }
+    Assert.assertTrue(processor.reachedMaxTasks());
+
+    DummyTask.signal.release();
+    Thread.sleep(100);
+    Assert.assertFalse(processor.reachedMaxTasks());
+    DummyTask.signal.release(limit);
+  }
+
+  static class DummyTask implements FastPathProcessable {
+    static Semaphore signal = new Semaphore(0);
+
+    @Override
+    public void process() {
+      try {
+        signal.acquire();
+      } catch (Exception e) {
+        // Do nothing.
+      }
+    }
   }
 
   private static void checkCacheCleaned(TableName tableName) {

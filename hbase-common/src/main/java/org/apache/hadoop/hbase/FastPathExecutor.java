@@ -138,7 +138,7 @@ public class FastPathExecutor {
     return fastPathHandlerStack.size();
   }
 
-  int numTasksInQueue() {
+  public int numTasksInQueue() {
     return queue.size();
   }
 
