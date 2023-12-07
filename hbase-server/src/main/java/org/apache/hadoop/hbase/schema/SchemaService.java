@@ -247,7 +247,7 @@ public class SchemaService extends BaseMasterAndRegionObserver {
 
   private void sendTask(TableName table, Operation operation,
       NavigableMap<byte [], List<Cell>> cellMap) {
-    if (!processor.reachedMaxTasks()) {
+    if (processor.reachedMaxTasks()) {
       return;
     }
     if (cellMap == null) {
