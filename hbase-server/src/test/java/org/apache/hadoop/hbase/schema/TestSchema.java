@@ -443,15 +443,15 @@ public class TestSchema {
     SchemaProcessor processor = SchemaProcessor.getInstance();
     processor.init(false, UTIL.getConfiguration(), (ClusterConnection) UTIL.getConnection());
     int limit = UTIL.getConfiguration().getInt(MAX_TASK_NUM, MAX_TASK_NUM_DEFAULT);
-    Assert.assertTrue(processor.reachedMaxTasks());
+    Assert.assertFalse(processor.reachedMaxTasks());
     for (int i = 0; i < limit + 1; i++) {
       processor.acceptTask(new DummyTask());
     }
-    Assert.assertFalse(processor.reachedMaxTasks());
+    Assert.assertTrue(processor.reachedMaxTasks());
 
     DummyTask.signal.release();
     Thread.sleep(100);
-    Assert.assertTrue(processor.reachedMaxTasks());
+    Assert.assertFalse(processor.reachedMaxTasks());
     DummyTask.signal.release(limit);
   }
 
