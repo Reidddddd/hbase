@@ -118,13 +118,6 @@ public final class SchemaTableAccessor {
       List<Put> puts = new ArrayList<>();
 
       for (Column column : schema.getUpdatedColumns()) {
-        if (puts.size() == 0) {
-          // add this table row at the beginning for easier ACL check
-          puts.add(new Put(t).addColumn(SCHEMA_TABLE_CF,
-                                        column.getFamy().extractContent(),
-                                        HConstants.EMPTY_BYTE_ARRAY));
-        }
-
         Qualy qualifier = column.getQualy();
         byte[] row = new byte[t.length + qualifier.getLength() + QUALIFIER_DELIMITER_BYTES.length];
         System.arraycopy(t, 0, row, 0, t.length);
@@ -198,4 +191,9 @@ public final class SchemaTableAccessor {
     }
   }
 
+  public static TableName parseTableNameFromRowKey(byte[] row) {
+    int idx = Bytes.indexOf(row, QUALIFIER_DELIMITER_BYTES);
+    // This is the first row with no delimiter.
+    return TableName.valueOf(idx == -1 ? row : Bytes.copy(row, 0, idx));
+  }
 }
