@@ -18,13 +18,13 @@
  */
 package org.apache.hadoop.hbase.schema;
 
-import static org.apache.hadoop.hbase.HConstants.EMPTY_BYTE_ARRAY;
 import java.io.IOException;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
+import org.apache.hadoop.hbase.SchemaTableAccessor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
@@ -37,7 +37,6 @@ import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.ipc.RpcServer;
-import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.MiniBatchOperationInProgress;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
@@ -70,12 +69,13 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Private
 public class SchemaAccessChecker extends BaseRegionObserver {
   private static final Log LOG = LogFactory.getLog(SchemaAccessChecker.class);
+  private static final String CHECK_REQUEST = "checkTableSchemaExistence";
+  private static final String READ_REQUEST = "getTableSchema";
+  private static final String UPDATE_REQUEST = "updateTableSchema";
+  private static final String ACL_CHECK_PASSED = "acl_check_passed";
+  private static final byte[] TRUE = Bytes.toBytes(true);
 
   private AccessChecker aclChecker;
-
-  private ThreadLocal<Boolean> passedACL = ThreadLocal.withInitial(() -> false);
-  // for abnormal batch puts check
-  private ThreadLocal<byte[]> passedTable = new ThreadLocal<>();
 
   private Admin admin;
 
@@ -100,48 +100,23 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public boolean preExists(ObserverContext<RegionCoprocessorEnvironment> e,
       Get get, boolean exists) throws IOException {
-    if (!RpcServer.isInRpcCallContext()) {
-      return exists;
-    }
     User user = RpcServer.getRequestUser();
-    if (Superusers.isSuperUser(user)) {
+    if (shouldSkipCheck(user)) {
       return exists;
     }
-    assert user != null;
-
-    TableName table = null;
-    try {
-      table = TableName.valueOf(get.getRow());
-    } catch (Throwable t) {
-      // like invalid table name, unexpected call to preExists
-      auditFailure(user, "checkTableSchemaExistence",
-                   Bytes.toString(get.getRow()), MESSAGE.INVALID_TABLE);
-      return exists;
-    }
-    if (!admin.isTableAvailable(table)) {
-      auditFailure(user, "checkTableSchemaExistence",
-                   table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
-      return exists;
-    }
-    if (table.isSystemTable()) {
-      auditFailure(user, "checkTableSchemaExistence",
-                   table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
+    if (get.getAttribute(ACL_CHECK_PASSED) != null) {
+      e.complete();
       return exists;
     }
 
-    try {
-      // in schema region, AccessChecker must not be null
-      aclChecker.requirePermission(user, "checkTableSchemaExistence", table,
-          null, null, Permission.Action.READ);
-    } catch (IOException ioe) {
-      auditFailure(user, "checkTableSchemaExistence",
-                   table.getNameAsString(), MESSAGE.READ_ACCESS_DENIED);
-      throw ioe;
+    TableName table = parseRowKeyForTableName(get.getRow(), CHECK_REQUEST, user);
+    if (table == null) {
+      return exists;
     }
-    auditSuccess(user, "checkTableSchemaExistence",
-                 table.getNameAsString(), MESSAGE.NA);
+    aclCheck(CHECK_REQUEST, table, user, Permission.Action.READ);
+    get.setAttribute(ACL_CHECK_PASSED, TRUE);
+
     // short circuit, no need to execute AccessController, it will fail otherwise
-    passedACL.set(true);
     e.complete();
     return exists;
   }
@@ -149,82 +124,45 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public void preGetOp(ObserverContext<RegionCoprocessorEnvironment> e, Get get, List<Cell> results)
       throws IOException {
-    if (!RpcServer.isInRpcCallContext()) {
-      return;
-    }
     User user = RpcServer.getRequestUser();
-    if (Superusers.isSuperUser(user)) {
+    if (shouldSkipCheck(user)) {
       return;
     }
-    if (passedACL.get()) {
+    if (get.getAttribute(ACL_CHECK_PASSED) != null) {
       e.complete();
-    } else {
-      auditFailure(user, "checkTableSchemaExistence",
-                   Bytes.toString(get.getRow()), MESSAGE.MALFORMED_REQUEST);
+      return;
     }
-  }
 
-  @Override
-  public boolean postExists(ObserverContext<RegionCoprocessorEnvironment> e, Get get,
-      boolean exists) throws IOException {
-    passedACL.set(false);
-    return exists;
+    TableName table = parseRowKeyForTableName(get.getRow(), CHECK_REQUEST, user);
+    if (table == null) {
+      return;
+    }
+    aclCheck(CHECK_REQUEST, table, user, Permission.Action.READ);
+    get.setAttribute(ACL_CHECK_PASSED, TRUE);
+
+    // short circuit, no need to execute AccessController, it will fail otherwise
+    e.complete();
   }
 
   @Override
   public RegionScanner preScannerOpen(ObserverContext<RegionCoprocessorEnvironment> e, Scan scan,
       RegionScanner s) throws IOException {
-    if (!RpcServer.isInRpcCallContext()) {
-      return s;
-    }
     User user = RpcServer.getRequestUser();
-    if (Superusers.isSuperUser(user)) {
-      return s;
-    }
     assert user != null;
-
-    TableName table = null;
-    try {
-      table = TableName.valueOf(scan.getStartRow());
-    } catch (Throwable t) {
-      // like invalid table name, unexpected call
-      auditFailure(user, "getTableSchema",
-                   Bytes.toString(scan.getStartRow()), MESSAGE.INVALID_TABLE);
-      return s;
-    }
-    if (!admin.isTableAvailable(table)) {
-      auditFailure(user, "getTableSchema",
-                   table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
-      return s;
-    }
-    if (table.isSystemTable()) {
-      auditFailure(user, "getTableSchema",
-                   table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
+    if (shouldSkipCheck(user)) {
       return s;
     }
 
-    try {
-      // in schema region, AccessChecker must not be null
-      aclChecker.requirePermission(user, "getTableSchema", table,
-          null, null, Permission.Action.READ);
-    } catch (IOException ioe) {
-      auditFailure(user, "getTableSchema",
-                   table.getNameAsString(), MESSAGE.READ_ACCESS_DENIED);
-      throw ioe;
+    TableName table = parseRowKeyForTableName(scan.getStartRow(), READ_REQUEST, user);
+    if (table == null) {
+      return s;
     }
-    auditSuccess(user, "getTableSchema",
-                 table.getNameAsString(), MESSAGE.NA);
+
+    aclCheck(READ_REQUEST, table, user, Permission.Action.READ);
 
     // short circuit, no need to execute AccessController, it will fail otherwise
-    passedACL.set(true);
     e.complete();
     return s;
-  }
-
-  @Override
-  public void postScannerClose(ObserverContext<RegionCoprocessorEnvironment> e, InternalScanner s)
-      throws IOException {
-    passedACL.set(false);
   }
 
   /**
@@ -237,82 +175,44 @@ public class SchemaAccessChecker extends BaseRegionObserver {
   @Override
   public void prePut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit,
       Durability durability) throws IOException {
-    if (!RpcServer.isInRpcCallContext()) {
-      return;
-    }
     User user = RpcServer.getRequestUser();
-    if (Superusers.isSuperUser(user)) {
-      return;
-    }
     assert user != null;
-
-    if (passedACL.get()) {
-      if (Bytes.startsWith(put.getRow(), passedTable.get())) {
-        // it means, put operates on a same table, should be safe
-        e.complete();
-        return;
-      }
-      // probably a problematic call
-      auditFailure(user, "updateTableSchema",
-                   Bytes.toString(put.getRow()), MESSAGE.MALFORMED_REQUEST);
+    if (shouldSkipCheck(user)) {
+      return;
+    }
+    if (put.getAttribute(ACL_CHECK_PASSED) != null) {
+      e.complete();
       return;
     }
 
-    TableName table = null;
-    try {
-      table = TableName.valueOf(put.getRow());
-    } catch (Throwable t) {
-      // like invalid table name, unexpected callMESSAGE
-      auditFailure(user, "updateTableSchema",
-                   Bytes.toString(put.getRow()), MESSAGE.INVALID_TABLE);
-      return;
-    }
-    if (!admin.isTableAvailable(table)) {
-      auditFailure(user, "updateTableSchema",
-                   table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
-      return;
-    }
-    if (table.isSystemTable()) {
-      auditFailure(user, "updateTableSchema",
-                   table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
-      return;
-    }
+    TableName table = parseRowKeyForTableName(put.getRow(), UPDATE_REQUEST, user);
+    aclCheck(UPDATE_REQUEST, table, user, Permission.Action.WRITE);
 
-    try {
-      // in schema region, AccessChecker must not be null
-      aclChecker.requirePermission(user, "updateTableSchema", table,
-          null, null, Permission.Action.WRITE);
-    } catch (IOException ioe) {
-      auditFailure(user, "updateTableSchema",
-                   table.getNameAsString(), MESSAGE.WRITE_ACCESS_DENIED);
-      throw ioe;
-    }
-    auditSuccess(user, "updateTableSchema",
-                 table.getNameAsString(), MESSAGE.NA);
+    put.setAttribute(ACL_CHECK_PASSED, TRUE);
 
     // short circuit, no need to execute AccessController, it will fail otherwise
     e.complete();
-    passedACL.set(true);
-    passedTable.set(put.getRow());
   }
 
   @Override
-  public void preBatchMutate(ObserverContext<RegionCoprocessorEnvironment> c,
+  public void preBatchMutate(ObserverContext<RegionCoprocessorEnvironment> e,
       MiniBatchOperationInProgress<Mutation> miniBatchOp) throws IOException {
-    if (!RpcServer.isInRpcCallContext()) {
+    User user = RpcServer.getRequestUser();
+    assert user != null;
+    if (shouldSkipCheck(user)) {
       return;
     }
-    if (passedACL.get()) {
-      c.complete();
-    }
-  }
 
-  @Override
-  public void postPut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit,
-      Durability durability) throws IOException {
-    if (passedACL.get()) {
-      passedACL.set(false);
-      passedTable.set(EMPTY_BYTE_ARRAY);
+    if (miniBatchOp.size() > 0) {
+      Mutation firstMutation = miniBatchOp.getOperation(0);
+      if (firstMutation.getAttribute(ACL_CHECK_PASSED) != null) {
+        e.complete();
+        return;
+      }
+      TableName table = parseRowKeyForTableName(firstMutation.getRow(), UPDATE_REQUEST, user);
+      aclCheck(UPDATE_REQUEST, table, user, Permission.Action.WRITE);
+      // short circuit, no need to execute AccessController, it will fail otherwise
+      e.complete();
     }
   }
 
@@ -347,4 +247,73 @@ public class SchemaAccessChecker extends BaseRegionObserver {
     LOG.info(String.format(AUDIT_FORMAT, user, action, table, "pass", error.msg));
   }
 
+  // Extracted duplicated logic in every hook.
+  // If we are not in an RpcContext or we are a superuser, return true.
+  private boolean shouldSkipCheck(User user) {
+    return !RpcServer.isInRpcCallContext() || Superusers.isSuperUser(user);
+  }
+
+  // Extracted duplicated logic in every hook.
+  // To parse the table name from given rowkey bytes.
+  // When we turn on the authentication, there are three cases to throw IOE in this method.
+  // 1. Target table unavailable.
+  // 2. Invalid byte[] row.
+  // 3. Target table is a system table.
+  // When authorizationEnabled == false, the return value will be null.
+  private TableName parseRowKeyForTableName(byte[] row, String request, User user)
+    throws IOException {
+    TableName table = null;
+    try {
+      table = SchemaTableAccessor.parseTableNameFromRowKey(row);
+    } catch (Throwable t) {
+      // like invalid table name, unexpected callMESSAGE
+      auditFailure(user, request, Bytes.toString(row), MESSAGE.INVALID_TABLE);
+    }
+    if (table == null) {
+      return null;
+    }
+    try {
+      if (!admin.isTableAvailable(table)) {
+        auditFailure(user, request, table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
+        return null;
+      }
+    } catch (IOException ioe) {
+      auditFailure(user, request, table.getNameAsString(), MESSAGE.TABLE_NOT_AVAILABLE);
+      throw ioe;
+    }
+    if (table.isSystemTable()) {
+      auditFailure(user, request, table.getNameAsString(), MESSAGE.SYSTEM_TABLE);
+      return null;
+    }
+    return table;
+  }
+
+  private void aclCheck(String request, TableName table, User user, Permission.Action action)
+    throws IOException {
+    if (table == null) {
+      // Null table name means a parse failure in the previous step.
+      // We only arrive here when the authentication is off.
+      // Do this check and throw a new AccessDeniedException to tell the client we cannot parse
+      // the table name from the request.
+      auditFailure(user, request, "Unknown table", MESSAGE.MALFORMED_REQUEST);
+      throw new AccessDeniedException("Unknown table");
+    }
+    try {
+      // in schema region, AccessChecker must not be null
+      aclChecker.requirePermission(user, request, table, null, null, action);
+    } catch (IOException ioe) {
+      switch (action) {
+        case READ:
+          auditFailure(user, request, table.getNameAsString(), MESSAGE.READ_ACCESS_DENIED);
+          break;
+        case WRITE:
+          auditFailure(user, request, table.getNameAsString(), MESSAGE.WRITE_ACCESS_DENIED);
+          break;
+        default:
+          break;
+      }
+      throw ioe;
+    }
+    auditSuccess(user, request, table.getNameAsString(), MESSAGE.NA);
+  }
 }

@@ -22,6 +22,7 @@ import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.MASTER_COPROCE
 import static org.apache.hadoop.hbase.coprocessor.CoprocessorHost.REGION_COPROCESSOR_CONF_KEY;
 import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM;
 import static org.apache.hadoop.hbase.schema.SchemaService.MAX_TASK_NUM_DEFAULT;
+import static org.apache.hadoop.hbase.schema.SchemaService.SOFT_MAX_COLUMNS_PER_TABLE;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.Semaphore;
@@ -71,6 +72,8 @@ public class TestSchema {
     UTIL.getConfiguration().set(MASTER_COPROCESSOR_CONF_KEY,
       "org.apache.hadoop.hbase.schema.SchemaService");
     UTIL.getConfiguration().setInt("hbase.schema.updater.threads", 1);
+    UTIL.getConfiguration().setInt(MAX_TASK_NUM, 10);
+    UTIL.getConfiguration().setInt(SOFT_MAX_COLUMNS_PER_TABLE, 10);
 
     UTIL.startMiniCluster();
     // Wait until all initialized.
@@ -364,7 +367,7 @@ public class TestSchema {
     put2.addColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO, TEST_VALUE);
     table.put(put2);
     // Wait for the schema recording.
-    Thread.sleep(1000);
+    Thread.sleep(5000);
 
     // Get schema via API and did some simple verification
     Admin admin = UTIL.getHBaseAdmin();
@@ -402,15 +405,16 @@ public class TestSchema {
     families[0] = TEST_FAMILY_1;
     Table table = UTIL.createTable(tableName, families);
     UTIL.waitTableAvailable(tableName);
+    int maxColumns = UTIL.getConfiguration().getInt(SOFT_MAX_COLUMNS_PER_TABLE, 1000);
 
     // Default upper bound is 1000.
-    for (int i = 0; i < 1005; i++) {
+    for (int i = 0; i < maxColumns + 5; i++) {
       Put put = new Put(TEST_ROW);
       put.addColumn(TEST_FAMILY_1, Bytes.toBytes(i), EMPTY_BYTE_ARRAY);
       table.put(put);
     }
 
-    Thread.sleep(3000);
+    Thread.sleep(5000);
 
     byte[] metaFamily = Bytes.toBytes("m");
     byte[] countQualifier = Bytes.toBytes("c");
@@ -425,10 +429,10 @@ public class TestSchema {
     // Wait for the schema table update.
     Thread.sleep(5000);
     Schema schema = admin.getSchemaOf(tableName);
-    Assert.assertTrue(schema.numberOfColumns() >= 1000);
+    Assert.assertTrue(schema.numberOfColumns() >= maxColumns);
 
     // Put some new columns.
-    for (int i = 1005; i < 1010; i++) {
+    for (int i = maxColumns + 5; i < maxColumns + 10; i++) {
       Put put = new Put(TEST_ROW);
       put.addColumn(TEST_FAMILY_1, Bytes.toBytes(i), EMPTY_BYTE_ARRAY);
       table.put(put);
