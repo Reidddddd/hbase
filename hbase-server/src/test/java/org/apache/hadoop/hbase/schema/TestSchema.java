@@ -370,12 +370,12 @@ public class TestSchema {
     Assert.assertTrue(schema.containColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE));
     Assert.assertTrue(schema.containColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO));
     Column column1 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE);
-    Assert.assertTrue(Bytes.equals(TEST_FAMILY_1, column1.getFamy().getFamily()));
-    Assert.assertTrue(Bytes.equals(TEST_QUALIFIER_ONE, column1.getQualy().getQualifier()));
+    Assert.assertTrue(Bytes.equals(TEST_FAMILY_1, column1.getFamy().extractContent()));
+    Assert.assertTrue(Bytes.equals(TEST_QUALIFIER_ONE, column1.getQualy().extractContent()));
     Assert.assertEquals(ColumnType.NONE, column1.getType());
     Column column2 = schema.getColumn(TEST_FAMILY_1, TEST_QUALIFIER_TWO);
-    Assert.assertTrue(Bytes.equals(TEST_FAMILY_1, column2.getFamy().getFamily()));
-    Assert.assertTrue(Bytes.equals(TEST_QUALIFIER_TWO, column2.getQualy().getQualifier()));
+    Assert.assertTrue(Bytes.equals(TEST_FAMILY_1, column2.getFamy().extractContent()));
+    Assert.assertTrue(Bytes.equals(TEST_QUALIFIER_TWO, column2.getQualy().extractContent()));
     Assert.assertEquals(ColumnType.NONE, column2.getType());
 
     // Update schema

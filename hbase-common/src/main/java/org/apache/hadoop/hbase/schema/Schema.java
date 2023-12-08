@@ -66,16 +66,26 @@ public class Schema implements Iterable<Column> {
   }
 
   public boolean addFamily(Famy family) {
-    return columns.putIfAbsent(family, new ConcurrentSkipListSet<>()) == null;
+    if (!columns.containsKey(family)) {
+      Famy actualKey = new Famy(family.extractContent());
+      return columns.putIfAbsent(actualKey, new ConcurrentSkipListSet<>()) == null;
+    }
+    return false;
   }
 
+  // Used for UT.
   public boolean addColumn(byte[] family, byte[] qualifier) {
     return addColumn(new Famy(family), new Qualy(qualifier));
   }
 
   public boolean addColumn(Famy family, Qualy qualifier) {
     addFamily(family);
-    return columns.get(family).add(qualifier);
+    if (!columns.get(family).contains(qualifier)) {
+      Qualy actualKey = new Qualy(qualifier.extractContent());
+      actualKey.updateType(qualifier.getType());
+      return columns.get(family).add(actualKey);
+    }
+    return false;
   }
 
   public TableName getTable() {
@@ -102,7 +112,9 @@ public class Schema implements Iterable<Column> {
     }
     Set<Qualy> qualies = columns.get(family);
     Qualy qualy = qualies.stream()
-                         .filter(q -> Bytes.equals(q.getQualifier(), qualifier.getQualifier()))
+                         .filter(q -> Bytes.equals(q.getBytes(), q.getOffset(),
+                           q.getLength(), qualifier.getBytes(), qualifier.getOffset(),
+                           qualifier.getLength()))
                          .findAny().get();
     return new MutableColumn(this, family, qualy);
   }

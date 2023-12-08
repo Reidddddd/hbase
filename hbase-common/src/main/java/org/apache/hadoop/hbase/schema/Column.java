@@ -49,11 +49,10 @@ public class Column implements Comparable<Column>, Comparator<Column> {
     qualifier = qualy;
 
     // calculate hashcode at the beginning, to avoid frequent copying
-    byte[] f = famy.getFamily();
-    byte[] q = qualy.getQualifier();
-    byte[] column = new byte[f.length + q.length];
-    System.arraycopy(f, 0, column, 0, f.length);
-    System.arraycopy(q, 0, column, f.length, q.length);
+    byte[] column = new byte[famy.getLength() + qualy.getLength()];
+    System.arraycopy(famy.getBytes(), famy.getOffset(), column, 0, famy.getLength());
+    System.arraycopy(qualy.getBytes(), qualy.getOffset(), column, famy.getLength(),
+      qualy.getLength());
     hashCode = Bytes.hashCode(column);
   }
 
@@ -86,9 +85,8 @@ public class Column implements Comparable<Column>, Comparator<Column> {
     if (!(other instanceof Column)) {
       return false;
     }
-    Column column = (Column) other;
-    return Bytes.equals(family.getFamily(), column.getFamy().getFamily()) &&
-           Bytes.equals(qualifier.getQualifier(), column.getQualy().getQualifier());
+    return family.equals(((Column) other).family) &&
+           qualifier.equals(((Column) other).qualifier);
   }
 
   @Override
@@ -96,9 +94,9 @@ public class Column implements Comparable<Column>, Comparator<Column> {
     if (this == other) {
       return 0;
     }
-    int res = Bytes.compareTo(family.getFamily(), other.getFamy().getFamily());
+    int res = family.compareTo(other.getFamy());
     if (res == 0) {
-      return Bytes.compareTo(qualifier.getQualifier(), other.getQualy().getQualifier());
+      return qualifier.compareTo(other.getQualy());
     }
     return res;
   }
@@ -111,8 +109,8 @@ public class Column implements Comparable<Column>, Comparator<Column> {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("column: {family: ").append(Bytes.toString(family.getFamily())).append(", ")
-      .append("qualifier: ").append(Bytes.toString(qualifier.getQualifier())).append(", ")
+    sb.append("column: {family: ").append(family.toString()).append(", ")
+      .append("qualifier: ").append(qualifier.toString()).append(", ")
       .append("type: ").append(qualifier.getType().name())
       .append("}");
     return sb.toString();
