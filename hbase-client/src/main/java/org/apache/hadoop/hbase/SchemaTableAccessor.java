@@ -198,4 +198,9 @@ public final class SchemaTableAccessor {
     }
   }
 
+  public static TableName parseTableNameFromRowKey(byte[] row) {
+    int idx = Bytes.indexOf(row, QUALIFIER_DELIMITER_BYTES);
+    // This is the first row with no delimiter.
+    return TableName.valueOf(idx == -1 ? row : Bytes.copy(row, 0, idx));
+  }
 }

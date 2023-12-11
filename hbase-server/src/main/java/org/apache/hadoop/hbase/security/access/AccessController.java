@@ -189,7 +189,7 @@ public class AccessController implements MasterCoprocessor, RegionCoprocessor,
   private static final String TAG_CHECK_PASSED = "tag_check_passed";
   private static final byte[] TRUE = Bytes.toBytes(true);
 
-  private AccessChecker accessChecker;
+  protected AccessChecker accessChecker;
   private ZKPermissionWatcher zkPermissionWatcher;
 
   /** flags if we are running on a region of the _acl_ table */
