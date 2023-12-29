@@ -357,9 +357,10 @@ public class RSGroupAdminServer implements RSGroupAdmin {
       List<RegionPlan> plans = new ArrayList<RegionPlan>();
       for(Map.Entry<TableName, Map<ServerName, List<HRegionInfo>>> tableMap:
           getRSGroupAssignmentsByTable(groupName).entrySet()) {
-        LOG.info("Creating partial plan for table "+tableMap.getKey()+": "+tableMap.getValue());
+        LOG.info("Creating partial plan for table " + tableMap.getKey() + ": ");
+        LOG.info("" + tableMap.getValue());
         List<RegionPlan> partialPlans = balancer.balanceCluster(tableMap.getValue());
-        LOG.info("Partial plan for table "+tableMap.getKey()+": "+partialPlans);
+        LOG.info("Partial plan for table " + tableMap.getKey() + ": "+partialPlans);
         if (partialPlans != null) {
           plans.addAll(partialPlans);
         }

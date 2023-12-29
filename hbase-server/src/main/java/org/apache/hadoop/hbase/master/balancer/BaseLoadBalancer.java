@@ -1302,7 +1302,19 @@ public abstract class BaseLoadBalancer implements LoadBalancer {
     float average = cs.getLoadAverage(); // for logging
     int floor = (int) Math.floor(average * (1 - slop));
     int ceiling = (int) Math.ceil(average * (1 + slop));
-    if (!(cs.getMaxLoad() > ceiling || cs.getMinLoad() < floor)) {
+    if (!(cs.getMaxLoad() > ceiling || cs.getMinLoad() < floor
+      /**
+       * For example we have 4 regions on 4 RSs:
+       * RS1 : region1, region2
+       * RS2 : region3
+       * RS3 : region4
+       * RS4 : no region
+       * For this situation our expectation is, balancer could move one region from RS1 to RS4.
+       * But if we only calculate maxLoad and minLoad and compare them with ceiling and floor,
+       * Balancer will do nothing.
+       * So we add the logic below, to cover the situation that region number is very small.
+       */
+      || (average <= 1 && cs.getMaxLoad() > 1))) {
       NavigableMap<ServerAndLoad, List<HRegionInfo>> serversByLoad = cs.getServersByLoad();
       if (LOG.isTraceEnabled()) {
         // If nothing to balance, then don't say anything unless trace-level logging.
