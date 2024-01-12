@@ -215,9 +215,12 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter
       InterruptedIOException ioe = new InterruptedIOException();
       ioe.initCause(e);
       throw ioe;
-    } catch (ExecutionException | TimeoutException e) {
+    } catch (ExecutionException e) {
       Throwables.propagateIfPossible(e.getCause(), IOException.class);
       throw new RuntimeException(e.getCause());
+    } catch (TimeoutException e) {
+      throw new RuntimeException("Write WAL meta data met a timeoutException after "
+        + waitTimeout + " mill seconds.", e);
     }
   }
 
