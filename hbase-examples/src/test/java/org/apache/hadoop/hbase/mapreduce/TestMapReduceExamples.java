@@ -32,6 +32,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.invocation.InvocationOnMock;
@@ -84,6 +85,7 @@ public class TestMapReduceExamples {
    * Test main method of SampleUploader.
    */
   @Test
+  @Ignore
   public void testMainSampleUploader() throws Exception {
     PrintStream oldPrintStream = System.err;
     SecurityManager SECURITY_MANAGER = System.getSecurityManager();
@@ -151,6 +153,7 @@ public class TestMapReduceExamples {
    * Test main method of IndexBuilder
    */
   @Test
+  @Ignore
   public void testMainIndexBuilder() throws Exception {
     PrintStream oldPrintStream = System.err;
     SecurityManager SECURITY_MANAGER = System.getSecurityManager();

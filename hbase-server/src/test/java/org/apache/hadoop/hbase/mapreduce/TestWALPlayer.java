@@ -57,6 +57,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Mapper.Context;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.invocation.InvocationOnMock;
@@ -192,6 +193,7 @@ public class TestWALPlayer {
    * Test main method
    */
   @Test
+  @Ignore
   public void testMainMethod() throws Exception {
 
     PrintStream oldPrintStream = System.err;

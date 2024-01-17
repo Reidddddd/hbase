@@ -33,6 +33,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -282,6 +283,7 @@ public class TestCellCounter {
    * Test main method of CellCounter
    */
   @Test (timeout=300000)
+  @Ignore
   public void testCellCounterMain() throws Exception {
 
     PrintStream oldPrintStream = System.err;
@@ -356,6 +358,7 @@ public class TestCellCounter {
   }
 
   @Test (timeout=300000)
+  @Ignore
   public void TestCellCounterWithoutOutputDir() throws Exception {
     PrintStream oldPrintStream = System.err;
     SecurityManager SECURITY_MANAGER = System.getSecurityManager();

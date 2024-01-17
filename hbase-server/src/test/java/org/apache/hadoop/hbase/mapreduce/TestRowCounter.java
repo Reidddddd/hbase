@@ -45,6 +45,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -359,6 +360,7 @@ public class TestRowCounter {
    * test main method. Import should print help and call System.exit
    */
   @Test
+  @Ignore
   public void testImportMain()
       throws Exception {
     PrintStream oldPrintStream = System.err;

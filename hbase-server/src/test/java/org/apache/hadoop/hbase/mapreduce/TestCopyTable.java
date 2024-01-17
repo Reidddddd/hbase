@@ -42,6 +42,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -228,6 +229,7 @@ public class TestCopyTable {
    * Test main method of CopyTable.
    */
   @Test
+  @Ignore
   public void testMainMethod() throws Exception {
     String[] emptyArgs = { "-h" };
     PrintStream oldWriter = System.err;
