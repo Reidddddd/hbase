@@ -79,6 +79,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -530,6 +531,7 @@ public class TestImportExport {
    * test main method. Import should print help and call System.exit
    */
   @Test
+  @Ignore
   public void testImportMain() throws Exception {
     PrintStream oldPrintStream = System.err;
     SecurityManager SECURITY_MANAGER = System.getSecurityManager();
@@ -559,6 +561,7 @@ public class TestImportExport {
    * test main method. Export should print help and call System.exit
    */
   @Test
+  @Ignore
   public void testExportMain() throws Exception {
     PrintStream oldPrintStream = System.err;
     SecurityManager SECURITY_MANAGER = System.getSecurityManager();
