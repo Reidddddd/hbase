@@ -1016,8 +1016,10 @@ public class HMaster extends HRegionServer implements MasterServices, Server {
 
   // Only invoked when k8s mode is on.
   void moveServerToTargetGroup(ServerName sn, String groupName) throws IOException {
-    if (!isInitialized() || rsGroupAdminClient == null) {
+    if (!isInitialized() || rsGroupAdminClient == null
+        || groupName.equals(RSGroupInfo.DEFAULT_GROUP)) {
       // We are not initialized or the rsGroupAdminClient is not initialized. Skip this move.
+      // Or the target group is default, no need to move.
       return;
     }
 

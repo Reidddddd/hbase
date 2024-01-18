@@ -383,7 +383,12 @@ public class MasterRpcServices extends RSRpcServices
       if (request.hasGroupName()) {
         String rsgroupName = request.getGroupName();
         if (!rsgroupName.isEmpty()) {
-          master.moveServerToTargetGroup(rs, rsgroupName);
+          try {
+            master.moveServerToTargetGroup(rs, rsgroupName);
+          } catch (IOException e) {
+            LOG.warn("Met an exception when moving regionserver: " + rs.getInternalHostName()
+              + " to the group " + rsgroupName + " ignored moving.", e);
+          }
         }
       }
 
