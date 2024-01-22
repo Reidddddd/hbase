@@ -353,8 +353,7 @@ public abstract class AbstractLog implements WAL {
     });
     long txid = txidHolder.longValue();
     try {
-      GenericWALEntry entry = new GenericWALEntry(txid, key, edits, htd, hri, inMemstore);
-      entry.stampRegionSequenceId(we);
+      GenericWALEntry entry = new GenericWALEntry(txid, key, edits, htd, hri, inMemstore, we);
       ringBuffer.get(txid).loadPayload(entry);
     } finally {
       ringBuffer.publish(txid);

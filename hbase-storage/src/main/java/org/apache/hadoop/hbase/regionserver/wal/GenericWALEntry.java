@@ -52,7 +52,8 @@ class GenericWALEntry extends Entry {
   private final Set<byte[]> familyNames;
 
   GenericWALEntry(final long sequence, final WALKey key, final WALEdit edit,
-      final HTableDescriptor htd, final HRegionInfo hri, final boolean inMemstore) {
+                  final HTableDescriptor htd, final HRegionInfo hri, final boolean inMemstore,
+                  final MultiVersionConcurrencyControl.WriteEntry we) throws IOException {
     super(key, edit);
     this.inMemstore = inMemstore;
     this.htd = htd;
@@ -60,14 +61,26 @@ class GenericWALEntry extends Entry {
     this.sequence = sequence;
     if (inMemstore) {
       // construct familyNames here to reduce the work of log sinker.
-      this.familyNames = edit.getFamilies() != null ? edit.getFamilies() :
-        getFamilyNamesFromEdit(edit);
+      // Also stamp region sequenceId in the same round to improve performance.
+      if (edit.getFamilies() != null) {
+        familyNames = edit.getFamilies();
+        if (!edit.isReplay()) {
+          long regionSequenceId = we.getWriteNumber();
+          for (Cell cell : edit.getCells()) {
+            CellUtil.setSequenceId(cell, regionSequenceId);
+          }
+        }
+      } else {
+        familyNames = getFamilyNamesFromEdit(edit, we.getWriteNumber());
+      }
     } else {
       this.familyNames = Collections.<byte[]> emptySet();
     }
+    this.getKey().setWriteEntry(we);
   }
 
-  private Set<byte[]> getFamilyNamesFromEdit(WALEdit edit) {
+  private Set<byte[]> getFamilyNamesFromEdit(WALEdit edit, long regionSequenceId)
+      throws IOException {
     ArrayList<Cell> cells = edit.getCells();
     if (CollectionUtils.isEmpty(cells)) {
       return Collections.emptySet();
@@ -76,6 +89,11 @@ class GenericWALEntry extends Entry {
       for (Cell cell : cells) {
         if (!CellUtil.matchingFamily(cell, WALEdit.METAFAMILY)) {
           familySet.add(CellUtil.cloneFamily(cell));
+        }
+        // We checked inMemory here before. But this function is only invoked for inMemory case.
+        // So, the check condition is removed.
+        if (!edit.isReplay()) {
+          CellUtil.setSequenceId(cell, regionSequenceId);
         }
       }
       return Collections.unmodifiableSet(familySet);
@@ -104,23 +122,6 @@ class GenericWALEntry extends Entry {
    */
   long getSequence() {
     return this.sequence;
-  }
-
-  /**
-   * Here is where a WAL edit gets its sequenceid.
-   * @param we after HBASE-17471 we already get the mvcc number
-   *        in WriteEntry, just stamp the writenumber to cells and walkey
-   * @return The sequenceid we stamped on this edit.
-   */
-  long stampRegionSequenceId(MultiVersionConcurrencyControl.WriteEntry we) throws IOException {
-    long regionSequenceId = we.getWriteNumber();
-    if (!this.getEdit().isReplay() && inMemstore) {
-      for (Cell c : getEdit().getCells()) {
-        CellUtil.setSequenceId(c, regionSequenceId);
-      }
-    }
-    getKey().setWriteEntry(we);
-    return regionSequenceId;
   }
 
   /**

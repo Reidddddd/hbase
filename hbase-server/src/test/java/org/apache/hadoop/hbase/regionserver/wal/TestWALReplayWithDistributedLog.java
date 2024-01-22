@@ -1064,8 +1064,7 @@ public class TestWALReplayWithDistributedLog extends TestDistributedLogBase {
     int index) throws IOException {
     GenericWALEntry entry =
       new GenericWALEntry(sequence, createWALKey(htd.getTableName(), hri, mvcc), createWALEdit(
-        rowName, family, ee, index), htd, hri, true);
-    entry.stampRegionSequenceId(mvcc.begin());
+          rowName, family, ee, index), htd, hri, true, mvcc.begin());
     return entry;
   }
 
