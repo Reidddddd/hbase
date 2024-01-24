@@ -74,7 +74,6 @@ public class ReplicationIndependentSourceManager extends ReplicationSourceManage
       QUEUE_CHECKER_EXECUTOR = (ThreadPoolExecutor) Executors.newFixedThreadPool(1,
         new ThreadFactoryBuilder()
           .setNameFormat("ReplicationIndependentConsumerQueueCheckerExecutor-%d")
-          .setDaemon(true)
           .build()
       );
     }
