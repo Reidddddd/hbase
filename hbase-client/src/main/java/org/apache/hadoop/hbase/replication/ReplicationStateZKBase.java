@@ -106,6 +106,18 @@ public abstract class ReplicationStateZKBase {
     return result;
   }
 
+  protected List<String> getListOfReplicatorZK(String serverName) throws KeeperException {
+    List<String> result = null;
+    try {
+      result = ZKUtil.listChildrenNoWatch(this.zookeeper,
+        ZKUtil.joinZNode(this.queuesZNode, serverName));
+    } catch (KeeperException e) {
+      this.abortable.abort("Failed to get list of replicators", e);
+      throw e;
+    }
+    return result;
+  }
+
   /**
    * @param state
    * @return Serialized protobuf of <code>state</code> with pb magic prefix prepended suitable for

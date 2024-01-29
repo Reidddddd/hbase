@@ -81,6 +81,8 @@ public class ReplicationIndependentSourceManager extends ReplicationSourceManage
 
   @Override
   protected void init() throws IOException, ReplicationException {
+    LOG.info("Start to init replication source manager, found " +
+      this.replicationPeers.getPeerIds().size() + " peers.");
     for (String id : this.replicationPeers.getPeerIds()) {
       MetricsSource metrics = new MetricsSource(id);
       this.sourcesMetrics.put(id, metrics);

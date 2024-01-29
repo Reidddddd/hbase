@@ -374,6 +374,17 @@ public class ReplicationQueuesZKImpl extends ReplicationStateZKBase implements R
   }
 
   @Override
+  public List<String> getAllQueuesOfReplicator(String replicator) throws ReplicationException {
+    try {
+      return super.getListOfReplicatorZK(replicator);
+    } catch (KeeperException e) {
+      this.abortable.abort("Failed to get a list of queues for region server: "
+        + this.myQueuesZnode, e);
+      throw new ReplicationException("getListOfReplicators() from ZK failed", e);
+    }
+  }
+
+  @Override
   public boolean isThisOurRegionServer(String regionserver) {
     return ZKUtil.joinZNode(this.queuesZNode, regionserver).equals(this.myQueuesZnode);
   }

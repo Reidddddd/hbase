@@ -183,6 +183,12 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
       if (currentReplicators != null && !currentReplicators.isEmpty()) {
         LOG.info("Found " + currentReplicators.size() + " regionservers.");
         for (String serverName : currentReplicators) {
+          List<String> queuesOfReplicator =
+            replicationQueues.getAllQueuesOfReplicator(serverName);
+          if (queuesOfReplicator == null || queuesOfReplicator.size() == 0) {
+            LOG.info("Queue of " + serverName + " is empty, try to find another one");
+            continue;
+          }
           if (replicationQueues.lockOtherRS(serverName, CreateMode.EPHEMERAL)) {
             consumeRS = serverName;
             LOG.info("Locked " + consumeRS);

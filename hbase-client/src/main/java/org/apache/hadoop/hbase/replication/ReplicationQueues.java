@@ -194,4 +194,6 @@ public interface ReplicationQueues {
   List<Path> getLogsInPath() throws IOException;
 
   void unlockOtherRS(String consumeRS);
+
+  List<String> getAllQueuesOfReplicator(String serverName) throws ReplicationException;
 }
