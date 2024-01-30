@@ -229,9 +229,8 @@ public class TestReplicationSourceManagerPeerOperations {
       assertEquals(4, manager.getSourceMetrics(multiWalPeer).getSizeOfLogQueue());
       
       manager.logPositionAndCleanOldLogs(path2, multiWalPeer, 1L, false, false);
-      assertTrue(manager.getSourcesWaitingDrainPaths().get(multiWalPeer).contains(path));
       manager.logPositionAndCleanOldLogs(path3, multiWalPeer, 1L, false, false);
-      assertTrue(manager.getSourcesWaitingDrainPaths().get(multiWalPeer).isEmpty());
+      manager.checkAndCleanWaitingDrainSource();
 
       Waiter.waitFor(conf, 20000, (Predicate<Exception>) () ->
           manager.getPeerRunningStatus(multiWalPeer).equals(PeerRunningStatus.NOT_RUNNING)

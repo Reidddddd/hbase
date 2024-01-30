@@ -49,7 +49,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.CompatibilitySingletonFactory;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.ScheduledChore;
 import org.apache.hadoop.hbase.Server;
+import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.TableDescriptors;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.conf.ConfigurationObserver;
@@ -233,6 +235,10 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
     this.peerReplicationTables = Collections.synchronizedSet(new HashSet<TableName>());
     this.sourcesPeerRunningStatus = new ConcurrentHashMap<String, PeerRunningStatus>();
     this.sourcesMetrics = new ConcurrentHashMap<String, MetricsSource>();
+    if (this.server instanceof HRegionServer) {
+      this.server.getChoreService()
+          .scheduleChore(new ReplicationSourceCleanerChore(this.server, this));
+    }
   }
 
   /**
@@ -265,7 +271,6 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
    */
   public void cleanOldLogs(String key, String id, boolean queueRecovered) {
     String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(key);
-    boolean isLogDrained = false;
     if (queueRecovered) {
       Map<String, SortedSet<String>> walsForPeer = walsByIdRecoveredQueues.get(id);
       if(walsForPeer != null) {
@@ -279,23 +284,7 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
         SortedSet<String> wals = walsById.get(id).get(logPrefix);
         if (wals != null && !wals.first().equals(key)) {
           cleanOldLogs(wals, key, id);
-          Set<Path> waitingDrainPaths = this.sourcesWaitingDrainPaths.get(id);
-          if (waitingDrainPaths != null) {
-            for (Path path : waitingDrainPaths) {
-              String logName = path.getName();
-              if (logName.contains(logPrefix) && !wals.contains(logName)) {
-                waitingDrainPaths.remove(path);
-                break;
-              }
-            }
-            if (waitingDrainPaths.isEmpty()) {
-              isLogDrained = true;
-            }
-          }
         }
-      }
-      if (isLogDrained) {
-        this.cleanSourceExecutor.execute(() -> cleanWaitingDrainSource(id));
       }
     }
   }
@@ -1081,31 +1070,67 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
   }
   
   /**
-   * When all the waitingDrainPaths are consumed the source can be removed and
-   * become not consuming source
-   * @param id id of the waiting drain source
+   * Check all the waiting drain sources and remove it when all the recorded paths is consumed
    */
-  private void cleanWaitingDrainSource(String id) {
-    String terminateMessage = "Replication source " + id +
-        " has no online regions in this server and all the waiting drain paths is consumed";
-    this.sourcesPeerRunningStatus.computeIfPresent(id, (peerId, status) -> {
-      Set<Path> waitingConsumePaths = this.sourcesWaitingDrainPaths.get(peerId);
-      // double check happens in a situation that the region become online at the same time
-      if (waitingConsumePaths != null && waitingConsumePaths.isEmpty()) {
-        MetricsSource metrics = this.sourcesMetrics.get(peerId);
-        ReplicationSourceInterface source = getSource(peerId);
-        this.sources.remove(peerId);
-        source.terminate(terminateMessage);
-        this.walsById.remove(peerId);
-        this.sourcesWaitingDrainPaths.remove(peerId);
-        this.replicationQueues.removePeerFromHFileRefs(peerId);
-        deleteSource(peerId, false);
-        metrics.clearSizeOfLogQueue();
-        metrics.setPeerNotRunning();
-        status = PeerRunningStatus.NOT_RUNNING;
-      }
-      return status;
-    });
+  public void checkAndCleanWaitingDrainSource() {
+    this.sourcesWaitingDrainPaths.keySet()
+        .forEach(id -> this.sourcesPeerRunningStatus.computeIfPresent(id, (peerId, status) -> {
+          Set<Path> waitingConsumePaths = this.sourcesWaitingDrainPaths.get(peerId);
+          // check if the source is waiting drain source
+          if (waitingConsumePaths != null) {
+            // check if the source is drained
+            Map<String, SortedSet<String>> peerWals = this.walsById.get(peerId);
+            Set<String> peerWalPrefixes = peerWals.keySet();
+            boolean drained = waitingConsumePaths.stream()
+                .allMatch(path -> {
+                  String name = path.getName();
+                  String walPrefix = DefaultWALProvider.getWALPrefixFromWALName(name);
+                  return peerWalPrefixes.contains(walPrefix) &&
+                      !peerWals.get(walPrefix).contains(name);
+                });
+
+            if (drained) {
+              String terminateMessage = "Replication source " + id +
+                  " has no online regions in this server " +
+                  "and all the waiting drain paths is consumed";
+              MetricsSource metrics = this.sourcesMetrics.get(peerId);
+              ReplicationSourceInterface source = getSource(peerId);
+              this.sources.remove(peerId);
+              source.terminate(terminateMessage);
+              this.walsById.remove(peerId);
+              this.sourcesWaitingDrainPaths.remove(peerId);
+              this.replicationQueues.removePeerFromHFileRefs(peerId);
+              deleteSource(peerId, false);
+              metrics.clearSizeOfLogQueue();
+              metrics.setPeerNotRunning();
+              status = PeerRunningStatus.NOT_RUNNING;
+            }
+          }
+          return status;
+        }
+        ));
+  }
+
+  /**
+   * This chore, every time it runs, will try to check and clean all the waiting drain source
+   */
+  static class ReplicationSourceCleanerChore extends ScheduledChore {
+
+    private static final String REPLICATION_SOURCE_CLEANER_CHORE_NAME = "ReplicationSourceCleaner";
+    private static final int REPLICATION_SOURCE_CLEANER_INTERVAL = 600 * 1000; // Always 10 min
+
+    private final ReplicationSourceManager manager;
+
+    public ReplicationSourceCleanerChore(Stoppable stopper, ReplicationSourceManager manager) {
+      super(REPLICATION_SOURCE_CLEANER_CHORE_NAME, stopper, REPLICATION_SOURCE_CLEANER_INTERVAL);
+      this.manager = manager;
+    }
+
+    @Override
+    protected void chore() {
+      manager.checkAndCleanWaitingDrainSource();
+    }
+
   }
   
   @VisibleForTesting
