@@ -45,7 +45,7 @@ public class ReplicationIndependentSourceManager extends ReplicationSourceManage
     LogFactory.getLog(ReplicationIndependentSourceManager.class);
 
   ReplicationIndependentConsumerQueueChecker queueChecker;
-  private static ThreadPoolExecutor QUEUE_CHECKER_EXECUTOR = null;
+  private ThreadPoolExecutor QUEUE_CHECKER_EXECUTOR = null;
   private Runnable onRegionServerMoved;
 
   /**
@@ -73,7 +73,7 @@ public class ReplicationIndependentSourceManager extends ReplicationSourceManage
     if (QUEUE_CHECKER_EXECUTOR == null) {
       QUEUE_CHECKER_EXECUTOR = (ThreadPoolExecutor) Executors.newFixedThreadPool(1,
         new ThreadFactoryBuilder()
-          .setNameFormat("ReplicationIndependentConsumerQueueCheckerExecutor-%d")
+          .setNameFormat(Thread.currentThread().getName() + "-QueueCheckerExecutor-%d")
           .build()
       );
     }

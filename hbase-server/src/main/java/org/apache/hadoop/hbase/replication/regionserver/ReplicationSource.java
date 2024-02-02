@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hbase.replication.regionserver;
 
+import static org.apache.hadoop.hbase.HConstants.REPLICATION_SOURCE_ONLY_PRODUCE_DEFAULT;
+import static org.apache.hadoop.hbase.HConstants.REPLICATION_SOURCE_ONLY_PRODUCE_KEY;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -302,7 +304,8 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
       // As we could support independent replication consumer now, we also add a config to control
       // whether RS should replicate data to sinker. Default is false, means RS will replicate data.
       (this.stopper instanceof HRegionServer
-        && conf.getBoolean("replication.source.only.produce", false))) {
+        && conf.getBoolean(REPLICATION_SOURCE_ONLY_PRODUCE_KEY,
+        REPLICATION_SOURCE_ONLY_PRODUCE_DEFAULT))) {
       return;
     }
 

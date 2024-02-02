@@ -896,6 +896,9 @@ public final class HConstants {
    * sink cluster to copy HFiles from source cluster file system
    */
   public static final String REPLICATION_CONF_DIR = "hbase.replication.conf.dir";
+  public static final String
+    REPLICATION_SOURCE_ONLY_PRODUCE_KEY = "replication.source.only.produce";
+  public static final boolean REPLICATION_SOURCE_ONLY_PRODUCE_DEFAULT = false;
 
   /** Maximum time to retry for a failed bulk load request */
   public static final String BULKLOAD_MAX_RETRIES_NUMBER = "hbase.bulkload.retries.number";

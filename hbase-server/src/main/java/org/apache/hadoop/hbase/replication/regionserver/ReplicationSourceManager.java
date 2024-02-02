@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hbase.replication.regionserver;
 
+import static org.apache.hadoop.hbase.HConstants.REPLICATION_SOURCE_ONLY_PRODUCE_DEFAULT;
+import static org.apache.hadoop.hbase.HConstants.REPLICATION_SOURCE_ONLY_PRODUCE_KEY;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
@@ -499,32 +501,38 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
           throw new IOException("Cannot add log to replication queue"
               + " when creating a new source, queueId=" + peerId + ", filename=" + logName, e);
         }
-        source.enqueueLog(logPath);
+        if (!conf.getBoolean(REPLICATION_SOURCE_ONLY_PRODUCE_KEY,
+          REPLICATION_SOURCE_ONLY_PRODUCE_DEFAULT)) {
+          source.enqueueLog(logPath);
+        }
       }
-      // update walsById map
-      synchronized (walsById) {
-        for (Map.Entry<String, Map<String, SortedSet<String>>> entry : this.walsById.entrySet()) {
-          String peerId = entry.getKey();
-          Map<String, SortedSet<String>> walsByPrefix = entry.getValue();
-          boolean existingPrefix = false;
-          for (Map.Entry<String, SortedSet<String>> walsEntry : walsByPrefix.entrySet()) {
-            SortedSet<String> wals = walsEntry.getValue();
-            if (this.sources.isEmpty()) {
-              // If there's no slaves, don't need to keep the old wals since
-              // we only consider the last one when a new slave comes in
-              wals.clear();
+      if (!conf.getBoolean(REPLICATION_SOURCE_ONLY_PRODUCE_KEY,
+        REPLICATION_SOURCE_ONLY_PRODUCE_DEFAULT)) {
+        // update walsById map
+        synchronized (walsById) {
+          for (Map.Entry<String, Map<String, SortedSet<String>>> entry : this.walsById.entrySet()) {
+            String peerId = entry.getKey();
+            Map<String, SortedSet<String>> walsByPrefix = entry.getValue();
+            boolean existingPrefix = false;
+            for (Map.Entry<String, SortedSet<String>> walsEntry : walsByPrefix.entrySet()) {
+              SortedSet<String> wals = walsEntry.getValue();
+              if (this.sources.isEmpty()) {
+                // If there's no slaves, don't need to keep the old wals since
+                // we only consider the last one when a new slave comes in
+                wals.clear();
+              }
+              if (logPrefix.equals(walsEntry.getKey())) {
+                wals.add(logName);
+                existingPrefix = true;
+              }
             }
-            if (logPrefix.equals(walsEntry.getKey())) {
+            if (!existingPrefix) {
+              // The new log belongs to a new group, add it into this peer
+              LOG.debug("Start tracking logs for wal group " + logPrefix + " for peer " + peerId);
+              SortedSet<String> wals = new TreeSet<String>();
               wals.add(logName);
-              existingPrefix = true;
+              walsByPrefix.put(logPrefix, wals);
             }
-          }
-          if (!existingPrefix) {
-            // The new log belongs to a new group, add it into this peer
-            LOG.debug("Start tracking logs for wal group " + logPrefix + " for peer " + peerId);
-            SortedSet<String> wals = new TreeSet<String>();
-            wals.add(logName);
-            walsByPrefix.put(logPrefix, wals);
           }
         }
       }

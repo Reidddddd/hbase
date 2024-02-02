@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.replication;
 
+import static org.apache.hadoop.hbase.HConstants.REPLICATION_SOURCE_ONLY_PRODUCE_KEY;
 import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import org.apache.commons.logging.Log;
@@ -58,7 +59,7 @@ public class TestReplicationIndependentConsumerRestartRS {
   private static final byte[] famName = Bytes.toBytes("cf1");
   private static final byte[] qualName = Bytes.toBytes("q1");
   protected static final int NB_ROWS_IN_BATCH = 100;
-  protected static final long SLEEP_TIME = 500;
+  protected static final long SLEEP_TIME = 5000;
   protected static final int NB_RETRIES = 10;
 
   private HTableDescriptor tableDescSource, tableDescTarget;
@@ -87,7 +88,7 @@ public class TestReplicationIndependentConsumerRestartRS {
     conf1.setFloat("replication.source.ratio", 1.0f);
     conf1.setBoolean("replication.source.eof.autorecovery", true);
     conf1.setBoolean("replication.source.rs.enable.failover", false);
-    conf1.setBoolean("replication.source.only.produce", true);
+    conf1.setBoolean(REPLICATION_SOURCE_ONLY_PRODUCE_KEY, true);
 
     utility1 = new HBaseTestingUtility(conf1);
     utility1.startMiniZKCluster();
@@ -163,6 +164,7 @@ public class TestReplicationIndependentConsumerRestartRS {
     assertEquals("has 100 rows on source", 100, rowCountSource);
     assertEquals("has 0 rows on slave", 0, rowCountTarget);
 
+    conf1.setBoolean("replication.source.rs.enable.failover", true);
     ReplicationIndependentConsumer.setConfigure(conf1);
     String[] arguments = new String[] { null };
     ReplicationIndependentConsumer consumer0 = new ReplicationIndependentConsumer();
@@ -204,7 +206,7 @@ public class TestReplicationIndependentConsumerRestartRS {
     }
     rowCountSource = utility1.countRows(tableSource);
     assertEquals(200, rowCountSource);
-    LOG.info(tableSource.getName().getNameAsString() + "rows count = " + rowCountSource);
+    LOG.info(tableSource.getName().getNameAsString() + " rows count = " + rowCountSource);
     for (int i = 0; i < NB_RETRIES; i++) {
       rowCountTarget = utility2.countRows(tableTarget);
       if (i == NB_RETRIES - 1) {

@@ -114,7 +114,12 @@ public class ReplicationIndependentConsumerQueueChecker extends Thread {
                 logsSet.forEach(path -> {
                   if (getWALTimestampFromWALName(path.getName())
                     .compareTo(getWALTimestampFromWALName(currentConsumeLog)) >= 0) {
+                    LOG.trace("Checker enqueue log: " + path.getName() +
+                      ", current log: " + currentConsumeLog);
                     enqueueLog(serverNameAndGroupName, source, peerId, path);
+                  }else {
+                    LOG.info("Checker not enqueue log: " + path.getName() +
+                      ", current log: " + currentConsumeLog);
                   }
                 });
               });
