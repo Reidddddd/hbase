@@ -120,22 +120,24 @@ public class ReplicationIndependentConsumerQueueChecker extends Thread {
               });
             });
           } else {// 2. Normally scenario.
-            Map<String, TreeSet<Path>> latestPathGroupByServerNameAndGroupName =
-              latestPaths.stream().collect(Collectors.groupingBy(
-                path -> getWALServerNameAndGroupNameFromWALName(path.getName()),
-                Collectors.toCollection(TreeSet::new)));
-
             // Find out wals not replicated and enqueue, for each group and each source.
             groupLogsMap.forEach((serverNameAndGroupName, logsSet) -> logsSet.forEach(path -> {
+              Map<String, TreeSet<Path>> latestPathGroupByServerNameAndGroupName =
+                latestPaths.stream().collect(Collectors.groupingBy(
+                  p -> getWALServerNameAndGroupNameFromWALName(p.getName()),
+                  Collectors.toCollection(TreeSet::new)));
+
               if (latestPathGroupByServerNameAndGroupName.containsKey(
                 getWALServerNameAndGroupNameFromWALName(path.getName()))) {
+                Path oldPath = latestPathGroupByServerNameAndGroupName.get(
+                    getWALServerNameAndGroupNameFromWALName(path.getName()))
+                  .first();
                 if (getWALTimestampFromWALName(path.getName()).compareTo(
-                  getWALTimestampFromWALName(
-                    latestPathGroupByServerNameAndGroupName.get(
-                      getWALServerNameAndGroupNameFromWALName(path.getName()))
-                      .first().getName())
-                ) > 0) {
-                  latestPaths.remove(getWALServerNameAndGroupNameFromWALName(path.getName()));
+                  getWALTimestampFromWALName(oldPath.getName())) > 0) {
+                  LOG.debug("Checker enqueue " + path.getName() + " because: " +
+                    getWALTimestampFromWALName(path.getName()) + " > " + getWALTimestampFromWALName(
+                    oldPath.getName()));
+                  latestPaths.remove(oldPath);
                   latestPaths.add(path);
 
                   sources.forEach(source -> {

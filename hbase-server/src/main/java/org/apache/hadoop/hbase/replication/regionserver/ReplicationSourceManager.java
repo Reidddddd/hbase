@@ -293,6 +293,7 @@ public class ReplicationSourceManager implements ReplicationListener, Configurat
     SortedSet<String> walSet = wals.headSet(key);
     LOG.debug("Removing " + walSet.size() + " logs in the list: " + walSet);
     for (String wal : walSet) {
+      LOG.debug("Removing " + wal + " for peer: " + id);
       this.replicationQueues.removeLog(id, wal);
     }
     walSet.clear();

@@ -199,6 +199,7 @@ public class ReplicationSource extends Thread implements ReplicationSourceInterf
   public void enqueueLog(Path log) {
     String logPrefix = DefaultWALProvider.getWALPrefixFromWALName(log.getName());
     boolean queueExists = logQueue.enqueueLog(log, logPrefix);
+    LOG.debug("enqueue log: " + log.getName() + " for " + peerId);
     if (!queueExists) {
       if (this.sourceRunning) {
         // new wal group observed after source startup, start a new worker thread to track it
