@@ -1358,4 +1358,8 @@ public class ServerManager {
   public void addPodInstance(ServerName serverName) {
     this.podInstances.add(serverName);
   }
+
+  public Set<ServerName> getPodInstances() {
+    return this.podInstances;
+  }
 }

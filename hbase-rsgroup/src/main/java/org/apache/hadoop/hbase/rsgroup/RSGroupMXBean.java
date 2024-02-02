@@ -20,18 +20,14 @@
 
 package org.apache.hadoop.hbase.rsgroup;
 
-import org.apache.hadoop.hbase.TableName;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.hadoop.hbase.net.Address;
-
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
 public interface RSGroupMXBean {
 
   public Map<String, String> getServersByGroup() throws IOException;
 
+  public Map<String, Map<String, Float>> getK8sResourceUsageByGroup() throws IOException;
 }

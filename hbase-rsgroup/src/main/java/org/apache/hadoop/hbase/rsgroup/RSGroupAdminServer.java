@@ -80,8 +80,7 @@ public class RSGroupAdminServer implements RSGroupAdmin {
   }
 
   private void registerMBean() {
-    RSGroupMXBeanImpl mxBeanInfo =
-        RSGroupMXBeanImpl.init(this, master);
+    RSGroupMXBeanImpl mxBeanInfo = RSGroupMXBeanImpl.init(this, master);
     MBeans.register("HBase", "Master,sub=RSGroup", mxBeanInfo);
     LOG.info("Registered RSGroup MXBean");
   }
