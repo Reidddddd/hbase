@@ -18,8 +18,11 @@
 package org.apache.hadoop.hbase.replication.regionserver;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -63,6 +66,11 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
   Stoppable {
 
   private static final Log LOG = LogFactory.getLog(ReplicationIndependentConsumer.class);
+
+  private final Cache<String, String> consumedRSCache =
+    CacheBuilder.newBuilder()
+      .expireAfterWrite(1, TimeUnit.HOURS)
+      .build();
 
   private static Configuration conf;
 
@@ -114,7 +122,7 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
     };
 
     zkw = new ZooKeeperWatcher(conf,
-      "ReplicationIndependentConsumer" + System.currentTimeMillis(), abortable, true);
+      "ReplicationIndependentConsumer" + System.currentTimeMillis(), abortable);
 
     walRootDir = FSUtils.getWALRootDir(conf);
     fs = FSUtils.getWALFileSystem(conf);
@@ -123,7 +131,6 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
 
     LOG.info("Start to init replication consumer.");
     init();
-    LOG.info("Init replication consumer done, current consuming regionserver is " + consumeRS);
     return 0;
   }
 
@@ -137,6 +144,8 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
           ReplicationType.INDEPENDENT);
         manager = (ReplicationIndependentSourceManager) replication.getReplicationManager();
         manager.onRegionServerMoved(() -> {
+          LOG.info("Found current consuming RS " + consumeRS + " moved, " +
+            manager.server.getServerName().toString());
           manager.join();
           releaseRSReplicationQueueLock();
           try {
@@ -159,6 +168,7 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
       }
       initSuccessful = true;
     }
+    LOG.info("Init replication consumer done, current consuming regionserver is " + consumeRS);
   }
 
   private void releaseRSReplicationQueueLock() {
@@ -167,6 +177,7 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
         ReplicationFactory.getReplicationQueues(
           zkw, this.conf, this, fs, oldLogDir, ReplicationType.INDEPENDENT);
       replicationQueues.unlockOtherRS(consumeRS);
+      consumedRSCache.put(consumeRS, consumeRS);
       LOG.info("Released lock on " + consumeRS);
       consumeRS = null;
     }
@@ -187,6 +198,10 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
             replicationQueues.getAllQueuesOfReplicator(serverName);
           if (queuesOfReplicator == null || queuesOfReplicator.size() == 0) {
             LOG.info("Queue of " + serverName + " is empty, try to find another one");
+            continue;
+          }
+          if (consumedRSCache.getIfPresent(serverName) != null) {
+            LOG.info("Queue of " + serverName + " is consumed, try to find another one");
             continue;
           }
           if (replicationQueues.lockOtherRS(serverName, CreateMode.EPHEMERAL)) {
