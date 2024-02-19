@@ -305,7 +305,6 @@ public abstract class BaseLoadBalancer implements LoadBalancer {
           continue;
         }
         int serverIndex = serversToIndex.get(entry.getKey().getAddress());
-
         // keep the servername if this is the first server name for this hostname
         // or this servername has the newest startcode.
         if (servers[serverIndex] == null ||

@@ -51,6 +51,7 @@ import org.apache.hadoop.hbase.master.procedure.ProcedureSyncWait;
 import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.procedure2.Procedure;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hbase.thirdparty.com.google.common.collect.Maps;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
@@ -71,6 +72,13 @@ public class RSGroupAdminServer implements RSGroupAdmin {
   public RSGroupAdminServer(MasterServices master, RSGroupInfoManager rsGroupInfoManager) {
     this.master = master;
     this.rsGroupInfoManager = rsGroupInfoManager;
+    registerMBean();
+  }
+
+  private void registerMBean() {
+    RSGroupJMXInfo mxBeanInfo = RSGroupJMXInfo.init(this, master);
+    MBeans.register("HBase", "Master,sub=RSGroup", mxBeanInfo);
+    LOG.info("Registered RSGroup MXBean");
   }
 
   @Override

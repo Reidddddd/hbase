@@ -1075,4 +1075,8 @@ public class ServerManager {
   public void evictPodInstance(ServerName serverName) {
     podInstances.remove(serverName);
   }
+
+  public Set<ServerName> getPodInstances() {
+    return this.podInstances;
+  }
 }
