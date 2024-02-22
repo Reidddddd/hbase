@@ -59,9 +59,11 @@ public class TestSchema {
   private static final byte[] TEST_FAMILY_1 = Bytes.toBytes("testFamily1");
   private static final byte[] TEST_FAMILY_2 = Bytes.toBytes("testFamily2");
   private static final byte[] TEST_FAMILY_3 = Bytes.toBytes("testFamily3");
+  private static final byte[] TEST_FAMILY_4 = Bytes.toBytes("testFamily4");
   private static final byte[] TEST_QUALIFIER_ONE = Bytes.toBytes("q1");
   private static final byte[] TEST_QUALIFIER_TWO = Bytes.toBytes("q2");
   private static final byte[] TEST_QUALIFIER_THREE = Bytes.toBytes("q3");
+  private static final byte[] TEST_QUALIFIER_FOUR = Bytes.toBytes("q4");
   private static final byte[] APPEND_DATA = Bytes.toBytes("I am data");
   private static final byte[] CQ_DELIMITER = Bytes.toBytes("&");
 
@@ -196,12 +198,20 @@ public class TestSchema {
   @Test
   public void TestSchemaViaAdminAPI() throws Exception {
     TableName tableName = TableName.valueOf("TestSchemaViaAdminAPI");
+    TableName tableNameWithSuffix = TableName.valueOf("TestSchemaViaAdminAPI_suffix");
     byte[][] families = new byte[3][];
     families[0] = TEST_FAMILY_1;
     families[1] = TEST_FAMILY_2;
     families[2] = TEST_FAMILY_3;
     Table table = UTIL.createTable(tableName, families);
+
+    byte[][] familiesOfSuffixTable = new byte[1][];
+    familiesOfSuffixTable[0] = TEST_FAMILY_4;
+    Table tableWithSuffix = UTIL.createTable(tableNameWithSuffix, familiesOfSuffixTable);
+
     UTIL.waitTableAvailable(tableName);
+    UTIL.waitTableAvailable(tableNameWithSuffix);
+
     Put put = new Put(TEST_ROW);
     put.addColumn(TEST_FAMILY_1, TEST_QUALIFIER_ONE, TEST_VALUE);
     table.put(put);
@@ -215,12 +225,18 @@ public class TestSchema {
     append1.add(TEST_FAMILY_3, TEST_QUALIFIER_THREE, APPEND_DATA);
     table.append(append1);
 
+    Put putToSuffixTable = new Put(TEST_ROW);
+    putToSuffixTable.addColumn(TEST_FAMILY_4, TEST_QUALIFIER_FOUR, TEST_VALUE);
+    tableWithSuffix.put(putToSuffixTable);
+
     // Slightly waiting for records being processed.
     Thread.sleep(1000);
 
     Admin admin = UTIL.getHBaseAdmin();
     Schema schema = admin.getSchemaOf(tableName);
     Assert.assertFalse(schema.containFamily(Bytes.toBytes("c")));
+    Assert.assertFalse(schema.containFamily(TEST_FAMILY_4));
+    Assert.assertFalse(schema.containColumn(TEST_FAMILY_4, TEST_QUALIFIER_FOUR));
     Assert.assertTrue(schema.containFamily(TEST_FAMILY_1));
     Assert.assertTrue(schema.containFamily(TEST_FAMILY_2));
     Assert.assertTrue(schema.containFamily(TEST_FAMILY_3));
@@ -288,6 +304,11 @@ public class TestSchema {
     scanner = schemaTable.getScanner(scan);
     iterator = scanner.iterator();
     Assert.assertFalse(iterator.hasNext());
+
+    // Check the first line of both column 'q' and 'm' are deleted
+    Get get = new Get(tableName.getName());
+    Result getRes = schemaTable.get(get);
+    Assert.assertTrue(getRes.isEmpty());
 
     checkCacheCleaned(tableName);
   }

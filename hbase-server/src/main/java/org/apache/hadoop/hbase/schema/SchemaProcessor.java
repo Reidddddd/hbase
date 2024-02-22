@@ -259,6 +259,8 @@ public class SchemaProcessor {
                   schemaTable.delete(deletes);
                   resultsBatch = scanner.next(batch);
                 }
+                // We need to remove the first line manually.
+                schemaTable.delete(new Delete(table.getName()));
               } catch (IOException e) {
                 handleIOException(e);
               }

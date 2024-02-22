@@ -146,12 +146,19 @@ public final class SchemaTableAccessor {
 
   /**
    * Create a scan for get all schema for a table.
-   * Start key is 'tablename', end key is 'tablenamf', (eg. e + 1 => f).
+   * Start key is 'tablename&', end key is 'tablename'', (eg. & + 1 => ').
    * Setting a small batch size, in case of it is fat columns table, so we can process in gentle.
+   * Note: the result do not contain the first line.
    */
   public static Scan createSchemaScanFor(TableName table) {
     Scan scan = new Scan();
-    byte[] startRow = table.getName();
+    byte[] tableNameBytes = table.getName();
+
+    byte[] startRow = new byte[tableNameBytes.length + QUALIFIER_DELIMITER_BYTES.length];
+    System.arraycopy(tableNameBytes, 0, startRow, 0, tableNameBytes.length);
+    System.arraycopy(QUALIFIER_DELIMITER_BYTES, 0, startRow, tableNameBytes.length,
+      QUALIFIER_DELIMITER_BYTES.length);
+
     byte[] stopRow = new byte[startRow.length];
     System.arraycopy(startRow, 0, stopRow, 0, startRow.length);
     stopRow[stopRow.length - 1]++;
