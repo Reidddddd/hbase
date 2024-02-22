@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.filesystem;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_COMPLETE_MAGIC;
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
@@ -31,15 +31,11 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
-import org.apache.hadoop.hbase.io.LimitInputStream;
-import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
-import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader.Builder;
-import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALKey;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractProtobufLogReader;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.WALInputStream;
-import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.FileSystemBasedReader;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -81,12 +77,6 @@ public class ProtobufLogReader extends AbstractProtobufLogReader implements File
     } else {
       return -1L;
     }
-  }
-
-  enum WALHdrResult {
-    EOF,                   // stream is at EOF when method starts
-    SUCCESS,
-    UNKNOWN_WRITER_CLS     // name of writer class isn't recognized
   }
 
   public ProtobufLogReader() {

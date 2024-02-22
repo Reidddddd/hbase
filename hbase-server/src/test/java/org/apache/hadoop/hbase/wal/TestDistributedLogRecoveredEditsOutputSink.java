@@ -25,7 +25,7 @@ import dlshade.org.apache.distributedlog.api.namespace.Namespace;
 import java.net.URI;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
+import org.apache.hadoop.hbase.regionserver.wal.distributedlog.DistributedLogAccessor;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
 import org.junit.Before;
 import org.junit.Test;

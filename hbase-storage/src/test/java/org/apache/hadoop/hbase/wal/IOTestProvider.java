@@ -31,9 +31,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
-import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.FSHLog;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogWriter;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -172,7 +172,7 @@ public class IOTestProvider implements WALProvider {
     // creatWriterInstance is where the new pipeline is set up for doing file rolls
     // if we are skipping it, just keep returning the same writer.
     @Override
-    protected Writer createWriterInstance(final String pathStr) throws IOException {
+    public Writer createWriterInstance(final String pathStr) throws IOException {
       Path path = pathStr == null ? null : new Path(pathStr);
       // we get called from the FSHLog constructor (!); always roll in this case since
       // we don't know yet if we're supposed to generally roll and

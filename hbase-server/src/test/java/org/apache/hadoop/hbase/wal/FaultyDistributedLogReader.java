@@ -24,9 +24,9 @@ import java.util.LinkedList;
 import java.util.Queue;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.regionserver.wal.distributedlog.DistributedLogReader;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private

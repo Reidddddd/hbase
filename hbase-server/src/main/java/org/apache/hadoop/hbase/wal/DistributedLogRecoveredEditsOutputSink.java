@@ -32,8 +32,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLogAccessor;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLogWriter;
+import org.apache.hadoop.hbase.regionserver.wal.distributedlog.DistributedLogAccessor;
+import org.apache.hadoop.hbase.regionserver.wal.distributedlog.DistributedLogWriter;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**

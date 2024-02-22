@@ -34,7 +34,7 @@ import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
- * A WAL Entry for {@link FSHLog} implementation.  Immutable.
+ * A WAL Entry for {@link AbstractLog} implementation.  Immutable.
  * A subclass of {@link Entry} that carries extra info across the ring buffer such as
  * region sequence id (we want to use this later, just before we write the WAL to ensure region
  * edits maintain order).  The extra info added here is not 'serialized' as part of the WALEdit

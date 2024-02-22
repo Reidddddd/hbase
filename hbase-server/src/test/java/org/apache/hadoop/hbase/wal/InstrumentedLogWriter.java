@@ -21,8 +21,8 @@ package org.apache.hadoop.hbase.wal;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
-import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
 import org.apache.hadoop.hbase.regionserver.wal.WALCellCodec;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogWriter;
 import org.apache.hadoop.hbase.util.Bytes;
 
 public class InstrumentedLogWriter extends ProtobufLogWriter {

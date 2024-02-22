@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hbase.wal;
 
+import com.google.common.annotations.VisibleForTesting;
 import dlshade.org.apache.distributedlog.api.DistributedLogManager;
 import dlshade.org.apache.distributedlog.api.LogWriter;
 import dlshade.org.apache.distributedlog.api.namespace.Namespace;
@@ -30,7 +31,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
-import com.google.common.annotations.VisibleForTesting;
 import dlshade.org.apache.distributedlog.exceptions.InvalidStreamNameException;
 import dlshade.org.apache.distributedlog.exceptions.LogNotFoundException;
 import org.apache.commons.logging.Log;
@@ -42,10 +42,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
-import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter;
-import org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader;
 import org.apache.hadoop.hbase.regionserver.wal.SequenceFileLogReader;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.FSHLog;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogWriter;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogReader;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;

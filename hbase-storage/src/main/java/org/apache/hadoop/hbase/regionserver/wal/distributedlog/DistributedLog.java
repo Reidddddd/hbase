@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.distributedlog;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.DISTRIBUTED_LOG_ARCHIVE_PREFIX;
 import dlshade.org.apache.bookkeeper.bookie.BookieException;
@@ -33,9 +33,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractLog;
+import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
@@ -70,7 +71,7 @@ public class DistributedLog extends AbstractLog {
   }
 
   @Override
-  protected void archiveLogUnities(List<String> logsToArchive) throws IOException {
+  public void archiveLogUnities(List<String> logsToArchive) throws IOException {
     if (logsToArchive != null) {
       for (String p : logsToArchive) {
         archiveLogEntity(p);
@@ -115,7 +116,7 @@ public class DistributedLog extends AbstractLog {
   }
 
   @Override
-  protected Writer createWriterInstance(String newWriterName) throws IOException {
+  public Writer createWriterInstance(String newWriterName) throws IOException {
     if (newWriterName == null) {
       throw new IOException("Cannot create writer with null name.");
     }
@@ -125,54 +126,6 @@ public class DistributedLog extends AbstractLog {
         DistributedLogWriter.class.getName() + " but get: " + writer.getClass().getName());
     }
     return writer;
-  }
-
-  @Override
-  protected void afterReplaceWriter(String newPathStr, String oldPathStr, Writer nextWriter)
-    throws IOException {
-    int oldNumEntries = this.numEntries.get();
-    this.numEntries.set(0);
-    try {
-      if (oldPathStr != null) {
-        this.byWalRegionSequenceIds.put(oldPathStr, this.sequenceIdAccounting.resetHighest());
-        DistributedLogManager distributedLogManager = distributedLogNamespace.openLog(oldPathStr);
-        long oldFileLen = distributedLogManager.getLogRecordCount() == 0 ? 0 :
-          distributedLogManager.getLastTxId();
-        distributedLogManager.close();
-
-        this.totalLogSize.addAndGet(oldFileLen);
-        LOG.info("Rolled WAL " + oldPathStr + " with entries=" + oldNumEntries + ", filesize="
-          + StringUtils.byteDesc(oldFileLen) + "; new WAL " + newPathStr);
-      } else {
-        LOG.info("New WAL " + newPathStr);
-      }
-    } catch (Exception e) {
-      // If we got exception, we failed to access distributed log. So that we revert the number of
-      // entries here.
-      this.numEntries.set(oldNumEntries);
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void checkLogRoll() {
-    try {
-      if ((writer != null && writer.getLength() > logrollsize)) {
-        requestLogRoll();
-      }
-    } catch (IOException e) {
-      LOG.warn("Writer.getLength() failed; continuing", e);
-    }
-  }
-
-  @Override
-  public void requestLogRoll() {
-    if (!this.listeners.isEmpty()) {
-      for (WALActionsListener i: this.listeners) {
-        // We do not care the number of replicas when we use DistributedLog to store WAL.
-        i.logRollRequested(false);
-      }
-    }
   }
 
   @Override
@@ -254,7 +207,7 @@ public class DistributedLog extends AbstractLog {
   }
 
   @Override
-  protected CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
+  public CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
       Writer nextWriter) {
     CompletableFuture<Void> res = super.asyncCloseWriter(writer, oldPath, newPath, nextWriter);
     CompletableFuture<Void> newFuture = new CompletableFuture<>();

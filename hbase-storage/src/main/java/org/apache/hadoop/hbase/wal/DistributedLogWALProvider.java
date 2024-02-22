@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.regionserver.wal.AbstractLog;
-import org.apache.hadoop.hbase.regionserver.wal.DistributedLog;
+import org.apache.hadoop.hbase.regionserver.wal.distributedlog.DistributedLog;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 

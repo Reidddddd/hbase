@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.distributedlog;
 
 import static org.apache.zookeeper.ZooDefs.Ids.OPEN_ACL_UNSAFE;
 import dlshade.org.apache.distributedlog.DistributedLogConfiguration;
@@ -38,7 +38,7 @@ import org.apache.zookeeper.ZooKeeper;
  * A singleton to access a distributed log Namespace.
  */
 @InterfaceAudience.Private
-public class DistributedLogAccessor implements Closeable {
+public final class DistributedLogAccessor implements Closeable {
   private static final Log LOG = LogFactory.getLog(DistributedLogAccessor.class);
   private static final Object obj = new Object();
 

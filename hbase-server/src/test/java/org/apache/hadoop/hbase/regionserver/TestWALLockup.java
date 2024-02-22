@@ -19,11 +19,9 @@
 package org.apache.hadoop.hbase.regionserver;
 
 import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -43,10 +41,10 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.regionserver.wal.DamagedWALException;
-import org.apache.hadoop.hbase.regionserver.wal.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.FSHLog;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManagerTestHelper;
@@ -165,7 +163,7 @@ public class TestWALLockup {
       }
 
       @Override
-      protected Writer createWriterInstance(String path) throws IOException {
+      public Writer createWriterInstance(String path) throws IOException {
         final Writer w = super.createWriterInstance(path);
         return new Writer() {
           @Override
@@ -320,7 +318,7 @@ public class TestWALLockup {
       }
 
       @Override
-      protected Writer createWriterInstance(String path) throws IOException {
+      public Writer createWriterInstance(String path) throws IOException {
         final Writer w = super.createWriterInstance(path);
         return new Writer() {
           @Override

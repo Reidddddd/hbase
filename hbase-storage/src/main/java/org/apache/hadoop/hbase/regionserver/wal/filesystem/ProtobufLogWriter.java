@@ -16,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.filesystem;
 
 import java.io.IOException;
 import org.apache.commons.logging.Log;
@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractProtobufLogWriter;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.wal.FileSystemBasedWriter;
 import org.apache.yetus.audience.InterfaceAudience;

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.filesystem;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.WAL_FILE_NAME_DELIMITER;
 import com.google.common.annotations.VisibleForTesting;
@@ -33,6 +33,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractLog;
+import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.ClassSize;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
@@ -240,7 +242,7 @@ public class FSHLog extends AbstractLog {
    * Get the backing files associated with this WAL.
    * @return may be null if there are no files.
    */
-  protected FileStatus[] getFiles() throws IOException {
+  public FileStatus[] getFiles() throws IOException {
     return FSUtils.listStatus(fs, fullPathLogDir, path -> ourLogs.accept(path.toString()));
   }
 
@@ -269,7 +271,7 @@ public class FSHLog extends AbstractLog {
    * @return null if underlying stream is not ready.
    */
   @VisibleForTesting
-  OutputStream getOutputStream() {
+  public OutputStream getOutputStream() {
     FSDataOutputStream fsdos = this.hdfs_out;
     if (fsdos == null) {
       return null;
@@ -293,35 +295,14 @@ public class FSHLog extends AbstractLog {
 
   @Override
   protected CompletableFuture<Void> asyncCloseWriter(Writer writer, String oldPath, String newPath,
-    Writer nextWriter) {
+      Writer nextWriter) {
     this.hdfs_out = nextWriter instanceof ProtobufLogWriter ?
       ((ProtobufLogWriter) nextWriter).getStream() : null;
     return super.asyncCloseWriter(writer, oldPath, newPath, nextWriter);
   }
 
   @Override
-  protected void afterReplaceWriter(String newPathStr, String oldPathStr, Writer nextWriter)
-    throws IOException {
-    int oldNumEntries = this.numEntries.get();
-    this.numEntries.set(0);
-    Path newPath = newPathStr == null ? null : new Path(newPathStr);
-    Path oldPath = oldPathStr == null ? null : new Path(oldPathStr);
-
-    final String newPathString = (null == newPath ? null : FSUtils.getPath(newPath));
-    if (oldPath != null) {
-      this.byWalRegionSequenceIds.put(oldPath.toString(), this.sequenceIdAccounting.resetHighest());
-      long oldFileLen = this.fs.getFileStatus(oldPath).getLen();
-      this.totalLogSize.addAndGet(oldFileLen);
-      LOG.info("Rolled WAL " + FSUtils.getPath(oldPath) + " with entries=" + oldNumEntries +
-        ", filesize=" + StringUtils.byteDesc(oldFileLen) + "; new WAL " +
-        newPathString);
-    } else {
-      LOG.info("New WAL " + newPathString);
-    }
-  }
-
-  @Override
-  protected Writer createWriterInstance(final String newWriterName) throws IOException {
+  public Writer createWriterInstance(final String newWriterName) throws IOException {
     if (newWriterName == null) {
       throw new IOException("Cannot create writer with null name.");
     }
@@ -371,7 +352,7 @@ public class FSHLog extends AbstractLog {
    * @param logNum to use
    * @return Path
    */
-  protected Path computeFilename(final long logNum) {
+  public Path computeFilename(final long logNum) {
     return new Path(fullPathLogDir, computeLogName(logNum));
   }
 
@@ -547,7 +528,7 @@ public class FSHLog extends AbstractLog {
    * are not properly running with the HDFS-826 patch.
    */
   @VisibleForTesting
-  int getLogReplication() {
+  public int getLogReplication() {
     try {
       //in standalone mode, it will return 0
       if (this.hdfs_out instanceof HdfsDataOutputStream) {
@@ -612,7 +593,7 @@ public class FSHLog extends AbstractLog {
    * This method gets the pipeline for the current WAL.
    */
   @VisibleForTesting
-  DatanodeInfo[] getPipeLine() {
+  public DatanodeInfo[] getPipeLine() {
     if (this.hdfs_out != null) {
       if (this.hdfs_out.getWrappedStream() instanceof DFSOutputStream) {
         return ((DFSOutputStream) this.hdfs_out.getWrappedStream()).getPipeline();

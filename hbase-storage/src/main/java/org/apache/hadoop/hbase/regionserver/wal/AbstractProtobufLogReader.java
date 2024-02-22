@@ -36,6 +36,7 @@ import org.apache.hadoop.hbase.io.LimitInputStream;
 import org.apache.hadoop.hbase.io.util.LRUDictionary;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogReader;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.WALInputStream;
 import org.apache.hadoop.hbase.wal.Entry;
@@ -72,6 +73,12 @@ public abstract class AbstractProtobufLogReader extends ReaderBase {
   protected String codecClsName = null;
   protected long logLength;
 
+  protected enum WALHdrResult {
+    EOF,                   // stream is at EOF when method starts
+    SUCCESS,
+    UNKNOWN_WRITER_CLS     // name of writer class isn't recognized
+  }
+
   public AbstractProtobufLogReader() {
     super();
   }
@@ -102,18 +109,18 @@ public abstract class AbstractProtobufLogReader extends ReaderBase {
   }
 
   // context for WALHdr carrying information such as Cell Codec classname
-  static class WALHdrContext {
-    ProtobufLogReader.WALHdrResult result;
+  protected static class WALHdrContext {
+    WALHdrResult result;
     String cellCodecClsName;
 
-    WALHdrContext(ProtobufLogReader.WALHdrResult result, String cellCodecClsName) {
+    WALHdrContext(WALHdrResult result, String cellCodecClsName) {
       this.result = result;
       this.cellCodecClsName = cellCodecClsName;
     }
-    ProtobufLogReader.WALHdrResult getResult() {
+    public WALHdrResult getResult() {
       return result;
     }
-    String getCellCodecClsName() {
+    public String getCellCodecClsName() {
       return cellCodecClsName;
     }
   }

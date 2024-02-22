@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.distributedlog;
 
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
 import com.google.common.annotations.VisibleForTesting;
@@ -34,6 +34,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractProtobufLogReader;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogReader;
 import org.apache.hadoop.hbase.util.WALInputStream;
 import org.apache.hadoop.hbase.wal.ServiceBasedReader;
 import org.apache.hadoop.hbase.wal.WALUtils;

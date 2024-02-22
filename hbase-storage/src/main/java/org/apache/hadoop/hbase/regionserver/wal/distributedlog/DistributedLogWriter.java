@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.distributedlog;
 
 import com.google.common.annotations.VisibleForTesting;
 import dlshade.org.apache.distributedlog.AppendOnlyStreamWriter;
@@ -33,6 +33,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.regionserver.wal.AbstractProtobufLogWriter;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.ServiceBasedWriter;
 import org.apache.hadoop.hbase.wal.WALUtils;

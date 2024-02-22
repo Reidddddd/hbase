@@ -46,7 +46,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  * details.
  */
 @InterfaceAudience.Private
-class SequenceIdAccounting {
+public class SequenceIdAccounting {
 
   private static final Log LOG = LogFactory.getLog(SequenceIdAccounting.class);
   /**
@@ -145,7 +145,7 @@ class SequenceIdAccounting {
    * @return Return the previous accounting Map of regions to the last sequence id written into
    *         each.
    */
-  Map<byte[], Long> resetHighest() {
+  public Map<byte[], Long> resetHighest() {
     Map<byte[], Long> old = this.highestSequenceIds;
     this.highestSequenceIds = new HashMap<byte[], Long>();
     return old;

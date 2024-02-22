@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.regionserver.wal.filesystem;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.io.crypto.Encryption;
 import org.apache.hadoop.hbase.io.crypto.EncryptionTest;
 import org.apache.hadoop.hbase.io.crypto.EncryptionUtil;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader;
+import org.apache.hadoop.hbase.regionserver.wal.WALCellCodec;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.yetus.audience.InterfaceAudience;
 

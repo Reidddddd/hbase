@@ -62,6 +62,7 @@ import org.apache.hadoop.hbase.coprocessor.SampleRegionWALObserver;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.regionserver.Region;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.FSHLog;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdge;
@@ -456,7 +457,7 @@ public class TestFSHLog {
     FSHLog wal = new FSHLog(FileSystem.get(conf), walRootDir,
         testName, conf) {
       @Override
-      void atHeadOfRingBufferEventHandlerAppend() {
+      protected void atHeadOfRingBufferEventHandlerAppend() {
         if (goslow.isTrue()) {
           Threads.sleep(100);
           LOG.debug("Sleeping before appending 100ms");
@@ -524,8 +525,8 @@ public class TestFSHLog {
     try {
       Field ringBufferEventHandlerField = AbstractLog.class.getDeclaredField("ringBufferEventHandler");
       ringBufferEventHandlerField.setAccessible(true);
-      FSHLog.RingBufferEventHandler ringBufferEventHandler =
-          (FSHLog.RingBufferEventHandler) ringBufferEventHandlerField.get(log);
+      AbstractLog.RingBufferEventHandler ringBufferEventHandler =
+          (AbstractLog.RingBufferEventHandler) ringBufferEventHandlerField.get(log);
       Field syncRunnerIndexField =
           AbstractLog.RingBufferEventHandler.class.getDeclaredField("syncRunnerIndex");
       syncRunnerIndexField.setAccessible(true);

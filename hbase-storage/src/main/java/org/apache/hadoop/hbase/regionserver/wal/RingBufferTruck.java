@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import com.lmax.disruptor.EventFactory;
+import org.apache.hadoop.hbase.regionserver.wal.filesystem.FSHLog;
 import org.apache.yetus.audience.InterfaceAudience;
 
 /**
