@@ -106,6 +106,7 @@ if [ $# = 0 ]; then
   echo "  canary          Run the Canary tool"
   echo "  hbtop           Run the HBTop tool"
   echo "  version         Print the version"
+  echo "  consumer        Run replication consumer"
   echo "  CLASSNAME       Run the class named CLASSNAME"
   exit 1
 fi
@@ -272,7 +273,7 @@ fi
 unset IFS
 
 #Set the right GC options based on the what we are running
-declare -a server_cmds=("master" "regionserver" "thrift" "thrift2" "rest" "avro" "zookeeper")
+declare -a server_cmds=("master" "regionserver" "thrift" "thrift2" "rest" "avro" "zookeeper" "consumer")
 for cmd in ${server_cmds[@]}; do
 	if [[ $cmd == $COMMAND ]]; then
 		server=true
@@ -410,6 +411,11 @@ elif [ "$COMMAND" = "hbtop" ] ; then
   HBASE_OPTS="${HBASE_OPTS} ${HBASE_HBTOP_OPTS}"
 elif [ "$COMMAND" = "version" ] ; then
   CLASS='org.apache.hadoop.hbase.util.VersionInfo'
+elif [ "$COMMAND" = "consumer" ] ; then
+  CLASS='org.apache.hadoop.hbase.replication.regionserver.ReplicationIndependentConsumer'
+  if [ "$1" != "stop" ] ; then
+    HBASE_OPTS="$HBASE_OPTS $HBASE_REPLICATION_CONSUMER_OPTS"
+  fi
 else
   CLASS=$COMMAND
 fi
