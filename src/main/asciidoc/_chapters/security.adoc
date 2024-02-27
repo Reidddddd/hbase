@@ -1566,11 +1566,11 @@ You can include these in the HMaster's _hbase-site.xml_ as well, but the HMaster
 ----
 <property>
   <name>hbase.regionserver.hlog.reader.impl</name>
-  <value>org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader</value>
+  <value>org.apache.hadoop.hbase.regionserver.wal.filesystem.SecureProtobufLogReader</value>
 </property>
 <property>
   <name>hbase.regionserver.hlog.writer.impl</name>
-  <value>org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter</value>
+  <value>org.apache.hadoop.hbase.regionserver.wal.filesystem.SecureProtobufLogWriter</value>
 </property>
 <property>
   <name>hbase.regionserver.wal.encryption</name>
@@ -1733,11 +1733,11 @@ All options have been discussed separately in the sections above.
 <!-- WAL Encryption -->
 <property>
   <name>hbase.regionserver.hlog.reader.impl</name>
-  <value>org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogReader</value>
+  <value>org.apache.hadoop.hbase.regionserver.wal.filesystem.SecureProtobufLogReader</value>
 </property>
 <property>
   <name>hbase.regionserver.hlog.writer.impl</name>
-  <value>org.apache.hadoop.hbase.regionserver.wal.SecureProtobufLogWriter</value>
+  <value>org.apache.hadoop.hbase.regionserver.wal.filesystem.SecureProtobufLogWriter</value>
 </property>
 <property>
   <name>hbase.regionserver.wal.encryption</name>

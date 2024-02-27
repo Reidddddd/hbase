@@ -692,6 +692,8 @@ public class TestDistributedLog extends TestDistributedLogBase {
   public void testLegerFencingDoesNotBlockCloseAsyncCloseWriter() throws IOException {
     Configuration conf4This = HBaseConfiguration.create(conf);
     conf4This.setInt("hbase.regionserver.logroll.errors.tolerated", 0);
+    String oldPath = currentTest.getMethodName() + "/wal.000.suffix";
+    String newPath = currentTest.getMethodName() + "/wal.001.suffix";
 
     Writer writer1 = Mockito.mock(Writer.class);
     // -101 is the code for LedgerFencedException
@@ -703,9 +705,9 @@ public class TestDistributedLog extends TestDistributedLogBase {
     doThrow(new BKTransmitException("test error", -2)).when(writer2).close();
 
     DistributedLog log =
-      new DistributedLog(conf4This, null, null, null, currentTest.getMethodName());
+      new DistributedLog(conf4This, null, null, ".suffix", currentTest.getMethodName());
 
-    CompletableFuture<Void> future1 = log.asyncCloseWriter(writer1, "oldPath", "newPath", null);
+    CompletableFuture<Void> future1 = log.asyncCloseWriter(writer1, oldPath, newPath, null);
 
     try {
       future1.join();
@@ -713,7 +715,7 @@ public class TestDistributedLog extends TestDistributedLogBase {
       fail("Future1 should complete without exception but got: " + e);
     }
 
-    CompletableFuture<Void> future2 = log.asyncCloseWriter(writer2, "oldPath", "newPath", null);
+    CompletableFuture<Void> future2 = log.asyncCloseWriter(writer2, oldPath, newPath, null);
 
     try {
       future2.join();

@@ -276,12 +276,12 @@ possible configurations would overwhelm and obscure the important.
   </property>
   <property>
     <name>hbase.regionserver.hlog.reader.impl</name>
-    <value>org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader</value>
+    <value>org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogReader</value>
     <description>The WAL file reader implementation.</description>
   </property>
   <property>
     <name>hbase.regionserver.hlog.writer.impl</name>
-    <value>org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter</value>
+    <value>org.apache.hadoop.hbase.regionserver.wal.filesystem.ProtobufLogWriter</value>
     <description>The WAL file writer implementation.</description>
   </property>
   <property>
