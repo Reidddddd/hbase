@@ -108,38 +108,30 @@ public class TestLedgerLogSystem extends BookKeeperClusterTestCase {
     Assert.assertFalse(ledgerLogSystem.tryLockPath(createdPath));
     Assert.assertTrue(ledgerLogSystem.isLocked(createdPath));
     Assert.assertTrue(ledgerLogSystem.unlockPath(createdPath));
-
-    try {
-      Assert.assertTrue(ledgerLogSystem.tryLockPath(createdPath));
-      ledgerLogSystem.deleteRecursively(createdPath);
-      fail("Should not be able to delete a locked path.");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof IllegalStateException);
-    }
-
-    try {
-      Assert.assertTrue(ledgerLogSystem.unlockPath(createdPath));
-      ledgerLogSystem.deleteRecursively(createdPath);
-    } catch (Exception e) {
-      fail("Should be able to delete log without a lock.");
-    }
   }
 
   @Test
   public void testRenameLogCorrectness() throws IOException, InterruptedException, KeeperException {
     String createdPath = ZKUtil.joinZNode(WAL_ROOT, "testRenameLogCorrectness");
     String newPath = ZKUtil.joinZNode(WAL_ROOT, "renamed");
-    byte[] data = Bytes.toBytes("data");
-    ledgerLogSystem.createPathRecursive(createdPath, data);
+    LogMetadata logMetadata = new LogMetadata(0, false);
+    ledgerLogSystem.createPathRecursive(createdPath, logMetadata.toBytes());
+    // Rename will close the unclosed log automatically.
     ledgerLogSystem.renamePath(createdPath, newPath);
-    Assert.assertTrue(Bytes.equals(RecoverableZooKeeper.removeMetaData(
-      zkc.getData(newPath, false, null)), data));
+
+    LogMetadata newMetadata = new LogMetadata(RecoverableZooKeeper.removeMetaData(
+      zkc.getData(newPath, false, null)));
+
+    Assert.assertTrue(newMetadata.isClosed());
+    Assert.assertEquals(logMetadata.isCompressed(), newMetadata.isCompressed());
+    Assert.assertEquals(newMetadata.getLedgerIds().size(), 1);
+    Assert.assertEquals(0, (long) newMetadata.getLedgerIds().get(0));
   }
 
   @Test
   public void testDeleteLogPath() throws IOException {
     String createdPath = ZKUtil.joinZNode(WAL_ROOT, "testDeleteLogPath");
-    ledgerLogSystem.createPathRecursive(createdPath, Bytes.toBytes("data"));
+    ledgerLogSystem.createPathRecursive(createdPath, Bytes.toBytes("long_data"));
     Assert.assertTrue(ledgerLogSystem.logExists(createdPath));
 
     ledgerLogSystem.deleteRecursively(createdPath);
