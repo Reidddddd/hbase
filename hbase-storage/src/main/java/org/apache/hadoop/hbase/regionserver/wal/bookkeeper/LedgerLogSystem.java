@@ -47,6 +47,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.LedgerUtil;
+import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -90,6 +91,10 @@ public final class LedgerLogSystem {
 
   public synchronized LedgerHandle createLog(String logPath)
       throws BKException, InterruptedException, IOException {
+    if (checkLogExisting(logPath)) {
+      throw new IllegalArgumentIOException("Log: " + logPath + " is already exists. " +
+        "Or it is under wal splitting.");
+    }
     LedgerHandle result = createNewLedger();
 
     LogMetadata logMetadata = new LogMetadata(result.getId(),
@@ -351,5 +356,15 @@ public final class LedgerLogSystem {
 
   public byte[] getDataOfPath(String logPath) throws InterruptedException, KeeperException {
     return zookeeper.getData(logPath, false, null);
+  }
+
+  // Check whether a log exists or its corresponding splitting log exists or it is already archived.
+  private boolean checkLogExisting(String logName) throws IOException {
+    String archivePath = LedgerUtil.getLedgerArchivePath(conf);
+    String splitParent = ZKUtil.getParent(logName) + WALUtils.SPLITTING_EXT;
+
+    return logExists(logName) ||
+           logExists(splitParent) ||
+           logExists(ZKUtil.joinZNode(archivePath, ZKUtil.getNodeName(logName)));
   }
 }

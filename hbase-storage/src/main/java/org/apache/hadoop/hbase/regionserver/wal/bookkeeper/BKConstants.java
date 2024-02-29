@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal.bookkeeper;
 
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
@@ -41,10 +40,6 @@ public final class BKConstants {
 
   public static final String LEDGER_COMPRESSED = "hbase.ledger.compressed";
   public static final Boolean DEFAULT_LEDGER_COMPRESSED = false;
-  public static final String LEDGER_WRITER_SYNCED = "hbase.ledger.writer.synced";
-  public static final boolean DEFAULT_LEDGER_WRITER_SYNCED = false;
-  public static final byte[] EOL_BYTES = Bytes.toBytes("EOL");
-  public static final byte[] SYNC_MARKER = Bytes.toBytes("SYNC");
 
   private BKConstants() {}
 }

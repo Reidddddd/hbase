@@ -42,7 +42,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  * the assign of the region sequence id.  See #stampRegionSequenceId().
  */
 @InterfaceAudience.Private
-class GenericWALEntry extends Entry {
+public class GenericWALEntry extends Entry {
   // The below data members are denoted 'transient' just to highlight these are not persisted;
   // they are only in memory and held here while passing over the ring buffer.
   private final transient long sequence;
@@ -51,9 +51,9 @@ class GenericWALEntry extends Entry {
   private final transient HRegionInfo hri;
   private final Set<byte[]> familyNames;
 
-  GenericWALEntry(final long sequence, final WALKey key, final WALEdit edit,
-                  final HTableDescriptor htd, final HRegionInfo hri, final boolean inMemstore,
-                  final MultiVersionConcurrencyControl.WriteEntry we) throws IOException {
+  protected GenericWALEntry(final long sequence, final WALKey key, final WALEdit edit,
+      final HTableDescriptor htd, final HRegionInfo hri, final boolean inMemstore,
+      final MultiVersionConcurrencyControl.WriteEntry we) throws IOException {
     super(key, edit);
     this.inMemstore = inMemstore;
     this.htd = htd;
@@ -120,7 +120,7 @@ class GenericWALEntry extends Entry {
   /**
    * @return The sequence on the ring buffer when this edit was added.
    */
-  long getSequence() {
+  public long getSequence() {
     return this.sequence;
   }
 
