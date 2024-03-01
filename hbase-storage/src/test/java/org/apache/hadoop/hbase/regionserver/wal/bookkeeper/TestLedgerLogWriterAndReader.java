@@ -165,7 +165,8 @@ public class TestLedgerLogWriterAndReader extends BookKeeperClusterTestCase {
     Assert.assertEquals(0, logSystem.getLogDataSize(logName));
     writer.close();
 
-    Assert.assertTrue(logSystem.getLogDataSize(logName) > 0);
+    long actualLength = logSystem.getLogDataSize(logName);
+    Assert.assertTrue(actualLength > 0);
   }
 
   @Test

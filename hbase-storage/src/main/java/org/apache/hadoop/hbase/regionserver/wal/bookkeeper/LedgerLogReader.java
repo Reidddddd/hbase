@@ -57,6 +57,11 @@ public class LedgerLogReader extends ReaderBase implements ServiceBasedReader {
   private LogMetadata metadata;
   private Iterator<Long> ledgerIdIterator;
 
+  // Constructor for reflection.
+  public LedgerLogReader() {
+
+  }
+
   @Override
   public void init(Configuration conf, String logName) throws URISyntaxException, IOException {
     this.conf = conf;

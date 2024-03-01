@@ -67,6 +67,11 @@ public class LedgerLogWriter implements ServiceBasedWriter {
 
   private volatile LedgerHandle ledgerHandle;
 
+  // Constructor for reflection.
+  public LedgerLogWriter() {
+
+  }
+
   public LedgerLogWriter(Configuration conf, String logName)
       throws IOException, URISyntaxException {
     init(conf, logName);
@@ -147,9 +152,12 @@ public class LedgerLogWriter implements ServiceBasedWriter {
         LOG.warn("Unexpected exception met when close log " + logName, e);
       }
     } finally {
-      metadata.setClosed();
-      metadata.setDataSize(writtenSize.get());
-      logSystem.updateLogMetadata(logName, metadata);
+      // We need this check as the node should be already renamed or deleted.
+      if (logSystem.logExists(logName)) {
+        metadata.setClosed();
+        metadata.setDataSize(writtenSize.get());
+        logSystem.updateLogMetadata(logName, metadata);
+      }
       logSystem.unlockPath(logName);
     }
   }
@@ -182,6 +190,11 @@ public class LedgerLogWriter implements ServiceBasedWriter {
 
   public String getLogName() {
     return logName;
+  }
+
+  @Override
+  public String toString() {
+    return getLogName();
   }
 
   public long getLedgerId() {
@@ -291,11 +304,11 @@ public class LedgerLogWriter implements ServiceBasedWriter {
 
     @Override
     public void process(WatchedEvent event) {
-      if (event.getType() == Watcher.Event.EventType.NodeDeleted) {
-        // We are renamed by master to do splitting.
-        writerClosed.compareAndSet(false, true);
-      } else if (event.getType() == Watcher.Event.EventType.NodeDataChanged) {
-        try {
+      try {
+        if (event.getType() == Watcher.Event.EventType.NodeDeleted) {
+          // We are renamed by master to do splitting.
+          writerClosed.compareAndSet(false, true);
+        } else if (event.getType() == Watcher.Event.EventType.NodeDataChanged) {
           metadata = logSystem.getLogMetadata(logName);
           if (metadata.isClosed()) {
             // Once the log is closed, there will be no change on the metadata.
@@ -306,13 +319,14 @@ public class LedgerLogWriter implements ServiceBasedWriter {
               // Master is closing us to do splitting.
               close();
             }
+            writerClosed.compareAndSet(false, true);
           } else {
             // Re-watch the meta data.
             logSystem.watchLogPath(logName, this);
           }
-        } catch (IOException | InterruptedException | KeeperException e) {
-          throw new RuntimeException(e);
         }
+      } catch (IOException | InterruptedException | KeeperException e) {
+        throw new IllegalStateException(e);
       }
     }
   }

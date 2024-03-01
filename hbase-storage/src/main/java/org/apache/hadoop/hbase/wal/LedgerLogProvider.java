@@ -1,4 +1,5 @@
 /**
+ *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,20 +16,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hbase.regionserver.wal;
+package org.apache.hadoop.hbase.wal;
 
-import org.apache.hadoop.hbase.testclassification.MediumTests;
-import org.apache.hadoop.hbase.wal.DistributedLogWALSplitter;
-import org.junit.BeforeClass;
-import org.junit.experimental.categories.Category;
+import static org.apache.hadoop.hbase.wal.WALUtils.META_WAL_PROVIDER_ID;
+import java.io.IOException;
+import org.apache.hadoop.hbase.regionserver.wal.bookkeeper.LedgerLog;
+import org.apache.hadoop.hbase.util.LedgerUtil;
+import org.apache.yetus.audience.InterfaceAudience;
 
-@Category(MediumTests.class)
-public class TestWALReplayBoundedLogWriterCreationWithDistributedLog
-    extends TestWALReplayWithDistributedLog {
-  @BeforeClass
-  public static void setUpBeforeClass() throws Exception {
-    TestWALReplayWithDistributedLog.setUpBeforeClass();
-    TEST_UTIL.getConfiguration()
-      .setBoolean(DistributedLogWALSplitter.SPLIT_WRITER_CREATION_BOUNDED, true);
+@InterfaceAudience.Private
+public class LedgerLogProvider extends AbstractWALProvider {
+
+  @Override
+  protected LedgerLog createWAL() throws IOException {
+    try {
+      return new LedgerLog(conf, listeners, logPrefix,
+        META_WAL_PROVIDER_ID.equals(providerId) ? META_WAL_PROVIDER_ID : null, factory.factoryId,
+        LedgerUtil.getLedgerRootPath(conf));
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
+
 }

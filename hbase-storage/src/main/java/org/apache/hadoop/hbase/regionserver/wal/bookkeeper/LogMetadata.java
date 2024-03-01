@@ -53,7 +53,7 @@ public class LogMetadata {
       ledgerIds.add(Bytes.toLong(data, i * Bytes.SIZEOF_LONG, Bytes.SIZEOF_LONG));
     }
 
-    this.dataSize = Bytes.toLong(data, numOfLedgers, Bytes.SIZEOF_LONG);
+    this.dataSize = Bytes.toLong(data, numOfLedgers * Bytes.SIZEOF_LONG, Bytes.SIZEOF_LONG);
     // The compressed first check the data length matches our format mentioned in previous comment.
     // Then check the corresponding byte for compressed and closed.
     this.compressed = data.length % Bytes.SIZEOF_LONG == 2 && data[data.length - 2] != 0;
@@ -77,7 +77,7 @@ public class LogMetadata {
     for (int i = 0; i < ledgerIds.size(); i++) {
       Bytes.putLong(data, i * Bytes.SIZEOF_LONG, ledgerIds.get(i));
     }
-    Bytes.putLong(data, ledgerIds.size(), dataSize);
+    Bytes.putLong(data, ledgerIds.size() * Bytes.SIZEOF_LONG, dataSize);
     Bytes.putByte(data, data.length - 2, compressed ? (byte) 1 : (byte) 0);
     Bytes.putByte(data, data.length - 1, isClosed ? (byte) 1 : (byte) 0);
     return data;
@@ -113,5 +113,17 @@ public class LogMetadata {
 
   public void setDataSize(long dataSize) {
     this.dataSize = dataSize;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Ledger Ids: \n");
+    ledgerIds.forEach(ledgerId -> sb.append(ledgerId).append(" "));
+    sb.append("\n");
+    sb.append("Data Size: ").append(dataSize).append("\n");
+    sb.append("Is compressed: ").append(compressed).append("\n");
+    sb.append("Is closed: ").append(isClosed).append("\n");
+    return sb.toString();
   }
 }

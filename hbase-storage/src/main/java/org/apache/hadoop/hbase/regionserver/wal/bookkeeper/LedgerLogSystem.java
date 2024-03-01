@@ -143,11 +143,17 @@ public final class LedgerLogSystem {
   }
 
   public LogMetadata getLogMetadata(String logPath) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Read log: " + logPath + " meta: " + logManager.getLogMeta(logPath));
+    }
     return logManager.getLogMeta(logPath);
   }
 
   public void updateLogMetadata(String logPath, LogMetadata metadata)
       throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Updated log: " + logPath + " meta: " + metadata);
+    }
     logManager.updateLogMeta(logPath, metadata);
   }
 

@@ -105,7 +105,7 @@ public class GenericWALEntry extends Entry {
     return "sequence=" + this.sequence + ", " + super.toString();
   };
 
-  boolean isInMemstore() {
+  public boolean isInMemstore() {
     return this.inMemstore;
   }
 
@@ -113,7 +113,7 @@ public class GenericWALEntry extends Entry {
     return this.htd;
   }
 
-  HRegionInfo getHRegionInfo() {
+  public HRegionInfo getHRegionInfo() {
     return this.hri;
   }
 
@@ -127,7 +127,7 @@ public class GenericWALEntry extends Entry {
   /**
    * @return the family names which are effected by this edit.
    */
-  Set<byte[]> getFamilyNames() {
+  public Set<byte[]> getFamilyNames() {
     return familyNames;
   }
 }

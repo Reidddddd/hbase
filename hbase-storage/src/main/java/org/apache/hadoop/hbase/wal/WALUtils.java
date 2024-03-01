@@ -84,6 +84,16 @@ public class WALUtils {
    */
   public static final String WAL_TRAILER_WARN_SIZE = "hbase.regionserver.waltrailer.warn.size";
   public static final int DEFAULT_WAL_TRAILER_WARN_SIZE = 1024 * 1024; // 1MB
+  public static final String HLOG_WRITER = "hbase.regionserver.hlog.writer.impl";
+  public static final Class<? extends Writer> HLOG_WRITER_DEFAULT = ProtobufLogWriter.class;
+  public static final String HLOG_READER = "hbase.regionserver.hlog.reader.impl";
+  public static final Class<? extends Reader> HLOG_READER_DEFAULT = ProtobufLogReader.class;
+  public static final String RECOVERED_EDITS_WRITER = "hbase.wal.recovered.edits.writer.class";
+  public static final Class<? extends Writer> RECOVERED_EDITS_WRITER_DEFAULT =
+    ProtobufLogWriter.class;
+  public static final String RECOVERED_EDITS_READER = "hbase.wal.recovered.edits.reader.class";
+  public static final Class<? extends Reader> RECOVERED_EDITS_READER_DEFAULT =
+    ProtobufLogReader.class;
 
   /**
    * Create a writer for the WAL.
@@ -102,19 +112,33 @@ public class WALUtils {
    */
   @VisibleForTesting
   public static Writer createRecoveredEditsWriter(final FileSystem fs, final Path path,
-      Configuration conf) throws IOException {
-    return createWriter(conf, fs, path, true);
+      final Configuration conf) throws IOException {
+    Class<? extends Writer> writerClass = conf.getClass(RECOVERED_EDITS_WRITER,
+      RECOVERED_EDITS_WRITER_DEFAULT, Writer.class);
+    return createWriter(conf, fs, path, true, writerClass);
+  }
+
+  @VisibleForTesting
+  public static Reader createRecoveredEditsReader(final FileSystem fs, final Path path,
+      final CancelableProgressable reporter, final Configuration conf) throws IOException {
+    Class<? extends Reader> readerClass = conf.getClass(RECOVERED_EDITS_READER,
+      RECOVERED_EDITS_READER_DEFAULT, Reader.class);
+    return createReader(fs, path, reporter, conf, readerClass);
   }
 
   /**
    * public because of FSHLog. Should be package-private
    */
   public static Writer createWriter(final Configuration conf, final FileSystem fs, final Path path,
-    final boolean overwritable)
-    throws IOException {
+      final boolean overwritable) throws IOException {
     // Configuration already does caching for the Class lookup.
-    Class<? extends Writer> logWriterClass = conf.getClass("hbase.regionserver.hlog.writer.impl",
-      ProtobufLogWriter.class, Writer.class);
+    Class<? extends Writer> logWriterClass = conf.getClass(HLOG_WRITER, HLOG_WRITER_DEFAULT,
+      Writer.class);
+    return createWriter(conf, fs, path, overwritable, logWriterClass);
+  }
+
+  public static Writer createWriter(final Configuration conf, final FileSystem fs, final Path path,
+      final boolean overwritable, Class<? extends Writer> logWriterClass) throws IOException {
     Writer writer = null;
     try {
       writer = logWriterClass.getDeclaredConstructor().newInstance();
@@ -181,13 +205,16 @@ public class WALUtils {
   }
 
   public static Reader createReader(final FileSystem fs, final Path path,
-    CancelableProgressable reporter, boolean allowCustom, Configuration conf)
+      CancelableProgressable reporter, boolean allowCustom, Configuration conf) throws IOException {
+    Class<? extends Reader> lrClass = allowCustom ?
+      conf.getClass(HLOG_READER, HLOG_READER_DEFAULT, Reader.class) : ProtobufLogReader.class;
+    return createReader(fs, path, reporter, conf, lrClass);
+  }
+
+  public static Reader createReader(final FileSystem fs, final Path path,
+      CancelableProgressable reporter, Configuration conf, Class<? extends Reader> lrClass)
     throws IOException {
     int timeoutMillis = conf.getInt("hbase.hlog.open.timeout", 300000);
-
-    Class<? extends Reader> lrClass = allowCustom ?
-      conf.getClass("hbase.regionserver.hlog.reader.impl", ProtobufLogReader.class,
-        Reader.class) : ProtobufLogReader.class;
 
     try {
       // A wal file could be under recovery, so it may take several

@@ -157,8 +157,8 @@ public class SequenceIdAccounting {
    * currently older.
    * @param lowest Whether to keep running account of oldest sequence id.
    */
-  void update(byte[] encodedRegionName, Set<byte[]> families, long sequenceid,
-      final boolean lowest) {
+  public void update(byte[] encodedRegionName, Set<byte[]> families, long sequenceid,
+    final boolean lowest) {
     Long l = Long.valueOf(sequenceid);
     this.highestSequenceIds.put(encodedRegionName, l);
     if (lowest) {

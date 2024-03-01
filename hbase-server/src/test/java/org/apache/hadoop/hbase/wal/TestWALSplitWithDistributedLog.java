@@ -148,9 +148,10 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
     // We just copy them to our hbase configuration.
     conf.set("distributedlog.znode.parent", "/messaging/distributedlog");
     conf.set("distributedlog.zk.quorum", zkServers);
-    conf.setClass("hbase.regionserver.hlog.writer.impl",
-      InstrumentedDistributedLogWriter.class, Writer.class);
-    conf.setClass("hbase.regionserver.hlog.reader.impl", DistributedLogReader.class, Reader.class);
+    conf.setClass(WALUtils.HLOG_WRITER, InstrumentedDistributedLogWriter.class, Writer.class);
+    conf.setClass(WALUtils.HLOG_READER, DistributedLogReader.class, Reader.class);
+    conf.setClass(WALUtils.RECOVERED_EDITS_WRITER, DistributedLogWriter.class, Writer.class);
+    conf.setClass(WALUtils.RECOVERED_EDITS_READER, DistributedLogReader.class, Reader.class);
     conf.setClass("hbase.wal.provider", RegionGroupingProvider.class, WALProvider.class);
     conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.set(REGION_GROUPING_STRATEGY, RegionGroupingProvider.Strategies.bounded.name());
@@ -807,13 +808,11 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
    */
   private Set<String> splitCorruptWALs(final FaultyDistributedLogReader.FailureType failureType)
     throws IOException {
-    Class<?> backupClass = conf.getClass("hbase.regionserver.hlog.reader.impl",
-      Reader.class);
+    Class<?> backupClass = conf.getClass(WALUtils.HLOG_READER, Reader.class);
     InstrumentedDistributedLogWriter.activateFailure = false;
 
     try {
-      conf.setClass("hbase.regionserver.hlog.reader.impl",
-        FaultyDistributedLogReader.class, Reader.class);
+      conf.setClass(WALUtils.HLOG_READER, FaultyDistributedLogReader.class, Reader.class);
       conf.set("faultysequencefilelogreader.failuretype", failureType.name());
       // Clean up from previous tests or previous loop
       try {
@@ -838,8 +837,7 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
       DistributedLogWALSplitter.split(WALDIR, OLDLOGDIR, conf, wals, namespace);
       return walDirContents;
     } finally {
-      conf.setClass("hbase.regionserver.hlog.reader.impl", backupClass,
-        Reader.class);
+      conf.setClass(WALUtils.HLOG_READER, backupClass, Reader.class);
     }
   }
 
@@ -1005,6 +1003,9 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
   public void testSplitWillFailIfWritingToRegionFails() throws Exception {
     //leave 5th log open so we could append the "trap"
     Writer writer = generateWALs(4);
+    Configuration localConf = HBaseConfiguration.create(conf);
+    localConf.setClass(WALUtils.RECOVERED_EDITS_WRITER, InstrumentedDistributedLogWriter.class,
+      Writer.class);
 
     String region = "break";
     Path tablePath = new Path(TABLE_NAME.getNamespaceAsString(), TABLE_NAME.getQualifierAsString());
@@ -1017,7 +1018,7 @@ public class TestWALSplitWithDistributedLog extends TestDistributedLogBase {
 
     try {
       InstrumentedDistributedLogWriter.activateFailure = true;
-      DistributedLogWALSplitter.split(WALDIR, OLDLOGDIR, conf, wals, namespace);
+      DistributedLogWALSplitter.split(WALDIR, OLDLOGDIR, localConf, wals, namespace);
     } catch (IOException e) {
       assertTrue(e.getMessage().
         contains("This exception is instrumented and should only be thrown for testing"));

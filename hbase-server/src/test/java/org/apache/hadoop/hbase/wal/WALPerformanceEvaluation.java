@@ -58,6 +58,7 @@ import org.apache.hadoop.hbase.regionserver.LogRoller;
 import org.apache.hadoop.hbase.mvcc.MultiVersionConcurrencyControl;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.regionserver.wal.bookkeeper.LedgerLogSystem;
 import org.apache.hadoop.hbase.regionserver.wal.distributedlog.DistributedLogAccessor;
 import org.apache.hadoop.hbase.regionserver.wal.filesystem.FSHLog;
 import org.apache.hadoop.hbase.regionserver.wal.filesystem.SecureProtobufLogReader;
@@ -67,7 +68,9 @@ import org.apache.hadoop.hbase.trace.SpanReceiverHost;
 import org.apache.hadoop.hbase.trace.TraceUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.util.LedgerUtil;
 import org.apache.hadoop.hbase.util.Threads;
+import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.core.ProbabilitySampler;
@@ -106,6 +109,12 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
   static final String TABLE_NAME = "WALPerformanceEvaluation";
   static final String QUALIFIER_PREFIX = "q";
   static final String FAMILY_PREFIX = "cf";
+
+  private WALType walType = WALType.FS;
+
+  enum WALType {
+    FS, DL, LEDGER
+  }
 
   private int numQualifiers = 1;
   private int valueSize = 512;
@@ -181,7 +190,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
             addFamilyMapToWALEdit(put.getFamilyCellMap(), walEdit);
             HRegionInfo hri = region.getRegionInfo();
             final WALKey logkey =
-                new WALKey(hri.getEncodedNameAsBytes(), hri.getTable(), now, mvcc);
+              new WALKey(hri.getEncodedNameAsBytes(), hri.getTable(), now, mvcc);
             wal.append(htd, hri, logkey, walEdit, true);
             if (!this.noSync) {
               if (++lastSync >= this.syncInterval) {
@@ -262,6 +271,20 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
         printUsageAndExit();
       } else if (cmd.equals("--help")) {
         printUsageAndExit();
+      } else if (cmd.equals("--walType")) {
+        String t = args[++i];
+        switch (t) {
+          case "dl":
+            walType = WALType.DL;
+            break;
+          case "ledger":
+            walType = WALType.LEDGER;
+            break;
+          case "fs":
+          default:
+            walType = WALType.FS;
+            break;
+        }
       } else {
         System.err.println("UNEXPECTED: " + cmd);
         printUsageAndExit();
@@ -278,10 +301,8 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
       Configuration conf = getConf();
       conf.set(HConstants.CRYPTO_KEYPROVIDER_CONF_KEY, KeyProviderForTesting.class.getName());
       conf.set(HConstants.CRYPTO_MASTERKEY_NAME_CONF_KEY, "hbase");
-      conf.setClass("hbase.regionserver.hlog.reader.impl", SecureProtobufLogReader.class,
-        Reader.class);
-      conf.setClass("hbase.regionserver.hlog.writer.impl", SecureProtobufLogWriter.class,
-        Writer.class);
+      conf.setClass(WALUtils.HLOG_READER, SecureProtobufLogReader.class, Reader.class);
+      conf.setClass(WALUtils.HLOG_WRITER, SecureProtobufLogWriter.class, Writer.class);
       conf.setBoolean(HConstants.ENABLE_WAL_ENCRYPTION, true);
       conf.set(HConstants.CRYPTO_WAL_ALGORITHM_CONF_KEY, cipher);
     }
@@ -312,8 +333,21 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
       rootRegionDir = rootRegionDir.makeQualified(fs);
       Configuration conf = getConf();
       try {
-        Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
-        cleanRegionRootNamespace(namespace, "wals");
+        switch (walType) {
+          case DL:
+            Namespace namespace = DistributedLogAccessor.getInstance(conf).getNamespace();
+            cleanRegionRootNamespace(namespace, "wals");
+            break;
+          case LEDGER:
+            String logPath = LedgerUtil.getLedgerLogPath(LedgerUtil.getLedgerRootPath(conf));
+            LedgerLogSystem ledgerLogSystem = LedgerLogSystem.getInstance(conf);
+            ledgerLogSystem.deleteRecursively(logPath);
+            break;
+          case FS:
+            break;
+          default:
+            throw new IllegalArgumentException("Unknown wal type detected: " + walType);
+        }
       } catch (Throwable t) {
         LOG.warn("Clear distributedlog namesapce failed with throwable: \n", t);
       }
@@ -355,31 +389,21 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
             ((walProvider instanceof RegionGroupingProvider) &&
               (wals.getProviderClass(DELEGATE_PROVIDER, DEFAULT_DELEGATE_PROVIDER) ==
                 DefaultWALProvider.class))) {
-            Path dir = new Path(FSUtils.getWALRootDir(getConf()),
-              WALUtils.getWALDirectoryName("wals"));
-            FileStatus[] fsss = fs.listStatus(dir);
-            if (fsss.length == 0) throw new IllegalStateException("No WAL found");
-            for (FileStatus fss : fsss) {
-              Path p = fss.getPath();
-              if (!fs.exists(p)) throw new IllegalStateException(p.toString());
-              editCount += verify(wals, p, verbose);
-            }
-          } else {
-            Namespace namespace = DistributedLogAccessor.getInstance(getConf()).getNamespace();
-            Iterator<String> logs = namespace.getLogs(wals.factoryId);
-            while (logs.hasNext()) {
-              String log = logs.next();
-              String logName = WALUtils.getFullPathStringForDistributedLog(wals.factoryId, log);
-              DistributedLogManager distributedLogManager = namespace.openLog(logName);
-              if (!distributedLogManager.isEndOfStreamMarked()) {
-                throw new IllegalStateException("Distributed log is not closed after finishing.");
-              }
-              if (distributedLogManager.getLastTxId() == 0) {
-                throw new IllegalStateException("Distributed log is empty.");
-              }
-              editCount += verify(wals, new Path(logName), verbose);
-            }
+            editCount = verifyWithHDFS(wals, fs, verbose);
+
+          } else if ((walProvider instanceof DistributedLogWALProvider) ||
+            ((walProvider instanceof RegionGroupingProvider) &&
+              (wals.getProviderClass(DELEGATE_PROVIDER, DEFAULT_DELEGATE_PROVIDER) ==
+                DistributedLogWALProvider.class))){
+            editCount = verifyWithDistributedLog(wals, verbose);
+
+          } else if ((walProvider instanceof LedgerLogProvider) ||
+            ((walProvider instanceof RegionGroupingProvider) &&
+              (wals.getProviderClass(DELEGATE_PROVIDER, DEFAULT_DELEGATE_PROVIDER) ==
+                LedgerLogProvider.class))) {
+            editCount = verifyWithLedgerLog(wals, verbose);
           }
+
           long expected = numIterations * numThreads;
           if (editCount != expected) {
             throw new IllegalStateException("Counted=" + editCount + ", expected=" + expected);
@@ -414,6 +438,53 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
     }
 
     return(0);
+  }
+
+  private long verifyWithHDFS(WALFactory wals, FileSystem fs, boolean verbose) throws IOException {
+    long editCount = 0;
+    Path dir = new Path(FSUtils.getWALRootDir(getConf()),
+      WALUtils.getWALDirectoryName("wals"));
+    FileStatus[] fsss = fs.listStatus(dir);
+    if (fsss.length == 0) throw new IllegalStateException("No WAL found");
+    for (FileStatus fss : fsss) {
+      Path p = fss.getPath();
+      if (!fs.exists(p)) throw new IllegalStateException(p.toString());
+      editCount += verify(wals, p, verbose);
+    }
+    return editCount;
+  }
+
+  private long verifyWithDistributedLog(WALFactory wals, boolean verbose) throws Exception {
+    long editCount = 0;
+    Namespace namespace = DistributedLogAccessor.getInstance(getConf()).getNamespace();
+    Iterator<String> logs = namespace.getLogs(wals.factoryId);
+    while (logs.hasNext()) {
+      String log = logs.next();
+      String logName = WALUtils.getFullPathStringForDistributedLog(wals.factoryId, log);
+      DistributedLogManager distributedLogManager = namespace.openLog(logName);
+      if (!distributedLogManager.isEndOfStreamMarked()) {
+        throw new IllegalStateException("Distributed log is not closed after finishing.");
+      }
+      if (distributedLogManager.getLastTxId() == 0) {
+        throw new IllegalStateException("Distributed log is empty.");
+      }
+      editCount += verify(wals, new Path(logName), verbose);
+    }
+
+    return editCount;
+  }
+
+  private long verifyWithLedgerLog(WALFactory wals, boolean verbose) throws IOException {
+    long editCount = 0;
+    LedgerLogSystem ledgerLogSystem = LedgerLogSystem.getInstance(getConf());
+    String walRootPath = LedgerUtil.getLedgerRootPath(getConf());
+    String parentPath = LedgerUtil.getLedgerLogPath(walRootPath, wals.factoryId);
+    for (String log : ledgerLogSystem.getLogUnderPath(parentPath)) {
+      String fullPath = ZKUtil.joinZNode(parentPath, log);
+      editCount += verify(wals, new Path(fullPath), verbose);
+    }
+
+    return editCount;
   }
 
   private static HTableDescriptor createHTableDescriptor(final int regionNum,

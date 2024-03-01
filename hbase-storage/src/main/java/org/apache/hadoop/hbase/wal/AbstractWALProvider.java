@@ -27,8 +27,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.regionserver.wal.AbstractLog;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.hadoop.hbase.regionserver.wal.WALBase;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 
@@ -37,7 +37,7 @@ import org.apache.yetus.audience.InterfaceStability;
 public abstract class AbstractWALProvider implements WALProvider {
   private static final Log LOG = LogFactory.getLog(AbstractWALProvider.class);
 
-  protected volatile AbstractLog log = null;
+  protected volatile WALBase log = null;
   protected WALFactory factory = null;
   protected Configuration conf = null;
   protected List<WALActionsListener> listeners = null;
@@ -104,7 +104,7 @@ public abstract class AbstractWALProvider implements WALProvider {
     return log;
   }
 
-  protected abstract AbstractLog createWAL() throws IOException;
+  protected abstract WALBase createWAL() throws IOException;
 
   @Override
   public void close() throws IOException {

@@ -22,6 +22,10 @@ import static org.apache.hadoop.hbase.wal.BoundedGroupingStrategy.DEFAULT_NUM_RE
 import static org.apache.hadoop.hbase.wal.BoundedGroupingStrategy.NUM_REGION_GROUPS;
 import static org.apache.hadoop.hbase.wal.RegionGroupingProvider.DELEGATE_PROVIDER;
 import static org.apache.hadoop.hbase.wal.RegionGroupingProvider.REGION_GROUPING_STRATEGY;
+import static org.apache.hadoop.hbase.wal.WALUtils.HLOG_READER;
+import static org.apache.hadoop.hbase.wal.WALUtils.HLOG_WRITER;
+import static org.apache.hadoop.hbase.wal.WALUtils.RECOVERED_EDITS_READER;
+import static org.apache.hadoop.hbase.wal.WALUtils.RECOVERED_EDITS_WRITER;
 import static org.junit.Assert.assertEquals;
 import dlshade.org.apache.distributedlog.DLMTestUtil;
 import dlshade.org.apache.distributedlog.TestDistributedLogBase;
@@ -68,8 +72,10 @@ public class TestBoundedRegionGroupingStrategyWithDistributedLog extends TestDis
     // We just copy them to our hbase configuration.
     conf.set("distributedlog.znode.parent", "/messaging/distributedlog");
     conf.set("distributedlog.zk.quorum", zkServers);
-    conf.setClass("hbase.regionserver.hlog.writer.impl", DistributedLogWriter.class, Writer.class);
-    conf.setClass("hbase.regionserver.hlog.reader.impl", DistributedLogReader.class, Reader.class);
+    conf.setClass(HLOG_WRITER, DistributedLogWriter.class, Writer.class);
+    conf.setClass(HLOG_READER, DistributedLogReader.class, Reader.class);
+    conf.setClass(RECOVERED_EDITS_WRITER, DistributedLogWriter.class, Writer.class);
+    conf.setClass(RECOVERED_EDITS_READER, DistributedLogReader.class, Reader.class);
     conf.setClass("hbase.wal.provider", RegionGroupingProvider.class, WALProvider.class);
     conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.set(REGION_GROUPING_STRATEGY, RegionGroupingProvider.Strategies.bounded.name());
@@ -96,7 +102,7 @@ public class TestBoundedRegionGroupingStrategyWithDistributedLog extends TestDis
     final String parallelism = Integer.toString(DEFAULT_NUM_REGION_GROUPS * 2);
     int errCode = WALPerformanceEvaluation.innerMain(new Configuration(conf),
       new String [] {"-threads", parallelism, "-verify", "-noclosefs", "-iterations", "3000",
-        "-regions", parallelism});
+        "-regions", parallelism, "--walType", "dl"});
     assertEquals(0, errCode);
   }
 
@@ -108,7 +114,7 @@ public class TestBoundedRegionGroupingStrategyWithDistributedLog extends TestDis
       final String parallelism = Integer.toString(temp*4);
       int errCode = WALPerformanceEvaluation.innerMain(new Configuration(conf),
         new String [] {"-threads", parallelism, "-verify", "-noclosefs", "-iterations", "3000",
-          "-regions", parallelism});
+          "-regions", parallelism, "--walType", "dl"});
       assertEquals(0, errCode);
     } finally {
       conf.setInt(NUM_REGION_GROUPS, temp);
@@ -123,7 +129,7 @@ public class TestBoundedRegionGroupingStrategyWithDistributedLog extends TestDis
       final String parallelism = Integer.toString(temp*4*2);
       int errCode = WALPerformanceEvaluation.innerMain(new Configuration(conf),
         new String [] {"-threads", parallelism, "-verify", "-noclosefs", "-iterations", "3000",
-          "-regions", parallelism});
+          "-regions", parallelism, "--walType", "dl"});
       assertEquals(0, errCode);
     } finally {
       conf.setInt(NUM_REGION_GROUPS, temp);

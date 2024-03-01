@@ -146,8 +146,8 @@ public class TestWALSplit {
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
     conf = TEST_UTIL.getConfiguration();
-    conf.setClass("hbase.regionserver.hlog.writer.impl",
-        InstrumentedLogWriter.class, Writer.class);
+    conf.setClass(WALUtils.HLOG_WRITER, InstrumentedLogWriter.class, Writer.class);
+    conf.setClass(WALUtils.RECOVERED_EDITS_WRITER, InstrumentedLogWriter.class, Writer.class);
     // This is how you turn off shortcircuit read currently.  TODO: Fix.  Should read config.
     System.setProperty("hbase.tests.use.shortcircuit.reads", "false");
     // Create fake maping user to group and set it to the conf.
@@ -593,13 +593,13 @@ public class TestWALSplit {
    */
   private Set<String> splitCorruptWALs(final FaultySequenceFileLogReader.FailureType failureType)
       throws IOException {
-    Class<?> backupClass = conf.getClass("hbase.regionserver.hlog.reader.impl",
-      Reader.class);
+    Class<?> backupClass = conf.getClass(WALUtils.HLOG_READER, Reader.class);
     InstrumentedLogWriter.activateFailure = false;
 
     try {
-      conf.setClass("hbase.regionserver.hlog.reader.impl",
-          FaultySequenceFileLogReader.class, Reader.class);
+      conf.setClass(WALUtils.HLOG_READER, FaultySequenceFileLogReader.class, Reader.class);
+      conf.setClass(WALUtils.RECOVERED_EDITS_READER, FaultySequenceFileLogReader.class,
+        Reader.class);
       conf.set("faultysequencefilelogreader.failuretype", failureType.name());
       // Clean up from previous tests or previous loop
       try {
@@ -628,8 +628,7 @@ public class TestWALSplit {
       WALSplitter.split(HBASELOGDIR, WALDIR, OLDLOGDIR, fs, conf, wals);
       return walDirContents;
     } finally {
-      conf.setClass("hbase.regionserver.hlog.reader.impl", backupClass,
-        Reader.class);
+      conf.setClass(WALUtils.HLOG_READER, backupClass, Reader.class);
     }
   }
 

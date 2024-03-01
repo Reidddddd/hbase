@@ -59,7 +59,8 @@ public class WALFactory {
     defaultProvider(DefaultWALProvider.class),
     filesystem(DefaultWALProvider.class),
     multiwal(RegionGroupingProvider.class),
-    distributedLog(DistributedLogWALProvider.class);
+    distributedLog(DistributedLogWALProvider.class),
+    bkledger(LedgerLogProvider.class);
 
     final Class<? extends WALProvider> clazz;
 

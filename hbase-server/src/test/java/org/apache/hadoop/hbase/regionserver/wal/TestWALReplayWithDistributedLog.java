@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import static org.apache.hadoop.hbase.wal.WALUtils.HLOG_READER;
+import static org.apache.hadoop.hbase.wal.WALUtils.HLOG_WRITER;
 import static org.apache.hadoop.hbase.wal.WALUtils.PB_WAL_MAGIC;
+import static org.apache.hadoop.hbase.wal.WALUtils.RECOVERED_EDITS_READER;
+import static org.apache.hadoop.hbase.wal.WALUtils.RECOVERED_EDITS_WRITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -185,10 +189,10 @@ public class TestWALReplayWithDistributedLog extends TestDistributedLogBase {
     // We just copy them to our hbase configuration.
     conf.set("distributedlog.znode.parent", "/messaging/distributedlog");
     conf.set("distributedlog.zk.quorum", zkServers);
-    conf.setClass("hbase.regionserver.hlog.writer.impl", DistributedLogWriter.class,
-      Writer.class);
-    conf.setClass("hbase.regionserver.hlog.reader.impl", DistributedLogReader.class,
-      Reader.class);
+    conf.setClass(HLOG_WRITER, DistributedLogWriter.class, Writer.class);
+    conf.setClass(HLOG_READER, DistributedLogReader.class, Reader.class);
+    conf.setClass(RECOVERED_EDITS_WRITER, DistributedLogWriter.class, Writer.class);
+    conf.setClass(RECOVERED_EDITS_READER, DistributedLogReader.class, Reader.class);
     conf.setClass("hbase.wal.provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.setClass("hbase.wal.meta_provider", DistributedLogWALProvider.class, WALProvider.class);
     conf.setClass("hbase.hregion.wal.replayer.class", DistributedLogWALReplayer.class,
