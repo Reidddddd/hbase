@@ -161,7 +161,7 @@ public class TestReplicationIndependentConsumer {
     assertEquals("has 0 rows on slave", 0, rowCountTarget);
 
     ReplicationIndependentConsumer.setConfigure(conf1);
-    String[] arguments = new String[] { null };
+    String[] arguments = new String[] {};
     ReplicationIndependentConsumer consumer0 = new ReplicationIndependentConsumer();
     Thread thread0 = new Thread(() -> {
       try {

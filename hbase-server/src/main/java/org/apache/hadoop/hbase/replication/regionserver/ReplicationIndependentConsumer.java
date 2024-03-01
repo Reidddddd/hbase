@@ -21,8 +21,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -38,10 +43,14 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.replication.ReplicationException;
 import org.apache.hadoop.hbase.replication.ReplicationFactory;
 import org.apache.hadoop.hbase.replication.ReplicationQueues;
 import org.apache.hadoop.hbase.replication.ReplicationType;
+import org.apache.hadoop.hbase.rsgroup.RSGroupAdmin;
+import org.apache.hadoop.hbase.rsgroup.RSGroupAdminClient;
+import org.apache.hadoop.hbase.rsgroup.RSGroupInfo;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.zookeeper.MetaTableLocator;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -81,6 +90,8 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
   private Path oldLogDir, logDir, walRootDir;
   private ZooKeeperWatcher zkw;
   private String consumeRS;
+  Map<String, String> argsMap = new HashMap<>();
+  private String rsgroup;
 
   // although the tool is designed to be run on command line
   // this api is provided for executing the tool through another app
@@ -129,9 +140,31 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
     oldLogDir = new Path(walRootDir, HConstants.HREGION_OLDLOGDIR_NAME);
     logDir = new Path(walRootDir, HConstants.HREGION_LOGDIR_NAME);
 
+    parseArgs(args);
+
     LOG.info("Start to init replication consumer.");
     init();
     return 0;
+  }
+
+  private void parseArgs(String[] args) {
+    if (args == null) {
+      return;
+    }
+    for (String arg : args) {
+      String[] keyValue = arg.split("=");
+      if (keyValue.length == 2) {
+        argsMap.put(keyValue[0], keyValue[1]);
+      }
+    }
+  }
+
+  private boolean isSpecifiedGroup() {
+    return argsMap.containsKey("rsgroup") && argsMap.get("rsgroup").length() > 0;
+  }
+
+  private String getConsumeGroup() {
+    return argsMap.get("rsgroup");
   }
 
   private void init() throws InterruptedException {
@@ -189,6 +222,9 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
       ReplicationFactory.getReplicationQueues(
         zkw, this.conf, this, fs, oldLogDir, ReplicationType.INDEPENDENT);
     List<String> currentReplicators = replicationQueues.getListOfReplicators();
+
+    Set<String> groupServerSet = getGroupServers();
+
     loop :
     while (consumeRS == null || consumeRS.length() == 0) {
       if (currentReplicators != null && !currentReplicators.isEmpty()) {
@@ -202,6 +238,11 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
           }
           if (consumedRSCache.getIfPresent(serverName) != null) {
             LOG.info("Queue of " + serverName + " is consumed, try to find another one");
+            continue;
+          }
+          if (!belongToGroup(serverName, groupServerSet)) {
+            LOG.info(serverName + " is not belong to rsgroup: "
+              + getConsumeGroup() + ", try to find another one");
             continue;
           }
           if (replicationQueues.lockOtherRS(serverName, CreateMode.EPHEMERAL)) {
@@ -219,6 +260,30 @@ public class ReplicationIndependentConsumer extends Configured implements Tool, 
         throw e;
       }
       currentReplicators = replicationQueues.getListOfReplicators();
+    }
+  }
+
+  private boolean belongToGroup(String serverName, Set<String> groupServerSet) {
+    if (groupServerSet == null || groupServerSet.size() == 0) {
+      return true;
+    }
+    return groupServerSet.contains(serverName.split(",")[0]);
+  }
+
+  private Set<String> getGroupServers() {
+    if (!isSpecifiedGroup()) {
+      return new HashSet<>();
+    }
+    String group = getConsumeGroup();
+    try {
+      RSGroupAdmin groupAdmin = new RSGroupAdminClient(ConnectionFactory.createConnection(conf));
+      RSGroupInfo rsGroupInfo = groupAdmin.getRSGroupInfo(group);
+      Set<String> serversSet = rsGroupInfo.getServers()
+        .stream().map(address -> address.getHostname()).collect(Collectors.toSet());
+      LOG.info("Found " + serversSet.size() + " servers in " + group + " group.");
+      return serversSet;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

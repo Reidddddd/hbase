@@ -166,7 +166,7 @@ public class TestReplicationIndependentConsumerRestartRS {
 
     conf1.setBoolean("replication.source.rs.enable.failover", true);
     ReplicationIndependentConsumer.setConfigure(conf1);
-    String[] arguments = new String[] { null };
+    String[] arguments = new String[] {};
     ReplicationIndependentConsumer consumer0 = new ReplicationIndependentConsumer();
     Thread thread0 = new Thread(() -> {
       try {
