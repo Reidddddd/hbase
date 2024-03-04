@@ -48,9 +48,7 @@ public class LedgerLogReader extends ReaderBase implements ServiceBasedReader {
   private final AtomicLong cursor = new AtomicLong(0);
 
   private Configuration conf;
-  private BookKeeper bkClient;
   private LedgerHandle ledgerHandle;
-  private ClientConfiguration bkConfig;
   private LedgerLogSystem logSystem;
   private String logName;
   private LedgerEntryDecompressor decompressor;
@@ -67,12 +65,6 @@ public class LedgerLogReader extends ReaderBase implements ServiceBasedReader {
     this.conf = conf;
     this.logName = logName;
     logSystem = LedgerLogSystem.getInstance(conf);
-    try {
-      bkConfig = LedgerUtil.getBKClientConf(conf);
-      bkClient = LedgerUtil.getBKClient(bkConfig);
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
     metadata = logSystem.getLogMetadata(logName);
     ledgerIdIterator = metadata.getLedgerIdIterator();
     if (ledgerIdIterator.hasNext()) {
@@ -85,8 +77,6 @@ public class LedgerLogReader extends ReaderBase implements ServiceBasedReader {
   public LedgerLogReader(Configuration conf, ClientConfiguration bkConfig, BookKeeper bkClient,
       LedgerHandle ledgerHandle, String logName) throws IOException {
     this.conf = conf;
-    this.bkConfig = bkConfig;
-    this.bkClient = bkClient;
     this.ledgerHandle = ledgerHandle;
     this.logSystem = LedgerLogSystem.getInstance(conf);
     this.logName = logName;
@@ -199,9 +189,6 @@ public class LedgerLogReader extends ReaderBase implements ServiceBasedReader {
     try {
       if (ledgerHandle != null) {
         ledgerHandle.close();
-      }
-      if (bkClient != null) {
-        bkClient.close();
       }
     } catch (Exception e) {
       throw new IOException(e);
