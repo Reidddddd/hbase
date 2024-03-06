@@ -38,6 +38,7 @@ import dlshade.org.apache.bookkeeper.client.LedgerHandle;
 import dlshade.org.apache.bookkeeper.conf.ClientConfiguration;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.ConfigurationException;
@@ -47,6 +48,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.LedgerUtil;
+import org.apache.hadoop.hbase.util.LogNameFilter;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
@@ -271,6 +273,24 @@ public final class LedgerLogSystem {
 
   public List<String> getLogUnderPath(String logPath) throws IOException {
     return logManager.getLogUnderPath(logPath);
+  }
+
+  public List<String> getLogUnderPath(List<String> logPaths) throws IOException {
+    return getLogUnderPath(logPaths, null);
+  }
+
+  public List<String> getLogUnderPath(final List<String> logPaths, LogNameFilter filter)
+      throws IOException {
+    List<String> res = new ArrayList<>();
+    for (String logPath : logPaths) {
+      List<String> subLogs = getLogUnderPath(logPath);
+      for (String subLog : subLogs) {
+        if (filter == null || filter.accept(subLog)) {
+          res.add(subLog);
+        }
+      }
+    }
+    return res;
   }
 
   // For singleton use.

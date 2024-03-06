@@ -49,6 +49,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.io.util.HeapMemorySizeUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.DrainBarrier;
+import org.apache.hadoop.hbase.util.LogNameFilter;
 import org.apache.hadoop.hbase.wal.Entry;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALKey;
@@ -184,31 +185,7 @@ public abstract class WALBase implements WAL {
   /**
    * Matches just those wal files that belong to this wal instance.
    */
-  protected LogNameFilter ourLogs;
-
-  protected static class LogNameFilter {
-    private final String logPrefix;
-    private final String logSuffix;
-
-    public LogNameFilter(String logPrefix, String logSuffix) {
-      this.logPrefix = logPrefix;
-      this.logSuffix = logSuffix;
-    }
-
-    public boolean accept(String logName) {
-      // The path should start with dir/<prefix> and end with our suffix
-      if (!logName.startsWith(logPrefix)) {
-        return false;
-      }
-      if (logSuffix.isEmpty()) {
-        // in the case of the null suffix, we need to ensure the filename ends with a timestamp.
-        return org.apache.commons.lang.StringUtils.isNumeric(
-          logName.substring(logPrefix.length() + WAL_FILE_NAME_DELIMITER.length()));
-      } else {
-        return logName.endsWith(logSuffix);
-      }
-    }
-  }
+  protected LogNameFilter logNameFilter;
 
   @Override
   public void registerWALActionsListener(final WALActionsListener listener) {
@@ -283,7 +260,7 @@ public abstract class WALBase implements WAL {
     if (logName == null || logName.length() == 0) {
       throw new IllegalArgumentException("Log name can't be null");
     }
-    if (!ourLogs.accept(logName)) {
+    if (!logNameFilter.accept(logName)) {
       throw new IllegalArgumentException("The log file " + logName +
         " doesn't belong to this WAL. (" + toString() + ")");
     }

@@ -29,6 +29,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.regionserver.wal.bookkeeper.LedgerLogSystem;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.ServerName;
@@ -174,6 +175,30 @@ public class ZKSplitLog {
     String log = WALUtils.pathToDistributedLogName(new Path(getSplitLogDir(walRoot, logName),
       "corrupt"));
     return namespace.logExists(log);
+  }
+
+  public static void markCorruptedLedgerLog(LedgerLogSystem ledgerLogSystem, String walRoot,
+      String logName) {
+    String splitLogPath = ZKUtil.joinZNode(
+      ZKUtil.joinZNode(walRoot, HConstants.SPLIT_LOGDIR_NAME),
+      ZKUtil.getNodeName(logName)
+    );
+    String corruptedPath = ZKUtil.joinZNode(splitLogPath, HConstants.CORRUPT_DIR_NAME);
+    try {
+      ledgerLogSystem.createPathRecursive(corruptedPath, HConstants.EMPTY_BYTE_ARRAY);
+    } catch (Exception e) {
+      LOG.warn("Could not flag a log file as corrupted. Failed to create " + splitLogPath, e);
+    }
+  }
+
+  public static boolean isCorruptedLedgerLog(LedgerLogSystem ledgerLogSystem, String walRoot,
+      String logName) throws IOException {
+    String splitLogPath = ZKUtil.joinZNode(
+      ZKUtil.joinZNode(walRoot, HConstants.SPLIT_LOGDIR_NAME),
+      ZKUtil.getNodeName(logName)
+    );
+    String corruptedPath = ZKUtil.joinZNode(splitLogPath, HConstants.CORRUPT_DIR_NAME);
+    return ledgerLogSystem.logExists(corruptedPath);
   }
 
   /*

@@ -131,7 +131,9 @@ public class LogManagerZKImpl implements LogManager {
   @Override
   public List<String> getLogUnderPath(String logParentPath) throws IOException {
     try {
-      return zookeeper.getChildren(logParentPath, false);
+      List<String> res = zookeeper.getChildren(logParentPath, false);
+      res.replaceAll(s -> ZKUtil.joinZNode(logParentPath, s));
+      return res;
     } catch (KeeperException | InterruptedException e) {
       if (e instanceof KeeperException.NoNodeException) {
         return Lists.newArrayListWithExpectedSize(0);

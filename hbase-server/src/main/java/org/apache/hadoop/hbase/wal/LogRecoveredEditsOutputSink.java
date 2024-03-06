@@ -25,7 +25,6 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HConstants;
@@ -41,10 +40,10 @@ public class LogRecoveredEditsOutputSink extends AbstractLogRecoveredEditsOutput
 
   private final FileSystem walFS;
 
-  private FileStatus fileBeingSplit;
+  private String fileNameBeingSplit;
 
   public LogRecoveredEditsOutputSink(PipelineController controller, EntryBuffers entryBuffers,
-      int numWriters, FileSystem walFS, Configuration conf, WALSplitter walSplitter,
+      int numWriters, FileSystem walFS, Configuration conf, AbstractWALSplitter walSplitter,
       Map<String, Map<byte[], Long>> regionMaxSeqIdInStores) {
     // More threads could potentially write faster at the expense
     // of causing more disk seeks as the logs are split.
@@ -169,25 +168,22 @@ public class LogRecoveredEditsOutputSink extends AbstractLogRecoveredEditsOutput
   WriterAndPath createWAP(byte[] region, Entry entry) throws IOException {
     String tmpDirName = conf.get(HConstants.TEMPORARY_FS_DIRECTORY_KEY,
       HConstants.DEFAULT_TEMPORARY_HDFS_DIRECTORY);
-    Path regionedits = WALSplitterUtil.getRegionSplitEditsPath(entry,
-      fileBeingSplit.getPath().getName(), tmpDirName, conf);
-    if (regionedits == null) {
-      return null;
-    }
-    if (walFS.exists(regionedits)) {
+    Path regionEdits = WALSplitterUtil.getRegionSplitEditsPath(entry, fileNameBeingSplit,
+      tmpDirName, conf);
+    if (walFS.exists(regionEdits)) {
       LOG.warn("Found old edits file. It could be the "
-        + "result of a previous failed split attempt. Deleting " + regionedits + ", length="
-        + walFS.getFileStatus(regionedits).getLen());
-      if (!walFS.delete(regionedits, false)) {
-        LOG.warn("Failed delete of old " + regionedits);
+        + "result of a previous failed split attempt. Deleting " + regionEdits + ", length="
+        + walFS.getFileStatus(regionEdits).getLen());
+      if (!walFS.delete(regionEdits, false)) {
+        LOG.warn("Failed delete of old " + regionEdits);
       }
     }
-    Writer w = this.walSplitter.createWriter(regionedits);
-    LOG.debug("Creating writer path=" + regionedits);
-    return new WriterAndPath(regionedits, w, entry.getKey().getLogSeqNum());
+    Writer w = this.walSplitter.createWriter(regionEdits);
+    LOG.debug("Creating writer path=" + regionEdits);
+    return new WriterAndPath(regionEdits, w, entry.getKey().getLogSeqNum());
   }
 
-  void setFileBeingSplit(FileStatus fileBeingSplit) {
-    this.fileBeingSplit = fileBeingSplit;
+  public void setFileNameBeingSplit(String fileNameBeingSplit) {
+    this.fileNameBeingSplit = fileNameBeingSplit;
   }
 }

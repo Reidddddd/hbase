@@ -83,9 +83,9 @@ public class LedgerLogWriter implements ServiceBasedWriter {
 
   // Only used for UTs.
   @VisibleForTesting
-  public LedgerLogWriter(Configuration conf, LedgerHandle ledgerHandle, String logName)
-      throws IOException {
-    logSystem = LedgerLogSystem.getInstance(conf);
+  public LedgerLogWriter(Configuration conf, LedgerHandle ledgerHandle, String logName,
+      LedgerLogSystem ledgerLogSystem) throws IOException {
+    logSystem = ledgerLogSystem;
     this.conf = conf;
     this.ledgerHandle = ledgerHandle;
     this.logName = logName;

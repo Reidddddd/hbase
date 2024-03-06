@@ -37,18 +37,18 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.yetus.audience.InterfaceAudience;
 
+/**
+ * Class that will limit the number of hdfs writers we create to split the logs
+ */
 @InterfaceAudience.Private
-  /**
-   * Class that will limit the number of hdfs writers we create to split the logs
-   */
-class BoundedLogWriterCreationOutputSink extends LogRecoveredEditsOutputSink{
+public class BoundedLogWriterCreationOutputSink extends LogRecoveredEditsOutputSink{
   private static final Log LOG = LogFactory.getLog(BoundedLogWriterCreationOutputSink.class);
 
   ConcurrentHashMap<String, Long> regionRecoverStatMap = new ConcurrentHashMap<>();
 
   public BoundedLogWriterCreationOutputSink(PipelineController controller,
       EntryBuffers entryBuffers, int numWriters, FileSystem walFS, Configuration conf,
-      Map<String, Map<byte[], Long>> regionMaxSeqIdInStores, WALSplitter walSplitter){
+      Map<String, Map<byte[], Long>> regionMaxSeqIdInStores, AbstractWALSplitter walSplitter){
     super(controller, entryBuffers, numWriters, walFS, conf, walSplitter,regionMaxSeqIdInStores);
   }
 

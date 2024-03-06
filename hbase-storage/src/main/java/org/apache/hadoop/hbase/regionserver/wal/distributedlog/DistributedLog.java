@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.exceptions.IllegalArgumentIOException;
 import org.apache.hadoop.hbase.regionserver.wal.AbstractLog;
 import org.apache.hadoop.hbase.regionserver.wal.WALActionsListener;
+import org.apache.hadoop.hbase.util.LogNameFilter;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -65,7 +66,7 @@ public class DistributedLog extends AbstractLog {
     }
     this.serverName = serverName;
     init();
-    ourLogs = new LogNameFilter(prefixLogStr, logNameSuffix);
+    logNameFilter = new LogNameFilter(prefixLogStr, logNameSuffix);
     rollWriter();
     initDisruptor();
   }
@@ -173,7 +174,7 @@ public class DistributedLog extends AbstractLog {
       int numOfLogs = 0;
       while (logNames.hasNext()) {
         String logName = logNames.next();
-        if (!ourLogs.accept(logName)) {
+        if (!logNameFilter.accept(logName)) {
           continue;
         }
         String archiveLogName =

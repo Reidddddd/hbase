@@ -56,8 +56,8 @@ public abstract class AbstractLogRecoveredEditsOutputSink extends OutputSink {
   protected final AbstractWALSplitter walSplitter;
 
   public AbstractLogRecoveredEditsOutputSink(PipelineController controller,
-    EntryBuffers entryBuffers, int numWriters, Configuration conf,
-    Map<String, Map<byte[], Long>> regionMaxSeqIdInStores, AbstractWALSplitter walSplitter) {
+      EntryBuffers entryBuffers, int numWriters, Configuration conf,
+      Map<String, Map<byte[], Long>> regionMaxSeqIdInStores, AbstractWALSplitter walSplitter) {
     super(controller, entryBuffers, numWriters);
     this.conf = conf;
     this.regionMaxSeqIdInStores = regionMaxSeqIdInStores;

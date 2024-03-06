@@ -17,11 +17,10 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal.bookkeeper;
 
+import com.google.common.annotations.VisibleForTesting;
 import dlshade.org.apache.bookkeeper.client.BKException;
-import dlshade.org.apache.bookkeeper.client.BookKeeper;
 import dlshade.org.apache.bookkeeper.client.LedgerHandle;
 import dlshade.org.apache.bookkeeper.client.api.LastConfirmedAndEntry;
-import dlshade.org.apache.bookkeeper.conf.ClientConfiguration;
 import dlshade.org.apache.distributedlog.exceptions.NotYetImplementedException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -74,8 +73,9 @@ public class LedgerLogReader extends ReaderBase implements ServiceBasedReader {
       ? new Lz4Decompressor() : new DisableDecompressor();
   }
 
-  public LedgerLogReader(Configuration conf, ClientConfiguration bkConfig, BookKeeper bkClient,
-      LedgerHandle ledgerHandle, String logName) throws IOException {
+  @VisibleForTesting
+  public LedgerLogReader(Configuration conf, LedgerHandle ledgerHandle, String logName)
+      throws IOException {
     this.conf = conf;
     this.ledgerHandle = ledgerHandle;
     this.logSystem = LedgerLogSystem.getInstance(conf);

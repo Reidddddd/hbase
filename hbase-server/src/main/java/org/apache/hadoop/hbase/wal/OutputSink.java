@@ -74,7 +74,7 @@ public abstract class OutputSink {
     this.entryBuffers = entryBuffers;
   }
 
-  void setReporter(CancelableProgressable reporter) {
+  public void setReporter(CancelableProgressable reporter) {
     this.reporter = reporter;
   }
 
@@ -116,7 +116,7 @@ public abstract class OutputSink {
     return this.writers.size();
   }
 
-  long getSkippedEdits() {
+  public long getSkippedEdits() {
     return this.skippedEdits.get();
   }
 
@@ -179,6 +179,14 @@ public abstract class OutputSink {
    */
   public boolean flush() throws IOException {
     return false;
+  }
+
+  public List<Path> getSplits() {
+    return splits;
+  }
+
+  public void setSplits(List<Path> splits) {
+    this.splits = splits;
   }
 
   /**

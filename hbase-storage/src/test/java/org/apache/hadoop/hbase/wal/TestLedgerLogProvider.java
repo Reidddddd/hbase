@@ -104,8 +104,8 @@ public class TestLedgerLogProvider extends BookKeeperClusterTestCase {
     mvcc = new MultiVersionConcurrencyControl();
   }
 
-  protected void addEdits(WAL log, HRegionInfo hri, HTableDescriptor htd,
-    int times) throws IOException {
+  protected void addEdits(WAL log, HRegionInfo hri, HTableDescriptor htd, int times)
+      throws IOException {
     final byte[] row = Bytes.toBytes("row");
     for (int i = 0; i < times; i++) {
       long timestamp = System.currentTimeMillis();
@@ -270,9 +270,7 @@ public class TestLedgerLogProvider extends BookKeeperClusterTestCase {
       wal.rollWriter();
       assertEquals(0, wal.getNumRolledLogFiles());
     } finally {
-      if (wals != null) {
-        wals.close();
-      }
+      wals.close();
     }
   }
 

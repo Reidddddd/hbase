@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.regionserver.wal.bookkeeper;
 
 import static org.apache.hadoop.hbase.HConstants.HREGION_OLDLOGDIR_NAME;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hbase.regionserver.wal.WALBase;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.LedgerUtil;
+import org.apache.hadoop.hbase.util.LogNameFilter;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALUtils;
 import org.apache.hadoop.hbase.wal.Writer;
@@ -69,7 +71,7 @@ public class LedgerLog extends WALBase {
     this.logArchivePath = ZKUtil.joinZNode(rootPath, HREGION_OLDLOGDIR_NAME);
     logrollsize = conf.getLong(LEDGER_ROLL_SIZE, DEFAULT_LEDGER_ROLL_SIZE);
     prefixLogStr = ZKUtil.joinZNode(logPath, serverName) + WALUtils.WAL_FILE_NAME_DELIMITER;
-    ourLogs = new LogNameFilter(prefixLogStr, logNameSuffix);
+    logNameFilter = new LogNameFilter(prefixLogStr, logNameSuffix);
     // Create the first writer.
     rollWriter();
   }
@@ -198,22 +200,18 @@ public class LedgerLog extends WALBase {
     shutdown();
     try {
       // We only archive the logs under this server.
-      List<String> logNames = logSystem.getLogUnderPath(this.logPath);
+      List<String> logNames =
+        logSystem.getLogUnderPath(Collections.singletonList(logPath), logNameFilter);
       int numOfLogs = 0;
       for (String logName : logNames) {
-        if (!ourLogs.accept(ZKUtil.joinZNode(logPath, logName))) {
-          continue;
-        }
-
+        String archivePath = ZKUtil.joinZNode(logArchivePath, ZKUtil.getNodeName(logName));
         // Tell our listeners that a log is going to be archived.
         if (!this.listeners.isEmpty()) {
           for (WALActionsListener i : this.listeners) {
-            i.preLogArchive(new Path(this.logPath, logName),
-              new Path(this.logArchivePath, logName));
+            i.preLogArchive(new Path(logName), new Path(archivePath));
           }
         }
-        this.logSystem.renamePath(ZKUtil.joinZNode(logPath, logName),
-          ZKUtil.joinZNode(logArchivePath, logName));
+        this.logSystem.renamePath(logName, archivePath);
         numOfLogs += 1;
       }
 

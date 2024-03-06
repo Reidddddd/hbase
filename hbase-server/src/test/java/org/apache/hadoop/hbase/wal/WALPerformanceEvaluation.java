@@ -70,7 +70,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.LedgerUtil;
 import org.apache.hadoop.hbase.util.Threads;
-import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.htrace.core.ProbabilitySampler;
@@ -480,8 +479,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
     String walRootPath = LedgerUtil.getLedgerRootPath(getConf());
     String parentPath = LedgerUtil.getLedgerLogPath(walRootPath, wals.factoryId);
     for (String log : ledgerLogSystem.getLogUnderPath(parentPath)) {
-      String fullPath = ZKUtil.joinZNode(parentPath, log);
-      editCount += verify(wals, new Path(fullPath), verbose);
+      editCount += verify(wals, new Path(log), verbose);
     }
 
     return editCount;

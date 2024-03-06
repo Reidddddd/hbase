@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.ClassSize;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.util.LogNameFilter;
 import org.apache.hadoop.hbase.wal.WAL;
 import org.apache.hadoop.hbase.wal.WALFactory;
 import org.apache.hadoop.hbase.wal.WALPrettyPrinter;
@@ -187,7 +188,7 @@ public class FSHLog extends AbstractLog {
       final String archiveDir, final Configuration conf,
       final List<WALActionsListener> listeners,
       final boolean failIfWALExists, final String prefix, final String suffix)
-    throws IOException {
+      throws IOException {
     super(conf, listeners, prefix, suffix);
     this.fs = fs;
     this.fullPathLogDir = new Path(rootDir, logDir);
@@ -208,11 +209,11 @@ public class FSHLog extends AbstractLog {
     // this FSHLog instance
     FSUtils.setStoragePolicy(fs, conf, this.fullPathLogDir, HConstants.WAL_STORAGE_POLICY,
       HConstants.DEFAULT_WAL_STORAGE_POLICY);
-    this.ourLogs = new LogNameFilter(this.prefixLogStr, logNameSuffix);
+    this.logNameFilter = new LogNameFilter(this.prefixLogStr, logNameSuffix);
 
     if (failIfWALExists) {
       final FileStatus[] walFiles = FSUtils.listStatus(fs, fullPathLogDir,
-        path -> ourLogs.accept(path.toString()));
+        path -> logNameFilter.accept(path.toString()));
       if (null != walFiles && 0 != walFiles.length) {
         throw new IOException("Target WAL already exists within directory " + fullPathLogDir);
       }
@@ -243,7 +244,7 @@ public class FSHLog extends AbstractLog {
    * @return may be null if there are no files.
    */
   public FileStatus[] getFiles() throws IOException {
-    return FSUtils.listStatus(fs, fullPathLogDir, path -> ourLogs.accept(path.toString()));
+    return FSUtils.listStatus(fs, fullPathLogDir, path -> logNameFilter.accept(path.toString()));
   }
 
   @Override

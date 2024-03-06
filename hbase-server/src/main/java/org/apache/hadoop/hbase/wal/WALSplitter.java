@@ -178,7 +178,8 @@ public class WALSplitter extends AbstractWALSplitter {
     Reader in = null;
     // set the file being split currently
     if (this.outputSink instanceof LogRecoveredEditsOutputSink) {
-      ((LogRecoveredEditsOutputSink) this.outputSink).setFileBeingSplit(logfile);
+      ((LogRecoveredEditsOutputSink) this.outputSink).
+        setFileNameBeingSplit(logfile.getPath().getName());
     }
     try {
       long logLength = logfile.getLen();

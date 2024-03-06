@@ -89,7 +89,7 @@ public final class WALSplitterUtil {
   @SuppressWarnings("deprecation")
   @VisibleForTesting
   static Path getRegionSplitEditsPath(final Entry logEntry, String fileNameBeingSplit,
-    String tmpDirName, Configuration conf) throws IOException {
+      String tmpDirName, Configuration conf) throws IOException {
     FileSystem walFS = FSUtils.getWALFileSystem(conf);
     TableName tableName = logEntry.getKey().getTablename();
     String encodedRegionName = Bytes.toString(logEntry.getKey().getEncodedRegionName());

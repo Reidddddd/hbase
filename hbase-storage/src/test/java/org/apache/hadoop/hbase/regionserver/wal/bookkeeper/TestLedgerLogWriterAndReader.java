@@ -99,7 +99,7 @@ public class TestLedgerLogWriterAndReader extends BookKeeperClusterTestCase {
     LedgerHandle writeLedger = logSystem.createLog("/WALs/" + name.getMethodName());
     LOG.info("Ledger id: " + writeLedger.getId());
     LedgerLogWriter writer = new LedgerLogWriter(conf, writeLedger,
-      "/WALs/" + name.getMethodName());
+      "/WALs/" + name.getMethodName(), logSystem);
 
     WALKey walKey = new WALKey(regionName, fakeTableName, fakeSequenceId);
     WALEdit walEdit = new WALEdit();
@@ -113,14 +113,14 @@ public class TestLedgerLogWriterAndReader extends BookKeeperClusterTestCase {
     LedgerHandle readHandle = bkc.openLedger(writeLedger.getId(), digestType, password);
     Assert.assertNotEquals(0, readHandle.getLedgerMetadata().getLength());
 
-    LedgerLogReader reader = new LedgerLogReader(conf, bkc.getConf(), bkc, readHandle,
+    LedgerLogReader reader = new LedgerLogReader(conf, readHandle,
       "/WALs/" + name.getMethodName());
     Entry readEntry = reader.next();
     // As there is no edit, the readEntry should be null.
     Assert.assertNull(readEntry);
 
     writeLedger = logSystem.createLog("/WALs/testEntryWithEdits");
-    writer = new LedgerLogWriter(conf, writeLedger, "/WALs/testEntryWithEdits");
+    writer = new LedgerLogWriter(conf, writeLedger, "/WALs/testEntryWithEdits", logSystem);
 
     Cell fakeCell = new KeyValue(
       Bytes.toBytes("row"), Bytes.toBytes("cf"), Bytes.toBytes("cq"),
@@ -132,8 +132,7 @@ public class TestLedgerLogWriterAndReader extends BookKeeperClusterTestCase {
     writer.sync();
 
     readHandle = bkc.openLedger(writeLedger.getId(), digestType, password);
-    reader = new LedgerLogReader(conf, bkc.getConf(), bkc, readHandle,
-      "/WALs/testEntryWithEdits");
+    reader = new LedgerLogReader(conf, readHandle, "/WALs/testEntryWithEdits");
 
     readEntry = reader.next();
 
@@ -153,7 +152,7 @@ public class TestLedgerLogWriterAndReader extends BookKeeperClusterTestCase {
     LedgerLogSystem logSystem = LedgerLogSystem.getInstance(conf);
     LedgerHandle writeLedger = logSystem.createLog("/WALs/" + name.getMethodName());
     LedgerLogWriter writer = new LedgerLogWriter(conf, writeLedger,
-      "/WALs/" + name.getMethodName());
+      "/WALs/" + name.getMethodName(), logSystem);
 
     WALKey walKey = new WALKey(regionName, fakeTableName, fakeSequenceId);
     WALEdit walEdit = new WALEdit();
@@ -179,7 +178,7 @@ public class TestLedgerLogWriterAndReader extends BookKeeperClusterTestCase {
     LedgerHandle writeLedger =
       logSystem.createLog(ZKUtil.joinZNode(LOG_ROOT, name.getMethodName()));
     LedgerLogWriter writer = new LedgerLogWriter(conf, writeLedger,
-      ZKUtil.joinZNode(LOG_ROOT, name.getMethodName()));
+      ZKUtil.joinZNode(LOG_ROOT, name.getMethodName()), logSystem);
 
     try {
       LedgerLogWriter writer2 =

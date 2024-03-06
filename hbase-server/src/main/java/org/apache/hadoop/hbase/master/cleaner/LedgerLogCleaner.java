@@ -25,7 +25,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.hadoop.hbase.regionserver.wal.bookkeeper.LedgerLogSystem;
 import org.apache.hadoop.hbase.util.LedgerUtil;
-import org.apache.hadoop.hbase.zookeeper.ZKUtil;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
@@ -71,11 +70,10 @@ public class LedgerLogCleaner extends AbstractCleanerChore {
       return false;
     }
     for (String log : logs) {
-      String logName = ZKUtil.joinZNode(archivePath, log);
       try {
-        logSystem.deleteLog(logName);
+        logSystem.deleteLog(log);
       } catch (IOException e) {
-        LOG.warn("Failed delete log: " + logName + " skip it this time.", e);
+        LOG.warn("Failed delete log: " + log + " skip it this time.", e);
       }
     }
     return true;

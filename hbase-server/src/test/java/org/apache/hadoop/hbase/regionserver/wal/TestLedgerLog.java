@@ -451,7 +451,7 @@ public class TestLedgerLog extends BookKeeperClusterTestCase {
 
     if (ledgerLogSystem.logExists(logPath)) {
       for (String log : ledgerLogSystem.getLogUnderPath(logPath)) {
-        ledgerLogSystem.deleteLog(ZKUtil.joinZNode(logPath, log));
+        ledgerLogSystem.deleteLog(log);
       }
     }
 

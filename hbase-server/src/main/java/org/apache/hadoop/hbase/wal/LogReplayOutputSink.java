@@ -27,15 +27,15 @@ import org.apache.hadoop.hbase.coordination.BaseCoordinatedStateManager;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Private
-class LogReplayOutputSink extends AbstractLogReplayOutputSink {
+public class LogReplayOutputSink extends AbstractLogReplayOutputSink {
   private final FileSystem walFS;
-  private final WALSplitter walSplitter;
+  private final AbstractWALSplitter walSplitter;
 
   public LogReplayOutputSink(PipelineController controller, EntryBuffers entryBuffers,
       int numWriters, Configuration conf, Set<TableName> disablingOrDisabledTables,
       Map<String, Long> lastFlushedSequenceIds, BaseCoordinatedStateManager csm,
       Map<String, Map<byte[], Long>> regionMaxSeqIdInStores, String failedServerName,
-      FileSystem walFS, WALSplitter walSplitter) {
+      FileSystem walFS, AbstractWALSplitter walSplitter) {
     super(controller, entryBuffers, numWriters, conf, disablingOrDisabledTables,
       lastFlushedSequenceIds, csm, regionMaxSeqIdInStores, failedServerName);
     this.walFS = walFS;

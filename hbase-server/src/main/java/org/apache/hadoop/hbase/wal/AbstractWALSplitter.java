@@ -67,7 +67,9 @@ public abstract class AbstractWALSplitter {
   public static final boolean SPLIT_SKIP_ERRORS_DEFAULT = false;
   public static final String SPLIT_SANITY_CHECK = "hbase.split.sanity.check";
   public static final boolean DEFAULT_SPLIT_SANITY_CHECK = false;
-  public final static String SPLIT_WRITER_CREATION_BOUNDED = "hbase.split.writer.creation.bounded";
+  public static final String SPLIT_WRITER_CREATION_BOUNDED = "hbase.split.writer.creation.bounded";
+  public static final String SPLIT_LOG_REPORT_OPENED_FILES = "hbase.splitlog.report.openedfiles";
+  public static final int DEFAULT_SPLIT_LOG_REPORT_OPENED_FILES = 3;
 
   protected final Configuration conf;
   protected final WALFactory walFactory;
@@ -81,9 +83,9 @@ public abstract class AbstractWALSplitter {
 
   // Major subcomponents of the split process.
   // These are separated into inner classes to make testing easier.
-  PipelineController controller;
-  OutputSink outputSink;
-  EntryBuffers entryBuffers;
+  protected PipelineController controller;
+  protected OutputSink outputSink;
+  protected EntryBuffers entryBuffers;
 
   protected boolean distributedLogReplay;
 
