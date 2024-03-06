@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hbase.ipc;
 
+import static org.apache.hadoop.hbase.HConstants.USE_VIRTUAL_THREAD;
+import static org.apache.hadoop.hbase.HConstants.USE_VIRTUAL_THREAD_DEFAULT;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -35,6 +37,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Abortable;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.monitoring.MonitoredRPCHandler;
 import org.apache.hadoop.hbase.util.BoundedPriorityBlockingQueue;
@@ -260,7 +263,12 @@ public abstract class RpcExecutor {
           + ",port=" + port;
       RpcHandler handler = getHandler(name, handlerFailureThreshhold, callQueues.get(index),
         activeHandlerCount, failedHandlerCount, handlerCount, abortable);
-      handler.start();
+      if (JVM.isVirtualThreadSupported() &&
+          conf.getBoolean(USE_VIRTUAL_THREAD, USE_VIRTUAL_THREAD_DEFAULT)) {
+        Thread.startVirtualThread(handler);
+      } else {
+        handler.start();
+      }
       LOG.debug("Started " + name);
       handlers.add(handler);
     }

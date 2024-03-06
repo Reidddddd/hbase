@@ -125,6 +125,10 @@ public class JVM {
     return JVM_SPEC_VERSION;
   }
 
+  public static boolean isVirtualThreadSupported() {
+    return JVM_SPEC_VERSION >= 19;
+  }
+
   /**
    * Load the implementation of UnixOperatingSystemMXBean for Oracle jvm
    * and runs the desired method.

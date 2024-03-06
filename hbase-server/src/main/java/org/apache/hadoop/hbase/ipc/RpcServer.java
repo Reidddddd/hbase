@@ -19,6 +19,8 @@
 package org.apache.hadoop.hbase.ipc;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
+import static org.apache.hadoop.hbase.HConstants.USE_VIRTUAL_THREAD;
+import static org.apache.hadoop.hbase.HConstants.USE_VIRTUAL_THREAD_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -85,6 +87,7 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.security.AuthenticationFailedException;
 import org.apache.hadoop.hbase.security.token.AbstractAuthenticationSecretManager;
 import org.apache.hadoop.hbase.security.token.SystemTableBasedSecretManager;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
 import org.apache.hadoop.hbase.client.NeedUnmanagedConnectionException;
@@ -687,8 +690,10 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       selector= Selector.open();
 
       readers = new Reader[readThreads];
-      readPool = Executors.newFixedThreadPool(readThreads,
-        new ThreadFactoryBuilder().setNameFormat(
+      readPool = JVM.isVirtualThreadSupported() &&
+        conf.getBoolean(USE_VIRTUAL_THREAD, USE_VIRTUAL_THREAD_DEFAULT) ?
+        Executors.newVirtualThreadPerTaskExecutor() :
+        Executors.newFixedThreadPool(readThreads, new ThreadFactoryBuilder().setNameFormat(
           "RpcServer.reader=%d,bindAddress=" + bindAddress.getHostName() +
           ",port=" + port).setDaemon(true)
         .setUncaughtExceptionHandler(Threads.LOGGING_EXCEPTION_HANDLER).build());
