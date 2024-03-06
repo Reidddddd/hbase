@@ -2330,4 +2330,19 @@ public class ZKUtil {
     }
     return storeIds;
   }
+
+  public static void main(String[] args) throws IOException, KeeperException {
+    switch (args[0]) {
+      case "create":
+        String znode = args[1];
+        ZooKeeperWatcher zkw = new ZooKeeperWatcher(
+          HBaseConfiguration.create(),
+          ZKUtil.class.getName(), null);
+        createWithParents(zkw, znode);
+        LOG.info("Created new znode: " + znode);
+        break;
+      default:
+        break;
+    }
+  }
 }
