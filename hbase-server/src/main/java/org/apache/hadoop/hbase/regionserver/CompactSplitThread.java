@@ -38,7 +38,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.RemoteExceptionHandler;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.conf.ConfigurationManager;
 import org.apache.hadoop.hbase.conf.PropagatingConfigurationObserver;
@@ -118,6 +120,8 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
 
     final String n = Thread.currentThread().getName();
 
+    boolean useVirtual = JVM.isVirtualThreadSupported() &&
+      conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT);
     StealJobQueue<Runnable> stealJobQueue = new StealJobQueue<Runnable>();
     this.longCompactions = new ThreadPoolExecutor(largeThreads, largeThreads, 60, TimeUnit.SECONDS,
         stealJobQueue, new ThreadFactory() {
@@ -126,7 +130,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-longCompactions-" + longCompactionThreadCounter.getAndIncrement();
-            return new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
           }
       });
     this.longCompactions.setRejectedExecutionHandler(new Rejection());
@@ -138,7 +142,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-shortCompactions-" + shortCompactionThreadCounter.getAndIncrement();
-            return new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
           }
       });
     this.shortCompactions
@@ -150,7 +154,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-splits-" + splitThreadCounter.getAndIncrement();
-            return new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
           }
       });
     int mergeThreads = conf.getInt(MERGE_THREADS, MERGE_THREADS_DEFAULT);
@@ -159,7 +163,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-merges-" + System.currentTimeMillis();
-            return new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
           }
         });
 
