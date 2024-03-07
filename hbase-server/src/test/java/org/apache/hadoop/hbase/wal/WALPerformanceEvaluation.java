@@ -109,6 +109,10 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
   private int valueSize = 512;
   private int keySize = 16;
 
+  public WALPerformanceEvaluation(Configuration conf) {
+    super(conf);
+  }
+
   @Override
   public void setConf(Configuration conf) {
     super.setConf(conf);
@@ -580,7 +584,7 @@ public final class WALPerformanceEvaluation extends Configured implements Tool {
    * @throws Exception
    */
   static int innerMain(final Configuration c, final String [] args) throws Exception {
-    return ToolRunner.run(c, new WALPerformanceEvaluation(), args);
+    return ToolRunner.run(c, new WALPerformanceEvaluation(c), args);
   }
 
   public static void main(String[] args) throws Exception {
