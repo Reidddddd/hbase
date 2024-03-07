@@ -640,7 +640,9 @@ public class HRegionServer extends HasThread implements
     this.configurationManager = new ConfigurationManager();
 
     // We need to create chore service first. Otherwise, the CredentialCache will have NPE.
-    this.choreService = new ChoreService(getServerName().toString(), true);
+    this.choreService = new ChoreService(getServerName().toString(), true,
+      JVM.isVirtualThreadSupported() &&
+        conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT));
     rpcServices.start();
     putUpWebUI();
     this.walRoller = new LogRoller(this, this);

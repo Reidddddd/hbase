@@ -46,12 +46,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hbase.ChoreService;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ScheduledChore;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.SplitLogCounters;
 import org.apache.hadoop.hbase.Stoppable;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.coordination.BaseCoordinatedStateManager;
 import org.apache.hadoop.hbase.coordination.SplitLogManagerCoordination;
@@ -141,7 +143,10 @@ public class SplitLogManager {
     this.server = server;
     this.conf = conf;
     this.stopper = stopper;
-    this.choreService = new ChoreService(serverName.toString() + "_splitLogManager_");
+    this.choreService =
+      new ChoreService(serverName.toString() + "_splitLogManager_", false,
+        JVM.isVirtualThreadSupported() &&
+          conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT));
     if (server.getCoordinatedStateManager() != null) {
       SplitLogManagerCoordination coordination =
           ((BaseCoordinatedStateManager) server.getCoordinatedStateManager())

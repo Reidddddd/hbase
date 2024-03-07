@@ -98,7 +98,7 @@ public class ChoreService implements ChoreServicer {
   @InterfaceAudience.Private
   @VisibleForTesting
   public ChoreService(final String coreThreadPoolPrefix) {
-    this(coreThreadPoolPrefix, MIN_CORE_POOL_SIZE, false);
+    this(coreThreadPoolPrefix, MIN_CORE_POOL_SIZE, false, false);
   }
 
   /**
@@ -108,7 +108,22 @@ public class ChoreService implements ChoreServicer {
    *               to true this will add -10% to 10% jitter.
    */
   public ChoreService(final String coreThreadPoolPrefix, final boolean jitter) {
-    this(coreThreadPoolPrefix, MIN_CORE_POOL_SIZE, jitter);
+    this(coreThreadPoolPrefix, MIN_CORE_POOL_SIZE, jitter, false);
+  }
+
+  /**
+   * @param coreThreadPoolPrefix Prefix that will be applied to the Thread name of all threads
+   *          spawned by this service
+   * @param jitter Should chore service add some jitter for all of the scheduled chores. When set
+   *               to true this will add -10% to 10% jitter.
+   * @param useVirtual Should the underlying thread be used as virtual thread.
+   */
+  public ChoreService(final String coreThreadPoolPrefix, final boolean jitter, boolean useVirtual) {
+    this(coreThreadPoolPrefix, MIN_CORE_POOL_SIZE, jitter, useVirtual);
+  }
+
+  public ChoreService(final String coreThreadPoolPrefix, int corePoolSize, boolean useVirtual) {
+    this(coreThreadPoolPrefix, corePoolSize, false, useVirtual);
   }
 
   /**
@@ -119,14 +134,17 @@ public class ChoreService implements ChoreServicer {
    *          beneficial if you know that 1 thread will not be enough.
    * @param jitter Should chore service add some jitter for all of the scheduled chores. When set
    *               to true this will add -10% to 10% jitter.
+   * @param useVirtual If true, the underlying thread will be virtual thread.
    */
-  public ChoreService(final String coreThreadPoolPrefix, int corePoolSize, boolean jitter) {
+  public ChoreService(final String coreThreadPoolPrefix, int corePoolSize, boolean jitter,
+      boolean useVirtual) {
     this.coreThreadPoolPrefix = coreThreadPoolPrefix;
     if (corePoolSize < MIN_CORE_POOL_SIZE)  {
       corePoolSize = MIN_CORE_POOL_SIZE;
     }
 
-    final ThreadFactory threadFactory = new ChoreServiceThreadFactory(coreThreadPoolPrefix);
+    final ThreadFactory threadFactory =
+      new ChoreServiceThreadFactory(coreThreadPoolPrefix, useVirtual);
     if (jitter) {
       scheduler = new JitterScheduledThreadPoolExecutorImpl(corePoolSize, threadFactory, 0.1);
     } else {
@@ -247,21 +265,28 @@ public class ChoreService implements ChoreServicer {
    * daemon threads, and thus, don't prevent the JVM from shutting down
    */
   static class ChoreServiceThreadFactory implements ThreadFactory {
-    private final String threadPrefix;
     private final static String THREAD_NAME_SUFFIX = "_ChoreService_";
+
+    private final String threadPrefix;
+    private final boolean useVirtual;
     private AtomicInteger threadNumber = new AtomicInteger(1);
 
     /**
      * @param threadPrefix The prefix given to all threads created by this factory
+     * @param useVirtual If true, the underlying thread will be virtual thread.
      */
-    public ChoreServiceThreadFactory(final String threadPrefix) {
+    public ChoreServiceThreadFactory(final String threadPrefix, boolean useVirtual) {
       this.threadPrefix = threadPrefix;
+      this.useVirtual = useVirtual;
     }
 
     @Override
     public Thread newThread(Runnable r) {
-      Thread thread =
-          new Thread(r, threadPrefix + THREAD_NAME_SUFFIX + threadNumber.getAndIncrement());
+      String threadName = threadPrefix + THREAD_NAME_SUFFIX + threadNumber.getAndIncrement();
+      if (useVirtual) {
+        return Thread.ofVirtual().name(threadName).unstarted(r);
+      }
+      Thread thread = new Thread(r, threadName);
       thread.setDaemon(true);
       return thread;
     }

@@ -26,6 +26,7 @@ import java.util.concurrent.locks.Lock;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ChoreService;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.ScheduledChore;
 import org.apache.hadoop.hbase.Stoppable;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -75,7 +76,9 @@ public class ConnectionCache {
       @Override public void stop(String why) { isStopped = true;}
       @Override public boolean isStopped() {return isStopped;}
     };
-    this.choreService = new ChoreService("ConnectionCache");
+    this.choreService = new ChoreService("ConnectionCache", false,
+      JVM.isVirtualThreadSupported() &&
+        conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT));
     ScheduledChore cleaner = new ScheduledChore("ConnectionCleaner", stoppable, cleanInterval) {
       @Override
       protected void chore() {
