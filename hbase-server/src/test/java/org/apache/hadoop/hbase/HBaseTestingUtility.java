@@ -312,7 +312,13 @@ public class HBaseTestingUtility extends HBaseCommonTestingUtility {
   public HBaseTestingUtility(Configuration conf) {
     super(conf);
     TraceUtil.initTracer(conf);
-
+    // Surefire will not read the -D properties automatically to the configuration.
+    // We need to set it here explicitly.
+    // TODO: Do we need to support all hbase parameters?
+    String useVirtual = System.getProperty(HConstants.USE_VIRTUAL_THREAD);
+    if (useVirtual != null) {
+      conf.setBoolean(HConstants.USE_VIRTUAL_THREAD, Boolean.parseBoolean(useVirtual));
+    }
     // a hbase checksum verification failure will cause unit tests to fail
     ChecksumUtil.generateExceptionForChecksumFailureForTest(true);
   }

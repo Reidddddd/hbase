@@ -173,6 +173,7 @@ import org.apache.hadoop.hbase.util.FSTableDescriptors;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HasThread;
 import org.apache.hadoop.hbase.util.JSONBean;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hbase.util.JvmPauseMonitor;
 import org.apache.hadoop.hbase.util.MBeanUtil;
 import org.apache.hadoop.hbase.util.ServerRegionReplicaUtil;
@@ -919,6 +920,10 @@ public class HRegionServer extends HasThread implements
   }
 
   private void initializeThreads() throws IOException {
+    boolean useVirtual = JVM.isVirtualThreadSupported() &&
+      conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT);
+    LOG.info("Start initialize threads, use virtual thread: " + useVirtual);
+
     // Cache flushing thread.
     this.cacheFlusher = new MemStoreFlusher(conf, this);
 
