@@ -30,6 +30,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.regionserver.wal.AsyncFSWAL;
 import org.apache.hadoop.hbase.regionserver.wal.AsyncProtobufLogWriter;
 import org.apache.hadoop.hbase.util.FSUtils;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
@@ -60,7 +61,10 @@ public class AsyncFSWALProvider extends AbstractFSWALProvider<AsyncFSWAL> {
 
   @Override
   protected void doInit(Configuration conf) throws IOException {
-    eventLoopGroup = new NioEventLoopGroup(1, Threads.newDaemonThreadFactory("AsyncFSWAL"));
+    eventLoopGroup = JVM.isVirtualThreadSupported() &&
+      conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT) ?
+      new NioEventLoopGroup(1, Thread.ofVirtual().name("AsyncFSWAL").factory()) :
+      new NioEventLoopGroup(1, Threads.newDaemonThreadFactory("AsyncFSWAL"));
   }
 
   /**

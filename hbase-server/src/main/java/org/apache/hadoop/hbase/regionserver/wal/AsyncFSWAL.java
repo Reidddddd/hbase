@@ -37,7 +37,6 @@ import java.util.Queue;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -52,11 +51,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
 import org.apache.hadoop.hbase.io.asyncfs.AsyncFSOutput;
 import org.apache.hadoop.hbase.io.asyncfs.FanOutOneBlockAsyncDFSOutputHelper.NameNodeException;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hbase.wal.AsyncFSWALProvider;
 import org.apache.hadoop.hbase.wal.WALKey;
 import org.apache.hadoop.hbase.wal.WALProvider.AsyncWriter;
@@ -183,9 +184,6 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
 
   private final int createMaxRetries;
 
-  private final ExecutorService closeExecutor = Executors.newCachedThreadPool(
-          new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Close-WAL-Writer-%d").build());
-
   private volatile AsyncFSOutput fsOut;
 
   private final Deque<FSWALEntry> toWriteAppends = new ArrayDeque<>();
@@ -226,10 +224,13 @@ public class AsyncFSWAL extends AbstractFSWAL<AsyncWriter> {
         hasConsumerTask = () -> false;
       }
     } else {
-      ThreadPoolExecutor threadPool =
-              new ThreadPoolExecutor(1, 1, 0L,
-                TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
-                new ThreadFactoryBuilder().setNameFormat("AsyncFSWAL-%d").setDaemon(true).build());
+      ThreadPoolExecutor threadPool = JVM.isVirtualThreadSupported() &&
+        conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT) ?
+        new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
+          Thread.ofVirtual().name("AsyncFSWAL-", 0).factory()) :
+          new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<Runnable>(),
+            new ThreadFactoryBuilder().setNameFormat("AsyncFSWAL-%d").setDaemon(true).build());
       hasConsumerTask = () -> threadPool.getQueue().peek() == consumer;
       this.consumeExecutor = threadPool;
     }

@@ -31,11 +31,13 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.io.ByteBufferSupportOutputStream;
 import org.apache.hadoop.hbase.io.asyncfs.AsyncFSOutput;
 import org.apache.hadoop.hbase.io.asyncfs.AsyncFSOutputHelper;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALHeader;
 import org.apache.hadoop.hbase.protobuf.generated.WALProtos.WALTrailer;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hbase.wal.AsyncFSWALProvider;
 import org.apache.hadoop.hbase.wal.WAL.Entry;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -147,9 +149,9 @@ public class AsyncProtobufLogWriter extends AbstractProtobufLogWriter implements
   @Override
   protected void initOutput(FileSystem fs, Path path, boolean overwritable, int bufferSize,
                             short replication, long blockSize) throws IOException {
-    this.output =
-            AsyncFSOutputHelper.createOutput(fs, path,
-                    overwritable, false, replication, blockSize, eventLoopGroup);
+    this.output = AsyncFSOutputHelper.createOutput(fs, path, overwritable, false,
+      replication, blockSize, eventLoopGroup, JVM.isVirtualThreadSupported() &&
+        conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT));
     this.asyncOutputWrapper = new OutputStreamWrapper(output);
   }
 

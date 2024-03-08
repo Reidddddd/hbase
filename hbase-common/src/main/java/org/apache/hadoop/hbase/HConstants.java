@@ -1349,7 +1349,7 @@ public final class HConstants {
   public static final int MASTER_LOG_REPLAY_OPS_THREADS_DEFAULT = 10;
 
   // This parameter will only take into effect when JVM version >= 19.
-  public static final String USE_VIRTUAL_THREAD = "hbase.ipc.handler.virtual.enable";
+  public static final String USE_VIRTUAL_THREAD = "hbase.virtual.thread.enable";
   public static final boolean USE_VIRTUAL_THREAD_DEFAULT = false;
 
   private HConstants() {

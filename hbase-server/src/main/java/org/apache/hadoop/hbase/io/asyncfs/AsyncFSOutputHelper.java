@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.io.ByteArrayOutputStream;
 import org.apache.hadoop.hbase.util.CancelableProgressable;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -51,8 +52,8 @@ public final class AsyncFSOutputHelper {
    * implementation for other {@link FileSystem} which wraps around a {@link FSDataOutputStream}.
    */
   public static AsyncFSOutput createOutput(FileSystem fs, Path f, boolean overwrite,
-      boolean createParent, short replication, long blockSize, EventLoopGroup eventLoopGroup)
-      throws IOException {
+      boolean createParent, short replication, long blockSize, EventLoopGroup eventLoopGroup,
+      boolean useVirtual) throws IOException {
     if (fs instanceof DistributedFileSystem) {
       return FanOutOneBlockAsyncDFSOutputHelper.createOutput((DistributedFileSystem) fs, f,
         overwrite, createParent, replication, blockSize, eventLoopGroup);
@@ -66,8 +67,12 @@ public final class AsyncFSOutputHelper {
       fsOut = fs.createNonRecursive(f, overwrite, bufferSize, replication, blockSize, null);
     }
     final ExecutorService flushExecutor =
-        Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("AsyncFSOutputFlusher-" + f.toString().replace("%", "%%")).build());
+      JVM.isVirtualThreadSupported() && useVirtual ?
+        Executors.newSingleThreadExecutor(
+          Thread.ofVirtual().name("AsyncFSOutputFlusher-", 0).factory()):
+        Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setDaemon(true).
+          setNameFormat("AsyncFSOutputFlusher-" + f.toString().replace("%", "%%")).build());
+
     return new AsyncFSOutput() {
 
       private final ByteArrayOutputStream out = new ByteArrayOutputStream();

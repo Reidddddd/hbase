@@ -18,7 +18,6 @@
 package org.apache.hadoop.hbase.regionserver.wal;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.ExceptionHandler;
@@ -36,8 +35,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,6 +53,7 @@ import org.apache.hadoop.hbase.util.ClassSize;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.hbase.util.FSUtils;
 import org.apache.hadoop.hbase.util.HasThread;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.wal.DefaultWALProvider;
 import org.apache.hadoop.hbase.wal.WALFactory;
@@ -155,9 +153,6 @@ public class FSHLog extends AbstractFSWAL<Writer> {
   private final int closeErrorsTolerated;
 
   private final AtomicInteger closeErrorCount = new AtomicInteger();
-
-  private final ExecutorService closeExecutor = Executors.newCachedThreadPool(
-    new ThreadFactoryBuilder().setDaemon(true).setNameFormat("Close-WAL-Writer-%d").build());
 
   // Last time to check low replication on hlog's pipeline
   private volatile long lastTimeCheckLowReplication = EnvironmentEdgeManager.currentTime();
@@ -1189,7 +1184,13 @@ public class FSHLog extends AbstractFSWAL<Writer> {
 
     @Override
     public void onStart() {
+      boolean useVirtual = JVM.isVirtualThreadSupported() &&
+        conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT);
       for (SyncRunner syncRunner: this.syncRunners) {
+        if (useVirtual) {
+          Thread.startVirtualThread(syncRunner);
+          continue;
+        }
         syncRunner.start();
       }
     }

@@ -52,7 +52,7 @@ public class TestLocalAsyncOutput {
     Path f = new Path(TEST_UTIL.getDataTestDir(), "test");
     FileSystem fs = FileSystem.getLocal(TEST_UTIL.getConfiguration());
     AsyncFSOutput out = AsyncFSOutputHelper.createOutput(fs, f, false, true,
-            fs.getDefaultReplication(f), fs.getDefaultBlockSize(f), GROUP);
+            fs.getDefaultReplication(f), fs.getDefaultBlockSize(f), GROUP, false);
     byte[] b = new byte[10];
     ThreadLocalRandom.current().nextBytes(b);
     out.write(b);
