@@ -56,6 +56,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.util.JVM;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.hbase.io.HeapSize;
 import org.apache.hadoop.hbase.io.hfile.BlockCache;
@@ -220,9 +222,7 @@ public class BucketCache implements BlockCache, HeapSize {
       });
 
   /** Statistics thread schedule pool (for heavy debugging, could remove) */
-  private transient final ScheduledExecutorService scheduleThreadPool =
-    Executors.newScheduledThreadPool(1,
-      new ThreadFactoryBuilder().setNameFormat("BucketCacheStatsExecutor").setDaemon(true).build());
+  private transient ScheduledExecutorService scheduleThreadPool;
 
   // Allocate or free space for the block
   private transient BucketAllocator bucketAllocator;
@@ -320,11 +320,19 @@ public class BucketCache implements BlockCache, HeapSize {
       writerThreads[i].setName(threadName + "-BucketCacheWriter-" + i);
       writerThreads[i].setDaemon(true);
     }
-    startWriterThreads();
+    boolean useVirtual = JVM.isVirtualThreadSupported() &&
+      conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT);
+    startWriterThreads(useVirtual);
 
     // Run the statistics thread periodically to print the cache statistics log
     // TODO: Add means of turning this off.  Bit obnoxious running thread just to make a log
     // every five minutes.
+    scheduleThreadPool = useVirtual ?
+      Executors.newScheduledThreadPool(1,
+        Thread.ofVirtual().name("BucketCacheStatsExecutor").factory()):
+      Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().
+        setNameFormat("BucketCacheStatsExecutor").setDaemon(true).build());
+
     this.scheduleThreadPool.scheduleAtFixedRate(new StatisticsThread(this),
         statThreadPeriod, statThreadPeriod, TimeUnit.SECONDS);
     LOG.info("Started bucket cache; ioengine=" + ioEngineName +
@@ -351,8 +359,12 @@ public class BucketCache implements BlockCache, HeapSize {
    * starting the threads.
    */
   @VisibleForTesting
-  protected void startWriterThreads() {
+  protected void startWriterThreads(boolean useVirtual) {
     for (WriterThread thread : writerThreads) {
+      if (useVirtual) {
+        Thread.startVirtualThread(thread);
+        continue;
+      }
       thread.start();
     }
   }

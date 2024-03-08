@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.google.common.base.Objects;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.io.HeapSize;
@@ -163,10 +164,7 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
   private transient final EvictionThread evictionThread;
 
   /** Statistics thread schedule pool (for heavy debugging, could remove) */
-  private transient final ScheduledExecutorService scheduleThreadPool =
-    Executors.newScheduledThreadPool(1,
-      new ThreadFactoryBuilder().setNameFormat("LruBlockCacheStatsExecutor")
-        .setDaemon(true).build());
+  private transient ScheduledExecutorService scheduleThreadPool;
 
   /** Current size of cache */
   private final AtomicLong size;
@@ -246,7 +244,7 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
         DEFAULT_HARD_CAPACITY_LIMIT_FACTOR,
         false,
         DEFAULT_MAX_BLOCK_SIZE
-        );
+    );
   }
 
   public LruBlockCache(long maxSize, long blockSize, boolean evictionThread, Configuration conf) {
@@ -261,7 +259,8 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
         conf.getFloat(LRU_MEMORY_PERCENTAGE_CONFIG_NAME, DEFAULT_MEMORY_FACTOR),
         conf.getFloat(LRU_HARD_CAPACITY_LIMIT_FACTOR_CONFIG_NAME, DEFAULT_HARD_CAPACITY_LIMIT_FACTOR),
         conf.getBoolean(LRU_IN_MEMORY_FORCE_MODE_CONFIG_NAME, DEFAULT_IN_MEMORY_FORCE_MODE),
-        conf.getLong(LRU_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE)
+        conf.getLong(LRU_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE),
+        conf.getBoolean(HConstants.USE_VIRTUAL_THREAD, HConstants.USE_VIRTUAL_THREAD_DEFAULT)
         );
   }
 
@@ -288,11 +287,21 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
       float minFactor, float acceptableFactor, float singleFactor,
       float multiFactor, float memoryFactor, float hardLimitFactor,
       boolean forceInMemory, long maxBlockSize) {
+    this(maxSize, blockSize, evictionThread, mapInitialSize, mapLoadFactor, mapConcurrencyLevel,
+      minFactor, acceptableFactor, singleFactor, multiFactor, memoryFactor, hardLimitFactor,
+      forceInMemory, maxBlockSize, false);
+  }
+
+  public LruBlockCache(long maxSize, long blockSize, boolean evictionThread,
+      int mapInitialSize, float mapLoadFactor, int mapConcurrencyLevel,
+      float minFactor, float acceptableFactor, float singleFactor,
+      float multiFactor, float memoryFactor, float hardLimitFactor,
+      boolean forceInMemory, long maxBlockSize, boolean useVirtual) {
     this.maxBlockSize = maxBlockSize;
     if(singleFactor + multiFactor + memoryFactor != 1 ||
-        singleFactor < 0 || multiFactor < 0 || memoryFactor < 0) {
+      singleFactor < 0 || multiFactor < 0 || memoryFactor < 0) {
       throw new IllegalArgumentException("Single, multi, and memory factors " +
-          " should be non-negative and total 1.0");
+        " should be non-negative and total 1.0");
     }
     if(minFactor >= acceptableFactor) {
       throw new IllegalArgumentException("minFactor must be smaller than acceptableFactor");
@@ -304,7 +313,7 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
     this.blockSize = blockSize;
     this.forceInMemory = forceInMemory;
     map = new ConcurrentHashMap<BlockCacheKey,LruCachedBlock>(mapInitialSize,
-        mapLoadFactor, mapConcurrencyLevel);
+      mapLoadFactor, mapConcurrencyLevel);
     this.minFactor = minFactor;
     this.acceptableFactor = acceptableFactor;
     this.singleFactor = singleFactor;
@@ -320,14 +329,23 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
     this.hardCapacityLimitFactor = hardLimitFactor;
     if(evictionThread) {
       this.evictionThread = new EvictionThread(this);
-      this.evictionThread.start(); // FindBugs SC_START_IN_CTOR
+      if (useVirtual) {
+        Thread.startVirtualThread(this.evictionThread);
+      } else {
+        this.evictionThread.start(); // FindBugs SC_START_IN_CTOR
+      }
     } else {
       this.evictionThread = null;
     }
     // TODO: Add means of turning this off.  Bit obnoxious running thread just to make a log
     // every five minutes.
+    this.scheduleThreadPool = useVirtual ? Executors.newScheduledThreadPool(1,
+      Thread.ofVirtual().name("LruBlockCacheStatsExecutor").factory()) :
+        Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder().setNameFormat("LruBlockCacheStatsExecutor").
+            setDaemon(true).build());
     this.scheduleThreadPool.scheduleAtFixedRate(new StatisticsThread(this),
-        statThreadPeriod, statThreadPeriod, TimeUnit.SECONDS);
+      statThreadPeriod, statThreadPeriod, TimeUnit.SECONDS);
   }
 
   @Override

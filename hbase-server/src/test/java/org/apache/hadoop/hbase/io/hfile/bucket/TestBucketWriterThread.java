@@ -62,7 +62,7 @@ public class TestBucketWriterThread {
     }
 
     @Override
-    protected void startWriterThreads() {
+    protected void startWriterThreads(boolean useVirtual) {
       // intentional noop
     }
   }
