@@ -121,6 +121,7 @@ public class TestOpenedRegionHandler {
     try {
       int testIndex = 0;
       TEST_UTIL.startMiniZKCluster();
+      resetConf = conf;
       final Server server = new MockServer(TEST_UTIL);
       HTableDescriptor htd = new HTableDescriptor(
           TableName.valueOf("testShouldNotCompeleteOpenedRegionSuccessfullyIfVersionMismatches"));

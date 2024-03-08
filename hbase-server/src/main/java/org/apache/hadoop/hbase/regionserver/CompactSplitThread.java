@@ -130,7 +130,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-longCompactions-" + longCompactionThreadCounter.getAndIncrement();
-            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).unstarted(r) : new Thread(r, name);
           }
       });
     this.longCompactions.setRejectedExecutionHandler(new Rejection());
@@ -142,7 +142,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-shortCompactions-" + shortCompactionThreadCounter.getAndIncrement();
-            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).unstarted(r) : new Thread(r, name);
           }
       });
     this.shortCompactions
@@ -154,7 +154,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-splits-" + splitThreadCounter.getAndIncrement();
-            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).unstarted(r) : new Thread(r, name);
           }
       });
     int mergeThreads = conf.getInt(MERGE_THREADS, MERGE_THREADS_DEFAULT);
@@ -163,7 +163,7 @@ public class CompactSplitThread implements CompactionRequestor, PropagatingConfi
           @Override
           public Thread newThread(Runnable r) {
             String name = n + "-merges-" + System.currentTimeMillis();
-            return useVirtual ? Thread.ofVirtual().name(name).start(r) : new Thread(r, name);
+            return useVirtual ? Thread.ofVirtual().name(name).unstarted(r) : new Thread(r, name);
           }
         });
 
